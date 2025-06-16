@@ -1,0 +1,2657 @@
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:04 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:04 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:04 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Erro ao buscar motoristas: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.status_motoristas' doesn't exist
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:05 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:43:05 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:43:05 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Erro ao buscar motoristas: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.status_motoristas' doesn't exist
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:02 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Erro ao buscar motoristas: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.status_motoristas' doesn't exist
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:08 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:08 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Erro ao buscar motoristas: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.status_motoristas' doesn't exist
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:10 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Erro ao buscar motoristas: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.status_motoristas' doesn't exist
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:43 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:43 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:43 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:45 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:45 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:45 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:46 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:46 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:46 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:46 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:46 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:46 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:46 America/Sao_Paulo] Erro ao buscar motoristas: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.status_motoristas' doesn't exist
+[16-Jun-2025 02:44:46 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:46 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:46 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:46 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:46 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:47 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:44:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:44:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Erro ao buscar motoristas: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.status_motoristas' doesn't exist
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Erro no endpoint KPIs: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Erro geral na API: Erro ao buscar KPIs: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:12 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Erro no endpoint Checklists Pendentes: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Erro geral na API: Erro ao buscar checklists pendentes: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Erro no endpoint Infrações: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.infracoes_motoristas' doesn't exist
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Erro geral na API: Erro ao buscar infrações: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.infracoes_motoristas' doesn't exist
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:12 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:12 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:13 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:13 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:13 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Erro ao buscar motoristas: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.status_motoristas' doesn't exist
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:14 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Erro no endpoint KPIs: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Erro geral na API: Erro ao buscar KPIs: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Erro no endpoint Infrações: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.infracoes_motoristas' doesn't exist
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Erro geral na API: Erro ao buscar infrações: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.infracoes_motoristas' doesn't exist
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Erro no endpoint Checklists Pendentes: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Erro geral na API: Erro ao buscar checklists pendentes: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 02:46:14 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 02:46:14 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Erro ao buscar motoristas: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.status_motoristas' doesn't exist
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:46 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Erro no endpoint Checklists Pendentes: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Erro geral na API: Erro ao buscar checklists pendentes: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Erro no endpoint Infrações: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.infracoes_motoristas' doesn't exist
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Erro geral na API: Erro ao buscar infrações: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.infracoes_motoristas' doesn't exist
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Erro no endpoint KPIs: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Erro geral na API: Erro ao buscar KPIs: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:46 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:46 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Erro ao buscar motoristas: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.status_motoristas' doesn't exist
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:47 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Erro no endpoint KPIs: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Erro geral na API: Erro ao buscar KPIs: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Erro no endpoint Checklists Pendentes: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Erro geral na API: Erro ao buscar checklists pendentes: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.checklists' doesn't exist
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Erro no endpoint Infrações: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.infracoes_motoristas' doesn't exist
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Erro geral na API: Erro ao buscar infrações: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'sistema_frotas.infracoes_motoristas' doesn't exist
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:47 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:47 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:49 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:49 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:49 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:49 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:49 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:49 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:49 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:49 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:49 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:49 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:49 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:49 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:50 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:50 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Erro ao buscar veículos: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'v.tipo_id' in 'on clause'
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:52 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:52 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:52 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 441
+[16-Jun-2025 12:22:53 America/Sao_Paulo] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 442
+[16-Jun-2025 12:22:53 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 441
+[16-Jun-2025 12:22:53 America/Sao_Paulo] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 442
+[16-Jun-2025 12:22:53 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 441
+[16-Jun-2025 12:22:53 America/Sao_Paulo] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 442
+[16-Jun-2025 12:22:53 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 441
+[16-Jun-2025 12:22:53 America/Sao_Paulo] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 442
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:53 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:53 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Dados dos abastecimentos (PHP): Array
+(
+    [0] => Array
+        (
+            [id] => 102
+            [empresa_id] => 1
+            [veiculo_id] => 55
+            [motorista_id] => 48
+            [posto] => Posto Caro
+            [data_abastecimento] => 2025-06-15 15:08:02
+            [litros] => 200.00
+            [valor_litro] => 7.00
+            [valor_total] => 1400.00
+            [km_atual] => 3000
+            [tipo_combustivel] => Diesel
+            [forma_pagamento] => Dinheiro
+            [observacoes] => 
+            [comprovante] => 
+            [data_cadastro] => 2025-06-15 15:08:02
+            [rota_id] => 91
+            [status] => aprovado
+            [fonte] => gestor
+            [veiculo_placa] => AIF-440
+            [motorista_nome] => Hugo Rodrigues
+            [cidade_origem_nome] => 
+            [cidade_destino_nome] => 
+        )
+
+    [1] => Array
+        (
+            [id] => 101
+            [empresa_id] => 1
+            [veiculo_id] => 55
+            [motorista_id] => 48
+            [posto] => Posto Teste
+            [data_abastecimento] => 2025-06-15 15:08:02
+            [litros] => 100.00
+            [valor_litro] => 5.50
+            [valor_total] => 550.00
+            [km_atual] => 2000
+            [tipo_combustivel] => Diesel
+            [forma_pagamento] => Cartão
+            [observacoes] => 
+            [comprovante] => 
+            [data_cadastro] => 2025-06-15 15:08:02
+            [rota_id] => 90
+            [status] => aprovado
+            [fonte] => gestor
+            [veiculo_placa] => AIF-440
+            [motorista_nome] => Hugo Rodrigues
+            [cidade_origem_nome] => 
+            [cidade_destino_nome] => 
+        )
+
+    [2] => Array
+        (
+            [id] => 100
+            [empresa_id] => 1
+            [veiculo_id] => 55
+            [motorista_id] => 48
+            [posto] => Posto Caro
+            [data_abastecimento] => 2025-06-14 23:20:18
+            [litros] => 200.00
+            [valor_litro] => 7.00
+            [valor_total] => 1400.00
+            [km_atual] => 3000
+            [tipo_combustivel] => Diesel
+            [forma_pagamento] => Dinheiro
+            [observacoes] => 
+            [comprovante] => 
+            [data_cadastro] => 2025-06-14 23:20:18
+            [rota_id] => 84
+            [status] => aprovado
+            [fonte] => gestor
+            [veiculo_placa] => AIF-440
+            [motorista_nome] => Hugo Rodrigues
+            [cidade_origem_nome] => 
+            [cidade_destino_nome] => 
+        )
+
+    [3] => Array
+        (
+            [id] => 99
+            [empresa_id] => 1
+            [veiculo_id] => 55
+            [motorista_id] => 48
+            [posto] => Posto Teste
+            [data_abastecimento] => 2025-06-14 23:20:18
+            [litros] => 100.00
+            [valor_litro] => 5.50
+            [valor_total] => 550.00
+            [km_atual] => 2000
+            [tipo_combustivel] => Diesel
+            [forma_pagamento] => Cartão
+            [observacoes] => 
+            [comprovante] => 
+            [data_cadastro] => 2025-06-14 23:20:18
+            [rota_id] => 83
+            [status] => aprovado
+            [fonte] => gestor
+            [veiculo_placa] => AIF-440
+            [motorista_nome] => Hugo Rodrigues
+            [cidade_origem_nome] => 
+            [cidade_destino_nome] => 
+        )
+
+    [4] => Array
+        (
+            [id] => 98
+            [empresa_id] => 1
+            [veiculo_id] => 55
+            [motorista_id] => 48
+            [posto] => Posto Caro
+            [data_abastecimento] => 2025-06-14 23:20:05
+            [litros] => 200.00
+            [valor_litro] => 7.00
+            [valor_total] => 1400.00
+            [km_atual] => 3000
+            [tipo_combustivel] => Diesel
+            [forma_pagamento] => Dinheiro
+            [observacoes] => 
+            [comprovante] => 
+            [data_cadastro] => 2025-06-14 23:20:05
+            [rota_id] => 80
+            [status] => aprovado
+            [fonte] => gestor
+            [veiculo_placa] => AIF-440
+            [motorista_nome] => Hugo Rodrigues
+            [cidade_origem_nome] => 
+            [cidade_destino_nome] => 
+        )
+
+)
+
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Dados da rota para abastecimento ID 102: Origem: , Destino: 
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Dados da rota para abastecimento ID 101: Origem: , Destino: 
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Dados da rota para abastecimento ID 100: Origem: , Destino: 
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Dados da rota para abastecimento ID 99: Origem: , Destino: 
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Dados da rota para abastecimento ID 98: Origem: , Destino: 
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Dados dos abastecimentos: Array
+(
+    [0] => Array
+        (
+            [id] => 102
+            [empresa_id] => 1
+            [veiculo_id] => 55
+            [motorista_id] => 48
+            [posto] => Posto Caro
+            [data_abastecimento] => 2025-06-15 15:08:02
+            [litros] => 200.00
+            [valor_litro] => 7.00
+            [valor_total] => 1400.00
+            [km_atual] => 3000
+            [tipo_combustivel] => Diesel
+            [forma_pagamento] => Dinheiro
+            [observacoes] => 
+            [comprovante] => 
+            [data_cadastro] => 2025-06-15 15:08:02
+            [rota_id] => 91
+            [status] => aprovado
+            [fonte] => gestor
+            [veiculo_placa] => AIF-440
+            [motorista_nome] => Hugo Rodrigues
+            [cidade_origem_nome] => 
+            [cidade_destino_nome] => 
+        )
+
+    [1] => Array
+        (
+            [id] => 101
+            [empresa_id] => 1
+            [veiculo_id] => 55
+            [motorista_id] => 48
+            [posto] => Posto Teste
+            [data_abastecimento] => 2025-06-15 15:08:02
+            [litros] => 100.00
+            [valor_litro] => 5.50
+            [valor_total] => 550.00
+            [km_atual] => 2000
+            [tipo_combustivel] => Diesel
+            [forma_pagamento] => Cartão
+            [observacoes] => 
+            [comprovante] => 
+            [data_cadastro] => 2025-06-15 15:08:02
+            [rota_id] => 90
+            [status] => aprovado
+            [fonte] => gestor
+            [veiculo_placa] => AIF-440
+            [motorista_nome] => Hugo Rodrigues
+            [cidade_origem_nome] => 
+            [cidade_destino_nome] => 
+        )
+
+    [2] => Array
+        (
+            [id] => 100
+            [empresa_id] => 1
+            [veiculo_id] => 55
+            [motorista_id] => 48
+            [posto] => Posto Caro
+            [data_abastecimento] => 2025-06-14 23:20:18
+            [litros] => 200.00
+            [valor_litro] => 7.00
+            [valor_total] => 1400.00
+            [km_atual] => 3000
+            [tipo_combustivel] => Diesel
+            [forma_pagamento] => Dinheiro
+            [observacoes] => 
+            [comprovante] => 
+            [data_cadastro] => 2025-06-14 23:20:18
+            [rota_id] => 84
+            [status] => aprovado
+            [fonte] => gestor
+            [veiculo_placa] => AIF-440
+            [motorista_nome] => Hugo Rodrigues
+            [cidade_origem_nome] => 
+            [cidade_destino_nome] => 
+        )
+
+    [3] => Array
+        (
+            [id] => 99
+            [empresa_id] => 1
+            [veiculo_id] => 55
+            [motorista_id] => 48
+            [posto] => Posto Teste
+            [data_abastecimento] => 2025-06-14 23:20:18
+            [litros] => 100.00
+            [valor_litro] => 5.50
+            [valor_total] => 550.00
+            [km_atual] => 2000
+            [tipo_combustivel] => Diesel
+            [forma_pagamento] => Cartão
+            [observacoes] => 
+            [comprovante] => 
+            [data_cadastro] => 2025-06-14 23:20:18
+            [rota_id] => 83
+            [status] => aprovado
+            [fonte] => gestor
+            [veiculo_placa] => AIF-440
+            [motorista_nome] => Hugo Rodrigues
+            [cidade_origem_nome] => 
+            [cidade_destino_nome] => 
+        )
+
+    [4] => Array
+        (
+            [id] => 98
+            [empresa_id] => 1
+            [veiculo_id] => 55
+            [motorista_id] => 48
+            [posto] => Posto Caro
+            [data_abastecimento] => 2025-06-14 23:20:05
+            [litros] => 200.00
+            [valor_litro] => 7.00
+            [valor_total] => 1400.00
+            [km_atual] => 3000
+            [tipo_combustivel] => Diesel
+            [forma_pagamento] => Dinheiro
+            [observacoes] => 
+            [comprovante] => 
+            [data_cadastro] => 2025-06-14 23:20:05
+            [rota_id] => 80
+            [status] => aprovado
+            [fonte] => gestor
+            [veiculo_placa] => AIF-440
+            [motorista_nome] => Hugo Rodrigues
+            [cidade_origem_nome] => 
+            [cidade_destino_nome] => 
+        )
+
+)
+
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Session state in manutencoes.php: Array
+(
+    [loggedin] => 1
+    [id] => 16
+    [usuario_id] => 16
+    [nome] => victor 123
+    [email] => victor@rbxsoft.com
+    [empresa_id] => 1
+    [foto_perfil] => perfil_16_1747893599.png
+    [error] => Erro ao gerar relatório: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'dv.valor_total' in 'field list'
+)
+
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Erro ao buscar KPIs: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'v.quilometragem' in 'field list'
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:54 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:54 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:55 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 441
+[16-Jun-2025 12:22:55 America/Sao_Paulo] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 442
+[16-Jun-2025 12:22:55 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 441
+[16-Jun-2025 12:22:55 America/Sao_Paulo] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 442
+[16-Jun-2025 12:22:55 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 441
+[16-Jun-2025 12:22:55 America/Sao_Paulo] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 442
+[16-Jun-2025 12:22:55 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 441
+[16-Jun-2025 12:22:55 America/Sao_Paulo] PHP Deprecated:  strtotime(): Passing null to parameter #1 ($datetime) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\routes.php on line 442
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:55 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:55 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:55 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:56 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:56 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:56 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:56 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:56 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:56 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:56 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:56 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:56 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:56 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:56 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:56 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:56 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:57 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:57 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:57 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:57 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:57 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:57 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:57 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:57 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:57 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:57 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:57 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:57 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:57 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Iniciando carregamento do painel IA
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Session data: Array
+(
+    [loggedin] => 1
+    [id] => 16
+    [usuario_id] => 16
+    [nome] => victor 123
+    [email] => victor@rbxsoft.com
+    [empresa_id] => 1
+    [foto_perfil] => perfil_16_1747893599.png
+    [error] => Erro ao gerar relatório: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'dv.valor_total' in 'field list'
+)
+
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Conexão com banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:59 America/Sao_Paulo] ID da empresa obtido: 1
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Classes inicializadas com sucesso
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Dados de consumo obtidos: [{"placa":"222-222","modelo":"teste","mes":"2025-06","total_litros":"50.00","total_valor":"145.00","num_abastecimentos":1,"media_litros":"50.000000"},{"placa":"AIF-440","modelo":"Fiorino","mes":"2025-05","total_litros":"750.00","total_valor":"4457.00","num_abastecimentos":3,"media_litros":"250.000000"},{"placa":"AIF-440","modelo":"Fiorino","mes":"2025-06","total_litros":"3150.00","total_valor":"15754.00","num_abastecimentos":13,"media_litros":"131.250000"},{"placa":"ATM-3588","modelo":"Scania 770","mes":"2025-04","total_litros":"50.00","total_valor":"113.00","num_abastecimentos":1,"media_litros":"50.000000"},{"placa":"ATM-3588","modelo":"Scania 770","mes":"2025-05","total_litros":"155.00","total_valor":"470.65","num_abastecimentos":3,"media_litros":"51.666667"}]
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Dados de manutenção obtidos: [{"placa":"AIF-440","modelo":"Fiorino","tipo_manutencao":"Troca de \u00f3leo","num_manutencoes":6,"total_gasto":"4800.00","media_intervalo":"3.0000"}]
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Dados de rotas obtidos: []
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Alertas obtidos: [{"tipo":"manutencao","prioridade":"media","titulo":"Manuten\u00e7\u00e3o Pendente","mensagem":"O ve\u00edculo ATM-3588 (Scania 770) necessita de manuten\u00e7\u00e3o. KM atual: 120.00, Pr\u00f3xima manuten\u00e7\u00e3o: 122.00","veiculo":"ATM-3588","data":"2025-06-16 12:22:59"},{"tipo":"manutencao","prioridade":"media","titulo":"Manuten\u00e7\u00e3o Pendente","mensagem":"O ve\u00edculo AIF-440 (Fiorino) necessita de manuten\u00e7\u00e3o. KM atual: 110.00, Pr\u00f3xima manuten\u00e7\u00e3o: 122.00","veiculo":"AIF-440","data":"2025-06-16 12:22:59"},{"tipo":"manutencao","prioridade":"media","titulo":"Manuten\u00e7\u00e3o Pendente","mensagem":"O ve\u00edculo AIF-440 (Fiorino) necessita de manuten\u00e7\u00e3o. KM atual: 122.00, Tipo: 1231","veiculo":"AIF-440","data":"2025-06-16 12:22:59"},{"tipo":"manutencao","prioridade":"media","titulo":"Manuten\u00e7\u00e3o Pendente","mensagem":"O ve\u00edculo AIF-440 (Fiorino) necessita de manuten\u00e7\u00e3o. KM atual: 2100.00, Tipo: Troca de \u00f3leo","veiculo":"AIF-440","data":"2025-06-16 12:22:59"},{"tipo":"manutencao","prioridade":"media","titulo":"Manuten\u00e7\u00e3o Pendente","mensagem":"O ve\u00edculo AIF-440 (Fiorino) necessita de manuten\u00e7\u00e3o. KM atual: 2100.00, Tipo: Troca de \u00f3leo","veiculo":"AIF-440","data":"2025-06-16 12:22:59"},{"tipo":"manutencao","prioridade":"media","titulo":"Manuten\u00e7\u00e3o Pendente","mensagem":"O ve\u00edculo AIF-440 (Fiorino) necessita de manuten\u00e7\u00e3o. KM atual: 2100.00, Tipo: Troca de \u00f3leo","veiculo":"AIF-440","data":"2025-06-16 12:22:59"},{"tipo":"manutencao","prioridade":"media","titulo":"Manuten\u00e7\u00e3o Pendente","mensagem":"O ve\u00edculo AIF-440 (Fiorino) necessita de manuten\u00e7\u00e3o. KM atual: 2100.00, Tipo: Troca de \u00f3leo","veiculo":"AIF-440","data":"2025-06-16 12:22:59"},{"tipo":"manutencao","prioridade":"media","titulo":"Manuten\u00e7\u00e3o Pendente","mensagem":"O ve\u00edculo AIF-440 (Fiorino) necessita de manuten\u00e7\u00e3o. KM atual: 2100.00, Tipo: Troca de \u00f3leo","veiculo":"AIF-440","data":"2025-06-16 12:22:59"},{"tipo":"manutencao","prioridade":"media","titulo":"Manuten\u00e7\u00e3o Pendente","mensagem":"O ve\u00edculo AIF-440 (Fiorino) necessita de manuten\u00e7\u00e3o. KM atual: 2100.00, Tipo: Troca de \u00f3leo","veiculo":"AIF-440","data":"2025-06-16 12:22:59"}]
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Recomendações obtidas: [{"tipo":"manutencao","prioridade":"media","mensagem":"Agendar manuten\u00e7\u00e3o preventiva para o ve\u00edculo AIF-440","veiculo":"AIF-440","acoes":["Verificar disponibilidade de oficinas","Agendar manuten\u00e7\u00e3o preventiva","Preparar relat\u00f3rio de hist\u00f3rico de manuten\u00e7\u00f5es"]},{"tipo":"manutencao","prioridade":"media","mensagem":"Agendar manuten\u00e7\u00e3o preventiva para o ve\u00edculo ATM-3588","veiculo":"ATM-3588","acoes":["Verificar disponibilidade de oficinas","Agendar manuten\u00e7\u00e3o preventiva","Preparar relat\u00f3rio de hist\u00f3rico de manuten\u00e7\u00f5es"]}]
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Insights obtidos: [{"tipo":"custo","prioridade":"alta","mensagem":"Custos operacionais elevados para o ve\u00edculo AIF-440","veiculo":"AIF-440","modelo":"Fiorino","dados":{"custo_total":"273,777.00","custo_combustivel":"141,477.00","custo_manutencao":"132,300.00","media_frota":"91,568.55","diferenca_percentual":"199.0%"}},{"tipo":"manutencao","prioridade":"media","mensagem":"Padr\u00e3o identificado em manuten\u00e7\u00f5es do tipo Troca de \u00f3leo","dados":{"tipo_manutencao":"Troca de \u00f3leo","total_gasto":"4,800.00","num_manutencoes":6,"media_gasto":"800.00","media_intervalo":"3.0 dias","veiculos_afetados":1}},{"tipo":"custo","prioridade":"baixa","mensagem":"M\u00e9dia de custos operacionais da frota","dados":{"media_custo_total":"91,568.55","media_custo_combustivel":"47,401.88","media_custo_manutencao":"44,166.67","num_veiculos":3}}]
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Previsões de custos obtidas: [{"veiculo":"222-222","modelo":"teste","previsao_combustivel":435,"previsao_manutencao":0,"total_previsto":435},{"veiculo":"AIF-440","modelo":"Fiorino","previsao_combustivel":212215.5,"previsao_manutencao":198450,"total_previsto":410665.5},{"veiculo":"AIF-440","modelo":"Fiorino","previsao_combustivel":212215.5,"previsao_manutencao":198450,"total_previsto":410665.5},{"veiculo":"ATM-3588","modelo":"Scania 770","previsao_combustivel":875.4749999999999,"previsao_manutencao":300,"total_previsto":1175.475},{"veiculo":"ATM-3588","modelo":"Scania 770","previsao_combustivel":875.4749999999999,"previsao_manutencao":300,"total_previsto":1175.475}]
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Análise de eficiência dos motoristas obtida: [{"motorista":"Hugo Rodrigues","veiculo":"AIF-440","num_viagens":7,"media_distancia":"197.647059","media_tempo":"12.7059","consumo_medio":"98.5128204615","num_manutencoes":7,"indice_eficiencia":0.15790365042502721}]
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Erro ao analisar vida útil dos veículos: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'v.ano_fabricacao' in 'field list'
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Análise de vida útil dos veículos obtida: []
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Análise de otimização de rotas obtida: []
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Todos os dados foram obtidos com sucesso
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Session data in atualizar_dados.php: Array
+(
+    [loggedin] => 1
+    [id] => 16
+    [usuario_id] => 16
+    [nome] => victor 123
+    [email] => victor@rbxsoft.com
+    [empresa_id] => 1
+    [foto_perfil] => perfil_16_1747893599.png
+    [error] => Erro ao gerar relatório: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'dv.valor_total' in 'field list'
+)
+
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Session ID: adbm86b9mj67slq74no8jc12i8
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Session name: sistema_frotas_session
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Session status: 2
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Empresa ID from session: 1
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:22:59 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:22:59 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:22:59 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:01 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:01 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:01 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:01 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:01 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:01 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:01 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:23:01 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:01 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:01 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:02 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:23:02 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:02 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:02 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:03 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:03 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:03 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:03 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:03 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:03 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:03 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:23:03 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:03 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:03 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:10 America/Sao_Paulo] === INÍCIO DA EXECUÇÃO DA QUERY KPIs ===
+[16-Jun-2025 12:23:10 America/Sao_Paulo] SQL Query: 
+SELECT 
+    DATE_FORMAT(r.data_rota, '%Y-%m') AS mes_ano,
+    
+    -- Receitas
+    COALESCE(SUM(r.frete), 0) AS total_frete,
+    COALESCE(SUM(r.comissao), 0) AS total_comissao,
+    
+    -- Despesas de viagem
+    COALESCE(SUM(dv.total_despviagem), 0) AS total_despesas_viagem,
+    
+    -- Total de abastecimentos
+    (
+        SELECT COALESCE(SUM(valor_total), 0)
+        FROM abastecimentos
+        WHERE 
+            empresa_id = r.empresa_id
+            AND YEAR(data_abastecimento) = YEAR(r.data_rota)
+            AND MONTH(data_abastecimento) = MONTH(r.data_rota)
+    ) AS total_abastecimentos,
+    
+    -- Despesas fixas pagas no mês
+    (
+        SELECT COALESCE(SUM(df.valor), 0)
+        FROM despesas_fixas df
+        WHERE 
+            df.empresa_id = r.empresa_id
+            AND df.status_pagamento_id = 2
+            AND YEAR(df.data_pagamento) = YEAR(r.data_rota)
+            AND MONTH(df.data_pagamento) = MONTH(r.data_rota)
+    ) AS total_despesas_fixas,
+    
+    -- Parcelas de financiamento pagas no mês
+    (
+        SELECT COALESCE(SUM(pf.valor), 0)
+        FROM parcelas_financiamento pf
+        WHERE 
+            pf.empresa_id = r.empresa_id
+            AND pf.status_id = 2
+            AND YEAR(pf.data_pagamento) = YEAR(r.data_rota)
+            AND MONTH(pf.data_pagamento) = MONTH(r.data_rota)
+    ) AS total_parcelas_financiamento,
+    
+    -- Contas pagas no mês
+    (
+        SELECT COALESCE(SUM(cp.valor), 0)
+        FROM contas_pagar cp
+        WHERE 
+            cp.empresa_id = r.empresa_id
+            AND cp.status_id = 2
+            AND YEAR(cp.data_pagamento) = YEAR(r.data_rota)
+            AND MONTH(cp.data_pagamento) = MONTH(r.data_rota)
+    ) AS total_contas_pagas,
+    
+    -- Manutenções de veículos no mês
+    (
+        SELECT COALESCE(SUM(m.valor), 0)
+        FROM manutencoes m
+        WHERE 
+            m.empresa_id = r.empresa_id
+            AND YEAR(m.data_manutencao) = YEAR(r.data_rota)
+            AND MONTH(m.data_manutencao) = MONTH(r.data_rota)
+    ) AS total_manutencoes,
+    
+    -- Manutenção de pneus no mês
+    (
+        SELECT COALESCE(SUM(pm.custo), 0)
+        FROM pneu_manutencao pm
+        WHERE 
+            pm.empresa_id = r.empresa_id
+            AND YEAR(pm.data_manutencao) = YEAR(r.data_rota)
+            AND MONTH(pm.data_manutencao) = MONTH(r.data_rota)
+    ) AS total_pneu_manutencao,
+    
+    -- Cálculo do lucro
+    (
+        COALESCE(SUM(r.frete), 0)
+        - COALESCE(SUM(r.comissao), 0)
+        - COALESCE(SUM(dv.total_despviagem), 0)
+        - (
+            SELECT COALESCE(SUM(valor_total), 0)
+            FROM abastecimentos
+            WHERE 
+                empresa_id = r.empresa_id
+                AND YEAR(data_abastecimento) = YEAR(r.data_rota)
+                AND MONTH(data_abastecimento) = MONTH(r.data_rota)
+        )
+        - (
+            SELECT COALESCE(SUM(df.valor), 0)
+            FROM despesas_fixas df
+            WHERE 
+                df.empresa_id = r.empresa_id
+                AND df.status_pagamento_id = 2
+                AND YEAR(df.data_pagamento) = YEAR(r.data_rota)
+                AND MONTH(df.data_pagamento) = MONTH(r.data_rota)
+        )
+        - (
+            SELECT COALESCE(SUM(pf.valor), 0)
+            FROM parcelas_financiamento pf
+            WHERE 
+                pf.empresa_id = r.empresa_id
+                AND pf.status_id = 2
+                AND YEAR(pf.data_pagamento) = YEAR(r.data_rota)
+                AND MONTH(pf.data_pagamento) = MONTH(r.data_rota)
+        )
+        - (
+            SELECT COALESCE(SUM(cp.valor), 0)
+            FROM contas_pagar cp
+            WHERE 
+                cp.empresa_id = r.empresa_id
+                AND cp.status_id = 2
+                AND YEAR(cp.data_pagamento) = YEAR(r.data_rota)
+                AND MONTH(cp.data_pagamento) = MONTH(r.data_rota)
+        )
+        - (
+            SELECT COALESCE(SUM(m.valor), 0)
+            FROM manutencoes m
+            WHERE 
+                m.empresa_id = r.empresa_id
+                AND YEAR(m.data_manutencao) = YEAR(r.data_rota)
+                AND MONTH(m.data_manutencao) = MONTH(r.data_rota)
+        )
+        - (
+            SELECT COALESCE(SUM(pm.custo), 0)
+            FROM pneu_manutencao pm
+            WHERE 
+                pm.empresa_id = r.empresa_id
+                AND YEAR(pm.data_manutencao) = YEAR(r.data_rota)
+                AND MONTH(pm.data_manutencao) = MONTH(r.data_rota)
+        )
+    ) AS lucro_liquido
+FROM rotas r
+LEFT JOIN despesas_viagem dv ON dv.rota_id = r.id
+WHERE r.empresa_id = 1
+  AND MONTH(r.data_rota) = 6
+  AND YEAR(r.data_rota) = 2025
+
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Valor de empresa_id: 1
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Statement preparado com sucesso
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Query executada com sucesso
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Resultado KPIs: Array
+(
+    [mes_ano] => 2025-06
+    [total_frete] => 26050.00
+    [total_comissao] => 1005.00
+    [total_despesas_viagem] => 14870.00
+    [total_abastecimentos] => 15899.00
+    [total_despesas_fixas] => 0.00
+    [total_parcelas_financiamento] => 0.00
+    [total_contas_pagas] => 0.00
+    [total_manutencoes] => 4800.00
+    [total_pneu_manutencao] => 0.00
+    [lucro_liquido] => -10524.00
+)
+
+[16-Jun-2025 12:23:10 America/Sao_Paulo] === FIM DA EXECUÇÃO DA QUERY KPIs ===
+[16-Jun-2025 12:23:10 America/Sao_Paulo] === INÍCIO DA EXECUÇÃO DA QUERY Fretes vs Despesas ===
+[16-Jun-2025 12:23:10 America/Sao_Paulo] SQL Query: 
+    WITH dados AS (
+        SELECT 
+            MONTH(data) as mes,
+            YEAR(data) as ano,
+            SUM(CASE WHEN tipo = 'frete' THEN valor ELSE 0 END) as fretes,
+            SUM(CASE WHEN tipo != 'frete' THEN valor ELSE 0 END) as despesas
+        FROM (
+            SELECT data_rota as data, 'frete' as tipo, frete as valor FROM rotas WHERE empresa_id = 1
+            UNION ALL
+            SELECT created_at as data, 'despesa' as tipo, 
+                   (COALESCE(arla, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
+                    COALESCE(estacionamento, 0) + COALESCE(lavagem, 0) + COALESCE(borracharia, 0) + 
+                    COALESCE(eletrica_mecanica, 0) + COALESCE(adiantamento, 0)) as valor 
+            FROM despesas_viagem WHERE empresa_id = 1
+            UNION ALL
+            SELECT vencimento as data, 'despesa' as tipo, valor FROM despesas_fixas 
+            WHERE empresa_id = 1 AND status_pagamento_id = 2
+            UNION ALL
+            SELECT data_vencimento as data, 'despesa' as tipo, valor FROM contas_pagar 
+            WHERE empresa_id = 1
+        ) as dados
+        GROUP BY YEAR(data), MONTH(data)
+        ORDER BY ano, mes
+    )
+    SELECT * FROM dados
+    WHERE (ano < 2025) OR (ano = 2025 AND mes <= 6)
+    ORDER BY ano, mes
+    LIMIT 12
+
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Statement preparado com sucesso
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Query executada com sucesso
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Resultado Fretes vs Despesas: Array
+(
+    [0] => Array
+        (
+            [mes] => 4
+            [ano] => 2025
+            [fretes] => 1000.00
+            [despesas] => 100.00
+        )
+
+    [1] => Array
+        (
+            [mes] => 5
+            [ano] => 2025
+            [fretes] => 9500.00
+            [despesas] => 300.00
+        )
+
+    [2] => Array
+        (
+            [mes] => 6
+            [ano] => 2025
+            [fretes] => 26050.00
+            [despesas] => 74870.00
+        )
+
+)
+
+[16-Jun-2025 12:23:10 America/Sao_Paulo] === FIM DA EXECUÇÃO DA QUERY Fretes vs Despesas ===
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Executando query Distribuição Despesas...
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Resultado Distribuição Despesas: Array
+(
+    [0] => Array
+        (
+            [tipo] => Despesa de Viagem
+            [total] => 75070.00
+        )
+
+    [1] => Array
+        (
+            [tipo] => Abastecimento
+            [total] => 20939.65
+        )
+
+    [2] => Array
+        (
+            [tipo] => Comissão
+            [total] => 2210.00
+        )
+
+    [3] => Array
+        (
+            [tipo] => Despesa Fixa
+            [total] => 100.00
+        )
+
+    [4] => Array
+        (
+            [tipo] => Conta a Pagar
+            [total] => 100.00
+        )
+
+)
+
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Executando query Evolução Lucratividade...
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Resultado Evolução Lucratividade: Array
+(
+    [0] => Array
+        (
+            [mes] => 4
+            [ano] => 2025
+            [lucro] => 900.00
+        )
+
+    [1] => Array
+        (
+            [mes] => 5
+            [ano] => 2025
+            [lucro] => 9200.00
+        )
+
+    [2] => Array
+        (
+            [mes] => 6
+            [ano] => 2025
+            [lucro] => -48820.00
+        )
+
+)
+
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Executando query Composição Frete...
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Resultado Composição Frete: Array
+(
+    [0] => Array
+        (
+            [mes] => 4
+            [ano] => 2025
+            [comissoes] => 100.00
+            [abastecimentos] => 113.00
+            [outras_despesas] => 100.00
+        )
+
+    [1] => Array
+        (
+            [mes] => 5
+            [ano] => 2025
+            [comissoes] => 1105.00
+            [abastecimentos] => 4927.65
+            [outras_despesas] => 300.00
+        )
+
+    [2] => Array
+        (
+            [mes] => 6
+            [ano] => 2025
+            [comissoes] => 1005.00
+            [abastecimentos] => 15899.00
+            [outras_despesas] => 74870.00
+        )
+
+)
+
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Executando query Lucro por Veículo...
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Resultado Lucro por Veículo: Array
+(
+    [0] => Array
+        (
+            [placa] => ATM-3588
+            [faturamento] => 6000.00
+            [despesas] => 748.65
+            [lucro] => 5251.35
+        )
+
+    [1] => Array
+        (
+            [placa] => 222-222
+            [faturamento] => 2000.00
+            [despesas] => 1650.00
+            [lucro] => 350.00
+        )
+
+    [2] => Array
+        (
+            [placa] => AIF-440
+            [faturamento] => 28550.00
+            [despesas] => 93611.00
+            [lucro] => -65061.00
+        )
+
+)
+
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Executando query Lucro por Dia...
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Resultado Lucro por Dia: Array
+(
+    [0] => Array
+        (
+            [data] => 2025-04-21
+            [faturamento] => 1000.00
+            [despesas] => 113.00
+            [lucro] => 887.00
+        )
+
+    [1] => Array
+        (
+            [data] => 2025-04-22
+            [faturamento] => 0.00
+            [despesas] => 100.00
+            [lucro] => -100.00
+        )
+
+    [2] => Array
+        (
+            [data] => 2025-05-20
+            [faturamento] => 4000.00
+            [despesas] => 0.00
+            [lucro] => 4000.00
+        )
+
+    [3] => Array
+        (
+            [data] => 2025-05-21
+            [faturamento] => 2000.00
+            [despesas] => 4813.00
+            [lucro] => -2813.00
+        )
+
+    [4] => Array
+        (
+            [data] => 2025-05-22
+            [faturamento] => 0.00
+            [despesas] => 244.65
+            [lucro] => -244.65
+        )
+
+    [5] => Array
+        (
+            [data] => 2025-05-23
+            [faturamento] => 2000.00
+            [despesas] => 0.00
+            [lucro] => 2000.00
+        )
+
+    [6] => Array
+        (
+            [data] => 2025-05-24
+            [faturamento] => 1500.00
+            [despesas] => 170.00
+            [lucro] => 1330.00
+        )
+
+    [7] => Array
+        (
+            [data] => 2025-06-01
+            [faturamento] => 1000.00
+            [despesas] => 145.00
+            [lucro] => 855.00
+        )
+
+    [8] => Array
+        (
+            [data] => 2025-06-08
+            [faturamento] => 0.00
+            [despesas] => 3754.00
+            [lucro] => -3754.00
+        )
+
+    [9] => Array
+        (
+            [data] => 2025-06-09
+            [faturamento] => 8050.00
+            [despesas] => 0.00
+            [lucro] => 8050.00
+        )
+
+    [10] => Array
+        (
+            [data] => 2025-06-10
+            [faturamento] => 0.00
+            [despesas] => 100.00
+            [lucro] => -100.00
+        )
+
+    [11] => Array
+        (
+            [data] => 2025-06-11
+            [faturamento] => 0.00
+            [despesas] => 1570.00
+            [lucro] => -1570.00
+        )
+
+    [12] => Array
+        (
+            [data] => 2025-06-13
+            [faturamento] => 6000.00
+            [despesas] => 200.00
+            [lucro] => 5800.00
+        )
+
+    [13] => Array
+        (
+            [data] => 2025-06-14
+            [faturamento] => 10000.00
+            [despesas] => 71050.00
+            [lucro] => -61050.00
+        )
+
+    [14] => Array
+        (
+            [data] => 2025-06-15
+            [faturamento] => 1000.00
+            [despesas] => 13950.00
+            [lucro] => -12950.00
+        )
+
+)
+
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:10 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:10 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:10 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:11 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:11 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:11 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:11 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:11 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:11 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:11 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:11 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:11 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:11 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:11 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:11 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:11 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:23:11 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:11 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:11 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:11 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:11 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:11 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:12 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:12 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:12 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:12 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:12 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:12 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:12 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:12 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:12 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:12 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:12 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:12 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:13 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:13 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:13 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:13 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:13 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:13 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:13 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:23:13 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:13 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:13 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:13 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:13 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:13 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:18 America/Sao_Paulo] PHP Warning:  Undefined array key "posto_nome" in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:18 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:18 America/Sao_Paulo] PHP Warning:  Undefined array key "posto_nome" in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:18 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:18 America/Sao_Paulo] PHP Warning:  Undefined array key "posto_nome" in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:18 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:18 America/Sao_Paulo] PHP Warning:  Undefined array key "posto_nome" in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:18 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:18 America/Sao_Paulo] PHP Warning:  Undefined array key "posto_nome" in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:18 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:18 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:18 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:18 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:20 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:20 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:20 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Session state in manutencoes.php: Array
+(
+    [loggedin] => 1
+    [id] => 16
+    [usuario_id] => 16
+    [nome] => victor 123
+    [email] => victor@rbxsoft.com
+    [empresa_id] => 1
+    [foto_perfil] => perfil_16_1747893599.png
+    [error] => Erro ao gerar relatório: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'dv.valor_total' in 'field list'
+)
+
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Erro ao buscar KPIs: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'v.quilometragem' in 'field list'
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:23 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:23 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:23 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:25 America/Sao_Paulo] PHP Warning:  Undefined array key "posto_nome" in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:25 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:25 America/Sao_Paulo] PHP Warning:  Undefined array key "posto_nome" in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:25 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:25 America/Sao_Paulo] PHP Warning:  Undefined array key "posto_nome" in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:25 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:25 America/Sao_Paulo] PHP Warning:  Undefined array key "posto_nome" in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:25 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:25 America/Sao_Paulo] PHP Warning:  Undefined array key "posto_nome" in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:25 America/Sao_Paulo] PHP Deprecated:  htmlspecialchars(): Passing null to parameter #1 ($string) of type string is deprecated in C:\xampp\htdocs\sistema-frotas\pages\abastecimentos_motoristas.php on line 266
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:25 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:25 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:25 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:23:26 America/Sao_Paulo] PHP Notice:  session_start(): Ignoring session_start() because a session is already active in C:\xampp\htdocs\sistema-frotas\notificacoes\notificacoes.php on line 4
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:23:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:23:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:28:26 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:28:26 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:28:26 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:28:26 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:28:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:28:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso

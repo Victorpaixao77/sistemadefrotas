@@ -1,0 +1,115 @@
+/* Theme styles for Fleet Management System */
+
+/* Light Theme Variables */
+.light-theme {
+    --bg-primary: #f3f4f6;
+    --bg-secondary: #ffffff;
+    --bg-tertiary: #e5e7eb;
+    --bg-sidebar: #1e40af;
+    --text-primary: #1f2937;
+    --text-secondary: #4b5563;
+    --text-muted: #6b7280;
+    --accent-primary: #3b82f6;
+    --accent-secondary: #2563eb;
+    --accent-success: #10b981;
+    --accent-warning: #f59e0b;
+    --accent-danger: #ef4444;
+    --border-color: #e5e7eb;
+    --card-bg: #ffffff;
+    --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Light Theme Sidebar Overrides */
+.light-theme .sidebar {
+    background-color: var(--bg-sidebar);
+    color: white;
+}
+
+.light-theme .sidebar-link {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.light-theme .sidebar-link:hover,
+.light-theme .sidebar-link.active {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.light-theme .sidebar-dropdown a {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* Theme Transition Effects */
+body {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.theme-transition * {
+    transition: background-color 0.3s ease, 
+                color 0.3s ease, 
+                border-color 0.3s ease, 
+                box-shadow 0.3s ease !important;
+}
+
+/* Theme Toggle Button Styles */
+.theme-toggle {
+    position: relative;
+    width: 50px;
+    height: 26px;
+    border-radius: 13px;
+    background-color: var(--bg-tertiary);
+    cursor: pointer;
+    overflow: hidden;
+    z-index: 1000;
+}
+
+.theme-toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: var(--accent-primary);
+    transition: transform 0.3s ease;
+    z-index: 1001;
+}
+
+.light-theme .theme-toggle-thumb {
+    transform: translateX(24px);
+}
+
+.theme-toggle-icon {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    z-index: 1002;
+}
+
+.theme-toggle-icon.sun {
+    right: 7px;
+}
+
+.theme-toggle-icon.moon {
+    left: 7px;
+}
+
+/* Hover effect */
+.theme-toggle:hover {
+    opacity: 0.9;
+}
+
+.theme-toggle:active .theme-toggle-thumb {
+    transform: scale(0.95);
+}
+
+.light-theme .theme-toggle:active .theme-toggle-thumb {
+    transform: translateX(24px) scale(0.95);
+}

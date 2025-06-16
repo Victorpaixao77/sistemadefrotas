@@ -1,0 +1,106 @@
+/* Responsive Styles for Fleet Management System */
+
+/* Tablets and Medium-sized screens (< 992px) */
+@media (max-width: 991px) {
+    /* Dashboard Grid */
+    .dashboard-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    /* Analytics Grid */
+    .analytics-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Mobile Devices (< 768px) */
+@media (max-width: 767px) {
+    /* Layout Structure */
+    .main-content {
+        margin-left: 0 !important;
+    }
+    
+    .sidebar {
+        transform: translateX(-100%);
+        width: 240px !important;
+    }
+    
+    .sidebar.active {
+        transform: translateX(0);
+    }
+    
+    .sidebar-overlay.active {
+        display: block;
+    }
+    
+    /* Mobile Menu Toggle */
+    .mobile-menu-toggle {
+        display: block;
+    }
+    
+    /* Header Controls */
+    .user-info {
+        display: none;
+    }
+    
+    .header-left {
+        display: flex;
+        align-items: center;
+    }
+    
+    /* Dashboard Grid */
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    /* Dashboard Header */
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+    
+    .dashboard-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    /* Table Styles */
+    .data-table th, 
+    .data-table td {
+        padding: 12px 10px;
+        font-size: 0.875rem;
+    }
+    
+    .data-table th:not(:first-child):not(:last-child),
+    .data-table td:not(:first-child):not(:last-child) {
+        display: none;
+    }
+    
+    /* Form Styles */
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Small Mobile Devices (< 576px) */
+@media (max-width: 575px) {
+    /* Gutter adjustment */
+    .dashboard-content, 
+    .page-content {
+        padding: 16px;
+    }
+    
+    /* Table Styles */
+    .data-table th, 
+    .data-table td {
+        padding: 10px 8px;
+        font-size: 0.8125rem;
+    }
+    
+    /* Modal Styles */
+    .modal-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+}

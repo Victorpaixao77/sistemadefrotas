@@ -1,0 +1,238 @@
+[09-Jun-2025 12:12:24 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:12:24 Europe/Berlin] Session data: 
+[09-Jun-2025 12:12:24 Europe/Berlin] No motorista_id in session. Redirecting to login.
+[09-Jun-2025 12:12:32 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:12:32 Europe/Berlin] Session data: 
+[09-Jun-2025 12:12:32 Europe/Berlin] Processing request for motorista_id: 5, empresa_id: 1
+[09-Jun-2025 12:12:32 Europe/Berlin] Database connection established successfully
+[09-Jun-2025 12:12:32 Europe/Berlin] Vehicles found: 3
+[09-Jun-2025 12:12:32 Europe/Berlin] States found: 27
+[09-Jun-2025 12:16:36 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:16:36 Europe/Berlin] Session data: 
+[09-Jun-2025 12:16:36 Europe/Berlin] Processing request for motorista_id: 5, empresa_id: 1
+[09-Jun-2025 12:16:36 Europe/Berlin] Erro de conexão com o banco de dados: SQLSTATE[HY000] [1045] Access denied for user 'root'@'localhost' (using password: NO)
+[09-Jun-2025 12:16:36 Europe/Berlin] General error: Erro ao conectar com o banco de dados. Por favor, tente novamente mais tarde.
+[09-Jun-2025 12:18:21 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:18:21 Europe/Berlin] Session data: 
+[09-Jun-2025 12:18:21 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 7
+[09-Jun-2025 12:18:21 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 8
+[09-Jun-2025 12:18:21 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 9
+[09-Jun-2025 12:18:21 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 10
+[09-Jun-2025 12:18:21 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 11
+[09-Jun-2025 12:18:21 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 12
+[09-Jun-2025 12:18:21 Europe/Berlin] PHP Warning:  session_name(): Session name cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 15
+[09-Jun-2025 12:18:21 Europe/Berlin] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 18
+[09-Jun-2025 12:18:24 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:18:24 Europe/Berlin] Session data: 
+[09-Jun-2025 12:18:24 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 7
+[09-Jun-2025 12:18:24 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 8
+[09-Jun-2025 12:18:24 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 9
+[09-Jun-2025 12:18:24 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 10
+[09-Jun-2025 12:18:24 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 11
+[09-Jun-2025 12:18:24 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 12
+[09-Jun-2025 12:18:24 Europe/Berlin] PHP Warning:  session_name(): Session name cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 15
+[09-Jun-2025 12:18:24 Europe/Berlin] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 18
+[09-Jun-2025 12:19:44 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:19:44 Europe/Berlin] Session data: 
+[09-Jun-2025 12:19:44 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 7
+[09-Jun-2025 12:19:44 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 8
+[09-Jun-2025 12:19:44 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 9
+[09-Jun-2025 12:19:44 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 10
+[09-Jun-2025 12:19:44 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 11
+[09-Jun-2025 12:19:44 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 12
+[09-Jun-2025 12:19:44 Europe/Berlin] PHP Warning:  session_name(): Session name cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 15
+[09-Jun-2025 12:19:44 Europe/Berlin] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 18
+[09-Jun-2025 12:19:53 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:19:53 Europe/Berlin] Session data: 
+[09-Jun-2025 12:19:53 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 7
+[09-Jun-2025 12:19:53 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 8
+[09-Jun-2025 12:19:53 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 9
+[09-Jun-2025 12:19:53 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 10
+[09-Jun-2025 12:19:53 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 11
+[09-Jun-2025 12:19:53 Europe/Berlin] PHP Warning:  ini_set(): Session ini settings cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 12
+[09-Jun-2025 12:19:53 Europe/Berlin] PHP Warning:  session_name(): Session name cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 15
+[09-Jun-2025 12:19:53 Europe/Berlin] PHP Warning:  session_set_cookie_params(): Session cookie parameters cannot be changed when a session is active in C:\xampp\htdocs\sistema-frotas\includes\config.php on line 18
+[09-Jun-2025 12:21:51 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:21:51 Europe/Berlin] Session data: 
+[09-Jun-2025 12:37:45 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:37:45 Europe/Berlin] Session data: 
+[09-Jun-2025 12:38:10 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:38:10 Europe/Berlin] Session data: 
+[09-Jun-2025 12:38:11 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:38:11 Europe/Berlin] Session data: 
+[09-Jun-2025 12:38:20 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:38:20 Europe/Berlin] Session data: 
+[09-Jun-2025 12:39:39 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:39:39 Europe/Berlin] Session data: 
+[09-Jun-2025 12:39:41 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:39:41 Europe/Berlin] Session data: 
+[09-Jun-2025 12:40:50 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:40:50 Europe/Berlin] Session data: 
+[09-Jun-2025 12:40:56 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:40:56 Europe/Berlin] Session data: 
+[09-Jun-2025 12:42:40 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:42:40 Europe/Berlin] Session data: 
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Dados da sessão: Array
+(
+    [motorista_id] => 5
+    [motorista_nome] => victor
+    [empresa_id] => 1
+    [last_activity] => 1749463951
+)
+
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Dados da sessão: Array
+(
+    [motorista_id] => 5
+    [motorista_nome] => victor
+    [empresa_id] => 1
+    [last_activity] => 1749463951
+)
+
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Processando requisição para motorista_id: 5, empresa_id: 1
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[09-Jun-2025 07:42:40 America/Sao_Paulo] DB_SERVER: localhost:3307
+[09-Jun-2025 07:42:40 America/Sao_Paulo] DB_NAME: sistema_frotas
+[09-Jun-2025 07:42:40 America/Sao_Paulo] DB_USERNAME: root
+[09-Jun-2025 07:42:40 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Conexão com banco de dados estabelecida com sucesso
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Executando consulta: SELECT v.* FROM veiculos v WHERE v.empresa_id = :empresa_id
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Parâmetros: Array
+(
+    [:empresa_id] => 1
+)
+
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Resultados encontrados: 3
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Veículos encontrados: 3
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Executando consulta: SELECT * FROM estados ORDER BY nome
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Parâmetros: Array
+(
+)
+
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Resultados encontrados: 27
+[09-Jun-2025 07:42:40 America/Sao_Paulo] Estados encontrados: 27
+[09-Jun-2025 12:42:42 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:42:42 Europe/Berlin] Session data: 
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Dados da sessão: Array
+(
+    [motorista_id] => 5
+    [motorista_nome] => victor
+    [empresa_id] => 1
+    [last_activity] => 1749463951
+)
+
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Dados da sessão: Array
+(
+    [motorista_id] => 5
+    [motorista_nome] => victor
+    [empresa_id] => 1
+    [last_activity] => 1749463951
+)
+
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Processando requisição para motorista_id: 5, empresa_id: 1
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[09-Jun-2025 07:42:42 America/Sao_Paulo] DB_SERVER: localhost:3307
+[09-Jun-2025 07:42:42 America/Sao_Paulo] DB_NAME: sistema_frotas
+[09-Jun-2025 07:42:42 America/Sao_Paulo] DB_USERNAME: root
+[09-Jun-2025 07:42:42 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Conexão com banco de dados estabelecida com sucesso
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Executando consulta: SELECT v.* FROM veiculos v WHERE v.empresa_id = :empresa_id
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Parâmetros: Array
+(
+    [:empresa_id] => 1
+)
+
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Resultados encontrados: 3
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Veículos encontrados: 3
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Executando consulta: SELECT * FROM estados ORDER BY nome
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Parâmetros: Array
+(
+)
+
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Resultados encontrados: 27
+[09-Jun-2025 07:42:42 America/Sao_Paulo] Estados encontrados: 27
+[09-Jun-2025 12:43:21 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:43:21 Europe/Berlin] Session data: 
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Dados da sessão: Array
+(
+    [motorista_id] => 5
+    [motorista_nome] => victor
+    [empresa_id] => 1
+    [last_activity] => 1749463951
+)
+
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Dados da sessão: Array
+(
+    [motorista_id] => 5
+    [motorista_nome] => victor
+    [empresa_id] => 1
+    [last_activity] => 1749463951
+)
+
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Processando requisição para motorista_id: 5, empresa_id: 1
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[09-Jun-2025 07:43:21 America/Sao_Paulo] DB_SERVER: localhost:3307
+[09-Jun-2025 07:43:21 America/Sao_Paulo] DB_NAME: sistema_frotas
+[09-Jun-2025 07:43:21 America/Sao_Paulo] DB_USERNAME: root
+[09-Jun-2025 07:43:21 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Conexão com banco de dados estabelecida com sucesso
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Executando consulta: SELECT v.* FROM veiculos v WHERE v.empresa_id = :empresa_id
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Parâmetros: Array
+(
+    [:empresa_id] => 1
+)
+
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Resultados encontrados: 3
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Veículos encontrados: 3
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Executando consulta: SELECT * FROM estados ORDER BY nome
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Parâmetros: Array
+(
+)
+
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Resultados encontrados: 27
+[09-Jun-2025 07:43:21 America/Sao_Paulo] Estados encontrados: 27
+[09-Jun-2025 12:43:36 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:43:36 Europe/Berlin] Session data: 
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Dados da sessão: Array
+(
+    [motorista_id] => 5
+    [motorista_nome] => victor
+    [empresa_id] => 1
+    [last_activity] => 1749463951
+)
+
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Dados da sessão: Array
+(
+    [motorista_id] => 5
+    [motorista_nome] => victor
+    [empresa_id] => 1
+    [last_activity] => 1749463951
+)
+
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Processando requisição para motorista_id: 5, empresa_id: 1
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[09-Jun-2025 07:43:36 America/Sao_Paulo] DB_SERVER: localhost:3307
+[09-Jun-2025 07:43:36 America/Sao_Paulo] DB_NAME: sistema_frotas
+[09-Jun-2025 07:43:36 America/Sao_Paulo] DB_USERNAME: root
+[09-Jun-2025 07:43:36 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Conexão com banco de dados estabelecida com sucesso
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Executando consulta: SELECT v.* FROM veiculos v WHERE v.empresa_id = :empresa_id
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Parâmetros: Array
+(
+    [:empresa_id] => 1
+)
+
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Resultados encontrados: 3
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Veículos encontrados: 3
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Executando consulta: SELECT * FROM estados ORDER BY nome
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Parâmetros: Array
+(
+)
+
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Resultados encontrados: 27
+[09-Jun-2025 07:43:36 America/Sao_Paulo] Estados encontrados: 27
+[09-Jun-2025 12:45:37 Europe/Berlin] PHP Warning:  Undefined global variable $_SESSION in C:\xampp\htdocs\sistema-frotas\pages_motorista\rotas.php on line 11
+[09-Jun-2025 12:45:37 Europe/Berlin] Session data: 

@@ -1,0 +1,51 @@
+.form-group input[type="file"] {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 100%;
+    background-color: #fff;
+}
+
+.form-group .form-text {
+    font-size: 0.875rem;
+    color: #666;
+    margin-top: 4px;
+}
+
+.current-file {
+    margin-top: 8px;
+    padding: 8px;
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.current-file i {
+    color: #666;
+}
+
+.current-file a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+.current-file a:hover {
+    text-decoration: underline;
+}
+
+.btn-icon.view-comprovante-btn {
+    background-color: #17a2b8;
+    color: #fff;
+    margin: 0 4px;
+}
+
+.btn-icon.view-comprovante-btn:hover {
+    background-color: #138496;
+}
+
+.btn-icon.view-comprovante-btn i {
+    font-size: 14px;
+} 
