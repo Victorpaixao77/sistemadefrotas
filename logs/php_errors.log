@@ -2655,3 +2655,27 @@ WHERE r.empresa_id = 1
 [16-Jun-2025 12:28:26 America/Sao_Paulo] DB_USERNAME: root
 [16-Jun-2025 12:28:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
 [16-Jun-2025 12:28:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:33:26 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:33:26 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:33:26 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:33:26 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:33:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:33:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:38:26 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:38:26 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:38:26 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:38:26 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:38:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:38:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:43:26 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:43:26 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:43:26 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:43:26 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:43:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:43:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
+[16-Jun-2025 12:48:26 America/Sao_Paulo] Iniciando conexão com o banco de dados
+[16-Jun-2025 12:48:26 America/Sao_Paulo] DB_SERVER: localhost:3307
+[16-Jun-2025 12:48:26 America/Sao_Paulo] DB_NAME: sistema_frotas
+[16-Jun-2025 12:48:26 America/Sao_Paulo] DB_USERNAME: root
+[16-Jun-2025 12:48:26 America/Sao_Paulo] DSN: mysql:host=localhost:3307;dbname=sistema_frotas;charset=utf8
+[16-Jun-2025 12:48:26 America/Sao_Paulo] Conexão com o banco de dados estabelecida com sucesso
