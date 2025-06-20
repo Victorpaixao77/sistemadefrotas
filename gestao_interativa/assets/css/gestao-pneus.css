@@ -1,0 +1,329 @@
+/* Estilos gerais */
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+    --success-color: #2ecc71;
+    --warning-color: #f1c40f;
+    --danger-color: #e74c3c;
+    --light-gray: #ecf0f1;
+    --dark-gray: #7f8c8d;
+    --white: #ffffff;
+    --shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Layout */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.dashboard {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 20px;
+    min-height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    background: var(--primary-color);
+    color: var(--white);
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.sidebar-header {
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 20px;
+}
+
+.sidebar-menu {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sidebar-menu li {
+    margin-bottom: 10px;
+}
+
+.sidebar-menu a {
+    color: var(--white);
+    text-decoration: none;
+    display: block;
+    padding: 10px;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.sidebar-menu a:hover {
+    background-color: rgba(255,255,255,0.1);
+}
+
+/* Main content */
+.main-content {
+    background: var(--white);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+}
+
+/* Cards */
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.card {
+    background: var(--white);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 20px;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.card-title {
+    font-size: 1.1em;
+    color: var(--primary-color);
+    margin: 0;
+}
+
+.card-value {
+    font-size: 2em;
+    font-weight: bold;
+    color: var(--secondary-color);
+    margin: 10px 0;
+}
+
+/* Veículo Componente */
+.composicao-veiculo {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.cavalo, .carreta {
+    position: relative;
+    padding: 20px;
+    background: var(--light-gray);
+    border-radius: 8px;
+}
+
+.veiculo {
+    position: relative;
+    height: 200px;
+    background: var(--white);
+    border: 2px solid var(--primary-color);
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.veiculo-centralizado {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.linha-central {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--primary-color);
+}
+
+.eixos-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    min-height: 100px;
+}
+
+.eixo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: var(--light-gray);
+    border-radius: 4px;
+    cursor: move;
+}
+
+.linha-eixo {
+    flex: 1;
+    height: 2px;
+    background: var(--primary-color);
+}
+
+.pneu {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--dark-gray);
+    position: relative;
+}
+
+.pneu.bom { background: var(--success-color); }
+.pneu.regular { background: var(--warning-color); }
+.pneu.ruim { background: var(--danger-color); }
+.pneu.alerta { border: 2px solid var(--danger-color); }
+.pneu.rodizio { border: 2px solid var(--warning-color); }
+
+.tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary-color);
+    color: var(--white);
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s;
+}
+
+.pneu:hover .tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Drop areas */
+.drop-area {
+    border: 2px dashed var(--dark-gray);
+    border-radius: 4px;
+    padding: 20px;
+    min-height: 100px;
+    transition: all 0.3s;
+}
+
+.drop-area.over {
+    border-color: var(--secondary-color);
+    background: rgba(52, 152, 219, 0.1);
+}
+
+/* Buttons */
+.btn-salvar-eixos,
+.btn-undo-eixos,
+.btn-reset-eixos {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+
+.btn-salvar-eixos {
+    background: var(--success-color);
+    color: var(--white);
+}
+
+.btn-undo-eixos {
+    background: var(--warning-color);
+    color: var(--white);
+}
+
+.btn-reset-eixos {
+    background: var(--danger-color);
+    color: var(--white);
+}
+
+.btn-salvar-eixos:hover,
+.btn-undo-eixos:hover,
+.btn-reset-eixos:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+/* Legenda */
+.legenda {
+    display: none;
+    margin-top: 20px;
+    padding: 15px;
+    background: var(--light-gray);
+    border-radius: 4px;
+}
+
+.legenda.ativa {
+    display: block;
+}
+
+.legenda-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.legenda-cor {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+}
+
+/* Tabela de histórico */
+.historico-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.historico-table th,
+.historico-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--light-gray);
+}
+
+.historico-table th {
+    background: var(--primary-color);
+    color: var(--white);
+}
+
+.historico-table tr:hover {
+    background: var(--light-gray);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .dashboard {
+        grid-template-columns: 1fr;
+    }
+    
+    .sidebar {
+        display: none;
+    }
+    
+    .cards-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .composicao-veiculo {
+        flex-direction: column;
+    }
+    
+    .veiculo {
+        height: 150px;
+    }
+    
+    .pneu {
+        width: 30px;
+        height: 30px;
+    }
+} 

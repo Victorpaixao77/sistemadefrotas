@@ -1,0 +1,73 @@
+{
+    "55": {
+        "eixosCaminhao": [
+            {
+                "id": 1,
+                "pneus": 2
+            },
+            {
+                "id": 3,
+                "pneus": 4
+            },
+            {
+                "id": 4,
+                "pneus": 4
+            }
+        ],
+        "eixosCarreta": [
+            {
+                "id": 5,
+                "pneus": 4
+            },
+            {
+                "id": 6,
+                "pneus": 4
+            },
+            {
+                "id": 9,
+                "pneus": 4
+            }
+        ],
+        "idEixo": 10,
+        "pneusFlexAlocados": {
+            "cavalo-0-1": {
+                "id": 12,
+                "numero_serie": "123",
+                "marca": "pneumar",
+                "modelo": "teste",
+                "medida": "600",
+                "sulco_inicial": "22.0",
+                "dot": "123122",
+                "km_instalacao": "400.00",
+                "data_instalacao": "07\/06\/2025",
+                "vida_util_km": 600,
+                "numero_recapagens": 1,
+                "data_ultima_recapagem": "01\/06\/2025",
+                "lote": "123123",
+                "data_entrada": "01\/06\/2025",
+                "observacoes": "teste",
+                "status_nome": "reserva",
+                "status": "reserva"
+            },
+            "cavalo-0-0": {
+                "id": 10,
+                "numero_serie": "123123",
+                "marca": "pneumar",
+                "modelo": "teste",
+                "medida": "600",
+                "sulco_inicial": "21.0",
+                "dot": "123123",
+                "km_instalacao": "140.00",
+                "data_instalacao": "07\/06\/2025",
+                "vida_util_km": 500,
+                "numero_recapagens": 2,
+                "data_ultima_recapagem": "28\/05\/2025",
+                "lote": "1123",
+                "data_entrada": "28\/05\/2025",
+                "observacoes": "teste",
+                "status_nome": "reserva",
+                "status": "reserva"
+            }
+        }
+    }
+}

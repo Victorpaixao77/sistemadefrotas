@@ -1,33 +1,11 @@
 <?php
-require_once '../includes/config.php';
-require_once '../includes/functions.php';
-
-// Configure session before starting it
-configure_session();
-
-// Initialize the session
-session_start();
-
-// Check if user is logged in
-require_authentication();
-
-// Get empresa_id from session
-$empresa_id = $_SESSION['empresa_id'];
-
-// Set content type to JSON
 header('Content-Type: application/json');
 
-// Enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('log_errors', 1);
-ini_set('error_log', __DIR__ . '/../logs/php-error.log');
-
 try {
-    error_log("Iniciando busca de pneus disponíveis para empresa_id: " . $empresa_id);
+    $empresa_id = isset($_GET['empresa_id']) ? intval($_GET['empresa_id']) : 1;
     
-    $conn = getConnection();
-    error_log("Conexão com o banco de dados estabelecida");
+    $pdo = new PDO("mysql:host=localhost;port=3307;dbname=sistema_frotas", "root", "");
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
     // Buscar pneus disponíveis (não alocados)
     $sql = "SELECT 
@@ -57,7 +35,7 @@ try {
             END as status
             FROM pneus p
             LEFT JOIN status_pneus sp ON sp.id = p.status_id
-            WHERE p.empresa_id = :empresa_id
+            WHERE p.empresa_id = ?
             AND p.id NOT IN (
                 SELECT pneu_id 
                 FROM instalacoes_pneus 
@@ -66,14 +44,10 @@ try {
             AND p.status_id IN (2, 5) -- Apenas pneus em bom estado ou reserva
             ORDER BY p.numero_serie";
     
-    error_log("SQL: " . $sql);
-    
-    $stmt = $conn->prepare($sql);
-    $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-    $stmt->execute();
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$empresa_id]);
     
     $pneus = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    error_log("Pneus encontrados: " . count($pneus));
     
     // Formatar dados para exibição
     foreach ($pneus as &$pneu) {
@@ -89,18 +63,15 @@ try {
         }
     }
     
-    error_log("Dados formatados e prontos para envio");
-    
     echo json_encode([
         'success' => true,
         'pneus' => $pneus
     ]);
     
 } catch (Exception $e) {
-    error_log("Erro na API de pneus disponíveis: " . $e->getMessage());
-    error_log("Stack trace: " . $e->getTraceAsString());
     echo json_encode([
         'success' => false,
         'error' => $e->getMessage()
     ]);
-} 
+}
+?> 

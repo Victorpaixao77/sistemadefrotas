@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Estado Alerta</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .legend {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+        }
+        .legend-color.available {
+            background: #007bff;
+        }
+        .legend-color.occupied {
+            background: #28a745;
+        }
+        .legend-color.alert {
+            background: #ffd700;
+        }
+        .legend-color.maintenance {
+            background: #ffc107;
+        }
+        .legend-color.critical {
+            background: #dc3545;
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste - Estado "Alerta"</h1>
+        
+        <h2>Legenda Atual:</h2>
+        <div class="legend" id="legendaTeste">
+            <div class="legend-item">
+                <div class="legend-color available"></div>
+                <span>Disponível</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color occupied"></div>
+                <span>Em Uso</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color maintenance"></div>
+                <span>Manutenção</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color critical"></div>
+                <span>Crítico</span>
+            </div>
+        </div>
+        
+        <button class="btn" onclick="adicionarAlerta()">➕ Adicionar "Alerta"</button>
+        <button class="btn" onclick="removerAlerta()">➖ Remover "Alerta"</button>
+        
+        <h2>Resultado:</h2>
+        <div id="resultado"></div>
+        
+        <h2>Código para copiar:</h2>
+        <pre id="codigo" style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto;"></pre>
+    </div>
+
+    <script>
+        function adicionarAlerta() {
+            const legenda = document.getElementById('legendaTeste');
+            
+            // Verificar se já tem "Alerta"
+            if (!legenda.innerHTML.includes('Alerta')) {
+                // Adicionar "Alerta" após "Em Uso"
+                let html = legenda.innerHTML;
+                
+                // Substituir "Em Uso" por "Em Uso" + "Alerta"
+                html = html.replace(
+                    '<div class="legend-item">\n                <div class="legend-color occupied"></div>\n                <span>Em Uso</span>\n            </div>',
+                    '<div class="legend-item">\n                <div class="legend-color occupied"></div>\n                <span>Em Uso</span>\n            </div>\n            <div class="legend-item">\n                <div class="legend-color alert"></div>\n                <span>Alerta</span>\n            </div>'
+                );
+                
+                legenda.innerHTML = html;
+                
+                document.getElementById('resultado').innerHTML = '<p style="color: green;">✅ "Alerta" adicionado com sucesso!</p>';
+                atualizarCodigo();
+            } else {
+                document.getElementById('resultado').innerHTML = '<p style="color: orange;">⚠️ "Alerta" já existe na legenda!</p>';
+            }
+        }
+        
+        function removerAlerta() {
+            const legenda = document.getElementById('legendaTeste');
+            
+            // Verificar se tem "Alerta"
+            if (legenda.innerHTML.includes('Alerta')) {
+                // Remover "Alerta"
+                let html = legenda.innerHTML;
+                
+                // Substituir "Em Uso" + "Alerta" por apenas "Em Uso"
+                html = html.replace(
+                    '<div class="legend-item">\n                <div class="legend-color occupied"></div>\n                <span>Em Uso</span>\n            </div>\n            <div class="legend-item">\n                <div class="legend-color alert"></div>\n                <span>Alerta</span>\n            </div>',
+                    '<div class="legend-item">\n                <div class="legend-color occupied"></div>\n                <span>Em Uso</span>\n            </div>'
+                );
+                
+                legenda.innerHTML = html;
+                
+                document.getElementById('resultado').innerHTML = '<p style="color: red;">❌ "Alerta" removido!</p>';
+                atualizarCodigo();
+            } else {
+                document.getElementById('resultado').innerHTML = '<p style="color: orange;">⚠️ "Alerta" não existe na legenda!</p>';
+            }
+        }
+        
+        function atualizarCodigo() {
+            const legenda = document.getElementById('legendaTeste');
+            const codigo = document.getElementById('codigo');
+            
+            codigo.textContent = `// Código para adicionar "Alerta" na legenda
+function adicionarAlerta() {
+    const legendas = document.querySelectorAll('.legend');
+    
+    legendas.forEach(legenda => {
+        if (!legenda.innerHTML.includes('Alerta')) {
+            let html = legenda.innerHTML;
+            
+            html = html.replace(
+                '<div class="legend-item">\\n                    <div class="legend-color occupied"></div>\\n                    <span>Em Uso</span>\\n                </div>',
+                '<div class="legend-item">\\n                    <div class="legend-color occupied"></div>\\n                    <span>Em Uso</span>\\n                </div>\\n                <div class="legend-item">\\n                    <div class="legend-color alert"></div>\\n                    <span>Alerta</span>\\n                </div>'
+            );
+            
+            legenda.innerHTML = html;
+        }
+    });
+    
+    // Adicionar CSS
+    if (!document.querySelector('#alert-css')) {
+        const style = document.createElement('style');
+        style.id = 'alert-css';
+        style.textContent = '.legend-color.alert { background: #ffd700; }';
+        document.head.appendChild(style);
+    }
+}
+
+// Executar
+adicionarAlerta();`;
+        }
+        
+        // Inicializar
+        atualizarCodigo();
+    </script>
+</body>
+</html> 

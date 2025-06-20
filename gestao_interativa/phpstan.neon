@@ -1,0 +1,11 @@
+parameters:
+  level: 5
+  paths:
+    - src
+  excludePaths:
+    - tests
+    - vendor
+    - assets
+  checkMissingIterableValueType: false
+  checkMissingCallableSignature: false
+  checkUninitializedProperties: true 

@@ -1,0 +1,36 @@
+/* ===== ESTILOS PARA LEGENDA DE ALERTA ===== */
+
+/* Cor da legenda de alerta */
+.legend-color.alert {
+    background: linear-gradient(45deg, #ffd700, #ffed4e);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+    animation: alertPulse 2s infinite;
+}
+
+/* Animação para a legenda de alerta */
+@keyframes alertPulse {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+    }
+}
+
+/* Estilo para o texto da legenda de alerta */
+.legend-item:has(.legend-color.alert) span {
+    color: #b8860b;
+    font-weight: 600;
+}
+
+/* Responsividade para legendas */
+@media (max-width: 768px) {
+    .legend {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .legend-item {
+        min-width: 120px;
+    }
+} 

@@ -1,0 +1,8 @@
+body { font-family: Arial, sans-serif; background: #f7f7f7; margin: 0; padding: 20px; }
+h1 { color: #333; }
+table { background: #fff; border-radius: 4px; box-shadow: 0 2px 4px #0001; }
+th, td { padding: 8px 12px; }
+a { color: #007bff; text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { background: #dc3545; color: #fff; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; }
+button:hover { background: #c82333; } 
