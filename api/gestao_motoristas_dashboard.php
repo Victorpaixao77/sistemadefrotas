@@ -29,17 +29,17 @@ try {
                 $stmt->execute();
                 $total_ativos = $stmt->fetchColumn();
 
-                // Checklists pendentes
-                $sql = "SELECT COUNT(DISTINCT motorista_id) FROM checklists 
-                       WHERE empresa_id = :empresa_id AND status = 'pendente' 
+                // Checklists recentes (últimos 7 dias)
+                $sql = "SELECT COUNT(DISTINCT motorista_id) FROM checklist_viagem 
+                       WHERE empresa_id = :empresa_id 
                        AND data_checklist >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
                 $stmt = $conn->prepare($sql);
                 $stmt->bindValue(':empresa_id', $empresa_id);
                 $stmt->execute();
-                $checklists_pendentes = $stmt->fetchColumn();
+                $checklists_recentes = $stmt->fetchColumn();
 
-                // Infrações recentes
-                $sql = "SELECT COUNT(*) FROM infracoes_motoristas 
+                // Infrações recentes (usando multas)
+                $sql = "SELECT COUNT(*) FROM multas 
                        WHERE empresa_id = :empresa_id 
                        AND data_infracao >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)";
                 $stmt = $conn->prepare($sql);
@@ -65,8 +65,8 @@ try {
                         FROM rotas r
                         LEFT JOIN motoristas m ON r.motorista_id = m.id
                         WHERE r.empresa_id = :empresa_id 
-                        AND MONTH(r.data) = MONTH(CURDATE()) 
-                        AND YEAR(r.data) = YEAR(CURDATE())
+                        AND MONTH(r.data_rota) = MONTH(CURDATE()) 
+                        AND YEAR(r.data_rota) = YEAR(CURDATE())
                         GROUP BY r.motorista_id
                         ORDER BY total_viagens DESC LIMIT 1";
                 $stmt = $conn->prepare($sql);
@@ -77,7 +77,7 @@ try {
 
                 echo json_encode(['success' => true, 'data' => [
                     'total_ativos' => $total_ativos,
-                    'checklists_pendentes' => $checklists_pendentes,
+                    'checklists_recentes' => $checklists_recentes,
                     'infracoes_recentes' => $infracoes_recentes,
                     'melhor_eficiencia' => $melhor_eficiencia,
                     'mais_viagens' => $mais_viagens
@@ -108,12 +108,14 @@ try {
             break;
         case 'checklists_pendentes':
             try {
-                $sql = "SELECT m.nome, COUNT(*) as pendentes
-                        FROM checklists c
+                // Motoristas com checklists recentes (últimos 7 dias)
+                $sql = "SELECT m.nome, COUNT(*) as recentes
+                        FROM checklist_viagem c
                         LEFT JOIN motoristas m ON c.motorista_id = m.id
-                        WHERE c.empresa_id = :empresa_id AND c.status = 'pendente'
+                        WHERE c.empresa_id = :empresa_id 
+                        AND c.data_checklist >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
                         GROUP BY c.motorista_id
-                        ORDER BY pendentes DESC LIMIT 10";
+                        ORDER BY recentes DESC LIMIT 10";
                 $stmt = $conn->prepare($sql);
                 $stmt->bindValue(':empresa_id', $empresa_id);
                 $stmt->execute();
@@ -121,7 +123,7 @@ try {
                 $data = [];
                 foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
                     $labels[] = $row['nome'];
-                    $data[] = intval($row['pendentes']);
+                    $data[] = intval($row['recentes']);
                 }
                 echo json_encode(['success' => true, 'labels' => $labels, 'data' => $data]);
             } catch (PDOException $e) {
@@ -132,7 +134,7 @@ try {
         case 'infracoes':
             try {
                 $sql = "SELECT DATE_FORMAT(data_infracao, '%m/%Y') as mes, COUNT(*) as total
-                        FROM infracoes_motoristas
+                        FROM multas
                         WHERE empresa_id = :empresa_id 
                         AND data_infracao >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
                         GROUP BY mes ORDER BY data_infracao";
@@ -156,7 +158,7 @@ try {
             $sql = "SELECT m.nome, COUNT(*) as total
                     FROM rotas r
                     LEFT JOIN motoristas m ON r.motorista_id = m.id
-                    WHERE r.empresa_id = :empresa_id AND MONTH(r.data_saida) = MONTH(CURDATE()) AND YEAR(r.data_saida) = YEAR(CURDATE())
+                    WHERE r.empresa_id = :empresa_id AND MONTH(r.data_rota) = MONTH(CURDATE()) AND YEAR(r.data_rota) = YEAR(CURDATE())
                     GROUP BY r.motorista_id
                     ORDER BY total DESC";
             $stmt = $conn->prepare($sql);

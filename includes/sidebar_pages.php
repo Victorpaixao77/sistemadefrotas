@@ -19,7 +19,13 @@ if ($empresa_id) {
             $nome_personalizado = $row['nome_personalizado'];
             }
             if (!empty($row['logo_empresa'])) {
-                $logo_path = $row['logo_empresa'];
+                // Construir o caminho completo da logo
+                if (strpos($row['logo_empresa'], 'uploads/') !== 0) {
+                    // Se não começar com 'uploads/', adicionar o caminho
+                    $logo_path = 'uploads/logos/' . $row['logo_empresa'];
+                } else {
+                    $logo_path = $row['logo_empresa'];
+                }
             }
         }
     } catch (Exception $e) {}
@@ -28,17 +34,39 @@ if ($empresa_id) {
 // Determinar o caminho base para a logo
 $base_path = '';
 $current_path = $_SERVER['PHP_SELF'];
-if (strpos($current_path, '/pages/') !== false) {
+
+// Debug para verificar o caminho atual
+// error_log("Sidebar - Caminho atual: " . $current_path);
+
+if (strpos($current_path, '/fiscal/pages/') !== false) {
+    // Para páginas dentro de fiscal/pages/ precisa subir 2 níveis
+    $base_path = '../../';
+} elseif (strpos($current_path, '/fiscal/') !== false) {
+    // Para outras páginas dentro de fiscal/ precisa subir 1 nível
     $base_path = '../';
+} elseif (strpos($current_path, '/pages/') !== false) {
+    // Para páginas dentro de pages/ precisa subir 1 nível
+    $base_path = '../';
+} elseif (strpos($current_path, '/calendario/') !== false) {
+    // Para páginas dentro de calendario/ precisa subir 1 nível
+    $base_path = '../';
+} else {
+    // Para páginas na raiz
+    $base_path = '';
 }
 ?>
 <!-- Sidebar Navigation -->
 <div class="sidebar">
     <div class="sidebar-header">
         <div class="sidebar-logo">
-            <?php if ($logo_path): ?>
+            <?php 
+            if ($logo_path): 
+            ?>
             <div class="logo-image">
-                <img src="<?php echo $base_path . htmlspecialchars($logo_path); ?>" alt="Logo da Empresa">
+                <?php 
+                $logo_full_path = $base_path . htmlspecialchars($logo_path);
+                ?>
+                <img src="<?php echo $logo_full_path; ?>" alt="Logo da Empresa">
             </div>
             <?php else: ?>
             <div class="logo-icon">
@@ -116,6 +144,37 @@ if (strpos($current_path, '/pages/') !== false) {
                 <li class="sidebar-nav-item">
                     <a href="#" class="sidebar-link sidebar-dropdown-toggle">
                         <div class="sidebar-link-icon">
+                            <i class="fas fa-receipt"></i>
+                        </div>
+                        <span class="sidebar-link-text">Sistema Fiscal</span>
+                        <i class="fas fa-chevron-down dropdown-icon"></i>
+                    </a>
+                    <ul class="sidebar-dropdown">
+                        <li>
+                            <a href="/sistema-frotas/fiscal/pages/nfe.php">
+                                <i class="fas fa-receipt"></i> Gestão de NF-e
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/sistema-frotas/fiscal/pages/cte.php">
+                                <i class="fas fa-truck"></i> Gestão de CT-e
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/sistema-frotas/fiscal/pages/mdfe.php">
+                                <i class="fas fa-file-alt"></i> Gestão de MDF-e
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/sistema-frotas/fiscal/pages/eventos.php">
+                                <i class="fas fa-calendar-alt"></i> Eventos Fiscais
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="#" class="sidebar-link sidebar-dropdown-toggle">
+                        <div class="sidebar-link-icon">
                             <i class="fas fa-money-bill-wave"></i>
                         </div>
                         <span class="sidebar-link-text">Financeiro</span>
@@ -132,14 +191,15 @@ if (strpos($current_path, '/pages/') !== false) {
                                 <i class="fas fa-receipt"></i> Despesas Fixas
                             </a>
                         </li>
-                        <li>
-                            <a href="/sistema-frotas/pages/recibos.php">
-                                <i class="fas fa-file-invoice"></i> Recibos
-                            </a>
-                        </li>
+
                         <li>
                             <a href="/sistema-frotas/pages/financiamento.php">
                                 <i class="fas fa-hand-holding-usd"></i> Financiamento
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/sistema-frotas/pages/multas.php">
+                                <i class="fas fa-ticket-alt"></i> Multas
                             </a>
                         </li>
                     </ul>

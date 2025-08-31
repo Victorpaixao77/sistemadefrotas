@@ -86,7 +86,7 @@
                             <a href="/sistema-frotas/pages/contas_pagar.php">Contas a Pagar</a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/recibos.php">Recibos</a>
+
                         </li>
                         <li>
                             <a href="/sistema-frotas/pages/financiamento.php">Financiamento</a>

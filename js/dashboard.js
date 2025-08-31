@@ -22,9 +22,78 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
- * Initialize dashboard UI components
+ * Wait for Chart.js to be loaded and then initialize charts
+ */
+function waitForChartJS() {
+    if (typeof Chart !== 'undefined') {
+        // Chart.js is loaded, initialize only existing charts
+        initFinancialChart();
+        
+        // Only initialize other charts if their canvas elements exist
+        if (document.getElementById('fuelConsumptionChart')) {
+            initFuelConsumptionChart();
+        }
+        
+        if (document.getElementById('costAnalysisChart')) {
+            initCostAnalysisChart();
+        }
+    } else {
+        // Wait a bit and try again
+        setTimeout(waitForChartJS, 100);
+    }
+}
+
+/**
+ * Initialize dashboard
  */
 function initDashboard() {
+    // Setup event listeners
+    setupLogoutHandler();
+    
+    // Load initial data
+    loadDashboardData();
+    
+    // Setup modals
+    setupModals();
+    
+    // Initialize charts after Chart.js is loaded
+    waitForChartJS();
+    
+    // Setup drag and drop for dashboard cards
+    const dashboardGrid = document.getElementById('dashboardGrid');
+    if (dashboardGrid) {
+        new Sortable(dashboardGrid, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onEnd: function() {
+                saveCurrentLayout();
+            }
+        });
+    }
+    
+    // Load saved layout
+    const savedLayout = localStorage.getItem('dashboardLayout');
+    if (savedLayout) {
+        try {
+            const layout = JSON.parse(savedLayout);
+            // Apply saved layout
+            layout.forEach(item => {
+                const card = document.querySelector(`[data-card-id="${item.id}"]`);
+                if (card) {
+                    dashboardGrid.appendChild(card);
+                }
+            });
+        } catch (error) {
+            console.error('Error loading saved layout:', error);
+        }
+    }
+    
+    // Load compact layout preference
+    const compactLayout = localStorage.getItem('dashboardCompactLayout');
+    if (compactLayout === 'true') {
+        dashboardGrid.classList.add('compact-layout');
+    }
+    
     // Dashboard card hover effects
     const dashboardCards = document.querySelectorAll('.dashboard-card');
     dashboardCards.forEach(card => {
@@ -94,7 +163,7 @@ function loadDashboardData() {
             if (data && !data.error) {
                 updateDashboardCards(data);
                 updateMaintenanceTable(data.maintenanceData);
-                initFinancialChart();
+                // Charts are now initialized by waitForChartJS()
             }
         })
         .catch(error => {
@@ -609,89 +678,129 @@ function addWidgetToDashboard(widgetType) {
  * Initialize fuel consumption chart
  */
 function initFuelConsumptionChart() {
-    const ctx = document.getElementById('fuelConsumptionChart');
-    if (!ctx) return;
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded yet, retrying in 1 second...');
+        setTimeout(initFuelConsumptionChart, 1000);
+        return;
+    }
     
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai'],
-            datasets: [{
-                label: 'Média (km/l)',
-                data: [8.5, 9.1, 8.8, 9.5, 9.8],
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                tension: 0.3,
-                fill: true
-            }]
-        },
-        options: {
-            scales: {
-                y: {
-                    beginAtZero: false,
-                    min: 7,
+    const ctx = document.getElementById('fuelConsumptionChart');
+    if (!ctx) {
+        // Canvas doesn't exist, this is expected for some pages
+        return;
+    }
+    
+    try {
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+                datasets: [{
+                    label: 'Consumo Médio (km/l)',
+                    data: [8.5, 8.2, 8.8, 8.1, 8.9, 8.6],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
                     title: {
                         display: true,
-                        text: 'km/l'
+                        text: 'Consumo de Combustível (Últimos 6 meses)',
+                        font: {
+                            size: 16
+                        }
+                    },
+                    legend: {
+                        position: 'top'
                     }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return `${context.raw} km/l`;
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return `${value} km/l`;
+                            }
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.raw} km/l`;
+                            }
                         }
                     }
                 }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error('Error creating fuel consumption chart:', error);
+    }
 }
 
 /**
  * Initialize cost analysis chart
  */
 function initCostAnalysisChart() {
-    const ctx = document.getElementById('costAnalysisChart');
-    if (!ctx) return;
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded yet, retrying in 1 second...');
+        setTimeout(initCostAnalysisChart, 1000);
+        return;
+    }
     
-    new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: [
-                'Combustível',
-                'Manutenção',
-                'Impostos',
-                'Pessoal',
-                'Outros'
-            ],
-            datasets: [{
-                data: [45, 25, 10, 15, 5],
-                backgroundColor: [
-                    '#3b82f6',
-                    '#ef4444',
-                    '#f59e0b',
-                    '#10b981',
-                    '#8b5cf6'
-                ]
-            }]
-        },
-        options: {
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const value = context.raw;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = ((value / total) * 100).toFixed(1);
-                            return `${percentage}% (R$ ${(value * 100).toFixed(2).replace('.', ',')})`;
+    const ctx = document.getElementById('costAnalysisChart');
+    if (!ctx) {
+        // Canvas doesn't exist, this is expected for some pages
+        return;
+    }
+    
+    try {
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: [
+                    'Combustível',
+                    'Manutenção',
+                    'Impostos',
+                    'Pessoal',
+                    'Outros'
+                ],
+                datasets: [{
+                    data: [45, 25, 10, 15, 5],
+                    backgroundColor: [
+                        '#3b82f6',
+                        '#ef4444',
+                        '#f59e0b',
+                        '#10b981',
+                        '#8b5cf6'
+                    ]
+                }]
+            },
+            options: {
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return `${percentage}% (R$ ${(value * 100).toFixed(2).replace('.', ',')})`;
+                            }
                         }
                     }
                 }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error('Error creating cost analysis chart:', error);
+    }
 }
 
 /**
@@ -751,9 +860,47 @@ function toggleGridLayout() {
 }
 
 /**
+ * Utility function to safely destroy a chart if it exists
+ * @param {string} canvasId The canvas element ID
+ */
+function destroyChartIfExists(canvasId) {
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded yet');
+        return;
+    }
+    
+    try {
+        const existingChart = Chart.getChart(canvasId);
+        if (existingChart) {
+            existingChart.destroy();
+        }
+    } catch (error) {
+        console.warn('Error destroying chart:', error);
+    }
+}
+
+/**
  * Initialize financial chart
  */
 function initFinancialChart() {
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not loaded yet, retrying in 1 second...');
+        setTimeout(initFinancialChart, 1000);
+        return;
+    }
+    
+    // Check if canvas exists
+    const ctx = document.getElementById('financialChart');
+    if (!ctx) {
+        console.warn('Financial chart canvas not found');
+        return;
+    }
+    
+    // Destroy existing chart if it exists
+    destroyChartIfExists('financialChart');
+
     fetch('/sistema-frotas/api/financial_analytics.php')
         .then(response => {
             if (!response.ok) {
@@ -762,59 +909,73 @@ function initFinancialChart() {
             return response.json();
         })
         .then(data => {
+            // Check again if Chart.js is available
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js not available after data fetch');
+                return;
+            }
+            
+            // Check if canvas still exists
             const ctx = document.getElementById('financialChart');
-            if (!ctx) return;
+            if (!ctx) {
+                console.warn('Financial chart canvas not found after data fetch');
+                return;
+            }
 
-            new Chart(ctx, {
-                type: 'bar',
-                data: data,
-                options: {
-                    responsive: true,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Faturamento x Despesas (Mensal)',
-                            font: {
-                                size: 16
-                            }
-                        },
-                        legend: {
-                            position: 'top'
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let label = context.dataset.label || '';
-                                    if (label) {
-                                        label += ': ';
+            try {
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Faturamento x Despesas (Mensal)',
+                                font: {
+                                    size: 16
+                                }
+                            },
+                            legend: {
+                                position: 'top'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += new Intl.NumberFormat('pt-BR', {
+                                                style: 'currency',
+                                                currency: 'BRL'
+                                            }).format(context.parsed.y);
+                                        }
+                                        return label;
                                     }
-                                    if (context.parsed.y !== null) {
-                                        label += new Intl.NumberFormat('pt-BR', {
-                                            style: 'currency',
-                                            currency: 'BRL'
-                                        }).format(context.parsed.y);
-                                    }
-                                    return label;
                                 }
                             }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return new Intl.NumberFormat('pt-BR', {
-                                        style: 'currency',
-                                        currency: 'BRL',
-                                        maximumFractionDigits: 0
-                                    }).format(value);
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return new Intl.NumberFormat('pt-BR', {
+                                            style: 'currency',
+                                            currency: 'BRL',
+                                            maximumFractionDigits: 0
+                                        }).format(value);
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.error('Error creating financial chart:', error);
+            }
         })
         .catch(error => {
             console.error('Error loading financial data:', error);

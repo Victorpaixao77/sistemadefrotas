@@ -72,8 +72,25 @@ try {
             
             // Definir status conforme perfil
             $status = 'pendente';
+            $fonte = 'motorista';
+            
+            // Log para debug
+            error_log("=== DEBUG ABASTECIMENTO ===");
+            error_log("Session data: " . print_r($_SESSION, true));
+            error_log("tipo_usuario: " . ($_SESSION['tipo_usuario'] ?? 'NÃO DEFINIDO'));
+            error_log("is_admin: " . ($_SESSION['is_admin'] ?? 'NÃO DEFINIDO'));
+            
+            // Verificação mais robusta do tipo de usuário
             if (isset($_SESSION['tipo_usuario']) && in_array($_SESSION['tipo_usuario'], ['admin', 'gestor'])) {
                 $status = 'aprovado';
+                $fonte = 'gestor';
+                error_log("Usuário identificado como GESTOR - Status: $status, Fonte: $fonte");
+            } elseif (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 1) {
+                $status = 'aprovado';
+                $fonte = 'gestor';
+                error_log("Usuário identificado como ADMIN - Status: $status, Fonte: $fonte");
+            } else {
+                error_log("Usuário identificado como MOTORISTA - Status: $status, Fonte: $fonte");
             }
             
             // Insere o novo abastecimento
@@ -81,12 +98,12 @@ try {
                 empresa_id, veiculo_id, motorista_id, posto,
                 data_abastecimento, litros, valor_litro, valor_total,
                 km_atual, tipo_combustivel, forma_pagamento, observacoes,
-                rota_id, data_cadastro, comprovante, status
+                rota_id, data_cadastro, comprovante, status, fonte
             ) VALUES (
                 :empresa_id, :veiculo_id, :motorista_id, :posto,
                 :data_abastecimento, :litros, :valor_litro, :valor_total,
                 :km_atual, :tipo_combustivel, :forma_pagamento, :observacoes,
-                :rota_id, NOW(), :comprovante, :status
+                :rota_id, NOW(), :comprovante, :status, :fonte
             )";
             
             // Processar o upload do comprovante
@@ -128,6 +145,7 @@ try {
             $stmt->bindValue(':rota_id', $data['rota_id']);
             $stmt->bindValue(':comprovante', $comprovante_path);
             $stmt->bindValue(':status', $status);
+            $stmt->bindValue(':fonte', $fonte);
             
             $stmt->execute();
             
@@ -423,17 +441,40 @@ try {
                 $_POST['valor_litro'] = str_replace(',', '.', $_POST['valor_litro']);
                 $_POST['valor_total'] = str_replace(',', '.', $_POST['valor_total']);
 
+                // Definir status conforme perfil
+                $status = 'pendente';
+                $fonte = 'motorista';
+                
+                // Log para debug
+                error_log("=== DEBUG ABASTECIMENTO CREATE ===");
+                error_log("Session data: " . print_r($_SESSION, true));
+                error_log("tipo_usuario: " . ($_SESSION['tipo_usuario'] ?? 'NÃO DEFINIDO'));
+                error_log("is_admin: " . ($_SESSION['is_admin'] ?? 'NÃO DEFINIDO'));
+                
+                // Verificação mais robusta do tipo de usuário
+                if (isset($_SESSION['tipo_usuario']) && in_array($_SESSION['tipo_usuario'], ['admin', 'gestor'])) {
+                    $status = 'aprovado';
+                    $fonte = 'gestor';
+                    error_log("Usuário identificado como GESTOR - Status: $status, Fonte: $fonte");
+                } elseif (isset($_SESSION['is_admin']) && $_SESSION['is_admin'] == 1) {
+                    $status = 'aprovado';
+                    $fonte = 'gestor';
+                    error_log("Usuário identificado como ADMIN - Status: $status, Fonte: $fonte");
+                } else {
+                    error_log("Usuário identificado como MOTORISTA - Status: $status, Fonte: $fonte");
+                }
+
                 // Insert new refueling
                 $sql = "INSERT INTO abastecimentos (
                     empresa_id, data_abastecimento, veiculo_id, motorista_id,
                     posto, litros, valor_litro, valor_total, km_atual,
                     tipo_combustivel, forma_pagamento, observacoes, rota_id,
-                    data_cadastro
+                    data_cadastro, status, fonte
                 ) VALUES (
                     :empresa_id, :data_abastecimento, :veiculo_id, :motorista_id,
                     :posto, :litros, :valor_litro, :valor_total, :km_atual,
                     :tipo_combustivel, :forma_pagamento, :observacoes, :rota_id,
-                    NOW()
+                    NOW(), :status, :fonte
                 )";
 
                 $stmt = $conn->prepare($sql);
@@ -453,7 +494,9 @@ try {
                     'tipo_combustivel' => $_POST['tipo_combustivel'],
                     'forma_pagamento' => $_POST['forma_pagamento'],
                     'observacoes' => $_POST['observacoes'] ?? null,
-                    'rota_id' => $_POST['rota_id']
+                    'rota_id' => $_POST['rota_id'],
+                    'status' => $status,
+                    'fonte' => $fonte
                 ], true));
 
                 $stmt->bindValue(':empresa_id', $empresa_id);
@@ -469,6 +512,8 @@ try {
                 $stmt->bindValue(':forma_pagamento', $_POST['forma_pagamento']);
                 $stmt->bindValue(':observacoes', $_POST['observacoes'] ?? null);
                 $stmt->bindValue(':rota_id', $_POST['rota_id']);
+                $stmt->bindValue(':status', $status);
+                $stmt->bindValue(':fonte', $fonte);
 
                 $stmt->execute();
 

@@ -50,11 +50,14 @@ try {
             ip.id,
             ip.veiculo_id,
             ip.posicao,
+            ip.posicao_id,
             ip.data_instalacao,
             v.placa,
-            v.modelo as modelo_veiculo
+            v.modelo as modelo_veiculo,
+            pp.nome as posicao_nome
         FROM instalacoes_pneus ip
         LEFT JOIN veiculos v ON ip.veiculo_id = v.id
+        LEFT JOIN posicoes_pneus pp ON ip.posicao_id = pp.id
         WHERE ip.pneu_id = ? AND ip.data_remocao IS NULL
         ORDER BY ip.data_instalacao DESC
         LIMIT 1
@@ -66,6 +69,9 @@ try {
     
     if ($instalacao) {
         $pneu['instalacao_atual'] = $instalacao;
+        // Adicionar posição ao objeto principal do pneu
+        $pneu['posicao_nome'] = $instalacao['posicao_nome'] ?? null;
+        $pneu['posicao_id'] = $instalacao['posicao_id'] ?? null;
     }
     
     // Buscar histórico de manutenções

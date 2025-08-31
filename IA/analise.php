@@ -62,18 +62,18 @@ class Analise {
     public function analisarRotas() {
         try {
             $sql = "SELECT 
-                r.cidade_origem_id as origem,
-                r.cidade_destino_id as destino,
+                CONCAT(r.estado_origem, ' - ', r.cidade_origem_id) as origem,
+                CONCAT(r.estado_destino, ' - ', r.cidade_destino_id) as destino,
                 COUNT(DISTINCT r.veiculo_id) as num_veiculos,
                 AVG(TIMESTAMPDIFF(HOUR, r.data_saida, r.data_chegada)) as tempo_medio,
                 AVG(r.distancia_km) as distancia_media,
-                COUNT(DISTINCT r.data_rota) as num_viagens,
+                COUNT(DISTINCT r.data_saida) as num_viagens,
                 GROUP_CONCAT(DISTINCT v.placa) as veiculos
             FROM rotas r
             JOIN veiculos v ON r.veiculo_id = v.id
             WHERE v.empresa_id = :empresa_id
-            AND r.data_rota >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
-            GROUP BY r.cidade_origem_id, r.cidade_destino_id
+            AND r.data_saida >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
+            GROUP BY r.estado_origem, r.cidade_origem_id, r.estado_destino, r.cidade_destino_id
             HAVING num_viagens > 5";
 
             $stmt = $this->pdo->prepare($sql);
@@ -175,7 +175,7 @@ class Analise {
             JOIN rotas r ON v.id = r.veiculo_id
             JOIN abastecimentos a ON v.id = a.veiculo_id
             WHERE v.empresa_id = :empresa_id
-            AND r.data_rota >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
+            AND r.data_saida >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
             AND a.data_abastecimento >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
             GROUP BY v.id
             HAVING num_viagens > 5";

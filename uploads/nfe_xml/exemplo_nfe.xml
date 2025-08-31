@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+  <infNFe Id="NFe12345678901234567890123456789012345678901234">
+    <ide>
+      <nNF>12345</nNF>
+      <serie>1</serie>
+      <dhEmi>2025-08-26T10:00:00-03:00</dhEmi>
+    </ide>
+    <emit>
+      <xNome>Empresa ABC Ltda</xNome>
+      <CNPJ>12345678000195</CNPJ>
+    </emit>
+    <dest>
+      <xNome>Cliente Final</xNome>
+      <CNPJ>98765432000187</CNPJ>
+    </dest>
+    <total>
+      <ICMSTot>
+        <vNF>1500.00</vNF>
+      </ICMSTot>
+    </total>
+    <transp>
+      <vol>
+        <pesoB>500.00</pesoB>
+        <qVol>5</qVol>
+      </vol>
+    </transp>
+  </infNFe>
+</NFe>

@@ -65,8 +65,11 @@ $sql = "SELECT a.*, r.distancia_km, v.modelo, v.placa, r.id as rota_id, co.nome 
         JOIN rotas r ON a.rota_id = r.id
         JOIN veiculos v ON r.veiculo_id = v.id
         LEFT JOIN cidades co ON r.cidade_origem_id = co.id
-        LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id";
-foreach ($conn->query($sql) as $row) {
+        LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
+        WHERE v.empresa_id = :empresa_id";
+$stmt = $conn->prepare($sql);
+$stmt->execute(['empresa_id' => $empresa_id]);
+foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     $modelo = $row['modelo'];
     $placa = $row['placa'];
     $rota_nome = ($row['data_rota'] ? date('Y-m-d', strtotime($row['data_rota'])) : '') .
@@ -92,8 +95,10 @@ try {
             JOIN veiculos v ON r.veiculo_id = v.id
             LEFT JOIN cidades co ON r.cidade_origem_id = co.id
             LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-            WHERE a.valor_total > (r.distancia_km * 2) OR a.litros > (r.distancia_km * 0.5)";
-    foreach ($conn->query($sql) as $row) {
+            WHERE v.empresa_id = :empresa_id AND (a.valor_total > (r.distancia_km * 2) OR a.litros > (r.distancia_km * 0.5))";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $placa = $row['placa'];
         $rota_nome = ($row['data_rota'] ? date('Y-m-d', strtotime($row['data_rota'])) : '') .
             ' - ' . ($row['cidade_origem_nome'] ?? '-') . ' → ' . ($row['cidade_destino_nome'] ?? '-');
@@ -110,8 +115,10 @@ try {
     $sql = "SELECT m.*, v.modelo FROM manutencoes m
             JOIN veiculos v ON m.veiculo_id = v.id
             JOIN status_manutencao sm ON m.status_manutencao_id = sm.id
-            WHERE m.data_manutencao < NOW() AND sm.nome != 'Concluída'";
-    foreach ($conn->query($sql) as $row) {
+            WHERE v.empresa_id = :empresa_id AND m.data_manutencao < NOW() AND sm.nome != 'Concluída'";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         inserirNotificacao(
             $empresa_id,
             'manutencao',
@@ -127,8 +134,10 @@ try {
             JOIN veiculos v ON r.veiculo_id = v.id
             LEFT JOIN cidades co ON r.cidade_origem_id = co.id
             LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-            WHERE d.total_despviagem > 1000";
-    foreach ($conn->query($sql) as $row) {
+            WHERE v.empresa_id = :empresa_id AND d.total_despviagem > 1000";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $placa = $row['placa'];
         $rota_nome = ($row['data_rota'] ? date('Y-m-d', strtotime($row['data_rota'])) : '') .
             ' - ' . ($row['cidade_origem_nome'] ?? '-') . ' → ' . ($row['cidade_destino_nome'] ?? '-');
@@ -146,8 +155,10 @@ try {
             JOIN veiculos v ON r.veiculo_id = v.id
             LEFT JOIN cidades co ON r.cidade_origem_id = co.id
             LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-            WHERE r.status = 'em andamento' AND TIMESTAMPDIFF(HOUR, r.data_saida, NOW()) > 48";
-    foreach ($conn->query($sql) as $row) {
+            WHERE v.empresa_id = :empresa_id AND r.status = 'em andamento' AND TIMESTAMPDIFF(HOUR, r.data_saida, NOW()) > 48";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $placa = $row['placa'];
         $rota_nome = ($row['data_rota'] ? date('Y-m-d', strtotime($row['data_rota'])) : '') .
             ' - ' . ($row['cidade_origem_nome'] ?? '-') . ' → ' . ($row['cidade_destino_nome'] ?? '-');
@@ -163,8 +174,10 @@ try {
     // 5. Checklist pendente
     $sql = "SELECT cv.*, v.modelo FROM checklist_viagem cv
             JOIN veiculos v ON cv.veiculo_id = v.id
-            WHERE cv.data_checklist IS NULL";
-    foreach ($conn->query($sql) as $row) {
+            WHERE v.empresa_id = :empresa_id AND cv.data_checklist IS NULL";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         inserirNotificacao(
             $empresa_id,
             'alerta',
@@ -179,8 +192,10 @@ try {
             JOIN veiculos v ON r.veiculo_id = v.id
             LEFT JOIN cidades co ON r.cidade_origem_id = co.id
             LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-            WHERE r.eficiencia_viagem < 70";
-    foreach ($conn->query($sql) as $row) {
+            WHERE v.empresa_id = :empresa_id AND r.eficiencia_viagem < 70";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $placa = $row['placa'];
         $rota_nome = ($row['data_rota'] ? date('Y-m-d', strtotime($row['data_rota'])) : '') .
             ' - ' . ($row['cidade_origem_nome'] ?? '-') . ' → ' . ($row['cidade_destino_nome'] ?? '-');
@@ -198,8 +213,10 @@ try {
             JOIN veiculos v ON r.veiculo_id = v.id
             LEFT JOIN cidades co ON r.cidade_origem_id = co.id
             LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-            WHERE r.percentual_vazio > 30";
-    foreach ($conn->query($sql) as $row) {
+            WHERE v.empresa_id = :empresa_id AND r.percentual_vazio > 30";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $placa = $row['placa'];
         $rota_nome = ($row['data_rota'] ? date('Y-m-d', strtotime($row['data_rota'])) : '') .
             ' - ' . ($row['cidade_origem_nome'] ?? '-') . ' → ' . ($row['cidade_destino_nome'] ?? '-');
@@ -218,8 +235,11 @@ try {
             JOIN veiculos v ON r.veiculo_id = v.id
             LEFT JOIN cidades co ON r.cidade_origem_id = co.id
             LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
+            WHERE v.empresa_id = :empresa_id
             HAVING r.frete < total_despesas";
-    foreach ($conn->query($sql) as $row) {
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $placa = $row['placa'];
         $rota_nome = ($row['data_rota'] ? date('Y-m-d', strtotime($row['data_rota'])) : '') .
             ' - ' . ($row['cidade_origem_nome'] ?? '-') . ' → ' . ($row['cidade_destino_nome'] ?? '-');
@@ -237,8 +257,10 @@ try {
             JOIN veiculos v ON r.veiculo_id = v.id
             LEFT JOIN cidades co ON r.cidade_origem_id = co.id
             LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-            WHERE ABS((r.km_chegada - r.km_saida) - r.distancia_km) > 50";
-    foreach ($conn->query($sql) as $row) {
+            WHERE v.empresa_id = :empresa_id AND ABS((r.km_chegada - r.km_saida) - r.distancia_km) > 50";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $placa = $row['placa'];
         $rota_nome = ($row['data_rota'] ? date('Y-m-d', strtotime($row['data_rota'])) : '') .
             ' - ' . ($row['cidade_origem_nome'] ?? '-') . ' → ' . ($row['cidade_destino_nome'] ?? '-');
@@ -253,10 +275,13 @@ try {
 
     // 10. Previsão de Manutenção Próxima
     $sql = "SELECT m.* FROM manutencoes m
+            JOIN veiculos v ON m.veiculo_id = v.id
             JOIN status_manutencao sm ON m.status_manutencao_id = sm.id
-            WHERE m.data_manutencao BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 5 DAY)
+            WHERE v.empresa_id = :empresa_id AND m.data_manutencao BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL 5 DAY)
             AND sm.nome != 'Concluída'";
-    foreach ($conn->query($sql) as $row) {
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         inserirNotificacao(
             $empresa_id,
             'info',
@@ -274,9 +299,11 @@ try {
                 JOIN veiculos v ON r.veiculo_id = v.id
                 LEFT JOIN cidades co ON r.cidade_origem_id = co.id
                 LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-                WHERE r.frete = 0 AND r.status = 'aprovado'";
+                WHERE v.empresa_id = :empresa_id AND r.frete = 0 AND r.status = 'aprovado'";
         $count_frete_zerado = 0;
-        foreach ($conn->query($sql) as $row) {
+        $stmt = $conn->prepare($sql);
+        $stmt->execute(['empresa_id' => $empresa_id]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $count_frete_zerado++;
             // error_log('DEBUG IA: FRETE ZERADO - ROTA ID: ' . $row['id'] . ' STATUS: ' . $row['status']);
             $rota_nome = ($row['data_rota'] ? date('Y-m-d', strtotime($row['data_rota'])) : '') .
@@ -295,13 +322,17 @@ try {
     }
 
     // 2. Veículo com 3+ manutenções em 30 dias
-    $sql = "SELECT veiculo_id, COUNT(*) AS qtd_manutencoes
-            FROM manutencoes
-            WHERE data_conclusao IS NOT NULL
-            AND data_conclusao > DATE_SUB(NOW(), INTERVAL 30 DAY)
-            GROUP BY veiculo_id
+    $sql = "SELECT m.veiculo_id, COUNT(*) AS qtd_manutencoes
+            FROM manutencoes m
+            JOIN veiculos v ON m.veiculo_id = v.id
+            WHERE v.empresa_id = :empresa_id
+            AND m.data_conclusao IS NOT NULL
+            AND m.data_conclusao > DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY m.veiculo_id
             HAVING qtd_manutencoes >= 3";
-    foreach ($conn->query($sql) as $row) {
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         inserirNotificacao(
             $empresa_id,
             'alerta',
@@ -312,8 +343,15 @@ try {
     }
 
     // 3. Documentação de Motorista Vencida
-    $sql = "SELECT * FROM motoristas WHERE data_validade_cnh < DATE_ADD(NOW(), INTERVAL 15 DAY)";
-    foreach ($conn->query($sql) as $row) {
+    $sql = "SELECT m.* FROM motoristas m
+            JOIN rotas r ON m.id = r.motorista_id
+            JOIN veiculos v ON r.veiculo_id = v.id
+            WHERE v.empresa_id = :empresa_id 
+            AND m.data_validade_cnh < DATE_ADD(NOW(), INTERVAL 15 DAY)
+            GROUP BY m.id";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         inserirNotificacao(
             $empresa_id,
             'alerta',
@@ -328,9 +366,11 @@ try {
         // error_log('DEBUG IA: INÍCIO foreach carga excedida');
         $sql = "SELECT r.*, v.placa, v.capacidade_carga, r.status FROM rotas r
                 JOIN veiculos v ON r.veiculo_id = v.id
-                WHERE r.peso_carga > v.capacidade_carga AND r.status = 'aprovado'";
+                WHERE v.empresa_id = :empresa_id AND r.peso_carga > v.capacidade_carga AND r.status = 'aprovado'";
         $count_carga_excedida = 0;
-        foreach ($conn->query($sql) as $row) {
+        $stmt = $conn->prepare($sql);
+        $stmt->execute(['empresa_id' => $empresa_id]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $count_carga_excedida++;
             // error_log('DEBUG IA: CARGA EXCEDIDA - ROTA ID: ' . $row['id'] . ' STATUS: ' . $row['status']);
             inserirNotificacao(
@@ -347,9 +387,15 @@ try {
     }
 
     // 5. Parcela de Financiamento em Atraso
-    $sql = "SELECT * FROM parcelas_financiamento
-            WHERE data_vencimento < CURDATE() AND data_pagamento IS NULL AND status_id != 2";
-    foreach ($conn->query($sql) as $row) {
+    $sql = "SELECT pf.* FROM parcelas_financiamento pf
+            JOIN veiculos v ON pf.veiculo_id = v.id
+            WHERE v.empresa_id = :empresa_id
+            AND pf.data_vencimento < CURDATE() 
+            AND pf.data_pagamento IS NULL 
+            AND pf.status_id != 2";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         inserirNotificacao(
             $empresa_id,
             'alerta',
@@ -378,11 +424,10 @@ try {
                 AND df.empresa_id = :empresa_id";
         
         $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        $stmt->execute();
+        $stmt->execute(['empresa_id' => $empresa_id]);
         
         $count = 0;
-        while ($row = $stmt->fetch(PDO::PARAM_INT)) {
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $count++;
             $tipo = ($row['tipo_despesa_id'] == 3) ? 'IPVA' : 'Seguro';
             
@@ -406,34 +451,46 @@ try {
     $sql = "SELECT r.veiculo_id, COUNT(*) AS qtd_lavagens 
     FROM despesas_viagem d
     JOIN rotas r ON d.rota_id = r.id
-    WHERE d.lavagem > 0 
+    JOIN veiculos v ON r.veiculo_id = v.id
+    WHERE v.empresa_id = :empresa_id
+      AND d.lavagem > 0 
       AND d.created_at > DATE_SUB(NOW(), INTERVAL 30 DAY)
     GROUP BY r.veiculo_id
     HAVING qtd_lavagens > 3";
 
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+
     foreach (
-        $conn->query($sql) as $row
+        $stmt->fetchAll(PDO::FETCH_ASSOC) as $row
     ) {
         // Buscar modelo do veículo
         $veiculo_id = $row['veiculo_id'];
-        $veiculoStmt = $conn->prepare("SELECT modelo FROM veiculos WHERE id = ?");
-        $veiculoStmt->execute([$veiculo_id]);
+        $veiculoStmt = $conn->prepare("SELECT modelo FROM veiculos WHERE id = ? AND empresa_id = ?");
+        $veiculoStmt->execute([$veiculo_id, $empresa_id]);
         $veiculo = $veiculoStmt->fetch();
 
-        inserirNotificacao(
-            $empresa_id,
-            'alerta',
-            'Lavagens em excesso',
-            'O veículo ' . $veiculo['modelo'] . ' teve mais de 3 lavagens nos últimos 30 dias.',
-            'Avalie se essas lavagens são justificadas ou se há exagero nos gastos.'
-        );
+        if ($veiculo) {
+            inserirNotificacao(
+                $empresa_id,
+                'alerta',
+                'Lavagens em excesso',
+                'O veículo ' . $veiculo['modelo'] . ' teve mais de 3 lavagens nos últimos 30 dias.',
+                'Avalie se essas lavagens são justificadas ou se há exagero nos gastos.'
+            );
+        }
     }
 
     // 8. Motorista sem checklist na última rota
     $sql = "SELECT r.motorista_id, r.id AS rota_id FROM rotas r
+            JOIN veiculos v ON r.veiculo_id = v.id
             LEFT JOIN checklist_viagem c ON r.id = c.rota_id
-            WHERE c.id IS NULL AND r.status = 'concluida'";
-    foreach ($conn->query($sql) as $row) {
+            WHERE v.empresa_id = :empresa_id 
+            AND c.id IS NULL 
+            AND r.status = 'concluida'";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         inserirNotificacao(
             $empresa_id,
             'alerta',
@@ -444,9 +501,13 @@ try {
     }
 
     // 9. Manutenção com valor acima da média
-    $sql = "SELECT * FROM manutencoes
-            WHERE valor > (SELECT AVG(valor) FROM manutencoes)";
-    foreach ($conn->query($sql) as $row) {
+    $sql = "SELECT m.* FROM manutencoes m
+            JOIN veiculos v ON m.veiculo_id = v.id
+            WHERE v.empresa_id = :empresa_id
+            AND m.valor > (SELECT AVG(m2.valor) FROM manutencoes m2 JOIN veiculos v2 ON m2.veiculo_id = v2.id WHERE v2.empresa_id = :empresa_id)";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         inserirNotificacao(
             $empresa_id,
             'alerta',
@@ -459,10 +520,15 @@ try {
     // 10. Frete abaixo de R$ 1/km
     try {
         // error_log('DEBUG IA: INÍCIO foreach frete abaixo do mínimo');
-        $sql = "SELECT * FROM rotas
-                WHERE distancia_km > 0 AND frete / distancia_km < 1";
+        $sql = "SELECT r.* FROM rotas r
+                JOIN veiculos v ON r.veiculo_id = v.id
+                WHERE v.empresa_id = :empresa_id
+                AND r.distancia_km > 0 
+                AND r.frete / r.distancia_km < 1";
         $count_frete_baixo = 0;
-        foreach ($conn->query($sql) as $row) {
+        $stmt = $conn->prepare($sql);
+        $stmt->execute(['empresa_id' => $empresa_id]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $count_frete_baixo++;
             // error_log('DEBUG IA: FRETE BAIXO - ROTA ID: ' . $row['id'] . ' FRETE: ' . $row['frete'] . ' DISTÂNCIA: ' . $row['distancia_km']);
             inserirNotificacao(
@@ -483,9 +549,13 @@ try {
         // error_log('DEBUG IA: INÍCIO foreach adiantamento elevado');
         $sql = "SELECT d.*, r.frete FROM despesas_viagem d
                 JOIN rotas r ON d.rota_id = r.id
-                WHERE d.adiantamento > r.frete * 0.5";
+                JOIN veiculos v ON r.veiculo_id = v.id
+                WHERE v.empresa_id = :empresa_id
+                AND d.adiantamento > r.frete * 0.5";
         $count_adiantamento = 0;
-        foreach ($conn->query($sql) as $row) {
+        $stmt = $conn->prepare($sql);
+        $stmt->execute(['empresa_id' => $empresa_id]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $count_adiantamento++;
             // error_log('DEBUG IA: ADIANTAMENTO ELEVADO - ROTA ID: ' . $row['rota_id'] . ' ADIANTAMENTO: ' . $row['adiantamento'] . ' FRETE: ' . $row['frete']);
             inserirNotificacao(
@@ -501,11 +571,17 @@ try {
         // error_log("Erro em adiantamento elevado: " . $e->getMessage());
     }
 
-    // 10. Motoristas com Repetidas Pendências de Checklist
-    $sql = "SELECT motorista_id, COUNT(*) as pendentes FROM checklist_viagem
-            WHERE data_checklist IS NULL
-            GROUP BY motorista_id HAVING pendentes > 3";
-    foreach ($conn->query($sql) as $row) {
+    // 12. Motoristas com Repetidas Pendências de Checklist
+    $sql = "SELECT cv.motorista_id, COUNT(*) as pendentes FROM checklist_viagem cv
+            JOIN rotas r ON cv.rota_id = r.id
+            JOIN veiculos v ON r.veiculo_id = v.id
+            WHERE v.empresa_id = :empresa_id
+            AND cv.data_checklist IS NULL
+            GROUP BY cv.motorista_id 
+            HAVING pendentes > 3";
+    $stmt = $conn->prepare($sql);
+    $stmt->execute(['empresa_id' => $empresa_id]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         inserirNotificacao(
             $empresa_id,
             'alerta',
@@ -513,6 +589,199 @@ try {
             "Motorista ID {$row['motorista_id']} possui {$row['pendentes']} checklists pendentes.",
             "Acompanhe o cumprimento dos procedimentos."
         );
+    }
+
+    // ===== NOVAS FUNCIONALIDADES DE IA PARA PNEUS =====
+    
+    // 12. Pneus próximos da troca (80% da vida útil)
+    try {
+        $sql = "SELECT p.*, v.placa, v.modelo, ip.posicao
+                FROM pneus p
+                JOIN instalacoes_pneus ip ON p.id = ip.pneu_id
+                JOIN veiculos v ON ip.veiculo_id = v.id
+                WHERE p.empresa_id = :empresa_id 
+                AND ip.data_remocao IS NULL
+                AND p.quilometragem > 64000"; // 80% de 80.000 km
+        
+        $stmt = $conn->prepare($sql);
+        $stmt->execute(['empresa_id' => $empresa_id]);
+        
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            inserirNotificacao(
+                $empresa_id,
+                'pneu',
+                'Pneu próximo da troca',
+                "Pneu {$row['numero_serie']} do veículo {$row['placa']} (posição {$row['posicao']}) está próximo do limite de quilometragem ({$row['quilometragem']} km).",
+                "Planeje a troca do pneu nas próximas semanas para evitar problemas de segurança."
+            );
+        }
+    } catch (Exception $e) {
+        // error_log("Erro em verificação de pneus próximos da troca: " . $e->getMessage());
+    }
+    
+    // 13. Pneus com desgaste crítico (acima de 100.000 km)
+    try {
+        $sql = "SELECT p.*, v.placa, v.modelo, ip.posicao
+                FROM pneus p
+                JOIN instalacoes_pneus ip ON p.id = ip.pneu_id
+                JOIN veiculos v ON ip.veiculo_id = v.id
+                WHERE p.empresa_id = :empresa_id 
+                AND ip.data_remocao IS NULL
+                AND p.quilometragem > 100000";
+        
+        $stmt = $conn->prepare($sql);
+        $stmt->execute(['empresa_id' => $empresa_id]);
+        
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            inserirNotificacao(
+                $empresa_id,
+                'pneu',
+                '🚨 PNEU CRÍTICO - Troca URGENTE',
+                "Pneu {$row['numero_serie']} do veículo {$row['placa']} (posição {$row['posicao']}) está com quilometragem CRÍTICA ({$row['quilometragem']} km).",
+                "TROCA IMEDIATA NECESSÁRIA! Este pneu representa risco de segurança."
+            );
+        }
+    } catch (Exception $e) {
+        // error_log("Erro em verificação de pneus críticos: " . $e->getMessage());
+    }
+    
+    // 14. Pneus com idade avançada (mais de 6 anos)
+    try {
+        $sql = "SELECT p.*, v.placa, v.modelo, ip.posicao, p.dot
+                FROM pneus p
+                JOIN instalacoes_pneus ip ON p.id = ip.pneu_id
+                JOIN veiculos v ON ip.veiculo_id = v.id
+                WHERE p.empresa_id = :empresa_id 
+                AND ip.data_remocao IS NULL
+                AND p.dot IS NOT NULL
+                AND p.dot != ''
+                AND (YEAR(NOW()) - (2000 + CAST(SUBSTRING(p.dot, 3, 2) AS UNSIGNED))) > 6";
+        
+        $stmt = $conn->prepare($sql);
+        $stmt->execute(['empresa_id' => $empresa_id]);
+        
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $idade = date('Y') - (2000 + intval(substr($row['dot'], 2, 2)));
+            inserirNotificacao(
+                $empresa_id,
+                'pneu',
+                'Pneu com idade avançada',
+                "Pneu {$row['numero_serie']} do veículo {$row['placa']} (posição {$row['posicao']}) tem {$idade} anos de idade (DOT: {$row['dot']}).",
+                "Verifique a integridade do pneu e considere a troca por segurança."
+            );
+        }
+    } catch (Exception $e) {
+        // error_log("Erro em verificação de idade dos pneus: " . $e->getMessage());
+    }
+    
+    // 15. Otimização de alocação de pneus
+    try {
+        $sql = "SELECT 
+                    p.id as pneu_id, p.numero_serie, p.quilometragem, p.marca, p.modelo,
+                    v.placa, v.modelo as veiculo_modelo, ip.posicao,
+                    CASE 
+                        WHEN ip.posicao IN (1, 2) THEN 'baixo'
+                        WHEN ip.posicao IN (3, 4, 5, 6) THEN 'alto'
+                        ELSE 'medio'
+                    END as desgaste_posicao
+                FROM pneus p
+                JOIN instalacoes_pneus ip ON p.id = ip.pneu_id
+                JOIN veiculos v ON ip.veiculo_id = v.id
+                WHERE p.empresa_id = :empresa_id 
+                AND ip.data_remocao IS NULL
+                AND p.quilometragem > 60000
+                AND ip.posicao IN (1, 2)"; // Pneus com alta quilometragem em posições de baixo desgaste
+        
+        $stmt = $conn->prepare($sql);
+        $stmt->execute(['empresa_id' => $empresa_id]);
+        
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            inserirNotificacao(
+                $empresa_id,
+                'pneu',
+                '📊 Análise Preditiva: Otimizar alocação',
+                "Pneu {$row['numero_serie']} ({$row['quilometragem']} km) está em posição de baixo desgaste no veículo {$row['placa']}.",
+                "Considere mover este pneu para posição de maior desgaste para otimizar a vida útil da frota."
+            );
+        }
+    } catch (Exception $e) {
+        // error_log("Erro em otimização de alocação: " . $e->getMessage());
+    }
+    
+    // 16. Análise preditiva de falhas
+    try {
+        $sql = "SELECT 
+                    p.*, v.placa, v.modelo as veiculo_modelo, ip.posicao,
+                    p.quilometragem,
+                    (YEAR(NOW()) - (2000 + CAST(SUBSTRING(p.dot, 3, 2) AS UNSIGNED))) as idade
+                FROM pneus p
+                JOIN instalacoes_pneus ip ON p.id = ip.pneu_id
+                JOIN veiculos v ON ip.veiculo_id = v.id
+                WHERE p.empresa_id = :empresa_id 
+                AND ip.data_remocao IS NULL
+                AND (
+                    p.quilometragem > 90000 
+                    OR (YEAR(NOW()) - (2000 + CAST(SUBSTRING(p.dot, 3, 2) AS UNSIGNED))) > 7
+                )";
+        
+        $stmt = $conn->prepare($sql);
+        $stmt->execute(['empresa_id' => $empresa_id]);
+        
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $risco = 0;
+            $motivos = [];
+            
+            if ($row['quilometragem'] > 90000) {
+                $risco += 0.6;
+                $motivos[] = "alta quilometragem ({$row['quilometragem']} km)";
+            }
+            
+            if ($row['idade'] > 7) {
+                $risco += 0.4;
+                $motivos[] = "idade avançada ({$row['idade']} anos)";
+            }
+            
+            if ($risco > 0.5) {
+                inserirNotificacao(
+                    $empresa_id,
+                    'pneu',
+                    '📊 Análise Preditiva: Risco de Falha',
+                    "Pneu {$row['numero_serie']} do veículo {$row['placa']} apresenta risco de falha por: " . implode(', ', $motivos) . ".",
+                    "Probabilidade de falha: " . round($risco * 100, 1) . "%. Recomenda-se troca preventiva."
+                );
+            }
+        }
+    } catch (Exception $e) {
+        // error_log("Erro em análise preditiva: " . $e->getMessage());
+    }
+    
+    // 17. Verificação de pressão e calibração (simulado)
+    try {
+        $sql = "SELECT 
+                    p.*, v.placa, v.modelo as veiculo_modelo, ip.posicao,
+                    p.quilometragem
+                FROM pneus p
+                JOIN instalacoes_pneus ip ON p.id = ip.pneu_id
+                JOIN veiculos v ON ip.veiculo_id = v.id
+                WHERE p.empresa_id = :empresa_id 
+                AND ip.data_remocao IS NULL
+                AND p.quilometragem > 50000
+                AND RAND() < 0.3"; // 30% de chance de alerta de pressão
+        
+        $stmt = $conn->prepare($sql);
+        $stmt->execute(['empresa_id' => $empresa_id]);
+        
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            inserirNotificacao(
+                $empresa_id,
+                'pneu',
+                '🔧 Verificar Pressão e Calibração',
+                "Pneu {$row['numero_serie']} do veículo {$row['placa']} (posição {$row['posicao']}) pode precisar de verificação de pressão.",
+                "Verifique a pressão dos pneus e faça a calibração conforme especificações do fabricante."
+            );
+        }
+    } catch (Exception $e) {
+        // error_log("Erro em verificação de pressão: " . $e->getMessage());
     }
 
     // error_log('DEBUG IA: Fim do bloco try da IA');

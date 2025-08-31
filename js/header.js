@@ -6,9 +6,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inicializar dropdown de notificações
     initNotifications();
     
-    // Inicializar calendário (funcionalidade básica por enquanto)
-    initCalendar();
-    
     // Inicializar dropdown de perfil
     initProfileDropdown();
     
@@ -133,21 +130,7 @@ function updateNotificationCount() {
     }
 }
 
-/**
- * Inicializar funcionalidade de calendário
- */
-function initCalendar() {
-    const calendarBtn = document.getElementById('calendarBtn');
-    
-    if (!calendarBtn) return;
-    
-    calendarBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        // Por enquanto, apenas mostrar um alerta
-        alert('Funcionalidade de calendário será implementada em breve!');
-    });
-}
+
 
 /**
  * Inicializar dropdown de perfil

@@ -1,7 +1,10 @@
 <?php
 // Get the current page name from the URL
 $current_page = basename($_SERVER['PHP_SELF'], '.php');
-$page_title = ucfirst($current_page);  // Default page title
+// Only set default page title if not already defined
+if (!isset($page_title)) {
+    $page_title = ucfirst($current_page);  // Default page title
+}
 
 // Dados do usuário logado
 $nome_usuario = isset($_SESSION['nome']) ? $_SESSION['nome'] : '';
@@ -26,7 +29,7 @@ $letra = $nome_usuario ? mb_substr($nome_usuario, 0, 1, 'UTF-8') : 'U';
             <span class="notification-badge" id="iaNotificationBadge" style="display: none;">0</span>
         </button>
         <!-- Calendário -->
-        <button class="header-icon-btn" title="Calendário" id="calendarBtn" onclick="toggleCalendar()">
+        <button class="header-icon-btn" title="Calendário" id="calendarBtn" onclick="window.location.href='/sistema-frotas/calendario/'">
             <i class="fas fa-calendar-alt"></i>
         </button>
         

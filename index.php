@@ -120,6 +120,9 @@ try {
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/responsive.css">
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="logo.png">
+    
     <!-- Chart.js for analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -169,6 +172,109 @@ try {
             <div class="dashboard-content">
                 <div class="dashboard-header">
                     <h1>Bem-vindo, <?php echo htmlspecialchars($nome_usuario); ?>!</h1>
+                </div>
+                
+                <!-- Alertas Inteligentes -->
+                <div class="alertas-inteligentes mb-4" style="display: flex; gap: 16px; margin-bottom: 24px;">
+                    <?php
+                    // Buscar alertas reais do banco de dados
+                    $alertas = [];
+                    
+                    try {
+                        // 1. Manutenção urgente (veículos sem manutenção há mais de 90 dias)
+                        $sql_manutencao = "SELECT v.placa, DATEDIFF(CURRENT_DATE, ultima_manutencao.data_manutencao) as dias_sem_manutencao
+                                           FROM veiculos v 
+                                           LEFT JOIN (
+                                               SELECT veiculo_id, MAX(data_manutencao) as data_manutencao
+                                               FROM manutencoes 
+                                               WHERE empresa_id = :empresa_id
+                                               GROUP BY veiculo_id
+                                           ) ultima_manutencao ON v.id = ultima_manutencao.veiculo_id
+                                           WHERE v.empresa_id = :empresa_id2 
+                                           AND (ultima_manutencao.data_manutencao IS NULL OR DATEDIFF(CURRENT_DATE, ultima_manutencao.data_manutencao) > 90)
+                                           LIMIT 1";
+                        
+                        $stmt = $conn->prepare($sql_manutencao);
+                        $stmt->bindParam(':empresa_id', $empresa_id);
+                        $stmt->bindParam(':empresa_id2', $empresa_id);
+                        $stmt->execute();
+                        $manutencao_urgente = $stmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($manutencao_urgente) {
+                            $alertas[] = [
+                                'tipo' => 'Manutenção Urgente',
+                                'mensagem' => "Veículo {$manutencao_urgente['placa']} precisa de manutenção preventiva há " . $manutencao_urgente['dias_sem_manutencao'] . " dias.",
+                                'cor' => '#e74c3c'
+                            ];
+                        }
+                        
+                        // 2. Pneus antigos (baseado na idade do DOT - data de fabricação)
+                        $sql_pneu_antigo = "SELECT p.id, p.marca, p.modelo, p.dot,
+                                           DATEDIFF(CURRENT_DATE, STR_TO_DATE(p.dot, '%m/%y')) as dias_fabricacao
+                                           FROM pneus p 
+                                           WHERE p.empresa_id = :empresa_id 
+                                           AND p.dot IS NOT NULL 
+                                           AND p.dot != ''
+                                           AND p.dot REGEXP '^[0-9]{2}/[0-9]{2}$'
+                                           AND DATEDIFF(CURRENT_DATE, STR_TO_DATE(p.dot, '%m/%y')) > 1460
+                                           AND p.status_id IN (SELECT id FROM status_pneus WHERE nome = 'em_uso')
+                                           LIMIT 1";
+                        
+                        $stmt = $conn->prepare($sql_pneu_antigo);
+                        $stmt->bindParam(':empresa_id', $empresa_id);
+                        $stmt->execute();
+                        $pneu_antigo = $stmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($pneu_antigo) {
+                            $alertas[] = [
+                                'tipo' => 'Pneu Antigo',
+                                'mensagem' => "Pneu {$pneu_antigo['marca']} {$pneu_antigo['modelo']} com DOT {$pneu_antigo['dot']} tem mais de 4 anos.",
+                                'cor' => '#f39c12'
+                            ];
+                        }
+                        
+                        // 3. Despesa alta (combustível acima da média do mês)
+                        $sql_despesa_alta = "SELECT AVG(a.valor_total) as media_mensal, 
+                                           (SELECT SUM(valor_total) FROM abastecimentos 
+                                            WHERE empresa_id = :empresa_id 
+                                            AND MONTH(data_abastecimento) = MONTH(CURRENT_DATE)
+                                            AND YEAR(data_abastecimento) = YEAR(CURRENT_DATE)) as total_mes
+                                           FROM abastecimentos a 
+                                           WHERE a.empresa_id = :empresa_id2 
+                                           AND a.data_abastecimento >= DATE_SUB(CURRENT_DATE, INTERVAL 3 MONTH)";
+                        
+                        $stmt = $conn->prepare($sql_despesa_alta);
+                        $stmt->bindParam(':empresa_id', $empresa_id);
+                        $stmt->bindParam(':empresa_id2', $empresa_id);
+                        $stmt->execute();
+                        $despesa_data = $stmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($despesa_data && $despesa_data['total_mes'] > ($despesa_data['media_mensal'] * 1.2)) {
+                            $alertas[] = [
+                                'tipo' => 'Despesa Alta',
+                                'mensagem' => "Despesa de combustível 20% acima da média dos últimos 3 meses.",
+                                'cor' => '#2980b9'
+                            ];
+                        }
+                        
+                    } catch (Exception $e) {
+                        error_log("Erro ao buscar alertas: " . $e->getMessage());
+                    }
+                    
+                    // Se não houver alertas reais, mostrar alertas padrão
+                    if (empty($alertas)) {
+                        $alertas = [
+                            ['tipo' => 'Sistema OK', 'mensagem' => 'Todos os sistemas funcionando normalmente.', 'cor' => '#27ae60'],
+                        ];
+                    }
+                    ?>
+                    
+                    <?php foreach ($alertas as $alerta): ?>
+                        <div class="alerta-card" style="background: <?= $alerta['cor'] ?>; padding: 16px 24px; border-radius: 8px; color: #fff; font-weight: 500; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 12px;">
+                            <i class="fas fa-<?= $alerta['cor'] == '#27ae60' ? 'check-circle' : 'exclamation-triangle' ?>"></i> 
+                            <span><?= $alerta['tipo'] ?>: <?= $alerta['mensagem'] ?></span>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
                 
                 <!-- Dashboard KPIs -->
@@ -319,49 +425,46 @@ try {
                 </div>
                 
                 <!-- Gráfico Financeiro -->
-                <div class="card mb-4">
+                <div class="analytics-section">
+                    <div class="section-header">
+                        <h2>Análise Financeira</h2>
+                    </div>
+                    <div class="analytics-grid">
+                        <div class="analytics-card">
                     <div class="card-header">
-                        <h4 class="card-title mb-0">Análise Financeira</h4>
+                                <h3>Análise Financeira Geral</h3>
                     </div>
                     <div class="card-body">
                         <canvas id="financialChart"></canvas>
                     </div>
                 </div>
 
-                <!-- Gráfico de Distribuição de Despesas -->
-                <div class="card mb-4">
+                        <div class="analytics-card">
                     <div class="card-header">
-                        <h4 class="card-title mb-0">Distribuição de Despesas (<?= date('Y') ?>)</h4>
+                                <h3>Distribuição de Despesas (<?= date('Y') ?>)</h3>
                     </div>
                     <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-8">
                                 <canvas id="expensesDistributionChart"></canvas>
-                            </div>
-                            <div class="col-md-4">
-                                <div id="expensesDistributionLegend" class="mt-3"></div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
-                <!-- Gráfico de Comissões -->
-                <div class="card mb-4">
+                        <div class="analytics-card">
                     <div class="card-header">
-                        <h4 class="card-title mb-0">Comissões Pagas (<?= date('Y') ?>)</h4>
+                                <h3>Comissões Pagas (<?= date('Y') ?>)</h3>
                     </div>
                     <div class="card-body">
                         <canvas id="commissionsChart"></canvas>
                     </div>
                 </div>
 
-                <!-- Gráfico de Faturamento Líquido -->
-                <div class="card mb-4">
+                        <div class="analytics-card">
                     <div class="card-header">
-                        <h4 class="card-title mb-0">Faturamento Líquido (<?= date('Y') ?>)</h4>
+                                <h3>Faturamento Líquido (<?= date('Y') ?>)</h3>
                     </div>
                     <div class="card-body">
                         <canvas id="netRevenueChart"></canvas>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
@@ -371,32 +474,257 @@ try {
                         <h2>Atividades Recentes</h2>
                     </div>
                     <div class="card-body">
-                        <p>Nenhuma atividade recente encontrada.</p>
+                        <?php
+                        // Buscar atividades reais do banco de dados
+                        try {
+                            $atividades = [];
+                            
+                            // Últimas rotas
+                            $sql_rotas = "SELECT r.id, r.estado_origem, r.estado_destino, r.data_saida, m.nome as motorista, v.placa,
+                                         co.nome as cidade_origem, cd.nome as cidade_destino
+                                         FROM rotas r 
+                                         JOIN motoristas m ON r.motorista_id = m.id 
+                                         JOIN veiculos v ON r.veiculo_id = v.id 
+                                         LEFT JOIN cidades co ON r.cidade_origem_id = co.id
+                                         LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
+                                         WHERE r.empresa_id = :empresa_id 
+                                         ORDER BY r.data_saida DESC LIMIT 3";
+                            $stmt = $conn->prepare($sql_rotas);
+                            $stmt->bindParam(':empresa_id', $empresa_id);
+                            $stmt->execute();
+                            $rotas_recentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                            
+                            foreach ($rotas_recentes as $rota) {
+                                $origem = $rota['cidade_origem'] ? $rota['cidade_origem'] . '/' . $rota['estado_origem'] : $rota['estado_origem'];
+                                $destino = $rota['cidade_destino'] ? $rota['cidade_destino'] . '/' . $rota['estado_destino'] : $rota['estado_destino'];
+                                $atividades[] = [
+                                    'data' => date('d/m/Y', strtotime($rota['data_saida'])),
+                                    'descricao' => "Rota: {$origem} → {$destino} ({$rota['motorista']})",
+                                    'tipo' => 'rota',
+                                    'cor' => '#3498db'
+                                ];
+                            }
+                            
+                            // Últimos abastecimentos
+                            $sql_abastecimentos = "SELECT a.id, a.data_abastecimento, a.litros, a.valor_total, m.nome as motorista, v.placa 
+                                                  FROM abastecimentos a 
+                                                  JOIN motoristas m ON a.motorista_id = m.id 
+                                                  JOIN veiculos v ON a.veiculo_id = v.id 
+                                                  WHERE a.empresa_id = :empresa_id 
+                                                  ORDER BY a.data_abastecimento DESC LIMIT 3";
+                            $stmt = $conn->prepare($sql_abastecimentos);
+                            $stmt->bindParam(':empresa_id', $empresa_id);
+                            $stmt->execute();
+                            $abastecimentos_recentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                            
+                            foreach ($abastecimentos_recentes as $abastecimento) {
+                                $atividades[] = [
+                                    'data' => date('d/m/Y', strtotime($abastecimento['data_abastecimento'])),
+                                    'descricao' => "Abastecimento: {$abastecimento['placa']} - {$abastecimento['litros']}L (R$ " . number_format($abastecimento['valor_total'], 2, ',', '.') . ")",
+                                    'tipo' => 'abastecimento',
+                                    'cor' => '#e67e22'
+                                ];
+                            }
+                            
+                            // Últimas manutenções
+                            $sql_manutencoes = "SELECT m.id, m.data_manutencao, m.descricao, m.valor, v.placa 
+                                               FROM manutencoes m 
+                                               JOIN veiculos v ON m.veiculo_id = v.id 
+                                               WHERE m.empresa_id = :empresa_id 
+                                               ORDER BY m.data_manutencao DESC LIMIT 3";
+                            $stmt = $conn->prepare($sql_manutencoes);
+                            $stmt->bindParam(':empresa_id', $empresa_id);
+                            $stmt->execute();
+                            $manutencoes_recentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                            
+                            foreach ($manutencoes_recentes as $manutencao) {
+                                $atividades[] = [
+                                    'data' => date('d/m/Y', strtotime($manutencao['data_manutencao'])),
+                                    'descricao' => "Manutenção: {$manutencao['placa']} - " . substr($manutencao['descricao'], 0, 50) . "... (R$ " . number_format($manutencao['valor'], 2, ',', '.') . ")",
+                                    'tipo' => 'manutencao',
+                                    'cor' => '#f39c12'
+                                ];
+                            }
+                            
+                            // Ordenar por data (mais recentes primeiro)
+                            usort($atividades, function($a, $b) {
+                                return strtotime($b['data']) - strtotime($a['data']);
+                            });
+                            
+                            // Pegar apenas as 4 mais recentes
+                            $atividades = array_slice($atividades, 0, 4);
+                            
+                        } catch (Exception $e) {
+                            error_log("Erro ao buscar atividades recentes: " . $e->getMessage());
+                            $atividades = [];
+                        }
+                        ?>
+                        
+                        <?php if (empty($atividades)): ?>
+                            <p style="color: #666; font-style: italic;">Nenhuma atividade recente encontrada.</p>
+                        <?php else: ?>
+                            <ul style="list-style: none; padding: 0; margin: 0;">
+                                <?php foreach ($atividades as $atividade): ?>
+                                    <li style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; padding: 16px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 15px; transition: all 0.2s ease;">
+                                        <span style="font-size: 1.3rem; color: <?= $atividade['cor'] ?>; min-width: 24px;">
+                                            <i class="fas fa-<?= $atividade['tipo']=='rota'?'road':($atividade['tipo']=='abastecimento'?'gas-pump':($atividade['tipo']=='manutencao'?'wrench':'money-bill')) ?>"></i>
+                                        </span>
+                                        <div style="flex: 1;">
+                                            <div style="font-weight: 600; color: #2c3e50; margin-bottom: 4px;"><?= $atividade['descricao'] ?></div>
+                                            <div style="font-size: 0.9rem; color: #7f8c8d;"><?= $atividade['data'] ?></div>
+                                        </div>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
                     </div>
                 </div>
                 
-                <!-- Quick Actions -->
-                <div class="quick-actions">
+                <!-- Insights Inteligentes -->
                     <div class="card">
                         <div class="card-header">
-                            <h2>Ações Rápidas</h2>
+                        <h2>Insights Inteligentes</h2>
                         </div>
                         <div class="card-body">
-                            <div class="action-buttons">
-                                <a href="pages/veiculos/novo.php" class="btn btn-primary">
-                                    <i class="fas fa-plus"></i> Novo Veículo
-                                </a>
-                                <a href="pages/abastecimentos/novo.php" class="btn btn-success">
-                                    <i class="fas fa-gas-pump"></i> Registrar Abastecimento
-                                </a>
-                                <a href="pages/manutencoes/nova.php" class="btn btn-warning">
-                                    <i class="fas fa-wrench"></i> Nova Manutenção
-                                </a>
-                                <a href="pages/relatorios/geral.php" class="btn btn-info">
-                                    <i class="fas fa-chart-bar"></i> Relatórios
-                                </a>
-                            </div>
-                        </div>
+                        <?php
+                        // Buscar insights reais do banco de dados
+                        $insights = [];
+                        
+                        try {
+                            // 1. Análise de custos de manutenção por fornecedor
+                            $sql_custos_fornecedor = "SELECT f.nome as fornecedor, AVG(m.valor) as custo_medio, COUNT(*) as total_manutencoes
+                                                     FROM manutencoes m 
+                                                     JOIN fornecedores f ON m.fornecedor_id = f.id 
+                                                     WHERE m.empresa_id = :empresa_id 
+                                                     AND m.data_manutencao >= DATE_SUB(CURRENT_DATE, INTERVAL 6 MONTH)
+                                                     GROUP BY f.id 
+                                                     HAVING total_manutencoes >= 3
+                                                     ORDER BY custo_medio DESC 
+                                                     LIMIT 1";
+                            
+                            $stmt = $conn->prepare($sql_custos_fornecedor);
+                            $stmt->bindParam(':empresa_id', $empresa_id);
+                            $stmt->execute();
+                            $fornecedor_caro = $stmt->fetch(PDO::FETCH_ASSOC);
+                            
+                            if ($fornecedor_caro) {
+                                echo "Reduza custos de manutenção trocando fornecedor {$fornecedor_caro['fornecedor']} (média R$ " . number_format($fornecedor_caro['custo_medio'], 2, ',', '.') . ").";
+                            } else {
+                                // Se não há dados suficientes, buscar fornecedor com maior custo médio
+                                $sql_fornecedor_alt = "SELECT f.nome as fornecedor, AVG(m.valor) as custo_medio
+                                                      FROM manutencoes m 
+                                                      JOIN fornecedores f ON m.fornecedor_id = f.id 
+                                                      WHERE m.empresa_id = :empresa_id 
+                                                      AND m.data_manutencao >= DATE_SUB(CURRENT_DATE, INTERVAL 12 MONTH)
+                                                      GROUP BY f.id 
+                                                      ORDER BY custo_medio DESC 
+                                                      LIMIT 1";
+                                $stmt = $conn->prepare($sql_fornecedor_alt);
+                                $stmt->bindParam(':empresa_id', $empresa_id);
+                                $stmt->execute();
+                                $fornecedor_alt = $stmt->fetch(PDO::FETCH_ASSOC);
+                                
+                                if ($fornecedor_alt) {
+                                    echo "Reduza custos de manutenção trocando fornecedor {$fornecedor_alt['fornecedor']} (média R$ " . number_format($fornecedor_alt['custo_medio'], 2, ',', '.') . ").";
+                                } else {
+                                    echo "Analise os custos de manutenção por fornecedor para otimizar gastos.";
+                                }
+                            }
+                            
+                        } catch (Exception $e) {
+                            echo "Analise os custos de manutenção por fornecedor para otimizar gastos.";
+                        }
+                        ?>
+                        
+                        <ul style="list-style: disc inside; color: #2d3436; font-size: 1.1rem;">
+                            <li><?php
+                                try {
+                                    // 2. Motorista com melhor desempenho de consumo
+                                    $sql_motorista_consumo = "SELECT m.nome as motorista, 
+                                                             AVG(a.litros / NULLIF(r.distancia_km, 0)) as consumo_medio,
+                                                             COUNT(DISTINCT r.id) as total_rotas
+                                                             FROM motoristas m 
+                                                             JOIN rotas r ON m.id = r.motorista_id 
+                                                             JOIN abastecimentos a ON r.id = a.rota_id 
+                                                             WHERE m.empresa_id = :empresa_id 
+                                                             AND r.data_saida >= DATE_SUB(CURRENT_DATE, INTERVAL 3 MONTH)
+                                                             AND r.distancia_km > 0
+                                                             AND a.litros > 0
+                                                             GROUP BY m.id 
+                                                             HAVING total_rotas >= 3
+                                                             ORDER BY consumo_medio ASC 
+                                                             LIMIT 1";
+                                    
+                                    $stmt = $conn->prepare($sql_motorista_consumo);
+                                    $stmt->bindParam(':empresa_id', $empresa_id);
+                                    $stmt->execute();
+                                    $melhor_motorista = $stmt->fetch(PDO::FETCH_ASSOC);
+                                    
+                                    if ($melhor_motorista) {
+                                        $consumo_l_100km = $melhor_motorista['consumo_medio'] * 100;
+                                        echo "Motorista {$melhor_motorista['motorista']} tem melhor desempenho de consumo (" . number_format($consumo_l_100km, 1) . "L/100km).";
+                                    } else {
+                                        // Se não há dados suficientes, buscar motorista com mais rotas
+                                        $sql_motorista_alt = "SELECT m.nome as motorista, COUNT(r.id) as total_rotas
+                                                             FROM motoristas m 
+                                                             LEFT JOIN rotas r ON m.id = r.motorista_id 
+                                                             WHERE m.empresa_id = :empresa_id 
+                                                             AND r.data_saida >= DATE_SUB(CURRENT_DATE, INTERVAL 6 MONTH)
+                                                             GROUP BY m.id 
+                                                             HAVING total_rotas > 0
+                                                             ORDER BY total_rotas DESC 
+                                                             LIMIT 1";
+                                        $stmt = $conn->prepare($sql_motorista_alt);
+                                        $stmt->bindParam(':empresa_id', $empresa_id);
+                                        $stmt->execute();
+                                        $motorista_alt = $stmt->fetch(PDO::FETCH_ASSOC);
+                                        
+                                        if ($motorista_alt) {
+                                            echo "Motorista {$motorista_alt['motorista']} realizou {$motorista_alt['total_rotas']} rotas nos últimos 6 meses.";
+                                        } else {
+                                            echo "Monitore o desempenho de consumo dos motoristas para otimizar gastos com combustível.";
+                                        }
+                                    }
+                                    
+                                } catch (Exception $e) {
+                                    echo "Monitore o desempenho de consumo dos motoristas para otimizar gastos com combustível.";
+                                }
+                            ?></li>
+                            <li><?php
+                                try {
+                                    // 3. Análise de lucratividade por horário de rota
+                                    $sql_lucratividade_horario = "SELECT 
+                                                                 CASE 
+                                                                     WHEN HOUR(r.data_saida) BETWEEN 22 AND 6 THEN 'Noturno'
+                                                                     WHEN HOUR(r.data_saida) BETWEEN 6 AND 18 THEN 'Diurno'
+                                                                     ELSE 'Vespertino'
+                                                                 END as horario,
+                                                                 AVG(r.frete - r.comissao) as lucro_medio,
+                                                                 COUNT(*) as total_rotas
+                                                                 FROM rotas r 
+                                                                 WHERE r.empresa_id = :empresa_id 
+                                                                 AND r.data_saida >= DATE_SUB(CURRENT_DATE, INTERVAL 6 MONTH)
+                                                                 GROUP BY horario 
+                                                                 HAVING total_rotas >= 3
+                                                                 ORDER BY lucro_medio DESC 
+                                                                 LIMIT 1";
+                                    
+                                    $stmt = $conn->prepare($sql_lucratividade_horario);
+                                    $stmt->bindParam(':empresa_id', $empresa_id);
+                                    $stmt->execute();
+                                    $melhor_horario = $stmt->fetch(PDO::FETCH_ASSOC);
+                                    
+                                    if ($melhor_horario) {
+                                        echo "Rotas {$melhor_horario['horario']} apresentam maior lucratividade média (R$ " . number_format($melhor_horario['lucro_medio'], 2, ',', '.') . ").";
+                                    } else {
+                                        echo "Analise a lucratividade por horário de rotas para otimizar operações.";
+                                    }
+                                    
+                                } catch (Exception $e) {
+                                    echo "Analise a lucratividade por horário de rotas para otimizar operações.";
+                                }
+                            ?></li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -414,26 +742,18 @@ try {
         // Função para inicializar o gráfico de distribuição de despesas
         async function initExpensesDistributionChart() {
             try {
+                // Destroy existing chart if it exists
+                const existingChart = Chart.getChart('expensesDistributionChart');
+                if (existingChart) {
+                    existingChart.destroy();
+                }
+
                 const response = await fetch('/sistema-frotas/api/expenses_distribution.php');
                 if (!response.ok) {
                     throw new Error('Erro ao carregar dados de distribuição de despesas');
                 }
                 
                 const data = await response.json();
-                
-                // Formatar os valores para exibição
-                const formattedData = {
-                    labels: data.labels,
-                    datasets: [{
-                        ...data.datasets[0],
-                        data: data.datasets[0].data.map(value => 
-                            new Intl.NumberFormat('pt-BR', {
-                                style: 'currency',
-                                currency: 'BRL'
-                            }).format(value)
-                        )
-                    }]
-                };
                 
                 // Criar o gráfico
                 const ctx = document.getElementById('expensesDistributionChart').getContext('2d');
@@ -445,7 +765,8 @@ try {
                         maintainAspectRatio: false,
                         plugins: {
                             legend: {
-                                display: false
+                                display: true,
+                                position: 'bottom'
                             },
                             tooltip: {
                                 callbacks: {
@@ -462,27 +783,6 @@ try {
                     }
                 });
                 
-                // Criar legenda personalizada
-                const legendContainer = document.getElementById('expensesDistributionLegend');
-                data.labels.forEach((label, index) => {
-                    const color = data.datasets[0].backgroundColor[index];
-                    const value = new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                    }).format(data.datasets[0].data[index]);
-                    
-                    const legendItem = document.createElement('div');
-                    legendItem.className = 'd-flex align-items-center mb-2';
-                    legendItem.innerHTML = `
-                        <div class="me-2" style="width: 20px; height: 20px; background-color: ${color}; border-radius: 50%;"></div>
-                        <div>
-                            <div class="small text-muted">${label}</div>
-                            <div class="fw-bold">${value}</div>
-                        </div>
-                    `;
-                    legendContainer.appendChild(legendItem);
-                });
-                
             } catch (error) {
                 console.error('Erro ao carregar gráfico de distribuição de despesas:', error);
             }
@@ -491,6 +791,12 @@ try {
         // Função para inicializar o gráfico de comissões
         async function initCommissionsChart() {
             try {
+                // Destroy existing chart if it exists
+                const existingChart = Chart.getChart('commissionsChart');
+                if (existingChart) {
+                    existingChart.destroy();
+                }
+
                 const response = await fetch('/sistema-frotas/api/commissions_analytics.php');
                 if (!response.ok) {
                     throw new Error('Erro ao carregar dados de comissões');
@@ -548,6 +854,12 @@ try {
         // Função para inicializar o gráfico de faturamento líquido
         async function initNetRevenueChart() {
             try {
+                // Destroy existing chart if it exists
+                const existingChart = Chart.getChart('netRevenueChart');
+                if (existingChart) {
+                    existingChart.destroy();
+                }
+
                 const response = await fetch('/sistema-frotas/api/net_revenue_analytics.php');
                 if (!response.ok) {
                     throw new Error('Erro ao carregar dados de faturamento líquido');
@@ -606,8 +918,199 @@ try {
             }
         }
 
+        // Função para inicializar o gráfico financeiro (Faturamento x Despesas)
+        // Variáveis globais para controlar o gráfico financeiro
+        let financialChart = null;
+        let financialChartLoading = false;
+        
+        async function initFinancialChart() {
+            // Evitar múltiplas inicializações simultâneas
+            if (financialChartLoading) {
+                console.log('Gráfico financeiro já está sendo carregado...');
+                return;
+            }
+            
+            financialChartLoading = true;
+            try {
+                // Destroy existing chart if it exists
+                if (financialChart) {
+                    financialChart.destroy();
+                    financialChart = null;
+                }
+                
+                // Double check with Chart.js registry
+                const existingChart = Chart.getChart('financialChart');
+                if (existingChart) {
+                    existingChart.destroy();
+                }
+
+                // Verificar se o canvas existe
+                const canvas = document.getElementById('financialChart');
+                if (!canvas) {
+                    console.error('Canvas financialChart não encontrado');
+                    return;
+                }
+
+                const response = await fetch('/sistema-frotas/api/financial_analytics.php');
+                if (!response.ok) {
+                    throw new Error('Erro ao carregar dados financeiros');
+                }
+                
+                const data = await response.json();
+                
+                // Criar o gráfico
+                const ctx = document.getElementById('financialChart').getContext('2d');
+                financialChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: data.labels || ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                        datasets: [
+                            {
+                                label: 'Faturamento',
+                                data: data.faturamento || [],
+                                backgroundColor: 'rgba(46, 204, 64, 0.8)',
+                                borderColor: 'rgba(46, 204, 64, 1)',
+                                borderWidth: 2,
+                                borderRadius: 4,
+                                borderSkipped: false,
+                            },
+                            {
+                                label: 'Despesas',
+                                data: data.despesas || [],
+                                backgroundColor: 'rgba(231, 76, 60, 0.8)',
+                                borderColor: 'rgba(231, 76, 60, 1)',
+                                borderWidth: 2,
+                                borderRadius: 4,
+                                borderSkipped: false,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    usePointStyle: true,
+                                    padding: 20,
+                                    font: {
+                                        size: 12,
+                                        weight: '500'
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                titleColor: '#fff',
+                                bodyColor: '#fff',
+                                borderColor: 'rgba(255, 255, 255, 0.1)',
+                                borderWidth: 1,
+                                cornerRadius: 6,
+                                displayColors: true,
+                                callbacks: {
+                                    label: function(context) {
+                                        const value = context.raw;
+                                        const formattedValue = new Intl.NumberFormat('pt-BR', {
+                                            style: 'currency',
+                                            currency: 'BRL'
+                                        }).format(value);
+                                        return `${context.dataset.label}: ${formattedValue}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: {
+                                    display: false
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 11
+                                    }
+                                }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.1)',
+                                    lineWidth: 1
+                                },
+                                ticks: {
+                                    font: {
+                                        size: 11
+                                    },
+                                    callback: function(value) {
+                                        return new Intl.NumberFormat('pt-BR', {
+                                            style: 'currency',
+                                            currency: 'BRL',
+                                            maximumFractionDigits: 0
+                                        }).format(value);
+                                    }
+                                }
+                            }
+                        },
+                        interaction: {
+                            intersect: false,
+                            mode: 'index'
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Erro ao carregar gráfico financeiro:', error);
+                
+                // Criar gráfico com dados padrão em caso de erro
+                const ctx = document.getElementById('financialChart').getContext('2d');
+                financialChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+                        datasets: [
+                            {
+                                label: 'Faturamento',
+                                data: [<?php echo $total_fretes; ?>, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                                backgroundColor: 'rgba(46, 204, 64, 0.8)',
+                                borderColor: 'rgba(46, 204, 64, 1)',
+                                borderWidth: 2,
+                                borderRadius: 4,
+                            },
+                            {
+                                label: 'Despesas',
+                                data: [<?php echo ($total_desp_viagem + $total_desp_fixas + $total_contas_pagas + $total_manutencoes + $total_pneu_manutencao + $total_parcelas_financiamento); ?>, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                                backgroundColor: 'rgba(231, 76, 60, 0.8)',
+                                borderColor: 'rgba(231, 76, 60, 1)',
+                                borderWidth: 2,
+                                borderRadius: 4,
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } finally {
+                financialChartLoading = false;
+            }
+        }
+
         // Inicializar os gráficos quando a página carregar
         document.addEventListener('DOMContentLoaded', function() {
+            initFinancialChart();
             initExpensesDistributionChart();
             initCommissionsChart();
             initNetRevenueChart();

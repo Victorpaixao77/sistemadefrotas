@@ -17,18 +17,18 @@ class Recomendacoes {
     public function gerarRecomendacoesRotas() {
         try {
             $sql = "SELECT 
-                r.cidade_origem_id as origem,
-                r.cidade_destino_id as destino,
+                CONCAT(r.estado_origem, ' - ', r.cidade_origem_id) as origem,
+                CONCAT(r.estado_destino, ' - ', r.cidade_destino_id) as destino,
                 COUNT(DISTINCT r.veiculo_id) as num_veiculos,
                 AVG(TIMESTAMPDIFF(HOUR, r.data_saida, r.data_chegada)) as tempo_medio,
                 AVG(r.distancia_km) as distancia_media,
-                COUNT(DISTINCT r.data_rota) as num_viagens,
+                COUNT(DISTINCT r.data_saida) as num_viagens,
                 GROUP_CONCAT(DISTINCT v.placa) as veiculos
             FROM rotas r
             JOIN veiculos v ON r.veiculo_id = v.id
             WHERE v.empresa_id = :empresa_id
-            AND r.data_rota >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-            GROUP BY r.cidade_origem_id, r.cidade_destino_id
+            AND r.data_saida >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            GROUP BY r.estado_origem, r.cidade_origem_id, r.estado_destino, r.cidade_destino_id
             HAVING num_viagens > 5";
 
             $stmt = $this->pdo->prepare($sql);
@@ -48,7 +48,8 @@ class Recomendacoes {
                             "Adicionar mais veículos para esta rota",
                             "Verificar disponibilidade de outros veículos da frota",
                             "Considerar ajustar o cronograma de viagens"
-                        ]
+                        ],
+                        'data_criacao' => date('Y-m-d H:i:s')
                     ];
                 }
 
@@ -63,7 +64,8 @@ class Recomendacoes {
                             "Analisar alternativas de rota",
                             "Verificar horários de trânsito",
                             "Considerar dividir a rota em etapas"
-                        ]
+                        ],
+                        'data_criacao' => date('Y-m-d H:i:s')
                     ];
                 }
 
@@ -78,7 +80,8 @@ class Recomendacoes {
                             "Analisar pontos intermediários para paradas",
                             "Verificar necessidade de troca de motorista",
                             "Considerar uso de veículos mais adequados para longas distâncias"
-                        ]
+                        ],
+                        'data_criacao' => date('Y-m-d H:i:s')
                     ];
                 }
             }
@@ -131,7 +134,8 @@ class Recomendacoes {
                         "Verificar disponibilidade de oficinas",
                         "Agendar manutenção preventiva",
                         "Preparar relatório de histórico de manutenções"
-                    ]
+                    ],
+                    'data_criacao' => date('Y-m-d H:i:s')
                 ];
             }
 
@@ -156,7 +160,7 @@ class Recomendacoes {
             JOIN rotas r ON v.id = r.veiculo_id
             JOIN abastecimentos a ON v.id = a.veiculo_id
             WHERE v.empresa_id = :empresa_id
-            AND r.data_rota >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+            AND r.data_saida >= DATE_SUB(NOW(), INTERVAL 30 DAY)
             AND a.data_abastecimento >= DATE_SUB(NOW(), INTERVAL 30 DAY)
             GROUP BY v.id
             HAVING num_viagens > 5";
@@ -165,8 +169,18 @@ class Recomendacoes {
             $stmt->execute(['empresa_id' => $this->empresa_id]);
             $veiculos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+            // Verificar se há dados suficientes
+            if (count($veiculos) == 0) {
+                return [];
+            }
+
             // Calcula a média de consumo de todos os veículos
             $consumo_medio_geral = array_sum(array_column($veiculos, 'consumo_medio')) / count($veiculos);
+            
+            // Evitar divisão por zero
+            if ($consumo_medio_geral <= 0) {
+                return [];
+            }
 
             $recomendacoes = [];
             foreach ($veiculos as $veiculo) {
@@ -181,7 +195,8 @@ class Recomendacoes {
                             "Verificar pressão dos pneus",
                             "Analisar necessidade de manutenção do motor",
                             "Considerar uso de combustível alternativo"
-                        ]
+                        ],
+                        'data_criacao' => date('Y-m-d H:i:s')
                     ];
                 }
             }
@@ -222,14 +237,16 @@ class Recomendacoes {
             foreach ($veiculos as $veiculo) {
                 $recomendacoes[] = [
                     'tipo' => 'seguranca',
-                    'prioridade' => 'media',
-                    'mensagem' => "Verificar componentes de segurança do veículo {$veiculo['placa']}",
+                    'prioridade' => 'alta',
+                    'mensagem' => "Realizar verificação de segurança no veículo {$veiculo['placa']}",
                     'veiculo' => $veiculo['placa'],
                     'acoes' => [
-                        'Agendar inspeção de segurança',
-                        'Verificar componentes críticos',
-                        'Atualizar relatório de manutenção'
-                    ]
+                        "Verificar sistema de freios",
+                        "Inspecionar pneus e suspensão",
+                        "Testar sistema de direção",
+                        "Verificar documentação de segurança"
+                    ],
+                    'data_criacao' => date('Y-m-d H:i:s')
                 ];
             }
 
@@ -244,19 +261,24 @@ class Recomendacoes {
      * Obtém todas as recomendações
      */
     public function obterTodasRecomendacoes() {
-        $recomendacoes = array_merge(
-            $this->gerarRecomendacoesRotas(),
-            $this->gerarRecomendacoesManutencao(),
-            $this->gerarRecomendacoesEconomia(),
-            $this->gerarRecomendacoesSeguranca()
-        );
-        
-        // Ordena por prioridade
-        usort($recomendacoes, function($a, $b) {
-            $prioridades = ['alta' => 1, 'media' => 2, 'baixa' => 3];
-            return $prioridades[$a['prioridade']] - $prioridades[$b['prioridade']];
-        });
-        
-        return $recomendacoes;
+        try {
+            $recomendacoes = array_merge(
+                $this->gerarRecomendacoesRotas(),
+                $this->gerarRecomendacoesManutencao(),
+                $this->gerarRecomendacoesEconomia(),
+                $this->gerarRecomendacoesSeguranca()
+            );
+
+            // Ordenar por prioridade (alta, media, baixa)
+            usort($recomendacoes, function($a, $b) {
+                $prioridades = ['alta' => 3, 'media' => 2, 'baixa' => 1];
+                return $prioridades[$b['prioridade']] - $prioridades[$a['prioridade']];
+            });
+
+            return $recomendacoes;
+        } catch (Exception $e) {
+            error_log("Erro ao obter todas as recomendações: " . $e->getMessage());
+            return [];
+        }
     }
 } 

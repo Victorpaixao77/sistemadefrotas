@@ -339,7 +339,13 @@ try {
                             <td><?php echo htmlspecialchars($usuario['empresa_nome'] ?? 'N/A'); ?></td>
                             <td>
                                 <span class="badge <?php echo $usuario['tipo_usuario'] == 'admin' ? 'badge-admin' : 'badge-user'; ?>">
-                                    <?php echo ucfirst($usuario['tipo_usuario']); ?>
+                                    <?php 
+                                    $tipo_display = $usuario['tipo_usuario'];
+                                    if ($tipo_display == 'gestor') {
+                                        $tipo_display = 'Usuário';
+                                    }
+                                    echo ucfirst($tipo_display); 
+                                    ?>
                                 </span>
                             </td>
                             <td>
@@ -396,8 +402,9 @@ try {
                 <div class="form-group">
                     <label for="tipo_usuario">Tipo de Usuário:</label>
                     <select id="tipo_usuario" name="tipo_usuario" required>
-                        <option value="usuario">Usuário</option>
+                        <option value="gestor">Usuário</option>
                         <option value="admin">Administrador</option>
+                        <option value="motorista">Motorista</option>
                     </select>
                 </div>
                 <button type="submit" class="btn">Salvar</button>
@@ -439,8 +446,9 @@ try {
                 <div class="form-group">
                     <label for="edit_tipo_usuario">Tipo de Usuário:</label>
                     <select id="edit_tipo_usuario" name="tipo_usuario" required>
-                        <option value="usuario">Usuário</option>
+                        <option value="gestor">Usuário</option>
                         <option value="admin">Administrador</option>
+                        <option value="motorista">Motorista</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -471,7 +479,12 @@ try {
             document.getElementById('edit_nome').value = usuario.nome;
             document.getElementById('edit_email').value = usuario.email;
             document.getElementById('edit_empresa_id').value = usuario.empresa_adm_id;
-            document.getElementById('edit_tipo_usuario').value = usuario.tipo_usuario;
+            // Mapear o valor para o select
+            let tipoUsuario = usuario.tipo_usuario;
+            if (tipoUsuario === 'gestor') {
+                tipoUsuario = 'gestor'; // Mantém como gestor para o value
+            }
+            document.getElementById('edit_tipo_usuario').value = tipoUsuario;
             document.getElementById('edit_status').value = usuario.status;
             document.getElementById('editModal').style.display = 'block';
         }

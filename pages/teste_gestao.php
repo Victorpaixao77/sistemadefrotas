@@ -1,5 +1,13 @@
 <?php
+require_once '../includes/config.php';
+require_once '../includes/functions.php';
+
+configure_session();
 session_start();
+
+require_authentication();
+
+$page_title = "Teste de Gestão";
 
 // Debug: Verificar se a sessão está funcionando
 echo "<h1>Teste de Sessão</h1>";
@@ -19,12 +27,11 @@ echo "<p style='color: green;'>Usuário está logado!</p>";
 
 // Testar conexão com banco
 try {
-    $pdo = new PDO("mysql:host=localhost;port=3307;dbname=sistema_frotas", "root", "");
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    echo "<p style='color: green;'>Conexão com banco OK!</p>";
+    // Usar o sistema de conexão centralizado
+    $conn = getConnection();
     
     // Testar busca de veículos
-    $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM veiculos WHERE empresa_id = ?");
+    $stmt = $conn->prepare("SELECT COUNT(*) as total FROM veiculos WHERE empresa_id = ?");
     $stmt->execute([$_SESSION['empresa_id']]);
     $result = $stmt->fetch();
     echo "<p>Total de veículos: " . $result['total'] . "</p>";

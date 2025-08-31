@@ -185,24 +185,30 @@ switch ($action) {
         try {
             $conn = getConnection();
             $sql = "INSERT INTO abastecimentos (
-                        veiculo_id, data_abastecimento, tipo_combustivel,
-                        quantidade, valor_litro, valor_total, km_atual,
-                        posto, observacoes, status, fonte
+                        empresa_id, veiculo_id, motorista_id, rota_id,
+                        posto, data_abastecimento, litros, valor_litro, valor_total,
+                        km_atual, tipo_combustivel, forma_pagamento, observacoes,
+                        status, fonte
                     ) VALUES (
-                        :veiculo_id, :data_abastecimento, :tipo_combustivel,
-                        :quantidade, :valor_litro, :valor_total, :km_atual,
-                        :posto, :observacoes, 'pendente', 'motorista'
+                        :empresa_id, :veiculo_id, :motorista_id, :rota_id,
+                        :posto, :data_abastecimento, :litros, :valor_litro, :valor_total,
+                        :km_atual, :tipo_combustivel, :forma_pagamento, :observacoes,
+                        'pendente', 'motorista'
                     )";
             
             $stmt = $conn->prepare($sql);
+            $stmt->bindValue(':empresa_id', $empresa_id);
             $stmt->bindValue(':veiculo_id', $veiculo_id);
+            $stmt->bindValue(':motorista_id', $motorista_id);
+            $stmt->bindValue(':rota_id', $_POST['rota_id'] ?? null);
+            $stmt->bindValue(':posto', $posto);
             $stmt->bindValue(':data_abastecimento', $data_abastecimento);
-            $stmt->bindValue(':tipo_combustivel', $tipo_combustivel);
-            $stmt->bindValue(':quantidade', $quantidade);
+            $stmt->bindValue(':litros', $quantidade);
             $stmt->bindValue(':valor_litro', $valor_litro);
             $stmt->bindValue(':valor_total', $valor_total);
             $stmt->bindValue(':km_atual', $km_atual);
-            $stmt->bindValue(':posto', $posto);
+            $stmt->bindValue(':tipo_combustivel', $tipo_combustivel);
+            $stmt->bindValue(':forma_pagamento', $_POST['forma_pagamento'] ?? 'dinheiro');
             $stmt->bindValue(':observacoes', $observacoes);
             
             if ($stmt->execute()) {

@@ -24,7 +24,7 @@ $page_title = "Motoristas";
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Gestão de Frotas - <?php echo $page_title; ?></title>
+    <title>Gestão de Motoristas - Sistema de Frotas</title>
     
     <!-- CSS Files -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -144,6 +144,15 @@ $page_title = "Motoristas";
             height: 100%;
             width: 100%;
         }
+
+        /* Garantir que os botões do modal de motoristas tenham o mesmo tamanho dos botões do modal de veículos */
+        #motoristModal .modal-footer .btn-secondary,
+        #motoristModal .modal-footer .btn-primary {
+            min-width: 100px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -211,7 +220,7 @@ $page_title = "Motoristas";
                         <div class="card-body">
                             <div class="metric">
                                 <span class="metric-value" id="totalTrips">-</span>
-                                <span class="metric-subtitle">Disponibilidade</span>
+                                <span class="metric-subtitle">Distribuição por disponibilidade</span>
                             </div>
                         </div>
                     </div>
@@ -223,7 +232,7 @@ $page_title = "Motoristas";
                         <div class="card-body">
                             <div class="metric">
                                 <span class="metric-value" id="averageRating">-</span>
-                                <span class="metric-subtitle">Porcentagem</span>
+                                <span class="metric-subtitle">Total pago no mês</span>
                             </div>
                         </div>
                     </div>
@@ -431,7 +440,7 @@ $page_title = "Motoristas";
                 </form>
             </div>
             <div class="modal-footer">
-                <button id="cancelMotoristBtn" class="btn-secondary">Cancelar</button>
+                <button id="cancelMotoristBtn" class="btn-secondary close-modal">Cancelar</button>
                 <button id="saveMotoristBtn" class="btn-primary">Salvar</button>
             </div>
         </div>
@@ -649,6 +658,68 @@ $page_title = "Motoristas";
         </div>
     </div>
     
+    <!-- Modal de Ajuda -->
+    <div class="modal" id="helpMotoristsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Ajuda - Gestão de Motoristas</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <h3>Visão Geral</h3>
+                    <p>A página de Motoristas permite gerenciar todos os motoristas da empresa. Aqui você pode cadastrar, editar, visualizar e excluir motoristas, além de acompanhar métricas importantes de performance e eficiência.</p>
+                </div>
+
+                <div class="help-section">
+                    <h3>Funcionalidades Principais</h3>
+                    <ul>
+                        <li><strong>Novo Motorista:</strong> Cadastre um novo motorista com informações completas como dados pessoais, CNH e documentos.</li>
+                        <li><strong>Filtros:</strong> Use os filtros para encontrar motoristas específicos por status, tipo de CNH ou através da busca por texto.</li>
+                        <li><strong>Relatórios:</strong> Visualize relatórios e estatísticas de performance dos motoristas.</li>
+                        <li><strong>Análise de Eficiência:</strong> Acompanhe a eficiência financeira de cada motorista.</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Indicadores (KPIs)</h3>
+                    <ul>
+                        <li><strong>Total de Motoristas:</strong> Número total de motoristas ativos.</li>
+                        <li><strong>Motoristas Ativos:</strong> Quantidade de motoristas em operação.</li>
+                        <li><strong>Eficiência Financeira:</strong> Análise de faturamento vs despesas por motorista.</li>
+                        <li><strong>Avaliação de Desempenho:</strong> Métricas de performance em diferentes aspectos.</li>
+                        <li><strong>Distribuição por CNH:</strong> Gráfico mostrando a distribuição por tipo de CNH.</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Ações Disponíveis</h3>
+                    <ul>
+                        <li><strong>Visualizar:</strong> Veja detalhes completos do motorista, incluindo histórico de viagens e documentos.</li>
+                        <li><strong>Editar:</strong> Modifique informações de um motorista existente.</li>
+                        <li><strong>Excluir:</strong> Remova um motorista do sistema (ação irreversível).</li>
+                        <li><strong>Histórico:</strong> Acesse o histórico completo de viagens e atividades do motorista.</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Dicas Úteis</h3>
+                    <ul>
+                        <li>Mantenha os documentos dos motoristas sempre atualizados, especialmente a CNH.</li>
+                        <li>Monitore a eficiência financeira para identificar oportunidades de melhoria.</li>
+                        <li>Acompanhe o desempenho dos motoristas para treinamentos específicos.</li>
+                        <li>Utilize os filtros para encontrar motoristas específicos rapidamente.</li>
+                        <li>Analise os relatórios para otimizar a alocação de motoristas.</li>
+                        <li>Configure alertas para vencimento de documentos importantes.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('helpMotoristsModal')">Fechar</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- JavaScript Files -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
@@ -657,10 +728,10 @@ $page_title = "Motoristas";
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialize page
+        // Initialize page first (includes setupHelpButton)
         initializePage();
         
-        // Setup modal events
+        // Setup modal events after page initialization
         setupModals();
         
         // Setup filters
@@ -732,8 +803,10 @@ $page_title = "Motoristas";
                                         if (label) {
                                             label += ': ';
                                         }
-                                        if (context.parsed.y !== null) {
+                                        if (context.parsed && context.parsed.y !== null && context.parsed.y !== undefined) {
                                             label += formatCurrency(context.parsed.y);
+                                        } else {
+                                            label += formatCurrency(0);
                                         }
                                         return label;
                                     }
@@ -796,8 +869,10 @@ $page_title = "Motoristas";
                                         if (label) {
                                             label += ': ';
                                         }
-                                        if (context.parsed.value !== null) {
+                                        if (context.parsed && context.parsed.value !== null && context.parsed.value !== undefined) {
                                             label += context.parsed.value.toFixed(1) + '%';
+                                        } else {
+                                            label += '0.0%';
                                         }
                                         return label;
                                     }

@@ -110,6 +110,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../logo.png">
+    
     <!-- jQuery and jQuery Mask Plugin -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js"></script>
@@ -177,6 +180,63 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .user-profile.active .profile-dropdown-icon {
             transform: rotate(180deg);
         }
+        
+        /* Estilos das seções organizadas */
+        .card.mb-4 {
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--card-border-radius);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .card.mb-4:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .card-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .card-header h2 i {
+            color: var(--primary-color);
+            font-size: 1.1rem;
+        }
+        
+        .form-group-full {
+            grid-column: 1 / -1;
+        }
+        
+        .form-actions.text-center {
+            text-align: center;
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: var(--card-border-radius);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-lg {
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-lg:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-lg i {
+            margin-right: 8px;
+        }
     </style>
 </head>
 <body>
@@ -197,105 +257,140 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <?php echo displayFlashMessage(); ?>
                 
-                <!-- Main Content -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2>Dados da Empresa</h2>
+                <form method="POST">
+                    <!-- Seção: Informações Básicas -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h2><i class="fas fa-building"></i> Informações Básicas da Empresa</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="razaoSocial">Razão Social *</label>
+                                    <input type="text" id="razaoSocial" name="razao_social" 
+                                           value="<?php echo htmlspecialchars($companyData['razao_social'] ?? ''); ?>" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="nomeFantasia">Nome Fantasia</label>
+                                    <input type="text" id="nomeFantasia" name="nome_fantasia" 
+                                           value="<?php echo htmlspecialchars($companyData['nome_fantasia'] ?? ''); ?>">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="responsavel">Responsável</label>
+                                    <input type="text" id="responsavel" name="responsavel" 
+                                           value="<?php echo htmlspecialchars($companyData['responsavel'] ?? ''); ?>">
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <form method="POST" class="form-grid">
-                            <div class="form-group">
-                                <label for="razaoSocial">Razão Social *</label>
-                                <input type="text" id="razaoSocial" name="razao_social" 
-                                       value="<?php echo htmlspecialchars($companyData['razao_social'] ?? ''); ?>" required>
+                    
+                    <!-- Seção: Documentos Fiscais -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h2><i class="fas fa-file-invoice"></i> Documentos Fiscais</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="cnpj">CNPJ *</label>
+                                    <input type="text" id="cnpj" name="cnpj" 
+                                           value="<?php echo htmlspecialchars($companyData['cnpj'] ?? ''); ?>" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="inscricaoEstadual">Inscrição Estadual</label>
+                                    <input type="text" id="inscricaoEstadual" name="inscricao_estadual" 
+                                           value="<?php echo htmlspecialchars($companyData['inscricao_estadual'] ?? ''); ?>">
+                                </div>
                             </div>
-                            
-                            <div class="form-group">
-                                <label for="nomeFantasia">Nome Fantasia</label>
-                                <input type="text" id="nomeFantasia" name="nome_fantasia" 
-                                       value="<?php echo htmlspecialchars($companyData['nome_fantasia'] ?? ''); ?>">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="cnpj">CNPJ *</label>
-                                <input type="text" id="cnpj" name="cnpj" 
-                                       value="<?php echo htmlspecialchars($companyData['cnpj'] ?? ''); ?>" required>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="inscricaoEstadual">Inscrição Estadual</label>
-                                <input type="text" id="inscricaoEstadual" name="inscricao_estadual" 
-                                       value="<?php echo htmlspecialchars($companyData['inscricao_estadual'] ?? ''); ?>">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="responsavel">Responsável</label>
-                                <input type="text" id="responsavel" name="responsavel" 
-                                       value="<?php echo htmlspecialchars($companyData['responsavel'] ?? ''); ?>">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="telefone">Telefone</label>
-                                <input type="text" id="telefone" name="telefone" 
-                                       value="<?php echo htmlspecialchars($companyData['telefone'] ?? ''); ?>">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="email">E-mail</label>
-                                <input type="email" id="email" name="email" 
-                                       value="<?php echo htmlspecialchars($companyData['email'] ?? ''); ?>">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="endereco">Endereço</label>
-                                <input type="text" id="endereco" name="endereco" 
-                                       value="<?php echo htmlspecialchars($companyData['endereco'] ?? ''); ?>">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="cidade">Cidade</label>
-                                <input type="text" id="cidade" name="cidade" 
-                                       value="<?php echo htmlspecialchars($companyData['cidade'] ?? ''); ?>">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="estado">Estado</label>
-                                <select id="estado" name="estado">
-                                    <option value="">Selecione...</option>
-                                    <?php
-                                    $estados = array(
-                                        'AC' => 'Acre', 'AL' => 'Alagoas', 'AP' => 'Amapá', 'AM' => 'Amazonas',
-                                        'BA' => 'Bahia', 'CE' => 'Ceará', 'DF' => 'Distrito Federal',
-                                        'ES' => 'Espírito Santo', 'GO' => 'Goiás', 'MA' => 'Maranhão',
-                                        'MT' => 'Mato Grosso', 'MS' => 'Mato Grosso do Sul', 'MG' => 'Minas Gerais',
-                                        'PA' => 'Pará', 'PB' => 'Paraíba', 'PR' => 'Paraná', 'PE' => 'Pernambuco',
-                                        'PI' => 'Piauí', 'RJ' => 'Rio de Janeiro', 'RN' => 'Rio Grande do Norte',
-                                        'RS' => 'Rio Grande do Sul', 'RO' => 'Rondônia', 'RR' => 'Roraima',
-                                        'SC' => 'Santa Catarina', 'SP' => 'São Paulo', 'SE' => 'Sergipe',
-                                        'TO' => 'Tocantins'
-                                    );
-                                    
-                                    foreach ($estados as $uf => $nome) {
-                                        $selected = ($companyData['estado'] ?? '') === $uf ? 'selected' : '';
-                                        echo "<option value=\"$uf\" $selected>$nome</option>";
-                                    }
-                                    ?>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="cep">CEP</label>
-                                <input type="text" id="cep" name="cep" 
-                                       value="<?php echo htmlspecialchars($companyData['cep'] ?? ''); ?>">
-                            </div>
-                            
-                            <div class="form-actions">
-                                <button type="submit" class="btn btn-primary">Salvar Alterações</button>
-                                <button type="reset" class="btn btn-secondary">Cancelar</button>
-                            </div>
-                        </form>
+                        </div>
                     </div>
-                </div>
+                    
+                    <!-- Seção: Contato -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h2><i class="fas fa-phone"></i> Informações de Contato</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="telefone">Telefone</label>
+                                    <input type="text" id="telefone" name="telefone" 
+                                           value="<?php echo htmlspecialchars($companyData['telefone'] ?? ''); ?>">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="email">E-mail</label>
+                                    <input type="email" id="email" name="email" 
+                                           value="<?php echo htmlspecialchars($companyData['email'] ?? ''); ?>">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Seção: Endereço -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h2><i class="fas fa-map-marker-alt"></i> Endereço</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-grid">
+                                <div class="form-group form-group-full">
+                                    <label for="endereco">Logradouro</label>
+                                    <input type="text" id="endereco" name="endereco" 
+                                           value="<?php echo htmlspecialchars($companyData['endereco'] ?? ''); ?>"
+                                           placeholder="Rua, Avenida, etc.">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="cidade">Cidade</label>
+                                    <input type="text" id="cidade" name="cidade" 
+                                           value="<?php echo htmlspecialchars($companyData['cidade'] ?? ''); ?>">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="estado">Estado</label>
+                                    <select id="estado" name="estado">
+                                        <option value="">Selecione...</option>
+                                        <?php
+                                        $estados = array(
+                                            'AC' => 'Acre', 'AL' => 'Alagoas', 'AP' => 'Amapá', 'AM' => 'Amazonas',
+                                            'BA' => 'Bahia', 'CE' => 'Ceará', 'DF' => 'Distrito Federal',
+                                            'ES' => 'Espírito Santo', 'GO' => 'Goiás', 'MA' => 'Maranhão',
+                                            'MT' => 'Mato Grosso', 'MS' => 'Mato Grosso do Sul', 'MG' => 'Minas Gerais',
+                                            'PA' => 'Pará', 'PB' => 'Paraíba', 'PR' => 'Paraná', 'PE' => 'Pernambuco',
+                                            'PI' => 'Piauí', 'RJ' => 'Rio de Janeiro', 'RN' => 'Rio Grande do Norte',
+                                            'RS' => 'Rio Grande do Sul', 'RO' => 'Rondônia', 'RR' => 'Roraima',
+                                            'SC' => 'Santa Catarina', 'SP' => 'São Paulo', 'SE' => 'Sergipe',
+                                            'TO' => 'Tocantins'
+                                        );
+                                        
+                                        foreach ($estados as $uf => $nome) {
+                                            $selected = ($companyData['estado'] ?? '') === $uf ? 'selected' : '';
+                                            echo "<option value=\"$uf\" $selected>$nome</option>";
+                                        }
+                                        ?>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="cep">CEP</label>
+                                    <input type="text" id="cep" name="cep" 
+                                           value="<?php echo htmlspecialchars($companyData['cep'] ?? ''); ?>">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Botão de Ação -->
+                    <div class="form-actions text-center">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save"></i> Salvar Alterações
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

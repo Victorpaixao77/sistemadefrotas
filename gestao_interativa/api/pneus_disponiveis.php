@@ -1,13 +1,31 @@
 <?php
 header('Content-Type: application/json');
 
+// Prevenir qualquer saída antes do JSON
+ob_start();
+
+// Incluir configuração de sessão do sistema principal
+require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/db_connect.php';
+
+// Iniciar sessão se não estiver ativa
+if (session_status() === PHP_SESSION_NONE) {
+    configure_session();
+    session_start();
+}
+
 try {
-    $empresa_id = isset($_GET['empresa_id']) ? intval($_GET['empresa_id']) : 1;
+    // Verificar se o usuário está logado e obter empresa_id da sessão
+    if (!isset($_SESSION['empresa_id'])) {
+        throw new Exception('Usuário não autenticado ou empresa não identificada');
+    }
     
-    $pdo = new PDO("mysql:host=localhost;port=3307;dbname=sistema_frotas", "root", "");
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $empresa_id = intval($_SESSION['empresa_id']);
     
-    // Buscar pneus disponíveis (não alocados)
+    // Usar a mesma conexão do sistema principal
+    $pdo = getConnection();
+    
+    // Buscar pneus disponíveis (não alocados) - APENAS da empresa logada
     $sql = "SELECT 
             p.id,
             p.numero_serie,
@@ -35,7 +53,7 @@ try {
             END as status
             FROM pneus p
             LEFT JOIN status_pneus sp ON sp.id = p.status_id
-            WHERE p.empresa_id = ?
+            WHERE p.empresa_id = ? -- Filtrar apenas pneus da empresa logada
             AND p.id NOT IN (
                 SELECT pneu_id 
                 FROM instalacoes_pneus 
@@ -46,7 +64,6 @@ try {
     
     $stmt = $pdo->prepare($sql);
     $stmt->execute([$empresa_id]);
-    
     $pneus = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Formatar dados para exibição
@@ -63,12 +80,19 @@ try {
         }
     }
     
+    // Limpar qualquer saída anterior
+    ob_clean();
+    
     echo json_encode([
         'success' => true,
-        'pneus' => $pneus
+        'pneus' => $pneus,
+        'empresa_id' => $empresa_id // Para debug
     ]);
     
 } catch (Exception $e) {
+    // Limpar qualquer saída anterior
+    ob_clean();
+    
     echo json_encode([
         'success' => false,
         'error' => $e->getMessage()

@@ -20,7 +20,7 @@ function getMotoristas($page = 1) {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
-        $limit = 5; // Registros por página
+        $limit = 10; // Registros por página
         $offset = ($page - 1) * $limit;
         
         // Primeiro, conta o total de registros
@@ -32,11 +32,11 @@ function getMotoristas($page = 1) {
         
         // Consulta paginada
         $sql = "SELECT m.*, 
-                s.nome as status_nome,
-                c.nome as categoria_nome
+                d.nome as disponibilidade_nome,
+                c.nome as categoria_cnh_nome
                 FROM motoristas m
-                LEFT JOIN status_motoristas s ON m.status_id = s.id
-                LEFT JOIN categorias_motoristas c ON m.categoria_id = c.id
+                LEFT JOIN disponibilidades d ON m.disponibilidade_id = d.id
+                LEFT JOIN categorias_cnh c ON m.categoria_cnh_id = c.id
                 WHERE m.empresa_id = :empresa_id
                 ORDER BY m.nome ASC
                 LIMIT :limit OFFSET :offset";
@@ -86,21 +86,74 @@ $total_paginas = $resultado['total_paginas'];
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../logo.png">
+
+    <style>
+        .motorist-details {
+            padding: 20px 0;
+        }
+        
+        .detail-section {
+            margin-bottom: 30px;
+        }
+        
+        .detail-section h3 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .detail-item label {
+            font-weight: bold;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .detail-item span {
+            color: #333;
+            font-size: 1em;
+            padding: 8px 12px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 3px solid #007bff;
+        }
+    </style>
+    
+    <!-- Custom scripts -->
+    <script src="../js/theme.js"></script>
+    <script src="../js/sidebar.js"></script>
+    <script src="../js/motoristas.js"></script>
 </head>
 <body>
     <div class="app-container">
+        <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
         
+        <!-- Main Content -->
         <div class="main-content">
+            <!-- Top Header -->
             <?php include '../includes/header.php'; ?>
             
+            <!-- Page Content -->
             <div class="dashboard-content">
                 <div class="dashboard-header">
-                    <h1>Gestão de Motoristas</h1>
+                    <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
-                        <button id="addMotoristBtn" class="btn-add-widget">
-                            <i class="fas fa-plus"></i> Novo Motorista
-                        </button>
                         <div class="view-controls">
                             <button id="filterBtn" class="btn-restore-layout" title="Filtros">
                                 <i class="fas fa-filter"></i>
@@ -115,154 +168,316 @@ $total_paginas = $resultado['total_paginas'];
                     </div>
                 </div>
                 
-                <!-- DASHBOARD CARDS -->
+                <!-- KPI Cards Row -->
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Total de Motoristas Ativos</h3></div>
-                        <div class="card-body"><div class="metric"><span class="metric-value" id="kpiTotalAtivos">0</span><span class="metric-subtitle">Ativos</span></div></div>
+                        <div class="card-header">
+                            <h3>Motoristas Ativos</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="metric">
+                                <span class="metric-value" id="kpiTotalAtivos">0</span>
+                                <span class="metric-subtitle">Total ativos</span>
+                            </div>
+                        </div>
                     </div>
+                    
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Checklists Pendentes</h3></div>
-                        <div class="card-body"><div class="metric"><span class="metric-value" id="kpiChecklistsPendentes">0</span><span class="metric-subtitle">Pendentes</span></div></div>
+                        <div class="card-header">
+                            <h3>Checklists Pendentes</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="metric">
+                                <span class="metric-value" id="kpiChecklistsPendentes">0</span>
+                                <span class="metric-subtitle">Pendentes</span>
+                            </div>
+                        </div>
                     </div>
+                    
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Infrações Recentes</h3></div>
-                        <div class="card-body"><div class="metric"><span class="metric-value" id="kpiInfracoesRecentes">0</span><span class="metric-subtitle">Últimos 30 dias</span></div></div>
+                        <div class="card-header">
+                            <h3>Infrações Recentes</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="metric">
+                                <span class="metric-value" id="kpiInfracoesRecentes">0</span>
+                                <span class="metric-subtitle">Últimos 30 dias</span>
+                            </div>
+                        </div>
                     </div>
+                    
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Melhor Eficiência</h3></div>
-                        <div class="card-body"><div class="metric"><span class="metric-value" id="kpiMelhorEficiencia">-</span><span class="metric-subtitle">Km/L</span></div></div>
+                        <div class="card-header">
+                            <h3>Melhor Eficiência</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="metric">
+                                <span class="metric-value" id="kpiMelhorEficiencia">-</span>
+                                <span class="metric-subtitle">Km/L</span>
+                            </div>
+                        </div>
                     </div>
+                    
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Mais Viagens no Mês</h3></div>
-                        <div class="card-body"><div class="metric"><span class="metric-value" id="kpiMaisViagens">-</span><span class="metric-subtitle">Motorista</span></div></div>
+                        <div class="card-header">
+                            <h3>Mais Viagens</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="metric">
+                                <span class="metric-value" id="kpiMaisViagens">-</span>
+                                <span class="metric-subtitle">Motorista</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
-                <?php echo displayFlashMessage(); ?>
+                <!-- Search and Filter -->
+                <div class="filter-section">
+                    <div class="search-box">
+                        <input type="text" id="searchMotorist" placeholder="Buscar motorista...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    
+                    <div class="filter-options">
+                        <select id="statusFilter">
+                            <option value="">Todos os status</option>
+                            <option value="Ativo">Ativo</option>
+                            <option value="Inativo">Inativo</option>
+                            <option value="Férias">Férias</option>
+                            <option value="Afastado">Afastado</option>
+                        </select>
+                        
+                        <select id="categoriaFilter">
+                            <option value="">Todas as categorias</option>
+                            <option value="A">Categoria A</option>
+                            <option value="B">Categoria B</option>
+                            <option value="C">Categoria C</option>
+                            <option value="D">Categoria D</option>
+                            <option value="E">Categoria E</option>
+                        </select>
+                    </div>
+                </div>
                 
-                <div class="card">
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Nome</th>
-                                        <th>CNH</th>
-                                        <th>Categoria</th>
-                                        <th>Status</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($motoristas as $motorista): ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars($motorista['nome']); ?></td>
-                                        <td><?php echo htmlspecialchars($motorista['cnh']); ?></td>
-                                        <td><?php echo htmlspecialchars($motorista['categoria_nome']); ?></td>
-                                        <td>
-                                            <span class="status-badge status-<?php echo $motorista['status_id']; ?>">
-                                                <?php echo htmlspecialchars($motorista['status_nome']); ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="action-buttons">
-                                                <a href="view_motorista.php?id=<?php echo $motorista['id']; ?>" class="btn btn-info btn-sm" title="Visualizar">
-                                                    <i class="fas fa-eye"></i>
-                                                </a>
-                                                <a href="edit_motorista.php?id=<?php echo $motorista['id']; ?>" class="btn btn-warning btn-sm" title="Editar">
-                                                    <i class="fas fa-edit"></i>
-                                                </a>
-                                                <button type="button" class="btn btn-danger btn-sm" title="Excluir" onclick="confirmDelete(<?php echo $motorista['id']; ?>)">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                    
-                                    <?php if (empty($motoristas)): ?>
-                                    <tr>
-                                        <td colspan="5" class="text-center">Nenhum motorista encontrado</td>
-                                    </tr>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
+                <!-- Motorists Table -->
+                <div class="data-table-container">
+                    <table class="data-table" id="motoristTable">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>CNH</th>
+                                <th>Categoria</th>
+                                <th>Status</th>
+                                <th>Telefone</th>
+                                <th>Validade CNH</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($motoristas as $motorista): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($motorista['nome']); ?></td>
+                                <td><?php echo htmlspecialchars($motorista['cnh']); ?></td>
+                                <td><?php echo htmlspecialchars($motorista['categoria_cnh_nome'] ?? '-'); ?></td>
+                                <td>
+                                    <span class="status-badge status-<?php echo $motorista['disponibilidade_id'] ?? '1'; ?>">
+                                        <?php echo htmlspecialchars($motorista['disponibilidade_nome'] ?? 'Ativo'); ?>
+                                    </span>
+                                </td>
+                                <td><?php echo htmlspecialchars($motorista['telefone'] ?? '-'); ?></td>
+                                <td><?php echo $motorista['data_validade_cnh'] ? date('d/m/Y', strtotime($motorista['data_validade_cnh'])) : '-'; ?></td>
+                                <td class="actions">
+                                    <button class="btn-icon view-btn" data-id="<?php echo $motorista['id']; ?>" title="Ver detalhes">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                            
+                            <?php if (empty($motoristas)): ?>
+                            <tr>
+                                <td colspan="7" class="text-center">Nenhum motorista encontrado</td>
+                            </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                <div class="pagination">
+                    <?php if ($total_paginas > 1): ?>
+                        <a href="#" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" 
+                           onclick="return changePage(<?php echo $pagina_atual - 1; ?>)">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                        
+                        <span class="pagination-info">
+                            Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
+                        </span>
+                        
+                        <a href="#" class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>"
+                           onclick="return changePage(<?php echo $pagina_atual + 1; ?>)">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Analytics Section -->
+                <div class="analytics-section">
+                    <div class="section-header">
+                        <h2>Análise de Motoristas</h2>
+                    </div>
+                    
+                    <div class="analytics-grid">
+                        <div class="analytics-card">
+                            <div class="card-header">
+                                <h3>Ranking de Eficiência de Combustível</h3>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="chartEficienciaCombustivel"></canvas>
+                            </div>
                         </div>
                         
-                        <!-- Paginação -->
-                        <?php if ($total_paginas > 1): ?>
-                        <div class="pagination">
-                            <?php if ($pagina_atual > 1): ?>
-                            <a href="?page=<?php echo $pagina_atual - 1; ?>" class="pagination-btn">
-                                <i class="fas fa-chevron-left"></i> Anterior
-                            </a>
-                            <?php endif; ?>
-                            
-                            <span class="pagination-info">
-                                Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
-                            </span>
-                            
-                            <?php if ($pagina_atual < $total_paginas): ?>
-                            <a href="?page=<?php echo $pagina_atual + 1; ?>" class="pagination-btn">
-                                Próxima <i class="fas fa-chevron-right"></i>
-                            </a>
-                            <?php endif; ?>
+                        <div class="analytics-card">
+                            <div class="card-header">
+                                <h3>Checklists Pendentes por Motorista</h3>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="chartChecklistsPendentes"></canvas>
+                            </div>
                         </div>
-                        <?php endif; ?>
+                        
+                        <div class="analytics-card">
+                            <div class="card-header">
+                                <h3>Histórico de Infrações</h3>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="chartInfracoes"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="analytics-card">
+                            <div class="card-header">
+                                <h3>Distribuição de Viagens</h3>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="chartDistribuicaoViagens"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="analytics-card full-width">
+                            <div class="card-header">
+                                <h3>Documentação Vencida/Próxima do Vencimento</h3>
+                            </div>
+                            <div class="card-body" style="overflow-x:auto; max-height:300px;">
+                                <table class="data-table" id="tableDocumentacaoVencida">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>CNH</th>
+                                            <th>Categoria</th>
+                                            <th>Validade CNH</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+            
+            <!-- Footer -->
+            <footer class="footer">
+                <p>&copy; <?php echo date('Y'); ?> Sistema de Gestão de Frotas. Todos os direitos reservados.</p>
+            </footer>
+        </div>
+    </div>
+    
+    <!-- Modal de Visualização de Motorista -->
+    <div class="modal" id="motoristModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Detalhes do Motorista</h2>
+                <button class="close-modal" type="button" aria-label="Fechar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="motoristDetails">
+                    <!-- Detalhes do motorista serão carregados aqui -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="closeMotoristBtn">
+                    <i class="fas fa-times"></i>
+                    <span>Fechar</span>
+                </button>
+            </div>
+        </div>
+    </div>
 
-            <!-- ANALYTICS SECTION: GRÁFICOS E TABELAS -->
-            <div class="analytics-section">
-                <div class="section-header"><h2>Análises Inteligentes de Motoristas</h2></div>
-                <div class="analytics-grid">
-                    <div class="analytics-card">
-                        <div class="card-header"><h3>Ranking de Eficiência de Combustível</h3></div>
-                        <div class="card-body"><canvas id="chartEficienciaCombustivel"></canvas></div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="card-header"><h3>Checklists Pendentes por Motorista</h3></div>
-                        <div class="card-body"><canvas id="chartChecklistsPendentes"></canvas></div>
-                    </div>
+    <!-- Modal de Ajuda -->
+    <div class="modal" id="helpMotoristModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Ajuda - Gestão de Motoristas</h2>
+                <button class="close-modal" type="button" aria-label="Fechar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <h3>Visão Geral</h3>
+                    <p>A página de Gestão de Motoristas oferece uma visão completa da performance e status de todos os motoristas da empresa. Aqui você pode acompanhar eficiência, pendências e análises inteligentes.</p>
                 </div>
-                <div class="analytics-grid">
-                    <div class="analytics-card">
-                        <div class="card-header"><h3>Histórico de Infrações/Advertências</h3></div>
-                        <div class="card-body"><canvas id="chartInfracoes"></canvas></div>
-                    </div>
-                    <div class="analytics-card">
-                        <div class="card-header"><h3>Distribuição de Viagens por Motorista</h3></div>
-                        <div class="card-body"><canvas id="chartDistribuicaoViagens"></canvas></div>
-                    </div>
+
+                <div class="help-section">
+                    <h3>Funcionalidades Principais</h3>
+                    <ul>
+                        <li><strong>Visualização:</strong> Visualize detalhes completos dos motoristas cadastrados.</li>
+                        <li><strong>Filtros:</strong> Use os filtros para encontrar motoristas específicos por status ou categoria.</li>
+                        <li><strong>Exportar:</strong> Exporte os dados dos motoristas para análise externa.</li>
+                        <li><strong>Análises:</strong> Visualize relatórios e estatísticas de performance.</li>
+                    </ul>
                 </div>
-                <div class="analytics-grid">
-                    <div class="analytics-card full-width">
-                        <div class="card-header"><h3>Motoristas com Documentação Vencida/Próxima do Vencimento</h3></div>
-                        <div class="card-body" style="overflow-x:auto; max-height:300px;">
-                            <table class="data-table" id="tableDocumentacaoVencida">
-                                <thead>
-                                    <tr>
-                                        <th>Nome</th>
-                                        <th>CNH</th>
-                                        <th>Categoria</th>
-                                        <th>Validade CNH</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody></tbody>
-                            </table>
-                        </div>
-                    </div>
+
+                <div class="help-section">
+                    <h3>Indicadores (KPIs)</h3>
+                    <ul>
+                        <li><strong>Motoristas Ativos:</strong> Número de motoristas atualmente ativos.</li>
+                        <li><strong>Checklists Pendentes:</strong> Quantidade de checklists não realizados.</li>
+                        <li><strong>Infrações Recentes:</strong> Número de infrações nos últimos 30 dias.</li>
+                        <li><strong>Melhor Eficiência:</strong> Motorista com melhor km/l.</li>
+                        <li><strong>Mais Viagens:</strong> Motorista com maior número de viagens.</li>
+                    </ul>
                 </div>
+
+                <div class="help-section">
+                    <h3>Ações Disponíveis</h3>
+                    <ul>
+                        <li><strong>Visualizar:</strong> Veja detalhes completos do motorista, incluindo informações pessoais e da CNH.</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Dicas Úteis</h3>
+                    <ul>
+                        <li>Monitore regularmente a eficiência de combustível para identificar oportunidades de melhoria.</li>
+                        <li>Acompanhe os checklists pendentes para garantir a segurança da frota.</li>
+                        <li>Analise o histórico de infrações para identificar padrões e necessidades de treinamento.</li>
+                        <li>Configure alertas para vencimento de documentação importante.</li>
+                        <li>Use os rankings para reconhecer motoristas com melhor desempenho.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('helpMotoristModal')">Fechar</button>
             </div>
         </div>
     </div>
 
     <!-- JavaScript Files -->
-    <script src="../js/theme.js"></script>
-    <script src="../js/sidebar.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
     // DASHBOARDS E GRÁFICOS DE MOTORISTAS
@@ -272,7 +487,7 @@ $total_paginas = $resultado['total_paginas'];
             .then(r => r.json()).then(res => {
                 if (res.success) {
                     document.getElementById('kpiTotalAtivos').textContent = res.data.total_ativos;
-                    document.getElementById('kpiChecklistsPendentes').textContent = res.data.checklists_pendentes;
+                    document.getElementById('kpiChecklistsPendentes').textContent = res.data.checklists_recentes;
                     document.getElementById('kpiInfracoesRecentes').textContent = res.data.infracoes_recentes;
                     document.getElementById('kpiMelhorEficiencia').textContent = res.data.melhor_eficiencia;
                     document.getElementById('kpiMaisViagens').textContent = res.data.mais_viagens;
@@ -330,12 +545,26 @@ $total_paginas = $resultado['total_paginas'];
                     tbody.innerHTML = '';
                     res.data.forEach(row => {
                         const tr = document.createElement('tr');
-                        tr.innerHTML = `<td>${row.nome}</td><td>${row.cnh}</td><td>${row.categoria_nome}</td><td>${row.validade_cnh}</td><td>${row.status_nome}</td>`;
+                        tr.innerHTML = `<td>${row.nome}</td><td>${row.cnh}</td><td>${row.categoria_cnh_nome}</td><td>${row.validade_cnh}</td><td>${row.status_nome}</td>`;
                         tbody.appendChild(tr);
                     });
                 }
             });
     });
+    
+    // Função para mudar página
+    function changePage(page) {
+        window.location.href = '?page=' + page;
+        return false;
+    }
+    
+    // Função para fechar modal específico
+    function closeModal(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
     </script>
 </body>
 </html> 

@@ -10,12 +10,18 @@ require_authentication();
 $page_title = "Gestão Interativa de Pneus";
 
 try {
-    $pdo = new PDO("mysql:host=localhost;port=3307;dbname=sistema_frotas", "root", "");
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // Usar o sistema de conexão centralizado
+    $conn = getConnection();
     
-    $stmt = $pdo->prepare("SELECT * FROM veiculos WHERE empresa_id = ?");
+    // Buscar veículos com colunas corretas
+    $stmt = $conn->prepare("SELECT id, placa, modelo, marca, numero_eixos FROM veiculos WHERE empresa_id = ?");
     $stmt->execute([$_SESSION['empresa_id']]);
     $veiculos = $stmt->fetchAll();
+    
+    // Buscar posições de pneus disponíveis
+    $stmt = $conn->prepare("SELECT id, nome FROM posicoes_pneus ORDER BY nome");
+    $stmt->execute();
+    $posicoes = $stmt->fetchAll();
     
     $pneusDisponiveis = [];
     $pneusEmUso = [];
@@ -24,7 +30,7 @@ try {
     try {
         // Buscar pneus disponíveis (status_id 2 = disponível, 5 = novo/bom)
         // Pneus que não estão atualmente instalados em nenhum veículo
-        $stmt = $pdo->prepare("SELECT p.*, sp.nome as status_nome 
+        $stmt = $conn->prepare("SELECT p.*, sp.nome as status_nome 
                               FROM pneus p 
                               LEFT JOIN status_pneus sp ON p.status_id = sp.id 
                               WHERE p.empresa_id = ? AND p.status_id IN (2, 5)
@@ -32,27 +38,45 @@ try {
                                   SELECT pneu_id 
                                   FROM instalacoes_pneus 
                                   WHERE data_remocao IS NULL
+                              )
+                              AND p.id NOT IN (
+                                  SELECT pneu_id 
+                                  FROM alocacoes_pneus_flexiveis 
+                                  WHERE ativo = 1 AND data_remocao IS NULL
                               )");
         $stmt->execute([$_SESSION['empresa_id']]);
         $pneusDisponiveis = $stmt->fetchAll();
         
         error_log("Pneus disponíveis encontrados: " . count($pneusDisponiveis));
         
-        // Buscar pneus em uso (status_id 5 = em uso)
-        // Pneus que estão atualmente instalados
-        $stmt = $pdo->prepare("SELECT p.*, sp.nome as status_nome, ip.veiculo_id, ip.posicao
+        // Buscar pneus em uso (instalados + alocados no modo flexível)
+        $pneusEmUso = [];
+        
+        // 1. Pneus instalados na tabela instalacoes_pneus
+        $stmt = $conn->prepare("SELECT p.*, sp.nome as status_nome, ip.veiculo_id, ip.posicao, ip.posicao_id
                               FROM pneus p 
                               LEFT JOIN status_pneus sp ON p.status_id = sp.id 
                               INNER JOIN instalacoes_pneus ip ON p.id = ip.pneu_id
-                              WHERE p.empresa_id = ? AND p.status_id = 5
-                              AND ip.data_remocao IS NULL");
+                              WHERE p.empresa_id = ? AND ip.data_remocao IS NULL");
         $stmt->execute([$_SESSION['empresa_id']]);
-        $pneusEmUso = $stmt->fetchAll();
+        $pneusInstalados = $stmt->fetchAll();
         
-        error_log("Pneus em uso encontrados: " . count($pneusEmUso));
+        // 2. Pneus alocados no modo flexível (da tabela alocacoes_pneus_flexiveis)
+        $stmt = $conn->prepare("SELECT apf.*, p.numero_serie, p.marca, p.modelo, p.medida, p.status_id, sp.nome as status_nome
+                              FROM alocacoes_pneus_flexiveis apf
+                              INNER JOIN pneus p ON apf.pneu_id = p.id
+                              LEFT JOIN status_pneus sp ON p.status_id = sp.id
+                              WHERE apf.empresa_id = ? AND apf.ativo = 1 AND apf.data_remocao IS NULL");
+        $stmt->execute([$_SESSION['empresa_id']]);
+        $pneusFlexiveis = $stmt->fetchAll();
+        
+        // Combinar os dois arrays
+        $pneusEmUso = array_merge($pneusInstalados, $pneusFlexiveis);
+        
+        error_log("Pneus em uso encontrados: " . count($pneusEmUso) . " (instalados: " . count($pneusInstalados) . ", flexíveis: " . count($pneusFlexiveis) . ")");
         
         // Buscar pneus em manutenção (status_id 1 = furado/manutenção)
-        $stmt = $pdo->prepare("SELECT p.*, sp.nome as status_nome 
+        $stmt = $conn->prepare("SELECT p.*, sp.nome as status_nome 
                               FROM pneus p 
                               LEFT JOIN status_pneus sp ON p.status_id = sp.id 
                               WHERE p.empresa_id = ? AND p.status_id = 1");
@@ -85,6 +109,7 @@ try {
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <link rel="stylesheet" href="../css/ia_pneus_avancado.css">
     
     <style>
         /* Variáveis CSS adicionais para compatibilidade */
@@ -220,11 +245,110 @@ try {
             transform: translateY(-2px);
         }
         
+        /* ===== NOVOS ALERTAS DE PNEUS ===== */
+        .pneu-flex.pneu-alerta {
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4), 0 2px 4px rgba(245, 158, 11, 0.2);
+            border: 2px solid rgba(245, 158, 11, 0.3);
+            animation: pulse-alerta 3s infinite;
+            transition: all 0.3s ease;
+        }
+        
+        .pneu-flex.pneu-alerta:hover {
+            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.6), 0 4px 8px rgba(245, 158, 11, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .pneu-flex.pneu-pressao {
+            box-shadow: 0 4px 12px rgba(156, 39, 176, 0.4), 0 2px 4px rgba(156, 39, 176, 0.2);
+            border: 2px solid rgba(156, 39, 176, 0.3);
+            animation: pulse-pressao 2.5s infinite;
+            transition: all 0.3s ease;
+        }
+        
+        .pneu-flex.pneu-pressao:hover {
+            box-shadow: 0 6px 16px rgba(156, 39, 176, 0.6), 0 4px 8px rgba(156, 39, 176, 0.3);
+            transform: translateY(-2px);
+        }
+        
         @keyframes pulse-critico {
             0% { box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4), 0 2px 4px rgba(231, 76, 60, 0.2); }
             50% { box-shadow: 0 4px 12px rgba(231, 76, 60, 0.6), 0 2px 4px rgba(231, 76, 60, 0.4); }
             100% { box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4), 0 2px 4px rgba(231, 76, 60, 0.2); }
         }
+        
+        @keyframes pulse-alerta {
+            0% { box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4), 0 2px 4px rgba(245, 158, 11, 0.2); }
+            50% { box-shadow: 0 4px 12px rgba(245, 158, 11, 0.6), 0 2px 4px rgba(245, 158, 11, 0.4); }
+            100% { box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4), 0 2px 4px rgba(245, 158, 11, 0.2); }
+        }
+        
+        @keyframes pulse-pressao {
+            0% { box-shadow: 0 4px 12px rgba(156, 39, 176, 0.4), 0 2px 4px rgba(156, 39, 176, 0.2); }
+            50% { box-shadow: 0 4px 12px rgba(156, 39, 176, 0.6), 0 2px 4px rgba(156, 39, 176, 0.4); }
+            100% { box-shadow: 0 4px 12px rgba(156, 39, 176, 0.4), 0 2px 4px rgba(156, 39, 176, 0.2); }
+        }
+        
+        /* ===== INDICADORES DE ALERTA ===== */
+        .alerta-indicator {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid white;
+            z-index: 10;
+            animation: pulse-indicator 1.5s infinite;
+        }
+        
+        .alerta-indicator.critico {
+            background: #e74c3c;
+        }
+        
+        .alerta-indicator.atencao {
+            background: #f39c12;
+        }
+        
+        .alerta-indicator.pressao {
+            background: #9c27b0;
+        }
+        
+        @keyframes pulse-indicator {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        /* ===== LEGENDA DE ALERTAS ===== */
+        .legend-alertas {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .legend-alerta-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: var(--bg-primary);
+        }
+        
+        .legend-alerta-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid var(--border-color);
+        }
+        
+        .legend-alerta-color.critico { background: #e74c3c; }
+        .legend-alerta-color.atencao { background: #f39c12; }
+        .legend-alerta-color.pressao { background: #9c27b0; }
         
         .tire-slot {
             background: var(--bg-primary);
@@ -939,7 +1063,7 @@ try {
                             </div>
                             <div class="card-body">
                                 <div class="metric">
-                                    <span class="metric-value"><?php echo count($pneusEmUso); ?></span>
+                                    <span class="metric-value" id="pneus-em-uso-count"><?php echo count($pneusEmUso); ?></span>
                                     <span class="metric-subtitle">Instalados</span>
                                 </div>
                             </div>
@@ -963,71 +1087,7 @@ try {
                         <div class="vehicle-section">
                             <h2><i class="fas fa-truck"></i> Gestão de Pneus por Veículo</h2>
                             
-                            <ul class="nav nav-tabs" id="pneusTab" style="margin-bottom: 20px;">
-                                <li class="nav-item">
-                                    <a class="nav-link active" id="tab-padrao" href="#" onclick="mostrarModoPadrao(event)">Modo Padrão</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" id="tab-flexivel" href="#" onclick="mostrarModoFlexivel(event)">Modo Flexível</a>
-                                </li>
-                            </ul>
-
-                            <div id="area-modo-padrao">
-                                <select id="vehicleSelector" class="vehicle-selector">
-                                    <option value="">Selecione um veículo...</option>
-                                    <?php foreach ($veiculos as $veiculo): ?>
-                                        <option value="<?php echo $veiculo['id']; ?>" 
-                                                data-tipo="<?php echo $veiculo['tipo_veiculo'] ?? 'truck'; ?>"
-                                                data-placa="<?php echo $veiculo['placa']; ?>"
-                                                data-modelo="<?php echo $veiculo['modelo']; ?>">
-                                            <?php echo $veiculo['placa']; ?> - <?php echo $veiculo['modelo']; ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                
-                                <div id="vehicleInfo" class="vehicle-info" style="display: none;">
-                                    <div class="vehicle-image" id="vehicleImage">
-                                        🚛
-                                    </div>
-                                    <div class="vehicle-details">
-                                        <div class="vehicle-type" id="vehicleType">Tipo do Veículo</div>
-                                        <div class="vehicle-plate" id="vehiclePlate">Placa</div>
-                                    </div>
-                                </div>
-                                
-                                                                <!-- Legenda -->
-                                                                <div class="legend">
-                                    <div class="legend-item">
-                                        <div class="legend-color available"></div>
-                                        <span>Disponível</span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <div class="legend-color occupied"></div>
-                                        <span>Em Uso</span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <div class="legend-color alert"></div>
-                                        <span>Alerta</span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <div class="legend-color maintenance"></div>
-                                        <span>Manutenção</span>
-                                    </div>
-                                    <div class="legend-item">
-                                        <div class="legend-color critical"></div>
-                                        <span>Crítico</span>
-                                    </div>
-                                </div>
-                                
-                                <!-- Grid de Pneus -->
-                                <div class="tire-grid-container">
-                                    <div id="tireGrid" class="tire-grid">
-                                        <!-- Grid será gerado dinamicamente baseado no tipo de veículo -->
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div id="area-modo-flexivel" style="display:none;">
+                            <div id="area-modo-flexivel">
                                 <div style="margin-bottom: 16px;">
                                     <select id="veiculoSelectorFlex" class="vehicle-selector">
                                         <option value="">Selecione um veículo</option>
@@ -1040,7 +1100,6 @@ try {
                                     <button class="btn btn-primary" onclick="adicionarEixo('caminhao')">Adicionar Eixo ao Caminhão</button>
                                     <button class="btn btn-primary" onclick="adicionarEixo('carreta')">Adicionar Eixo à Carreta</button>
                                     <button class="btn btn-secondary" onclick="salvarLayoutFlexivel()">Salvar Layout</button>
-                                    <button class="btn btn-secondary" onclick="voltarModoPadrao()">Voltar ao Padrão</button>
                                 </div>
                                 <div style="margin-bottom: 16px; display: flex; gap: 16px; flex-wrap: wrap;">
                                     <button class="btn btn-danger" onclick="excluirEixo('caminhao')">Excluir Eixo do Caminhão</button>
@@ -1082,6 +1141,22 @@ try {
                                         <span>Crítico</span>
                                     </div>
                                 </div>
+                                
+                                <!-- Nova legenda de alertas inteligentes -->
+                                <div class="legend-alertas">
+                                    <div class="legend-alerta-item">
+                                        <div class="legend-alerta-color critico"></div>
+                                        <span>🚨 Crítico (Troca Urgente)</span>
+                                    </div>
+                                    <div class="legend-alerta-item">
+                                        <div class="legend-alerta-color atencao"></div>
+                                        <span>⚠️ Atenção (Planejar Troca)</span>
+                                    </div>
+                                    <div class="legend-alerta-item">
+                                        <div class="legend-alerta-color pressao"></div>
+                                        <span>🔧 Pressão/Calibração</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -1099,6 +1174,39 @@ try {
                         </div>
                     </div>
                 <?php endif; ?>
+                
+                <!-- Gráficos Interativos -->
+                <div class="analytics-section">
+                    <div class="section-header">
+                        <h2>Análise de Pneus</h2>
+                    </div>
+                    <div class="analytics-grid">
+                        <div class="analytics-card">
+                            <div class="card-header">
+                                <h3>Distribuição de Pneus por Status</h3>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="graficoPizza" width="400" height="320"></canvas>
+                            </div>
+                        </div>
+                        <div class="analytics-card">
+                            <div class="card-header">
+                                <h3>Tendência de Uso de Pneus (Últimos 6 Meses)</h3>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="graficoBarras" width="500" height="320"></canvas>
+                            </div>
+                        </div>
+                        <div class="analytics-card">
+                            <div class="card-header">
+                                <h3>Indicadores de Performance (KPIs)</h3>
+                            </div>
+                            <div class="card-body">
+                                <canvas id="graficoKPIs" width="500" height="320"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1114,16 +1222,19 @@ try {
     <!-- Feedback de Drag -->
     <div id="dragFeedback" class="drag-feedback" style="display: none;"></div>
     
-    <!-- Scripts do sistema -->
+    <!-- JavaScript Files -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
-    <script src="../js/header.js"></script>
+    <script src="../js/ia_pneus_avancado.js"></script>
 
     <script>
         const veiculosData = <?php echo json_encode($veiculos); ?>;
         let pneusDisponiveis = <?php echo json_encode($pneusDisponiveis); ?>;
         const pneusEmUso = <?php echo json_encode($pneusEmUso); ?>;
         const pneusManutencao = <?php echo json_encode($pneusManutencao); ?>;
+        
+        // Definir globalmente para compatibilidade
+        window.pneusDisponiveis = pneusDisponiveis;
         
         let veiculoSelecionado = null;
         let veiculoAtual = null;
@@ -1201,6 +1312,14 @@ try {
                     }
                 });
             }
+            
+            // Inicializar gráficos após carregar Chart.js
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js';
+            script.onload = function() {
+                setTimeout(inicializarGraficos, 500);
+            };
+            document.head.appendChild(script);
         });
         
         function carregarPneusVeiculo(veiculoId) {
@@ -1228,11 +1347,21 @@ try {
             const vehicleType = document.getElementById('vehicleType');
             const vehiclePlate = document.getElementById('vehiclePlate');
             
-            const tipo = veiculo.tipo_veiculo || 'truck';
+            // Determinar tipo baseado no número de eixos
+            const numeroEixos = veiculo.numero_eixos || 6;
+            let tipo = 'truck';
+            if (numeroEixos <= 4) {
+                tipo = 'truck';
+            } else if (numeroEixos <= 6) {
+                tipo = 'truck-6x4';
+            } else {
+                tipo = 'tractor';
+            }
+            
             const layout = vehicleLayouts[tipo] || vehicleLayouts['truck'];
             
             vehicleImage.innerHTML = layout.image;
-            vehicleType.textContent = `${veiculo.modelo} (${tipo.toUpperCase()})`;
+            vehicleType.textContent = `${veiculo.modelo} (${numeroEixos} EIXOS)`;
             vehiclePlate.textContent = veiculo.placa;
             
             vehicleInfo.style.display = 'flex';
@@ -1240,7 +1369,18 @@ try {
         
         function gerarGridPneus(veiculo) {
             const tireGrid = document.getElementById('tireGrid');
-            const tipo = veiculo.tipo_veiculo || 'truck';
+            
+            // Determinar tipo baseado no número de eixos
+            const numeroEixos = veiculo.numero_eixos || 6;
+            let tipo = 'truck';
+            if (numeroEixos <= 4) {
+                tipo = 'truck';
+            } else if (numeroEixos <= 6) {
+                tipo = 'truck-6x4';
+            } else {
+                tipo = 'tractor';
+            }
+            
             const layout = vehicleLayouts[tipo] || vehicleLayouts['truck'];
             
             // Limpar grid anterior
@@ -1273,7 +1413,9 @@ try {
         }
         
         function buscarPneusAlocados(veiculoId) {
-            fetch(`../gestao_interativa/api/pneus_veiculo.php?veiculo_id=${veiculoId}`)
+            fetch(`../gestao_interativa/api/pneus_veiculo.php?veiculo_id=${veiculoId}`, {
+                credentials: 'same-origin'
+            })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success && data.pneus_alocados) {
@@ -1294,6 +1436,7 @@ try {
                                     Modelo: ${pneu.modelo}<br>
                                     Medida: ${pneu.medida}<br>
                                     Status: ${pneu.status}<br>
+                                    Posição: ${pneu.posicao_nome || 'Não identificada'}<br>
                                     KM: ${pneu.quilometragem || 'N/A'}
                                 `;
                                 
@@ -1385,7 +1528,9 @@ try {
             }
             
             // Buscar detalhes completos do pneu
-            fetch(`../gestao_interativa/api/pneu_detalhes.php?pneu_id=${pneuId}`)
+            fetch(`../gestao_interativa/api/pneu_detalhes.php?pneu_id=${pneuId}`, {
+                credentials: 'same-origin'
+            })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
@@ -1396,6 +1541,7 @@ try {
                               `Modelo: ${pneu.modelo}\n` +
                               `Medida: ${pneu.medida}\n` +
                               `Status: ${pneu.status}\n` +
+                              `Posição: ${pneu.posicao_nome || 'Não identificada'}\n` +
                               `Quilometragem: ${pneu.quilometragem || 'N/A'} km\n` +
                               `Data de Instalação: ${pneu.data_instalacao || 'N/A'}\n` +
                               `Última Manutenção: ${pneu.ultima_manutencao || 'N/A'}`);
@@ -1439,10 +1585,30 @@ try {
             const pneuSelecionado = pneusDisponiveis[index];
             console.log('Alocando pneu:', pneuSelecionado, 'para posição:', position);
             
+            // Seleção da posição identificada
+            const posicoesDisponiveis = <?php echo json_encode($posicoes); ?>;
+            
+            let opcoesPosicao = 'Escolha a posição identificada:\n\n';
+            posicoesDisponiveis.forEach((pos, idx) => {
+                opcoesPosicao += `${idx + 1}. ${pos.nome}\n`;
+            });
+            
+            const escolhaPosicao = prompt(opcoesPosicao + '\nDigite o número da posição:');
+            const indexPosicao = parseInt(escolhaPosicao) - 1;
+            
+            if (isNaN(indexPosicao) || indexPosicao < 0 || indexPosicao >= posicoesDisponiveis.length) {
+                alert('Seleção de posição inválida!');
+                return;
+            }
+            
+            const posicaoEscolhida = posicoesDisponiveis[indexPosicao];
+            console.log('Posição escolhida:', posicaoEscolhida);
+            
             const dados = {
                 veiculo_id: veiculoSelecionado,
                 pneu_id: pneuSelecionado.id,
                 posicao: position,
+                posicao_id: posicaoEscolhida.id,
                 acao: 'alocar'
             };
             
@@ -1453,6 +1619,7 @@ try {
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                credentials: 'same-origin',
                 body: JSON.stringify(dados)
             })
             .then(response => {
@@ -1483,7 +1650,8 @@ try {
                             Marca: ${pneuSelecionado.marca}<br>
                             Modelo: ${pneuSelecionado.modelo}<br>
                             Medida: ${pneuSelecionado.medida}<br>
-                            Status: Em Uso
+                            Status: Em Uso<br>
+                            Posição: ${posicaoEscolhida.nome}
                         `;
                     }
                     
@@ -1527,6 +1695,7 @@ try {
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    credentials: 'same-origin',
                     body: JSON.stringify(dados)
                 })
                 .then(response => response.json())
@@ -1580,6 +1749,7 @@ try {
                     headers: {
                         'Content-Type': 'application/json',
                     },
+                    credentials: 'same-origin',
                     body: JSON.stringify(dados)
                 })
                 .then(response => response.json())
@@ -1636,9 +1806,16 @@ try {
         }
         
         function carregarHistorico(veiculoId) {
-            fetch(`../gestao_interativa/api/historico_alocacoes.php?veiculo_id=${veiculoId}`)
-                .then(response => response.json())
+            console.log('Carregando histórico para veículo:', veiculoId);
+            fetch(`../gestao_interativa/api/historico_alocacoes.php?veiculo_id=${veiculoId}`, {
+                credentials: 'same-origin'
+            })
+                .then(response => {
+                    console.log('Response status histórico:', response.status);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Dados do histórico:', data);
                     const historyDiv = document.getElementById('allocationHistory');
                     
                     if (data.success && data.historico && data.historico.length > 0) {
@@ -1656,8 +1833,10 @@ try {
                         });
                         html += '</div>';
                         historyDiv.innerHTML = html;
+                        console.log('Histórico carregado com sucesso');
                     } else {
                         historyDiv.innerHTML = '<p>Nenhum histórico encontrado para este veículo.</p>';
+                        console.log('Nenhum histórico encontrado');
                     }
                 })
                 .catch(error => {
@@ -1667,22 +1846,39 @@ try {
         }
         
         function carregarEstatisticas(veiculoId) {
-            const stats = {
-                pneusAtivos: 4,
-                pneusManutencao: 1,
-                pneusDescartados: 0,
-                quilometragemMedia: 45000
-            };
-            
-            const statsDiv = document.getElementById('vehicleStats');
-            statsDiv.innerHTML = `
-                <div style="font-size: 0.9em;">
-                    <p><strong>Pneus Ativos:</strong> ${stats.pneusAtivos}</p>
-                    <p><strong>Em Manutenção:</strong> ${stats.pneusManutencao}</p>
-                    <p><strong>Descartados:</strong> ${stats.pneusDescartados}</p>
-                    <p><strong>KM Médio:</strong> ${stats.quilometragemMedia.toLocaleString()} km</p>
-                </div>
-            `;
+            console.log('Carregando estatísticas para veículo:', veiculoId);
+            fetch(`../gestao_interativa/api/estatisticas_veiculo.php?veiculo_id=${veiculoId}`, {
+                credentials: 'same-origin'
+            })
+                .then(response => {
+                    console.log('Response status estatísticas:', response.status);
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Dados das estatísticas:', data);
+                    const statsDiv = document.getElementById('vehicleStats');
+                    
+                    if (data.success && data.estatisticas) {
+                        const stats = data.estatisticas;
+                        statsDiv.innerHTML = `
+                            <div style="font-size: 0.9em;">
+                                <p><strong>Pneus Ativos:</strong> ${stats.pneusAtivos}</p>
+                                <p><strong>Em Manutenção:</strong> ${stats.pneusManutencao}</p>
+                                <p><strong>Descartados:</strong> ${stats.pneusDescartados}</p>
+                                <p><strong>KM Médio:</strong> ${stats.quilometragemMedia.toLocaleString()} km</p>
+                                <p><strong>Total de Alocações:</strong> ${stats.totalAlocacoes}</p>
+                            </div>
+                        `;
+                        console.log('Estatísticas carregadas com sucesso');
+                    } else {
+                        statsDiv.innerHTML = '<p>Erro ao carregar estatísticas.</p>';
+                        console.log('Erro ao carregar estatísticas:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar estatísticas:', error);
+                    document.getElementById('vehicleStats').innerHTML = '<p>Erro ao carregar estatísticas.</p>';
+                });
         }
         
         function carregarPneusDisponiveis() {
@@ -1690,12 +1886,13 @@ try {
             
             const timestamp = new Date().getTime();
             
-            return fetch(`../gestao_interativa/api/pneus_disponiveis.php?empresa_id=1&t=${timestamp}`, {
+            return fetch(`../gestao_interativa/api/pneus_disponiveis.php?t=${timestamp}`, {
                 method: 'GET',
                 headers: {
                     'Cache-Control': 'no-cache',
                     'Pragma': 'no-cache'
-                }
+                },
+                credentials: 'same-origin' // Garantir que cookies de sessão sejam enviados
             })
                 .then(response => {
                     console.log('Response status:', response.status);
@@ -1707,6 +1904,10 @@ try {
                         // Atualizar a lista global de pneus disponíveis usando Object.assign
                         pneusDisponiveis.length = 0; // Limpar array existente
                         data.pneus.forEach(pneu => pneusDisponiveis.push(pneu)); // Adicionar novos pneus
+                        
+                        // Atualizar também a variável global
+                        window.pneusDisponiveis = pneusDisponiveis;
+                        
                         console.log('Lista de pneus disponíveis atualizada:', pneusDisponiveis);
                         console.log('Quantidade de pneus disponíveis:', pneusDisponiveis.length);
                         
@@ -1750,20 +1951,20 @@ try {
         }
 
         // Estado dos eixos e pneus alocados no modo flexível
-        let eixosCaminhao = [];
-        let eixosCarreta = [];
-        let idEixo = 1;
-        let pneusFlexAlocados = {}; // { slotId: pneuObj }
+        // (Variáveis declaradas no arquivo gestao_interativa_eixos.js)
 
         // Ao selecionar veículo, carregar layout e pneus alocados
         function onSelecionarVeiculoFlexivel(veiculoId) {
-            fetch('../gestao_interativa/api/layout_flexivel.php?veiculo_id=' + veiculoId)
+            fetch('../gestao_interativa/api/eixos_veiculos.php?action=layout_completo&veiculo_id=' + veiculoId, {
+                credentials: 'same-origin'
+            })
                 .then(r => r.json())
                 .then(data => {
                     if (data.success && data.layout) {
                         eixosCaminhao = data.layout.eixosCaminhao || [];
                         eixosCarreta = data.layout.eixosCarreta || [];
                         idEixo = data.layout.idEixo || 1;
+                        
                         // Reconectar pneus alocados aos dados atuais
                         const salvos = data.layout.pneusFlexAlocados || {};
                         pneusFlexAlocados = {};
@@ -1775,7 +1976,17 @@ try {
                                 pneuAtual = window.pneusDisponiveis.find(p => p.id == pneuSalvo.id);
                             }
                             // Se não encontrar, mantém o snapshot salvo
-                            pneusFlexAlocados[slotId] = pneuAtual || pneuSalvo;
+                            if (pneuAtual) {
+                                // Mesclar dados do pneu atual com informações de posição salvas
+                                pneusFlexAlocados[slotId] = {
+                                    ...pneuAtual,
+                                    posicao_id: pneuSalvo.posicao_id,
+                                    posicao_nome: pneuSalvo.posicao_nome
+                                };
+                            } else {
+                                // Usar o snapshot salvo completo
+                                pneusFlexAlocados[slotId] = pneuSalvo;
+                            }
                         }
                     } else {
                         eixosCaminhao = [];
@@ -1784,6 +1995,18 @@ try {
                         pneusFlexAlocados = {};
                     }
                     renderizarEixosFlexivel();
+                    atualizarDashboardPneusEmUso(); // Atualizar dashboard
+                    
+                    // Carregar histórico e estatísticas
+                    setTimeout(() => {
+                        carregarHistoricoFlexivel(veiculoId);
+                        carregarEstatisticasFlexivel(veiculoId);
+                    }, 100);
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar layout:', error);
+                    // Fallback para sistema antigo se necessário
+                    carregarLayoutFallback(veiculoId);
                 });
         }
 
@@ -1908,9 +2131,7 @@ try {
                     break;
                 case 'Remover Pneu':
                     if (confirm('Remover pneu deste slot?')) {
-                        delete pneusFlexAlocados[slotId];
-                        renderizarEixosFlexivel();
-                        salvarLayoutFlexivel(true);
+                        removerPneuFlexivel(slotId);
                     }
                     break;
                 case 'Enviar para Manutenção':
@@ -1952,10 +2173,9 @@ try {
                     }
                     
                     const pneuSelecionado = pneusDisponiveisFiltrados[index];
-                    pneusFlexAlocados[slotId] = pneuSelecionado;
                     
-                    renderizarEixosFlexivel();
-                    salvarLayoutFlexivel(true);
+                    // Usar a nova API para alocar o pneu
+                    alocarPneuFlexivel(slotId, pneuSelecionado.id);
                 })
                 .catch(error => {
                     console.error('Erro ao alocar pneu:', error);
@@ -1963,8 +2183,35 @@ try {
                 });
         }
 
+        // Função para atualizar o dashboard com pneus em uso
+        function atualizarDashboardPneusEmUso() {
+            // Contar pneus alocados no modo flexível
+            const totalPneusFlexiveis = Object.keys(pneusFlexAlocados).length;
+            
+            // Atualizar o elemento específico do dashboard "Pneus em Uso"
+            const dashboardCards = document.querySelectorAll('.dashboard-card');
+            dashboardCards.forEach(card => {
+                const header = card.querySelector('.card-header h3');
+                if (header && header.textContent.includes('Pneus em Uso')) {
+                    const metricValue = card.querySelector('.metric-value');
+                    if (metricValue) {
+                        metricValue.textContent = totalPneusFlexiveis;
+                    }
+                }
+            });
+            
+            console.log('Dashboard atualizado: ' + totalPneusFlexiveis + ' pneus em uso');
+        }
+
         function tooltipPneu(pneu) {
-            return `Série: ${pneu.numero_serie}\nMarca: ${pneu.marca}\nModelo: ${pneu.modelo}\nMedida: ${pneu.medida}`;
+            let tooltip = `Série: ${pneu.numero_serie}\nMarca: ${pneu.marca}\nModelo: ${pneu.modelo}\nMedida: ${pneu.medida}`;
+            
+            // Adicionar posição se disponível
+            if (pneu.posicao_nome) {
+                tooltip += `\nPosição: ${pneu.posicao_nome}`;
+            }
+            
+            return tooltip;
         }
 
         // Inicialização do modo flexível
@@ -1974,128 +2221,23 @@ try {
             idEixo = 1;
             pneusFlexAlocados = {};
             renderizarEixosFlexivel();
+            
+            // Limpar histórico e estatísticas
+            const historyDiv = document.getElementById('allocationHistory');
+            const statsDiv = document.getElementById('vehicleStats');
+            
+            if (historyDiv) {
+                historyDiv.innerHTML = '<p>Selecione um veículo para ver o histórico de alocações de pneus.</p>';
+            }
+            if (statsDiv) {
+                statsDiv.innerHTML = '<p>Selecione um veículo para ver as estatísticas.</p>';
+            }
         }
         document.addEventListener('DOMContentLoaded', function() {
             if (document.getElementById('area-modo-flexivel')) {
                 resetarFlexivel();
             }
         });
-
-        function adicionarEixo(tipo) {
-            let qtd = prompt('Quantos pneus por eixo? (1 = rodado simples/2 pneus, 2 = rodado duplo/4 pneus)', '1');
-            qtd = parseInt(qtd);
-            if (isNaN(qtd) || (qtd !== 1 && qtd !== 2)) {
-                alert('Escolha 1 (simples) ou 2 (duplo)');
-                return;
-            }
-            const novoEixo = {
-                id: idEixo++,
-                pneus: qtd === 1 ? 2 : 4
-            };
-            if (tipo === 'caminhao') {
-                eixosCaminhao.push(novoEixo);
-            } else {
-                eixosCarreta.push(novoEixo);
-            }
-            renderizarEixosFlexivel();
-            salvarLayoutFlexivel(true);
-        }
-
-        function excluirEixo(tipo) {
-            const eixos = tipo === 'caminhao' ? eixosCaminhao : eixosCarreta;
-            
-            if (eixos.length === 0) {
-                alert(`Não há eixos para excluir no ${tipo === 'caminhao' ? 'caminhão' : 'carreta'}.`);
-                return;
-            }
-            
-            // Verificar quais eixos têm pneus alocados
-            const eixosComPneus = [];
-            const eixosSemPneus = [];
-            
-            eixos.forEach((eixo, idx) => {
-                let temPneus = false;
-                const qtdPneus = eixo.pneus;
-                
-                // Verificar se algum pneu está alocado neste eixo
-                for (let i = 0; i < qtdPneus; i++) {
-                    const slotId = tipo === 'caminhao' ? `cavalo-${idx}-${i}` : `carreta-${idx}-${i}`;
-                    if (pneusFlexAlocados[slotId]) {
-                        temPneus = true;
-                        break;
-                    }
-                }
-                
-                if (temPneus) {
-                    eixosComPneus.push(idx + 1);
-                } else {
-                    eixosSemPneus.push(idx + 1);
-                }
-            });
-            
-            if (eixosSemPneus.length === 0) {
-                alert(`Todos os eixos do ${tipo === 'caminhao' ? 'caminhão' : 'carreta'} têm pneus alocados. Remova os pneus primeiro.`);
-                return;
-            }
-            
-            // Mostrar opções de eixos que podem ser excluídos
-            let opcoes = `Eixos disponíveis para exclusão:\n\n`;
-            eixosSemPneus.forEach(numero => {
-                opcoes += `${numero}. Eixo ${numero}\n`;
-            });
-            
-            if (eixosComPneus.length > 0) {
-                opcoes += `\nEixos com pneus (não podem ser excluídos): ${eixosComPneus.join(', ')}`;
-            }
-            
-            const escolha = prompt(opcoes + '\n\nDigite o número do eixo que deseja excluir:');
-            const index = parseInt(escolha) - 1;
-            
-            if (isNaN(index) || index < 0 || !eixosSemPneus.includes(index + 1)) {
-                alert('Seleção inválida!');
-                return;
-            }
-            
-            if (confirm(`Tem certeza que deseja excluir o Eixo ${index + 1}?`)) {
-                if (tipo === 'caminhao') {
-                    eixosCaminhao.splice(index, 1);
-                } else {
-                    eixosCarreta.splice(index, 1);
-                }
-                renderizarEixosFlexivel();
-                salvarLayoutFlexivel(true);
-                alert(`Eixo ${index + 1} excluído com sucesso!`);
-            }
-        }
-
-        function salvarLayoutFlexivel(auto = false) {
-            const veiculoId = veiculoSelecionado;
-            if (!veiculoId) {
-                if (!auto) alert('Selecione um veículo primeiro!');
-                return;
-            }
-            const layout = {
-                eixosCaminhao,
-                eixosCarreta,
-                idEixo,
-                pneusFlexAlocados
-            };
-            fetch('../gestao_interativa/api/layout_flexivel.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ veiculo_id: veiculoId, layout })
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (!auto) {
-                        if (data.success) {
-                            alert('Layout salvo com sucesso!');
-                        } else {
-                            alert('Erro ao salvar layout: ' + data.error);
-                        }
-                    }
-                });
-        }
 
         // ===== DRAG & DROP AVANÇADO =====
         let dragState = {
@@ -2133,13 +2275,31 @@ try {
                     
                     // Determinar classe de status para sombra
                     let statusClass = '';
+                    let alertaIndicator = '';
+                    
                     if (hasPneu) {
-                        const status = pneu.status_nome || '';
-                        if (status.includes('critico') || status.includes('furado') || status.includes('gasto')) {
+                        const kmAtual = pneu.quilometragem || 0;
+                        const kmLimite = 80000;
+                        const kmCritico = 100000;
+                        
+                        if (kmAtual > kmCritico) {
                             statusClass = 'pneu-critico';
+                            alertaIndicator = '<div class="alerta-indicator critico"></div>';
+                        } else if (kmAtual > (kmLimite * 0.8)) {
+                            statusClass = 'pneu-alerta';
+                            alertaIndicator = '<div class="alerta-indicator atencao"></div>';
+                        } else if (kmAtual > 50000 && Math.random() > 0.7) {
+                            statusClass = 'pneu-pressao';
+                            alertaIndicator = '<div class="alerta-indicator pressao"></div>';
                         } else {
                             statusClass = 'pneu-bom';
                         }
+                    }
+                    
+                    // Mostrar posição do pneu se disponível
+                    let posicaoInfo = '';
+                    if (hasPneu && pneu.posicao_nome) {
+                        posicaoInfo = `<div style='font-size:8px;color:#666;margin-top:2px;'>${pneu.posicao_nome}</div>`;
                     }
                     
                     pneusHTML += `
@@ -2158,6 +2318,8 @@ try {
                              ondragenter='handleDragEnter(event, "${slotId}")'
                              ondragleave='handleDragLeave(event, "${slotId}")'>
                             ${hasPneu ? `<span style='font-size:10px;'>${pneu.numero_serie}</span>` : ''}
+                            ${posicaoInfo}
+                            ${alertaIndicator}
                         </div>
                     `;
                 }
@@ -2305,6 +2467,7 @@ try {
                 // Atualizar interface
                 renderizarEixosFlexivel();
                 salvarLayoutFlexivel(true);
+                atualizarDashboardPneusEmUso(); // Atualizar dashboard
             } catch (error) {
                 console.error('Erro ao mover pneu:', error);
             }
@@ -2406,6 +2569,7 @@ try {
                         <strong>Marca:</strong> ${pneu.marca}<br>
                         <strong>Modelo:</strong> ${pneu.modelo}<br>
                         <strong>Medida:</strong> ${pneu.medida}<br>
+                        <strong>Posição:</strong> ${pneu.posicao_nome || 'Não identificada'}<br>
                         <strong>DOT:</strong> ${pneu.dot || 'N/A'}<br>
                         <strong>KM Atual:</strong> ${pneu.quilometragem || 'N/A'} km<br>
                         <strong>Próxima Manutenção:</strong> ${proximaManutencao}<br>
@@ -2675,6 +2839,7 @@ try {
                                 Marca: ${pneu.marca}
                                 Modelo: ${pneu.modelo}
                                 Medida: ${pneu.medida}
+                                Posição: ${pneu.posicao_nome || 'Não identificada'}
                                 Status: ${pneu.status_nome || 'N/A'}
                                 KM: ${pneu.quilometragem || 'N/A'}
                                 DOT: ${pneu.dot || 'N/A'}
@@ -2714,6 +2879,341 @@ try {
                 return { kmRestante: 0, mesesRestante: 0, recomendacao: 'Erro' };
             }
         }
+        
+        // ===== GRÁFICOS INTERATIVOS =====
+        function inicializarGraficos() {
+            try {
+                // Verificar se Chart.js está carregado
+                if (typeof Chart === 'undefined') {
+                    console.log('Chart.js não carregado, aguardando...');
+                    setTimeout(inicializarGraficos, 1000);
+                    return;
+                }
+                
+                // Gráfico de pizza - Distribuição de pneus por status
+                const canvasPizza = document.getElementById('graficoPizza');
+                if (canvasPizza) {
+                    const ctxPizza = canvasPizza.getContext('2d');
+                    
+                    // Usar as variáveis globais que já estão definidas
+                    const pneusDisponiveisCount = pneusDisponiveis.length;
+                    const pneusEmUsoCount = pneusEmUso.length;
+                    const pneusManutencaoCount = pneusManutencao.length;
+                    
+                    // Pneus críticos = pneus em uso com status crítico (pode ser baseado em data de instalação ou outro critério)
+                    // Por enquanto, vamos usar 20% dos pneus em uso como críticos para demonstração
+                    const pneusCriticosCount = Math.round(pneusEmUsoCount * 0.2);
+                    
+                    console.log('Dados para gráfico:', {
+                        disponiveis: pneusDisponiveisCount,
+                        emUso: pneusEmUsoCount,
+                        manutencao: pneusManutencaoCount,
+                        criticos: pneusCriticosCount
+                    });
+                    
+                    new Chart(ctxPizza, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Disponíveis', 'Em Uso', 'Manutenção', 'Críticos'],
+                            datasets: [{
+                                data: [
+                                    pneusDisponiveisCount,
+                                    pneusEmUsoCount,
+                                    pneusManutencaoCount,
+                                    pneusCriticosCount
+                                ],
+                                backgroundColor: [
+                                    '#10B981', // Verde
+                                    '#3B82F6', // Azul
+                                    '#F59E0B', // Amarelo
+                                    '#EF4444'  // Vermelho
+                                ],
+                                borderWidth: 2,
+                                borderColor: '#fff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-primary'),
+                                        padding: 20,
+                                        usePointStyle: true
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Distribuição de Pneus por Status',
+                                    color: getComputedStyle(document.documentElement).getPropertyValue('--text-primary'),
+                                    font: { size: 16, weight: 'bold' }
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                // Gráfico de barras - Tendência de uso ao longo do tempo
+                const canvasBarras = document.getElementById('graficoBarras');
+                if (canvasBarras) {
+                    const ctxBarras = canvasBarras.getContext('2d');
+                    new Chart(ctxBarras, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+                            datasets: [{
+                                label: 'Pneus Alocados',
+                                data: [12, 15, 18, 14, 20, 22],
+                                backgroundColor: '#3B82F6',
+                                borderColor: '#2563EB',
+                                borderWidth: 1
+                            }, {
+                                label: 'Pneus Trocados',
+                                data: [3, 5, 4, 6, 8, 7],
+                                backgroundColor: '#EF4444',
+                                borderColor: '#DC2626',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                    labels: {
+                                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-primary')
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Tendência de Uso de Pneus (Últimos 6 Meses)',
+                                    color: getComputedStyle(document.documentElement).getPropertyValue('--text-primary'),
+                                    font: { size: 16, weight: 'bold' }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary')
+                                    },
+                                    grid: {
+                                        color: getComputedStyle(document.documentElement).getPropertyValue('--border-color')
+                                    }
+                                },
+                                x: {
+                                    ticks: {
+                                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary')
+                                    },
+                                    grid: {
+                                        color: getComputedStyle(document.documentElement).getPropertyValue('--border-color')
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                // Gráfico de linha - KPIs de Performance
+                const canvasKPIs = document.getElementById('graficoKPIs');
+                if (canvasKPIs) {
+                    const ctxKPIs = canvasKPIs.getContext('2d');
+                    new Chart(ctxKPIs, {
+                        type: 'line',
+                        data: {
+                            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+                            datasets: [{
+                                label: 'Eficiência (%)',
+                                data: [85, 88, 92, 89, 94, 96],
+                                borderColor: '#10B981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            }, {
+                                label: 'Custo por KM (R$)',
+                                data: [0.15, 0.14, 0.13, 0.12, 0.11, 0.10],
+                                borderColor: '#F59E0B',
+                                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                    labels: {
+                                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-primary')
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Indicadores de Performance (KPIs)',
+                                    color: getComputedStyle(document.documentElement).getPropertyValue('--text-primary'),
+                                    font: { size: 16, weight: 'bold' }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary')
+                                    },
+                                    grid: {
+                                        color: getComputedStyle(document.documentElement).getPropertyValue('--border-color')
+                                    }
+                                },
+                                x: {
+                                    ticks: {
+                                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary')
+                                    },
+                                    grid: {
+                                        color: getComputedStyle(document.documentElement).getPropertyValue('--border-color')
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+                
+                console.log('Gráficos inicializados com sucesso!');
+            } catch (error) {
+                console.error('Erro ao inicializar gráficos:', error);
+            }
+        }
+        
+        // Atualizar gráficos quando dados mudarem
+        function atualizarGraficos() {
+            try {
+                // Remover gráficos existentes
+                const canvasPizza = document.getElementById('graficoPizza');
+                const canvasBarras = document.getElementById('graficoBarras');
+                const canvasKPIs = document.getElementById('graficoKPIs');
+                
+                if (canvasPizza) canvasPizza.style.display = 'none';
+                if (canvasBarras) canvasBarras.style.display = 'none';
+                if (canvasKPIs) canvasKPIs.style.display = 'none';
+                
+                // Recriar gráficos
+                setTimeout(() => {
+                    if (canvasPizza) canvasPizza.style.display = 'block';
+                    if (canvasBarras) canvasBarras.style.display = 'block';
+                    if (canvasKPIs) canvasKPIs.style.display = 'block';
+                    inicializarGraficos();
+                }, 100);
+            } catch (error) {
+                console.error('Erro ao atualizar gráficos:', error);
+            }
+        }
+
+        // Função para carregar histórico no modo flexível
+        function carregarHistoricoFlexivel(veiculoId) {
+            console.log('Carregando histórico flexível para veículo:', veiculoId);
+            fetch(`../gestao_interativa/api/historico_alocacoes.php?veiculo_id=${veiculoId}`, {
+                credentials: 'same-origin'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Dados do histórico flexível:', data);
+                    const historyDiv = document.getElementById('allocationHistory');
+                    
+                    if (data.success && data.historico && data.historico.length > 0) {
+                        let html = '<div style="max-height: 200px; overflow-y: auto;">';
+                        data.historico.forEach(item => {
+                            const acao = item.data_remocao ? 'Remoção' : 'Alocação';
+                            const data = item.data_remocao || item.data_instalacao;
+                            html += `
+                                <div style="padding: 8px; border-bottom: 1px solid #ddd; font-size: 0.9em;">
+                                    <strong>${data}</strong><br>
+                                    ${acao}: ${item.numero_serie} (Pos. ${item.posicao})<br>
+                                    <span class="status-badge status-${item.status_nome ? item.status_nome.toLowerCase().replace(' ', '-') : 'bom'}">${item.status_nome || 'Bom'}</span>
+                                </div>
+                            `;
+                        });
+                        html += '</div>';
+                        historyDiv.innerHTML = html;
+                        console.log('Histórico flexível carregado com sucesso');
+                    } else {
+                        historyDiv.innerHTML = '<p>Nenhum histórico encontrado para este veículo.</p>';
+                        console.log('Nenhum histórico flexível encontrado');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar histórico flexível:', error);
+                    const historyDiv = document.getElementById('allocationHistory');
+                    if (historyDiv) {
+                        historyDiv.innerHTML = '<p>Erro ao carregar histórico.</p>';
+                    }
+                });
+        }
+
+        // Função para carregar estatísticas no modo flexível
+        function carregarEstatisticasFlexivel(veiculoId) {
+            console.log('Carregando estatísticas flexível para veículo:', veiculoId);
+            fetch(`../gestao_interativa/api/estatisticas_veiculo.php?veiculo_id=${veiculoId}`, {
+                credentials: 'same-origin'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Dados das estatísticas flexível:', data);
+                    const statsDiv = document.getElementById('vehicleStats');
+                    
+                    if (data.success && data.estatisticas) {
+                        const stats = data.estatisticas;
+                        statsDiv.innerHTML = `
+                            <div style="font-size: 0.9em;">
+                                <p><strong>Pneus Ativos:</strong> ${stats.pneusAtivos}</p>
+                                <p><strong>Em Manutenção:</strong> ${stats.pneusManutencao}</p>
+                                <p><strong>Descartados:</strong> ${stats.pneusDescartados}</p>
+                                <p><strong>KM Médio:</strong> ${stats.quilometragemMedia.toLocaleString()} km</p>
+                                <p><strong>Total de Alocações:</strong> ${stats.totalAlocacoes}</p>
+                            </div>
+                        `;
+                        console.log('Estatísticas flexível carregadas com sucesso');
+                    } else {
+                        statsDiv.innerHTML = '<p>Erro ao carregar estatísticas.</p>';
+                        console.log('Erro ao carregar estatísticas flexível:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar estatísticas flexível:', error);
+                    const statsDiv = document.getElementById('vehicleStats');
+                    if (statsDiv) {
+                        statsDiv.innerHTML = '<p>Erro ao carregar estatísticas.</p>';
+                    }
+                });
+        }
+
+        // Função de fallback para sistema antigo (JSON)
+        function carregarLayoutFallback(veiculoId) {
+            fetch('../gestao_interativa/api/layout_flexivel.php?veiculo_id=' + veiculoId, {
+                credentials: 'same-origin'
+            })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.layout) {
+                        eixosCaminhao = data.layout.eixosCaminhao || [];
+                        eixosCarreta = data.layout.eixosCarreta || [];
+                        idEixo = data.layout.idEixo || 1;
+                        pneusFlexAlocados = data.layout.pneusFlexAlocados || {};
+                    } else {
+                        eixosCaminhao = [];
+                        eixosCarreta = [];
+                        idEixo = 1;
+                        pneusFlexAlocados = {};
+                    }
+                    renderizarEixosFlexivel();
+                    atualizarDashboardPneusEmUso();
+                });
+        }
     </script>
+    
+    <!-- Novo sistema de eixos com banco de dados -->
+    <script src="../js/gestao_interativa_eixos.js"></script>
 </body>
 </html> 

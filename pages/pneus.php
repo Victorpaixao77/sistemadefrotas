@@ -26,6 +26,9 @@ $page_title = "Pneus";
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../logo.png">
+    
     <!-- Chart.js for analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -36,33 +39,32 @@ $page_title = "Pneus";
             justify-content: center;
             align-items: center;
             margin-top: 20px;
-            gap: 10px;
+            gap: 15px;
         }
 
         .pagination-btn {
-            background-color: #fff;
-            border: 1px solid #ddd;
-            padding: 8px 12px;
+            padding: 8px 16px;
+            border: 1px solid var(--border-color);
             border-radius: 4px;
-            cursor: pointer;
+            background: var(--bg-secondary);
+            color: var(--text-color);
+            text-decoration: none;
             transition: all 0.3s ease;
         }
 
         .pagination-btn:hover:not(.disabled) {
-            background-color: #f0f0f0;
-            border-color: #999;
+            background: var(--bg-tertiary);
         }
 
         .pagination-btn.disabled {
             opacity: 0.5;
             cursor: not-allowed;
-            background-color: #f5f5f5;
+            pointer-events: none;
         }
 
-        #currentPage {
-            font-size: 14px;
-            color: #666;
-            padding: 0 10px;
+        .pagination-info {
+            font-size: 0.9rem;
+            color: var(--text-color);
         }
     </style>
 </head>
@@ -194,13 +196,13 @@ $page_title = "Pneus";
                 
                 <!-- Pagination -->
                 <div class="pagination">
-                    <button class="pagination-btn" id="prevPage" disabled>
+                    <a href="#" class="pagination-btn disabled" id="prevPage">
                         <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <span id="currentPage">Página 1 de 1</span>
-                    <button class="pagination-btn" id="nextPage" disabled>
+                    </a>
+                    <span class="pagination-info" id="currentPage">Página 1 de 1</span>
+                    <a href="#" class="pagination-btn disabled" id="nextPage">
                         <i class="fas fa-chevron-right"></i>
-                    </button>
+                    </a>
                 </div>
             </div>
             
@@ -330,12 +332,14 @@ $page_title = "Pneus";
         function initializePage() {
             document.getElementById('addTireBtn').addEventListener('click', showAddTireModal);
             document.getElementById('applyFilters').addEventListener('click', applyFilters);
-            document.getElementById('prevPage').addEventListener('click', () => {
+            document.getElementById('prevPage').addEventListener('click', function(e) {
+                e.preventDefault();
                 if (currentPage > 1) {
                     loadTires(currentPage - 1);
                 }
             });
-            document.getElementById('nextPage').addEventListener('click', () => {
+            document.getElementById('nextPage').addEventListener('click', function(e) {
+                e.preventDefault();
                 if (currentPage < totalPages) {
                     loadTires(currentPage + 1);
                 }
@@ -428,17 +432,20 @@ $page_title = "Pneus";
         function updatePagination(pagination) {
             currentPage = pagination.current_page;
             totalPages = pagination.total_pages;
-            
-            // Atualiza o texto da página atual
-            document.getElementById('currentPage').textContent = `Página ${currentPage} de ${totalPages}`;
-            
-            // Habilita/desabilita botões de navegação
-            document.getElementById('prevPage').disabled = currentPage <= 1;
-            document.getElementById('nextPage').disabled = currentPage >= totalPages;
-            
-            // Adiciona classes para estilo
-            document.getElementById('prevPage').classList.toggle('disabled', currentPage <= 1);
-            document.getElementById('nextPage').classList.toggle('disabled', currentPage >= totalPages);
+            const prevBtn = document.getElementById('prevPage');
+            const nextBtn = document.getElementById('nextPage');
+            const currentPageSpan = document.getElementById('currentPage');
+            currentPageSpan.textContent = `Página ${currentPage} de ${totalPages}`;
+            if (currentPage <= 1) {
+                prevBtn.classList.add('disabled');
+            } else {
+                prevBtn.classList.remove('disabled');
+            }
+            if (currentPage >= totalPages) {
+                nextBtn.classList.add('disabled');
+            } else {
+                nextBtn.classList.remove('disabled');
+            }
         }
 
         async function loadSelectData() {
@@ -642,6 +649,114 @@ $page_title = "Pneus";
             document.querySelector('.dashboard-card:nth-child(4) .metric-value').textContent = metrics.pneus_alerta;
             document.querySelector('.dashboard-card:nth-child(4) .metric-subtitle').textContent = 'Em alerta';
         }
+
+        // Função para configurar botão de ajuda
+        function setupHelpButton() {
+            const helpBtn = document.getElementById('helpBtn');
+            if (helpBtn) {
+                helpBtn.addEventListener('click', function() {
+                    const helpModal = document.getElementById('helpPneusModal');
+                    if (helpModal) {
+                        helpModal.style.display = 'block';
+                    }
+                });
+            }
+
+            // Close modal functionality for help modal
+            document.querySelectorAll('.close-modal').forEach(button => {
+                button.addEventListener('click', function() {
+                    const modal = this.closest('.modal');
+                    if (modal) {
+                        modal.style.display = 'none';
+                    }
+                });
+            });
+
+            // Close modal when clicking outside
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', function(event) {
+                    if (event.target === this) {
+                        this.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // Função para fechar modal específico
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Inicializar botão de ajuda quando o DOM estiver carregado
+        document.addEventListener('DOMContentLoaded', function() {
+            // Setup help button
+            setupHelpButton();
+        });
     </script>
+    
+    <!-- Modal de Ajuda -->
+    <div class="modal" id="helpPneusModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Ajuda - Gestão de Pneus</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <h3>Visão Geral</h3>
+                    <p>A página de Pneus permite gerenciar todo o estoque de pneus da empresa. Aqui você pode cadastrar, editar, visualizar e excluir pneus, além de acompanhar métricas importantes de vida útil e status.</p>
+                </div>
+
+                <div class="help-section">
+                    <h3>Funcionalidades Principais</h3>
+                    <ul>
+                        <li><strong>Novo Pneu:</strong> Cadastre um novo pneu com informações completas como marca, modelo, dimensões e DOT.</li>
+                        <li><strong>Filtros:</strong> Use os filtros para encontrar pneus específicos por status, marca ou através da busca por texto.</li>
+                        <li><strong>Relatórios:</strong> Visualize relatórios e estatísticas de vida útil dos pneus.</li>
+                        <li><strong>Alocação:</strong> Gerencie a alocação de pneus para veículos específicos.</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Indicadores (KPIs)</h3>
+                    <ul>
+                        <li><strong>Total de Pneus:</strong> Número total de pneus no estoque.</li>
+                        <li><strong>Pneus em Uso:</strong> Quantidade de pneus atualmente alocados em veículos.</li>
+                        <li><strong>Vida Útil Média:</strong> Percentual médio de vida útil dos pneus.</li>
+                        <li><strong>Pneus em Alerta:</strong> Quantidade de pneus que precisam de atenção.</li>
+                        <li><strong>Distribuição por Status:</strong> Gráfico mostrando a distribuição por status dos pneus.</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Ações Disponíveis</h3>
+                    <ul>
+                        <li><strong>Visualizar:</strong> Veja detalhes completos do pneu, incluindo histórico de uso e especificações.</li>
+                        <li><strong>Editar:</strong> Modifique informações de um pneu existente.</li>
+                        <li><strong>Excluir:</strong> Remova um pneu do sistema (ação irreversível).</li>
+                        <li><strong>Alocar:</strong> Atribua pneus a veículos específicos.</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Dicas Úteis</h3>
+                    <ul>
+                        <li>Mantenha o DOT (Data de Fabricação) sempre atualizado para controle de vida útil.</li>
+                        <li>Monitore a vida útil dos pneus para planejar substituições preventivas.</li>
+                        <li>Configure alertas para pneus que estão próximos do fim da vida útil.</li>
+                        <li>Utilize os filtros para encontrar pneus específicos rapidamente.</li>
+                        <li>Acompanhe as métricas para otimizar o uso dos pneus.</li>
+                        <li>Mantenha um registro detalhado da alocação de pneus por veículo.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('helpPneusModal')">Fechar</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html> 

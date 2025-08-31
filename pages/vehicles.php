@@ -60,27 +60,23 @@ function getVehicles($page = 1, $limit = 5) {
         
         // Depois busca os veículos com paginação
         $sql = "SELECT v.*, 
-                s.nome as status_nome,
-                tc.nome as tipo_combustivel_nome,
-                t.nome as tipo_nome,
-                c.nome as categoria_nome,
-                cr.nome as carroceria_nome,
-                cavalo.nome as cavalo_nome,
-                cavalo.eixos as cavalo_eixos,
-                cavalo.tracao as cavalo_tracao,
-                carreta.nome as carreta_nome,
-                carreta.capacidade_media as carreta_capacidade
-                FROM veiculos v
-                LEFT JOIN status_veiculos s ON v.status_id = s.id
-                LEFT JOIN tipos_combustivel tc ON v.tipo_combustivel_id = tc.id
-                LEFT JOIN tipos t ON v.tipo_id = t.id
-                LEFT JOIN categorias c ON v.categoria_id = c.id
-                LEFT JOIN carrocerias cr ON v.carroceria_id = cr.id
-                LEFT JOIN tipos_cavalos cavalo ON v.id_cavalo = cavalo.id
-                LEFT JOIN tipos_carretas carreta ON v.id_carreta = carreta.id
-                WHERE v.empresa_id = :empresa_id 
-                ORDER BY v.id DESC 
-                LIMIT :limit OFFSET :offset";
+    s.nome as status_nome,
+    tc.nome as tipo_combustivel_nome,
+    cr.nome as carroceria_nome,
+    cavalo.nome as cavalo_nome,
+    cavalo.eixos as cavalo_eixos,
+    cavalo.tracao as cavalo_tracao,
+    carreta.nome as carreta_nome,
+    carreta.capacidade_media as carreta_capacidade
+FROM veiculos v
+LEFT JOIN status_veiculos s ON v.status_id = s.id
+LEFT JOIN tipos_combustivel tc ON v.tipo_combustivel_id = tc.id
+LEFT JOIN carrocerias cr ON v.carroceria_id = cr.id
+LEFT JOIN tipos_cavalos cavalo ON v.id_cavalo = cavalo.id
+LEFT JOIN tipos_carretas carreta ON v.id_carreta = carreta.id
+WHERE v.empresa_id = :empresa_id 
+ORDER BY v.id DESC 
+LIMIT :limit OFFSET :offset";
         
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
@@ -130,6 +126,12 @@ $total_pages = $result['total_pages'];
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../logo.png">
+
+    <!-- jQuery (necessário para o modal de foto) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
     <!-- Chart.js for analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -203,6 +205,74 @@ $total_pages = $result['total_pages'];
     .pagination-info {
         font-size: 0.9rem;
         color: var(--text-color);
+    }
+    
+    /* Estilo para os cards de resumo */
+    .summary-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .summary-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.15) !important;
+    }
+    
+    @media (max-width: 768px) {
+        .vehicle-summary-cards {
+            grid-template-columns: 1fr !important;
+        }
+    }
+    
+    /* Estilos melhorados para os gráficos */
+    .analytics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+        gap: 30px;
+        margin: 30px 0;
+    }
+    
+    .analytics-card {
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        box-shadow: var(--card-shadow);
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .analytics-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    }
+    
+    .analytics-card .card-header {
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        padding: 15px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .analytics-card .card-header h3 {
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 500;
+    }
+    
+    .analytics-card .card-header .card-subtitle {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin-top: 2px;
+    }
+    
+    .analytics-card .card-body {
+        padding: 15px;
+        position: relative;
+    }
+    
+    @media (max-width: 1200px) {
+        .analytics-grid {
+            grid-template-columns: 1fr;
+        }
     }
     </style>
 </head>
@@ -404,18 +474,20 @@ $total_pages = $result['total_pages'];
                         <div class="analytics-card">
                             <div class="card-header">
                                 <h3>Consumo de Combustível</h3>
+                                <span class="card-subtitle">Eficiência por Mês (km/l)</span>
                             </div>
                             <div class="card-body">
-                                <canvas id="fuelEfficiencyChart" height="200"></canvas>
+                                <canvas id="fuelEfficiencyChart" height="250"></canvas>
                             </div>
                         </div>
                         
                         <div class="analytics-card">
                             <div class="card-header">
                                 <h3>Custos de Manutenção</h3>
+                                <span class="card-subtitle">Gastos Mensais (R$)</span>
                             </div>
                             <div class="card-body">
-                                <canvas id="maintenanceCostChart" height="200"></canvas>
+                                <canvas id="maintenanceCostChart" height="250"></canvas>
                             </div>
                         </div>
                     </div>
@@ -435,7 +507,7 @@ $total_pages = $result['total_pages'];
                 <span class="close-modal">&times;</span>
             </div>
             <div class="modal-body">
-                <form id="vehicleForm">
+                <form id="vehicleForm" enctype="multipart/form-data">
                     <input type="hidden" id="vehicleId" name="id">
                     
                     <div class="form-grid">
@@ -573,13 +645,13 @@ $total_pages = $result['total_pages'];
                         </div>
                         
                         <div class="form-group">
-                            <label for="documento">Documento</label>
-                            <input type="file" id="documento" name="documento">
-                        </div>
-                        
-                        <div class="form-group">
                             <label for="foto_veiculo">Foto do Veículo</label>
                             <input type="file" id="foto_veiculo" name="foto_veiculo">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="documento">Documento</label>
+                            <input type="file" id="documento" name="documento" accept="application/pdf,image/*,.doc,.docx,.xls,.xlsx,.txt,.csv">
                         </div>
                     </div>
                     
@@ -598,201 +670,96 @@ $total_pages = $result['total_pages'];
     
     <!-- View Vehicle Details Modal -->
     <div class="modal" id="viewVehicleModal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 900px;">
             <div class="modal-header">
                 <h2 id="viewModalTitle">Detalhes do Veículo</h2>
                 <span class="close-modal close-view-modal">&times;</span>
             </div>
             <div class="modal-body">
                 <div class="details-container">
-                    <div class="vehicle-header">
-                        <div class="vehicle-primary-info">
-                            <h3 id="vehicleModelYear"></h3>
-                            <div class="vehicle-plate" id="vehiclePlate"></div>
-                            <div class="vehicle-status" id="vehicleStatus"></div>
+                    <div class="vehicle-main-info-grid" style="display: flex; flex-wrap: wrap; gap: 32px; margin-bottom: 24px;">
+                        <div style="flex: 1; min-width: 260px;">
+                            <div><strong>Modelo:</strong> <span id="vehicleModelYear"></span></div>
+                            <div><strong>Placa:</strong> <span id="vehiclePlate"></span></div>
+                            <div><strong>Status:</strong> <span id="vehicleStatus"></span></div>
+                            <div><strong>Chassi:</strong> <span id="detailChassisNumber"></span></div>
+                            <div><strong>RENAVAM:</strong> <span id="detailRenavam"></span></div>
+                            <div><strong>Quilometragem:</strong> <span id="detailMileage"></span></div>
+                            <div><strong>Combustível:</strong> <span id="detailFuelType"></span></div>
+                            <div><strong>Tipo de Cavalo:</strong> <span id="detailCavalo"></span></div>
+                        </div>
+                        <div style="flex: 1; min-width: 260px;">
+                            <div><strong>Tipo de Carreta:</strong> <span id="detailCarreta"></span></div>
+                            <div><strong>Aquisição:</strong> <span id="detailAcquisition"></span></div>
+                            <div><strong>Cor:</strong> <span id="detailColor"></span></div>
+                            <div><strong>Ano:</strong> <span id="detailYear"></span></div>
+                            <div><strong>Capacidade de Carga:</strong> <span id="detailCapacidadeCarga"></span></div>
+                            <div><strong>Passageiros:</strong> <span id="detailCapacidadePassageiros"></span></div>
+                            <div><strong>Proprietário:</strong> <span id="detailProprietario"></span></div>
                         </div>
                     </div>
-                    
-                    <div class="tabs">
-                        <button class="tab-btn active" data-tab="generalInfo">Informações Gerais</button>
-                        <button class="tab-btn" data-tab="maintenance">Manutenções</button>
-                        <button class="tab-btn" data-tab="documents">Documentos</button>
-                        <button class="tab-btn" data-tab="costs">Custos</button>
+                    <div style="margin-bottom: 16px;">
+                        <strong>Observações:</strong>
+                        <div id="detailNotes"></div>
                     </div>
-                    
-                    <div class="tab-content active" id="generalInfo">
-                        <div class="info-grid">
-                            <div class="info-group">
-                                <label>Chassi</label>
-                                <div id="detailChassisNumber"></div>
+                    <hr style="margin: 16px 0;">
+                    <!-- Tabelas e gráficos mantidos -->
+                    <!-- Resumo Simples e Bonito -->
+                    <div class="vehicle-summary-cards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 20px 0;">
+                        
+                        <!-- Card de Custos -->
+                        <div class="summary-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                                <span style="font-size: 24px; margin-right: 10px;">💰</span>
+                                <h4 style="margin: 0; font-size: 18px;">Custos (Último Ano)</h4>
                             </div>
-                            <div class="info-group">
-                                <label>RENAVAM</label>
-                                <div id="detailRenavam"></div>
-                            </div>
-                            <div class="info-group">
-                                <label>Quilometragem</label>
-                                <div id="detailMileage"></div>
-                            </div>
-                            <div class="info-group">
-                                <label>Combustível</label>
-                                <div id="detailFuelType"></div>
-                            </div>
-                            <div class="info-group">
-                                <label>Tipo de Cavalo</label>
-                                <div id="detailCavalo"></div>
-                            </div>
-                            <div class="info-group">
-                                <label>Tipo de Carreta</label>
-                                <div id="detailCarreta"></div>
-                            </div>
-                            <div class="info-group">
-                                <label>Aquisição</label>
-                                <div id="detailAcquisition"></div>
-                            </div>
-                            <div class="info-group">
-                                <label>Motorista Atual</label>
-                                <div id="detailDriver"></div>
+                            <div style="font-size: 24px; font-weight: bold; margin-bottom: 8px;" id="totalCostValue">R$ 0,00</div>
+                            <div style="font-size: 14px; opacity: 0.9;">
+                                <div>🔧 Manutenção: <span id="maintenanceCostValue">R$ 0,00</span></div>
+                                <div>⛽ Combustível: <span id="fuelCostValue">R$ 0,00</span></div>
+                                <div>📏 Custo/km: <span id="costPerKm">R$ 0,00</span></div>
                             </div>
                         </div>
                         
-                        <div class="info-section">
-                            <h4>Observações</h4>
-                            <p id="detailNotes"></p>
-                        </div>
-                    </div>
-                    
-                    <div class="tab-content" id="maintenance">
-                        <div class="maintenance-schedule">
-                            <h4>Programação de Manutenção</h4>
-                            <table class="info-table">
-                                <thead>
-                                    <tr>
-                                        <th>Tipo</th>
-                                        <th>Última Data</th>
-                                        <th>Próxima Data</th>
-                                        <th>Intervalo (km)</th>
-                                        <th>Próxima Km</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="maintenanceScheduleBody">
-                                    <!-- Populated by JavaScript -->
-                                </tbody>
-                            </table>
+                        <!-- Card de Atividade Recente -->
+                        <div class="summary-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                                <span style="font-size: 24px; margin-right: 10px;">📊</span>
+                                <h4 style="margin: 0; font-size: 18px;">Atividade Recente</h4>
+                            </div>
+                            <div id="recentActivitySummary" style="font-size: 14px; line-height: 1.6;">
+                                <div>🚛 Última viagem: <span id="lastTripDate">-</span></div>
+                                <div>⛽ Último abastecimento: <span id="lastRefuelDate">-</span></div>
+                                <div>🔧 Última manutenção: <span id="lastMaintenanceDate">-</span></div>
+                            </div>
                         </div>
                         
-                        <div class="maintenance-history">
-                            <h4>Histórico de Manutenção</h4>
-                            <table class="info-table">
-                                <thead>
-                                    <tr>
-                                        <th>Data</th>
-                                        <th>Tipo</th>
-                                        <th>Descrição</th>
-                                        <th>Quilometragem</th>
-                                        <th>Custo</th>
-                                        <th>Mecânico</th>
-                                        <th>Observações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="maintenanceHistoryBody">
-                                    <!-- Populated by JavaScript -->
-                                </tbody>
-                            </table>
+                        <!-- Card de Status -->
+                        <div class="summary-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+                            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                                <span style="font-size: 24px; margin-right: 10px;">🎯</span>
+                                <h4 style="margin: 0; font-size: 18px;">Status Geral</h4>
+                            </div>
+                            <div style="font-size: 14px; line-height: 1.8;">
+                                <div>📈 Total de viagens: <span id="totalTripsCount">0</span></div>
+                                <div>⛽ Total de abastecimentos: <span id="totalRefuelsCount">0</span></div>
+                                <div>🔧 Total de manutenções: <span id="totalMaintenanceCount">0</span></div>
+                            </div>
                         </div>
-
-                        <div class="carretas-history">
-                            <h4>Histórico de Carretas</h4>
-                            <table class="info-table">
-                                <thead>
-                                    <tr>
-                                        <th>Data da Troca</th>
-                                        <th>Carreta</th>
-                                        <th>Capacidade</th>
-                                        <th>Motivo</th>
-                                        <th>Observações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="carretasHistoryBody">
-                                    <!-- Populated by JavaScript -->
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="km-history">
-                            <h4>Histórico de Quilometragem</h4>
-                            <table class="info-table">
-                                <thead>
-                                    <tr>
-                                        <th>Data</th>
-                                        <th>Quilometragem</th>
-                                        <th>Tipo</th>
-                                        <th>Observações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="kmHistoryBody">
-                                    <!-- Populated by JavaScript -->
-                                </tbody>
-                            </table>
-                        </div>
+                        
                     </div>
-                    
-                    <div class="tab-content" id="documents">
-                        <div class="documents-info">
-                            <h4>Documentação</h4>
-                            <div class="info-grid">
-                                <div class="info-group">
-                                    <label>Vencimento da Licença</label>
-                                    <div id="detailLicenseExpiry"></div>
-                                </div>
-                                <div class="info-group">
-                                    <label>Vencimento do Seguro</label>
-                                    <div id="detailInsuranceExpiry"></div>
-                                </div>
-                                <div class="info-group">
-                                    <label>Apólice de Seguro</label>
-                                    <div id="detailInsurancePolicy"></div>
-                                </div>
-                                <div class="info-group">
-                                    <label>Valor do Seguro</label>
-                                    <div id="detailInsuranceValue"></div>
-                                </div>
-                            </div>
+                    <hr style="margin: 16px 0;">
+                    <div class="vehicle-documents-row" style="display: flex; gap: 32px; justify-content: flex-start; align-items: flex-end;">
+                        <div style="flex: 1; min-width: 200px;">
+                            <strong>CRLV</strong><br>
+                            <button class="btn btn-primary" id="visualizarCrlvBtn" style="margin-top: 8px;">Visualizar CRLV</button>
                         </div>
-                    </div>
-                    
-                    <div class="tab-content" id="costs">
-                        <div class="cost-summary">
-                            <h4>Resumo de Custos</h4>
-                            <div class="info-grid">
-                                <div class="cost-card">
-                                    <h5>Manutenção (Último Ano)</h5>
-                                    <div class="cost-value" id="maintenanceCostValue">R$ 0,00</div>
-                                </div>
-                                <div class="cost-card">
-                                    <h5>Combustível (Último Ano)</h5>
-                                    <div class="cost-value" id="fuelCostValue">R$ 0,00</div>
-                                </div>
-                                <div class="cost-card">
-                                    <h5>Custo por Km</h5>
-                                    <div class="cost-value" id="costPerKm">R$ 0,00</div>
-                                </div>
-                                <div class="cost-card">
-                                    <h5>Total de Custos</h5>
-                                    <div class="cost-value" id="totalCostValue">R$ 0,00</div>
-                                </div>
-                            </div>
-                            
-                            <div class="chart-container">
-                                <canvas id="vehicleCostChart"></canvas>
-                            </div>
+                        <div style="flex: 1; min-width: 200px;">
+                            <strong>Foto do Veículo</strong><br>
+                            <button class="btn btn-primary" id="visualizarFotoVeiculoBtn" style="margin-top: 8px;">Visualizar Foto</button>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button id="closeVehicleDetailsBtn" class="btn-secondary">Fechar</button>
-                <button id="editFromDetailsBtn" class="btn-primary">Editar</button>
             </div>
         </div>
     </div>
@@ -815,9 +782,125 @@ $total_pages = $result['total_pages'];
         </div>
     </div>
     
+    <!-- Modal de Ajuda -->
+    <div class="modal" id="helpVehiclesModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Ajuda - Gestão de Veículos</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <h3>Visão Geral</h3>
+                    <p>A página de Veículos permite gerenciar toda a frota de veículos da empresa. Aqui você pode cadastrar, editar, visualizar e excluir veículos, além de acompanhar métricas importantes de performance e status.</p>
+                </div>
+
+                <div class="help-section">
+                    <h3>Funcionalidades Principais</h3>
+                    <ul>
+                        <li><strong>Novo Veículo:</strong> Cadastre um novo veículo com informações completas como placa, modelo, tipo, categoria e especificações técnicas.</li>
+                        <li><strong>Filtros:</strong> Use os filtros para encontrar veículos específicos por status, tipo ou através da busca por texto.</li>
+                        <li><strong>Exportar:</strong> Exporte a lista de veículos para análise externa em formato PDF.</li>
+                        <li><strong>Relatórios:</strong> Visualize relatórios e estatísticas da frota.</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Indicadores (KPIs)</h3>
+                    <ul>
+                        <li><strong>Total de Veículos:</strong> Número total de veículos na frota.</li>
+                        <li><strong>Veículos Ativos:</strong> Quantidade de veículos em operação.</li>
+                        <li><strong>Em Manutenção:</strong> Veículos atualmente em manutenção.</li>
+                        <li><strong>Quilometragem Total:</strong> Soma da quilometragem de todos os veículos.</li>
+                        <li><strong>Distribuição por Tipo:</strong> Gráfico mostrando a distribuição de veículos por tipo.</li>
+                        <li><strong>Status da Frota:</strong> Gráfico com o status atual de todos os veículos.</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Ações Disponíveis</h3>
+                    <ul>
+                        <li><strong>Visualizar:</strong> Veja detalhes completos do veículo, incluindo histórico de manutenções e especificações técnicas.</li>
+                        <li><strong>Editar:</strong> Modifique informações de um veículo existente.</li>
+                        <li><strong>Excluir:</strong> Remova um veículo do sistema (ação irreversível).</li>
+                        <li><strong>Histórico:</strong> Acesse o histórico completo de manutenções do veículo.</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Dicas Úteis</h3>
+                    <ul>
+                        <li>Mantenha as informações dos veículos sempre atualizadas, especialmente a quilometragem.</li>
+                        <li>Configure alertas para manutenções preventivas baseadas na quilometragem.</li>
+                        <li>Monitore o status dos veículos para identificar problemas rapidamente.</li>
+                        <li>Utilize os filtros para encontrar veículos específicos rapidamente.</li>
+                        <li>Acompanhe as métricas para otimizar a utilização da frota.</li>
+                        <li>Exporte relatórios regularmente para análise de performance.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('helpVehiclesModal')">Fechar</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal para exibir foto do veículo -->
+    <div class="modal" id="fotoVeiculoModal" style="display:none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Foto do Veículo</h2>
+                <span class="close-modal" id="closeFotoVeiculoModal">&times;</span>
+            </div>
+            <div class="modal-body" style="text-align:center;">
+                <img id="imgFotoVeiculo" src="" alt="Foto do Veículo" style="max-width:100%; max-height:400px; border-radius:8px; box-shadow:0 2px 8px #0002;">
+            </div>
+        </div>
+    </div>
+    
     <!-- JavaScript Files -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <script src="../js/vehicles.js"></script>
+    <script>
+    // Função para abrir a foto do veículo
+    $(document).ready(function() {
+        $('#visualizarFotoVeiculoBtn').on('click', function() {
+            var foto = window.selectedVehicle && window.selectedVehicle.foto_veiculo ? window.selectedVehicle.foto_veiculo : '';
+            if (foto) {
+                foto = foto.replace(/^uploads[\\\/]veiculos[\\\/]/, '');
+                window.open('../uploads/veiculos/' + foto, '_blank');
+            } else {
+                alert('Nenhuma foto disponível!');
+            }
+        });
+        $('#closeFotoVeiculoModal').on('click', function() {
+            $('#fotoVeiculoModal').fadeOut(200);
+            $('#noFotoMsg').remove();
+        });
+        // Fechar ao clicar fora
+        $('#fotoVeiculoModal').on('click', function(e) {
+            if (e.target === this) {
+                $(this).fadeOut(200);
+                $('#noFotoMsg').remove();
+            }
+        });
+        $('#visualizarCrlvBtn').on('click', function() {
+            var doc = window.selectedVehicle && window.selectedVehicle.documento ? window.selectedVehicle.documento : '';
+            if (doc) {
+                // Remove prefixo se já existir para evitar duplicidade
+                doc = doc.replace(/^uploads[\\\/]veiculos[\\\/]/, '');
+                window.open('../uploads/veiculos/' + doc, '_blank');
+            } else {
+                alert('Nenhum documento disponível!');
+            }
+        });
+        // Atualizar status da foto ao abrir detalhes do veículo
+        function updateFotoVeiculoStatus() {
+            var foto = window.selectedVehicle && window.selectedVehicle.foto_veiculo ? window.selectedVehicle.foto_veiculo : '';
+            $('#fotoVeiculoStatus').text(foto ? 'Foto disponível' : 'Nenhuma foto disponível');
+        }
+    });
+    </script>
 </body>
 </html>

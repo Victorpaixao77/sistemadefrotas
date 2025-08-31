@@ -103,6 +103,20 @@ function handleSaveVehicle() {
                 $data['foto_veiculo'] = 'uploads/veiculos/' . $newFileName;
             }
         }
+
+        // Handle file upload for documento if present
+        if (isset($_FILES['documento']) && $_FILES['documento']['error'] == 0) {
+            $uploadDir = '../uploads/veiculos/';
+            if (!file_exists($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+            $fileExtension = pathinfo($_FILES['documento']['name'], PATHINFO_EXTENSION);
+            $newFileName = uniqid() . '.' . $fileExtension;
+            $uploadFile = $uploadDir . $newFileName;
+            if (move_uploaded_file($_FILES['documento']['tmp_name'], $uploadFile)) {
+                $data['documento'] = 'uploads/veiculos/' . $newFileName;
+            }
+        }
         
         if ($id) {
             // Update existing vehicle

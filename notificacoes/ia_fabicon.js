@@ -61,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const list = panel.querySelector('.ia-notification-list');
         list.innerHTML = '';
         let unreadCount = 0;
+        
         if (data.success && data.notificacoes.length) {
           data.notificacoes.forEach(n => {
             const item = document.createElement('div');
@@ -90,6 +91,28 @@ document.addEventListener('DOMContentLoaded', function() {
             } else if (n.tipo === 'financeiro') {
               iconClass = 'danger';
               icon = 'fa-dollar-sign';
+            } else if (n.tipo === 'rota') {
+              iconClass = 'info';
+              icon = 'fa-route';
+            } else if (n.tipo === 'abastecimento') {
+              iconClass = 'warning';
+              icon = 'fa-gas-pump';
+            }
+            
+            // Formatar data de forma mais amigável
+            const dataNotif = new Date(n.data_criacao);
+            const agora = new Date();
+            const diffDias = Math.floor((agora - dataNotif) / (1000 * 60 * 60 * 24));
+            
+            let tempoAtraso = '';
+            if (diffDias === 0) {
+              tempoAtraso = 'Hoje';
+            } else if (diffDias === 1) {
+              tempoAtraso = 'Ontem';
+            } else if (diffDias < 7) {
+              tempoAtraso = `${diffDias} dias atrás`;
+            } else {
+              tempoAtraso = dataNotif.toLocaleDateString('pt-BR');
             }
             
             item.innerHTML = `
@@ -100,16 +123,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class='ia-notification-title'>${n.titulo}</div>
                 <div class='ia-notification-msg'>${n.mensagem}</div>
                 ${n.ia_mensagem ? `<div class='ia-dica'><i class='fas fa-lightbulb'></i> <b>Dica IA:</b> ${n.ia_mensagem}</div>` : ''}
-                <div class='ia-notification-time'>${new Date(n.data_criacao).toLocaleString('pt-BR')}</div>
+                <div class='ia-notification-time'>${tempoAtraso} às ${dataNotif.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</div>
               </div>
             `;
             list.appendChild(item);
           });
         } else {
-          list.innerHTML = '<div style="color:#b8c2d0">Nenhuma notificação IA encontrada.</div>';
+          list.innerHTML = '<div style="color:#b8c2d0; text-align: center; padding: 20px;">Nenhuma notificação IA encontrada.</div>';
         }
+        
         badge.textContent = unreadCount;
         badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+      })
+      .catch(error => {
+        console.error('Erro ao carregar notificações IA:', error);
+        const list = panel.querySelector('.ia-notification-list');
+        list.innerHTML = '<div style="color:#ef4444; text-align: center; padding: 20px;">Erro ao carregar notificações</div>';
       });
   }
 

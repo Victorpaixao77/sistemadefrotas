@@ -219,6 +219,199 @@ function getReportData($reportType, $month, $year) {
                         ORDER BY pm.data_manutencao DESC";
                 break;
                 
+            case 'vida_util_pneus':
+                $sql = "SELECT 
+                        p.numero_serie, p.marca, p.modelo, p.medida, p.km_instalacao,
+                        p.dot, v.placa, v.modelo as veiculo_modelo,
+                        CASE 
+                            WHEN p.dot IS NULL OR LENGTH(p.dot) < 4 OR 
+                                 CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED) > 99 OR
+                                 CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED) < 0 THEN 0
+                            ELSE GREATEST(0, YEAR(NOW()) - (2000 + CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED)))
+                        END as idade_anos,
+                        CASE 
+                            WHEN p.km_instalacao > 100000 THEN 'Crítico'
+                            WHEN p.km_instalacao > 80000 THEN 'Atenção'
+                            WHEN p.km_instalacao > 60000 THEN 'Monitorar'
+                            ELSE 'Bom'
+                        END as status_desgaste,
+                        (80000 - p.km_instalacao) as km_restante,
+                        ROUND((p.km_instalacao / 80000) * 100, 2) as percentual_desgaste
+                        FROM pneus p
+                        LEFT JOIN pneus_alocacao pa ON p.id = pa.pneu_id AND pa.status = 'alocado'
+                        LEFT JOIN veiculos v ON pa.veiculo_id = v.id
+                        WHERE p.empresa_id = :empresa_id
+                        ORDER BY p.km_instalacao DESC";
+                break;
+                
+            case 'custos_veiculo':
+                $sql = "SELECT 
+                        v.placa, v.modelo,
+                        COALESCE(SUM(a.valor_total), 0) as total_abastecimento,
+                        COALESCE(SUM(m.valor), 0) as total_manutencao,
+                        COALESCE(SUM(dv.total_despviagem), 0) as total_despesas_viagem,
+                        COALESCE(SUM(df.valor), 0) as total_despesas_fixas,
+                        (COALESCE(SUM(a.valor_total), 0) + COALESCE(SUM(m.valor), 0) + 
+                         COALESCE(SUM(dv.total_despviagem), 0) + COALESCE(SUM(df.valor), 0)) as custo_total,
+                        COALESCE(SUM(r.total_km), 0) as total_km_rodado,
+                        CASE 
+                            WHEN COALESCE(SUM(r.total_km), 0) > 0 
+                            THEN ROUND((COALESCE(SUM(a.valor_total), 0) + COALESCE(SUM(m.valor), 0) + 
+                                       COALESCE(SUM(dv.total_despviagem), 0) + COALESCE(SUM(df.valor), 0)) / 
+                                      COALESCE(SUM(r.total_km), 1), 2)
+                            ELSE 0 
+                        END as custo_por_km
+                        FROM veiculos v
+                        LEFT JOIN abastecimentos a ON v.id = a.veiculo_id 
+                            AND YEAR(a.data_abastecimento) = :year_abastecimento 
+                            AND MONTH(a.data_abastecimento) = :month_abastecimento
+                        LEFT JOIN manutencoes m ON v.id = m.veiculo_id 
+                            AND YEAR(m.data_manutencao) = :year_manutencao 
+                            AND MONTH(m.data_manutencao) = :month_manutencao
+                        LEFT JOIN rotas r ON v.id = r.veiculo_id 
+                            AND YEAR(r.data_saida) = :year_rota 
+                            AND MONTH(r.data_saida) = :month_rota
+                        LEFT JOIN despesas_viagem dv ON r.id = dv.rota_id
+                        LEFT JOIN despesas_fixas df ON v.id = df.veiculo_id 
+                            AND YEAR(df.data_pagamento) = :year_despesa 
+                            AND MONTH(df.data_pagamento) = :month_despesa
+                        WHERE v.empresa_id = :empresa_id
+                        GROUP BY v.id, v.placa, v.modelo
+                        ORDER BY custo_total DESC";
+                break;
+                
+            case 'eficiencia_frota':
+                $sql = "SELECT 
+                        v.placa, v.modelo,
+                        COUNT(r.id) as total_viagens,
+                        COALESCE(SUM(r.distancia_km), 0) as total_km,
+                        COALESCE(SUM(r.frete), 0) as total_frete,
+                        COALESCE(SUM(r.km_vazio), 0) as total_km_vazio,
+                        COALESCE(AVG(r.eficiencia_viagem), 0) as media_eficiencia,
+                        COALESCE(SUM(a.litros), 0) as total_litros,
+                        CASE 
+                            WHEN COALESCE(SUM(r.distancia_km), 0) > 0 
+                            THEN ROUND(COALESCE(SUM(r.distancia_km), 0) / COALESCE(SUM(a.litros), 1), 2)
+                            ELSE 0 
+                        END as km_por_litro,
+                        CASE 
+                            WHEN COALESCE(SUM(r.distancia_km), 0) > 0 
+                            THEN ROUND((COALESCE(SUM(r.distancia_km), 0) - COALESCE(SUM(r.km_vazio), 0)) / 
+                                      COALESCE(SUM(r.distancia_km), 1) * 100, 2)
+                            ELSE 0 
+                        END as percentual_ocupacao
+                        FROM veiculos v
+                        LEFT JOIN rotas r ON v.id = r.veiculo_id 
+                            AND YEAR(r.data_saida) = :year_rota 
+                            AND MONTH(r.data_saida) = :month_rota
+                        LEFT JOIN abastecimentos a ON v.id = a.veiculo_id 
+                            AND YEAR(a.data_abastecimento) = :year_abastecimento 
+                            AND MONTH(a.data_abastecimento) = :month_abastecimento
+                        WHERE v.empresa_id = :empresa_id
+                        GROUP BY v.id, v.placa, v.modelo
+                        ORDER BY media_eficiencia DESC";
+                break;
+                
+            case 'historico_manutencoes':
+                $sql = "SELECT 
+                        m.id, m.data_manutencao, m.descricao, m.valor,
+                        v.placa, v.modelo as veiculo_modelo,
+                        tm.nome as tipo_manutencao,
+                        sm.nome as status_manutencao,
+                        cm.nome as componente,
+                        DATEDIFF(m.data_conclusao, m.data_manutencao) as dias_duracao,
+                        CASE 
+                            WHEN m.valor > (SELECT AVG(valor) FROM manutencoes) THEN 'Acima da Média'
+                            WHEN m.valor < (SELECT AVG(valor) FROM manutencoes) THEN 'Abaixo da Média'
+                            ELSE 'Na Média'
+                        END as comparacao_custo
+                        FROM manutencoes m
+                        JOIN veiculos v ON v.id = m.veiculo_id
+                        JOIN tipos_manutencao tm ON tm.id = m.tipo_manutencao_id
+                        JOIN status_manutencao sm ON sm.id = m.status_manutencao_id
+                        LEFT JOIN componentes_manutencao cm ON cm.id = m.componente_id
+                        WHERE v.empresa_id = :empresa_id
+                        AND YEAR(m.data_manutencao) = :year 
+                        AND MONTH(m.data_manutencao) = :month
+                        ORDER BY m.data_manutencao DESC";
+                break;
+                
+            case 'analise_preditiva':
+                $sql = "SELECT 
+                        v.placa, v.modelo,
+                        p.numero_serie, p.marca, p.modelo as pneu_modelo,
+                        p.km_instalacao, p.dot,
+                        CASE 
+                            WHEN p.dot IS NULL OR LENGTH(p.dot) < 4 OR 
+                                 CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED) > 99 OR
+                                 CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED) < 0 THEN 0
+                            ELSE GREATEST(0, YEAR(NOW()) - (2000 + CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED)))
+                        END as idade_anos,
+                        CASE 
+                            WHEN p.km_instalacao > 90000 OR 
+                                 (CASE 
+                                     WHEN p.dot IS NULL OR LENGTH(p.dot) < 4 OR 
+                                          CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED) > 99 OR
+                                          CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED) < 0 THEN 0
+                                     ELSE GREATEST(0, YEAR(NOW()) - (2000 + CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED)))
+                                 END) > 7 THEN 'Alto'
+                            WHEN p.km_instalacao > 70000 OR 
+                                 (CASE 
+                                     WHEN p.dot IS NULL OR LENGTH(p.dot) < 4 OR 
+                                          CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED) > 99 OR
+                                          CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED) < 0 THEN 0
+                                     ELSE GREATEST(0, YEAR(NOW()) - (2000 + CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED)))
+                                 END) > 5 THEN 'Médio'
+                            ELSE 'Baixo'
+                        END as risco_falha,
+                        CASE 
+                            WHEN p.km_instalacao > 90000 THEN ROUND(0.6 + ((p.km_instalacao - 90000) / 10000) * 0.1, 2)
+                            WHEN (CASE 
+                                     WHEN p.dot IS NULL OR LENGTH(p.dot) < 4 OR 
+                                          CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED) > 99 OR
+                                          CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED) < 0 THEN 0
+                                     ELSE GREATEST(0, YEAR(NOW()) - (2000 + CAST(SUBSTRING(p.dot, 3, 2) AS SIGNED)))
+                                 END) > 7 THEN 0.8
+                            ELSE 0.2
+                        END as probabilidade_falha,
+                        (80000 - p.km_instalacao) as km_restante_vida_util,
+                        CASE 
+                            WHEN p.km_instalacao > 100000 THEN 'Troca Imediata'
+                            WHEN p.km_instalacao > 80000 THEN 'Planejar Troca'
+                            WHEN p.km_instalacao > 60000 THEN 'Monitorar'
+                            ELSE 'Bom Estado'
+                        END as recomendacao
+                        FROM pneus p
+                        JOIN pneus_alocacao pa ON p.id = pa.pneu_id AND pa.status = 'alocado'
+                        JOIN veiculos v ON pa.veiculo_id = v.id
+                        WHERE v.empresa_id = :empresa_id
+                        ORDER BY probabilidade_falha DESC";
+                break;
+                
+            case 'otimizacao_pneus':
+                $sql = "SELECT 
+                        v.placa, v.modelo as veiculo_modelo,
+                        p.numero_serie, p.marca, p.modelo as pneu_modelo,
+                        p.km_instalacao, pa.posicao_id,
+                        CASE 
+                            WHEN pa.posicao_id IN (1, 2) THEN 'Baixo Desgaste'
+                            WHEN pa.posicao_id IN (3, 4, 5, 6) THEN 'Alto Desgaste'
+                            ELSE 'Médio Desgaste'
+                        END as tipo_posicao,
+                        CASE 
+                            WHEN p.km_instalacao > 60000 AND pa.posicao_id IN (1, 2) THEN 'Mover para posição de alto desgaste'
+                            WHEN p.km_instalacao < 30000 AND pa.posicao_id IN (3, 4, 5, 6) THEN 'Mover para posição de baixo desgaste'
+                            ELSE 'Posição adequada'
+                        END as recomendacao_otimizacao,
+                        (80000 - p.km_instalacao) as km_restante,
+                        ROUND((p.km_instalacao / 80000) * 100, 2) as percentual_desgaste
+                        FROM pneus p
+                        JOIN pneus_alocacao pa ON p.id = pa.pneu_id AND pa.status = 'alocado'
+                        JOIN veiculos v ON pa.veiculo_id = v.id
+                        WHERE v.empresa_id = :empresa_id
+                        ORDER BY p.km_instalacao DESC";
+                break;
+                
             case 'veiculos_status':
                 $sql = "SELECT 
                         CASE 
@@ -323,12 +516,36 @@ function getReportData($reportType, $month, $year) {
         $stmt = $conn->prepare($sql);
         
         // Adicionar parâmetros apenas se o relatório precisar de mês/ano
-        if (!in_array($reportType, ['veiculos_status'])) {
-            $stmt->bindParam(':year', $year, PDO::PARAM_INT);
-            $stmt->bindParam(':month', $month, PDO::PARAM_INT);
+        if (!in_array($reportType, ['veiculos_status', 'vida_util_pneus', 'otimizacao_pneus', 'analise_preditiva'])) {
+            if ($reportType === 'eficiencia_frota') {
+                $stmt->bindParam(':year_rota', $year, PDO::PARAM_INT);
+                $stmt->bindParam(':month_rota', $month, PDO::PARAM_INT);
+                $stmt->bindParam(':year_abastecimento', $year, PDO::PARAM_INT);
+                $stmt->bindParam(':month_abastecimento', $month, PDO::PARAM_INT);
+            } elseif ($reportType === 'custos_veiculo') {
+                $stmt->bindParam(':year_abastecimento', $year, PDO::PARAM_INT);
+                $stmt->bindParam(':month_abastecimento', $month, PDO::PARAM_INT);
+                $stmt->bindParam(':year_manutencao', $year, PDO::PARAM_INT);
+                $stmt->bindParam(':month_manutencao', $month, PDO::PARAM_INT);
+                $stmt->bindParam(':year_rota', $year, PDO::PARAM_INT);
+                $stmt->bindParam(':month_rota', $month, PDO::PARAM_INT);
+                $stmt->bindParam(':year_despesa', $year, PDO::PARAM_INT);
+                $stmt->bindParam(':month_despesa', $month, PDO::PARAM_INT);
+            } else {
+                $stmt->bindParam(':year', $year, PDO::PARAM_INT);
+                $stmt->bindParam(':month', $month, PDO::PARAM_INT);
+            }
             error_log("Parâmetros para $reportType - Ano: $year, Mês: $month");
         }
         
+        // Adicionar empresa_id para relatórios que precisam
+        if (in_array($reportType, ['vida_util_pneus', 'custos_veiculo', 'eficiencia_frota', 'historico_manutencoes', 'analise_preditiva', 'otimizacao_pneus'])) {
+            $empresa_id = $_SESSION['empresa_id'] ?? 1;
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            error_log("Parâmetro empresa_id para $reportType: $empresa_id");
+        }
+        
+        // Executar a query
         $stmt->execute();
         $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -359,6 +576,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $format = $_POST['format'] ?? 'pdf';
         
         error_log("Iniciando processamento do relatório: $reportType em formato $format para $month/$year");
+        
+        // Verificar se é um relatório fiscal
+        if (strpos($reportType, 'fiscal_') === 0) {
+            // Relatório fiscal - redirecionar para API fiscal
+            $tipoFiscal = str_replace('fiscal_', '', $reportType);
+            $dataInicio = date('Y-m-01', mktime(0, 0, 0, $month, 1, $year));
+            $dataFim = date('Y-m-t', mktime(0, 0, 0, $month, 1, $year));
+            
+            // Redirecionar para a API fiscal com caminho absoluto
+            $url = "/sistema-frotas/fiscal/api/relatorios_fiscais.php?" . http_build_query([
+                'action' => 'gerar_relatorio',
+                'tipo' => $tipoFiscal,
+                'formato' => $format,
+                'data_inicio' => $dataInicio,
+                'data_fim' => $dataFim
+            ]);
+            
+            // Redirecionar para a API fiscal
+            header("Location: $url");
+            exit;
+        }
         
         $data = getReportData($reportType, $month, $year);
         
@@ -413,6 +651,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../logo.png">
     
     <style>
         .reports-grid {
@@ -533,6 +774,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .overlay.active {
             display: block;
         }
+        
+        .dashboard-section {
+            margin-bottom: 40px;
+        }
+        
+        .dashboard-section h2 {
+            color: var(--text-primary);
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .dashboard-section h2 i {
+            color: var(--primary-color);
+            font-size: 1.3rem;
+        }
     </style>
 </head>
 <body>
@@ -551,214 +812,452 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <h1>Relatórios</h1>
                 </div>
                 
-                <div class="reports-grid">
-                    <!-- Relatório de Rotas -->
-                    <div class="report-card">
-                        <h3>Relatório de Rotas Realizadas</h3>
-                        <p>Listar todas as rotas realizadas no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('rotas', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('rotas', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
+                <!-- Seção de Relatórios Operacionais -->
+                <div class="dashboard-section">
+                    <h2><i class="fas fa-route"></i> Relatórios Operacionais</h2>
+                    <div class="reports-grid">
+                        <!-- Relatório de Rotas -->
+                        <div class="report-card">
+                            <h3>Relatório de Rotas Realizadas</h3>
+                            <p>Listar todas as rotas realizadas no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('rotas', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('rotas', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Quilometragem -->
+                        <div class="report-card">
+                            <h3>Relatório de Quilometragem</h3>
+                            <p>Total de km rodados por veículo no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('quilometragem', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('quilometragem', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Eficiência da Frota -->
+                        <div class="report-card">
+                            <h3>Relatório de Eficiência da Frota</h3>
+                            <p>Indicadores de performance e eficiência operacional da frota.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('eficiencia_frota', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('eficiencia_frota', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Status dos Veículos -->
+                        <div class="report-card">
+                            <h3>Relatório de Status dos Veículos</h3>
+                            <p>Situação atual dos veículos.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('veiculos_status', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('veiculos_status', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Abastecimentos -->
+                        <div class="report-card">
+                            <h3>Relatório de Abastecimentos</h3>
+                            <p>Todos os abastecimentos realizados no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('abastecimentos', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('abastecimentos', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Desempenho -->
+                        <div class="report-card">
+                            <h3>Relatório de Desempenho</h3>
+                            <p>Performance geral dos veículos e motoristas.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('desempenho', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('desempenho', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    
-                    <!-- Relatório de Despesas Variáveis -->
-                    <div class="report-card">
-                        <h3>Relatório de Despesas Variáveis</h3>
-                        <p>Total de despesas variáveis por viagem no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('despesas_viagem', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('despesas_viagem', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
+                </div>
+                
+                <!-- Seção de Relatórios Financeiros -->
+                <div class="dashboard-section">
+                    <h2><i class="fas fa-dollar-sign"></i> Relatórios Financeiros</h2>
+                    <div class="reports-grid">
+                        <!-- Relatório de Lucro por Viagem -->
+                        <div class="report-card">
+                            <h3>Relatório de Lucro por Viagem</h3>
+                            <p>Cálculo de lucro por viagem no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('lucro_viagem', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('lucro_viagem', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Lucro Total -->
+                        <div class="report-card">
+                            <h3>Relatório de Lucro Total</h3>
+                            <p>Lucro total considerando todas as viagens.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('lucro_total', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('lucro_total', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Recebimentos -->
+                        <div class="report-card">
+                            <h3>Relatório de Recebimentos</h3>
+                            <p>Total recebido de cada cliente no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('recebimentos', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('recebimentos', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Contas a Pagar -->
+                        <div class="report-card">
+                            <h3>Relatório de Contas a Pagar</h3>
+                            <p>Todas as contas agendadas para pagamento no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('contas_pagar', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('contas_pagar', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Contas Pagas -->
+                        <div class="report-card">
+                            <h3>Relatório de Contas Pagas</h3>
+                            <p>Todas as contas efetivamente pagas no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('contas_pagas', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('contas_pagas', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Financiamentos -->
+                        <div class="report-card">
+                            <h3>Relatório de Financiamentos</h3>
+                            <p>Parcelas pagas e status dos financiamentos no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('financiamentos', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('financiamentos', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Despesas Variáveis -->
+                        <div class="report-card">
+                            <h3>Relatório de Despesas Variáveis</h3>
+                            <p>Total de despesas variáveis por viagem no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('despesas_viagem', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('despesas_viagem', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Despesas Fixas -->
+                        <div class="report-card">
+                            <h3>Relatório de Despesas Fixas</h3>
+                            <p>Listar todas as despesas fixas pagas no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('despesas_fixas', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('despesas_fixas', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Análise de Custos por Veículo -->
+                        <div class="report-card">
+                            <h3>Análise de Custos por Veículo</h3>
+                            <p>Breakdown completo de custos operacionais por veículo.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('custos_veiculo', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('custos_veiculo', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    
-                    <!-- Relatório de Despesas Fixas -->
-                    <div class="report-card">
-                        <h3>Relatório de Despesas Fixas</h3>
-                        <p>Listar todas as despesas fixas pagas no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('despesas_fixas', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('despesas_fixas', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
+                </div>
+                
+                <!-- Seção de Relatórios de Manutenção -->
+                <div class="dashboard-section">
+                    <h2><i class="fas fa-tools"></i> Relatórios de Manutenção</h2>
+                    <div class="reports-grid">
+                        <!-- Relatório de Manutenções -->
+                        <div class="report-card">
+                            <h3>Relatório de Manutenções</h3>
+                            <p>Listar manutenções preventivas e corretivas realizadas no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('manutencoes', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('manutencoes', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Histórico de Manutenções -->
+                        <div class="report-card">
+                            <h3>Histórico de Manutenções Detalhado</h3>
+                            <p>Histórico completo de manutenções preventivas e corretivas.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('historico_manutencoes', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('historico_manutencoes', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Pneus -->
+                        <div class="report-card">
+                            <h3>Relatório de Pneus</h3>
+                            <p>Manutenções de pneus realizadas no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('pneus', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('pneus', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Vida Útil dos Pneus -->
+                        <div class="report-card">
+                            <h3>Relatório de Vida Útil dos Pneus</h3>
+                            <p>Análise detalhada da vida útil e desgaste dos pneus da frota.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('vida_util_pneus', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('vida_util_pneus', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Ocorrências -->
+                        <div class="report-card">
+                            <h3>Relatório de Ocorrências</h3>
+                            <p>Todas as multas ou ocorrências registradas no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('ocorrencias', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('ocorrencias', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    
-                    <!-- Relatório de Manutenções -->
-                    <div class="report-card">
-                        <h3>Relatório de Manutenções</h3>
-                        <p>Listar manutenções preventivas e corretivas realizadas no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('manutencoes', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('manutencoes', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
+                </div>
+                
+                <!-- Seção de Relatórios com IA -->
+                <div class="dashboard-section">
+                    <h2><i class="fas fa-brain"></i> Relatórios Inteligentes (IA)</h2>
+                    <div class="reports-grid">
+                        <!-- Relatório de Análise Preditiva -->
+                        <div class="report-card">
+                            <h3>Análise Preditiva de Falhas</h3>
+                            <p>Relatório baseado em IA para predição de falhas e manutenções.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('analise_preditiva', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('analise_preditiva', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Otimização de Pneus -->
+                        <div class="report-card">
+                            <h3>Otimização de Alocação de Pneus</h3>
+                            <p>Recomendações de IA para otimizar a alocação e vida útil dos pneus.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('otimizacao_pneus', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('otimizacao_pneus', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    
-                    <!-- Relatório de Abastecimentos -->
-                    <div class="report-card">
-                        <h3>Relatório de Abastecimentos</h3>
-                        <p>Todos os abastecimentos realizados no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('abastecimentos', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('abastecimentos', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
+                </div>
+                
+                <!-- Seção de Relatórios Fiscais -->
+                <div class="dashboard-section">
+                    <h2><i class="fas fa-file-invoice"></i> Relatórios Fiscais</h2>
+                    <div class="reports-grid">
+                        <!-- Relatório de NF-e Recebidas -->
+                        <div class="report-card">
+                            <h3>📄 Relatório de NF-e Recebidas</h3>
+                            <p>Todas as NF-e recebidas dos clientes no período.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showFiscalReportForm('nfe_recebidas', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showFiscalReportForm('nfe_recebidas', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <!-- Relatório de Lucro por Viagem -->
-                    <div class="report-card">
-                        <h3>Relatório de Lucro por Viagem</h3>
-                        <p>Cálculo de lucro por viagem no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('lucro_viagem', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('lucro_viagem', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
+                        
+                        <!-- Relatório de CT-e Emitidos -->
+                        <div class="report-card">
+                            <h3>🚛 Relatório de CT-e Emitidos</h3>
+                            <p>Conhecimentos de transporte emitidos e seus status.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showFiscalReportForm('cte_emitidos', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showFiscalReportForm('cte_emitidos', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <!-- Relatório de Lucro Total -->
-                    <div class="report-card">
-                        <h3>Relatório de Lucro Total</h3>
-                        <p>Lucro total considerando todas as viagens.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('lucro_total', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('lucro_total', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
+                        
+                        <!-- Relatório de MDF-e Gerados -->
+                        <div class="report-card">
+                            <h3>📋 Relatório de MDF-e Gerados</h3>
+                            <p>Manifestos de documentos fiscais e controle de viagens.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showFiscalReportForm('mdfe_gerados', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showFiscalReportForm('mdfe_gerados', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <!-- Relatório de Pneus -->
-                    <div class="report-card">
-                        <h3>Relatório de Pneus</h3>
-                        <p>Todas as manutenções ou trocas de pneus no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('pneus', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('pneus', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
+                        
+                        <!-- Relatório de Eventos Fiscais -->
+                        <div class="report-card">
+                            <h3>📝 Relatório de Eventos Fiscais</h3>
+                            <p>Cancelamentos, correções e outros eventos fiscais.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showFiscalReportForm('eventos_fiscais', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showFiscalReportForm('eventos_fiscais', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <!-- Relatório de Status dos Veículos -->
-                    <div class="report-card">
-                        <h3>Relatório de Status dos Veículos</h3>
-                        <p>Situação atual dos veículos.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('veiculos_status', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('veiculos_status', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
+                        
+                        <!-- Relatório de Status SEFAZ -->
+                        <div class="report-card">
+                            <h3>🔄 Relatório de Status SEFAZ</h3>
+                            <p>Status de envio e retorno dos documentos na SEFAZ.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showFiscalReportForm('status_sefaz', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showFiscalReportForm('status_sefaz', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <!-- Relatório de Quilometragem -->
-                    <div class="report-card">
-                        <h3>Relatório de Quilometragem</h3>
-                        <p>Total de km rodados por veículo no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('quilometragem', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('quilometragem', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
+                        
+                        <!-- Relatório de Viagens Completas -->
+                        <div class="report-card">
+                            <h3>🗺️ Relatório de Viagens Completas</h3>
+                            <p>Viagens com NF-e, CT-e e MDF-e vinculados.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showFiscalReportForm('viagens_completas', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showFiscalReportForm('viagens_completas', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <!-- Relatório de Recebimentos -->
-                    <div class="report-card">
-                        <h3>Relatório de Recebimentos</h3>
-                        <p>Total recebido de cada cliente no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('recebimentos', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('recebimentos', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
+                        
+                        <!-- Relatório de Alertas e Validações -->
+                        <div class="report-card">
+                            <h3>⚠️ Relatório de Alertas</h3>
+                            <p>Alertas automáticos e validações de consistência.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showFiscalReportForm('alertas_validacoes', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showFiscalReportForm('alertas_validacoes', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <!-- Relatório de Contas a Pagar -->
-                    <div class="report-card">
-                        <h3>Relatório de Contas a Pagar</h3>
-                        <p>Todas as contas agendadas para pagamento no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('contas_pagar', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('contas_pagar', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Relatório de Contas Pagas -->
-                    <div class="report-card">
-                        <h3>Relatório de Contas Pagas</h3>
-                        <p>Todas as contas efetivamente pagas no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('contas_pagas', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('contas_pagas', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Relatório de Financiamentos -->
-                    <div class="report-card">
-                        <h3>Relatório de Financiamentos</h3>
-                        <p>Parcelas pagas e status dos financiamentos no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('financiamentos', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('financiamentos', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Relatório de Ocorrências -->
-                    <div class="report-card">
-                        <h3>Relatório de Ocorrências</h3>
-                        <p>Todas as multas ou ocorrências registradas no mês.</p>
-                        <div class="report-actions">
-                            <button class="btn-pdf" onclick="showReportForm('ocorrencias', 'pdf')">
-                                <i class="fas fa-file-pdf"></i> PDF
-                            </button>
-                            <button class="btn-excel" onclick="showReportForm('ocorrencias', 'excel')">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
+                        
+                        <!-- Relatório de Timeline de Documentos -->
+                        <div class="report-card">
+                            <h3>📅 Timeline de Documentos</h3>
+                            <p>Histórico cronológico de eventos por documento.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showFiscalReportForm('timeline_documentos', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showFiscalReportForm('timeline_documentos', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -815,7 +1314,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
     
     <!-- JavaScript Files -->
-    <script src="../js/header.js"></script>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     
@@ -835,6 +1333,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         function hideReportForm() {
             document.getElementById('reportForm').classList.remove('active');
             document.getElementById('overlay').classList.remove('active');
+        }
+        
+        // Função para relatórios fiscais - com seleção de período
+        function showFiscalReportForm(reportType, format) {
+            // Usar o mesmo modal dos outros relatórios
+            document.getElementById('reportType').value = 'fiscal_' + reportType;
+            document.getElementById('reportFormat').value = format;
+            document.getElementById('reportForm').classList.add('active');
+            document.getElementById('overlay').classList.add('active');
+            
+            // Set current month and year as default
+            const now = new Date();
+            document.getElementById('month').value = now.getMonth() + 1;
+            document.getElementById('year').value = now.getFullYear();
         }
         
         // Close form when clicking overlay

@@ -21,8 +21,8 @@ class RecomendacaoPneus {
     
     public function __construct($empresa_id) {
         $this->empresa_id = $empresa_id;
-        $this->pdo = new PDO("mysql:host=localhost;port=3307;dbname=sistema_frotas", "root", "");
-        $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        // Usar o sistema de conexão centralizado
+        $this->pdo = getConnection();
     }
     
     /**

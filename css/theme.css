@@ -5,7 +5,7 @@
     --bg-primary: #f3f4f6;
     --bg-secondary: #ffffff;
     --bg-tertiary: #e5e7eb;
-    --bg-sidebar: #1e40af;
+    --bg-sidebar: #ffffff;
     --text-primary: #1f2937;
     --text-secondary: #4b5563;
     --text-muted: #6b7280;
@@ -22,21 +22,67 @@
 /* Light Theme Sidebar Overrides */
 .light-theme .sidebar {
     background-color: var(--bg-sidebar);
-    color: white;
+    color: var(--text-primary);
+    border-right-color: var(--border-color);
 }
 
 .light-theme .sidebar-link {
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--text-secondary);
 }
 
 .light-theme .sidebar-link:hover,
 .light-theme .sidebar-link.active {
-    color: white;
-    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    background-color: var(--bg-tertiary);
 }
 
 .light-theme .sidebar-dropdown a {
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--text-secondary);
+}
+
+.light-theme .sidebar-dropdown a:hover {
+    color: var(--text-primary);
+    background-color: var(--bg-tertiary);
+}
+
+.light-theme .sidebar-header {
+    border-bottom-color: var(--border-color);
+}
+
+.light-theme .app-name {
+    color: var(--text-primary);
+}
+
+.light-theme .sidebar-toggle {
+    color: var(--text-secondary);
+}
+
+.light-theme .sidebar-toggle:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Light theme dropdown styles */
+.light-theme .sidebar-dropdown {
+    background-color: var(--bg-sidebar);
+}
+
+.light-theme .sidebar-dropdown a {
+    color: var(--text-secondary);
+}
+
+.light-theme .sidebar-dropdown a:hover {
+    color: var(--accent-primary);
+    background-color: var(--bg-tertiary);
+}
+
+/* Light theme collapsed sidebar styles */
+.light-theme.sidebar-collapsed .sidebar {
+    background-color: var(--bg-sidebar);
+}
+
+.light-theme.sidebar-hovered .sidebar {
+    background-color: var(--bg-sidebar);
 }
 
 /* Theme Transition Effects */

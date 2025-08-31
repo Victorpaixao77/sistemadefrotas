@@ -10,15 +10,22 @@ class Database {
 
     private function __construct() {
         try {
+            // Carregar configurações do arquivo config/database.php
+            $config = require __DIR__ . '/../../config/database.php';
+            
+            $dsn = sprintf(
+                "mysql:host=%s;port=%d;dbname=%s;charset=%s",
+                $config['host'],
+                $config['port'],
+                $config['database'],
+                $config['charset']
+            );
+            
             $this->connection = new PDO(
-                "mysql:host=localhost;dbname=sistema_frotas;charset=utf8",
-                "root",
-                "",
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false
-                ]
+                $dsn,
+                $config['username'],
+                $config['password'],
+                $config['options']
             );
         } catch (PDOException $e) {
             throw new \Exception("Erro na conexão com o banco de dados: " . $e->getMessage());

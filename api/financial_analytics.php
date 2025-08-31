@@ -29,13 +29,12 @@ try {
     // Get revenue data (completed routes)
     $revenue_query = "
         SELECT 
-            MONTH(data_rota) as month,
+            MONTH(data_saida) as month,
             SUM(frete) as total
         FROM rotas 
         WHERE empresa_id = :empresa_id 
-        AND YEAR(data_rota) = :year
-        AND no_prazo = 1
-        GROUP BY MONTH(data_rota)
+        AND YEAR(data_saida) = :year
+        GROUP BY MONTH(data_saida)
         ORDER BY month";
     
     $stmt = $conn->prepare($revenue_query);
@@ -65,12 +64,12 @@ try {
             
             -- Despesas Fixas
             SELECT 
-                MONTH(vencimento) as month,
+                MONTH(data_pagamento) as month,
                 SUM(valor) as total
             FROM despesas_fixas
             WHERE empresa_id = :empresa_id_2 
-            AND YEAR(vencimento) = :year_2
-            GROUP BY MONTH(vencimento)
+            AND YEAR(data_pagamento) = :year_2
+            GROUP BY MONTH(data_pagamento)
             
             UNION ALL
             
@@ -151,22 +150,8 @@ try {
         'labels' => array_map(function($month) {
             return date('M', mktime(0, 0, 0, $month, 1));
         }, $months),
-        'datasets' => [
-            [
-                'label' => 'Faturamento',
-                'data' => array_values($revenue_by_month),
-                'backgroundColor' => '#10b981',
-                'borderColor' => '#10b981',
-                'borderWidth' => 1
-            ],
-            [
-                'label' => 'Despesas',
-                'data' => array_values($expenses_by_month),
-                'backgroundColor' => '#ef4444',
-                'borderColor' => '#ef4444',
-                'borderWidth' => 1
-            ]
-        ]
+        'faturamento' => array_values($revenue_by_month),
+        'despesas' => array_values($expenses_by_month)
     ];
     
     echo json_encode($response);

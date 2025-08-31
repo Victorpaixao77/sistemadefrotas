@@ -49,7 +49,8 @@ class AnaliseAvancada {
                     'modelo' => $registro['modelo'],
                     'previsao_combustivel' => $media_combustivel * 3,
                     'previsao_manutencao' => $media_manutencao * 3,
-                    'total_previsto' => ($media_combustivel + $media_manutencao) * 3
+                    'total_previsto' => ($media_combustivel + $media_manutencao) * 3,
+                    'data_analise' => date('Y-m-d H:i:s')
                 ];
             }
 
@@ -79,7 +80,7 @@ class AnaliseAvancada {
             LEFT JOIN abastecimentos a ON r.id = a.rota_id
             LEFT JOIN manutencoes m2 ON v.id = m2.veiculo_id
             WHERE v.empresa_id = :empresa_id
-            AND r.data_rota >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
+            AND r.data_saida >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
             GROUP BY m.id, v.id
             HAVING num_viagens > 5";
 
@@ -98,7 +99,8 @@ class AnaliseAvancada {
                     'media_tempo' => $registro['media_tempo'],
                     'consumo_medio' => $registro['consumo_medio'],
                     'num_manutencoes' => $registro['num_manutencoes'],
-                    'indice_eficiencia' => $eficiencia
+                    'indice_eficiencia' => $eficiencia,
+                    'data_analise' => date('Y-m-d H:i:s')
                 ];
             }
 
@@ -139,7 +141,7 @@ class AnaliseAvancada {
             foreach ($dados as $veiculo) {
                 $idade = date('Y') - $veiculo['ano_fabricacao'];
                 $custo_medio_mensal = ($veiculo['total_manutencao'] + $veiculo['total_combustivel']) / 12;
-                $custo_por_km = ($veiculo['total_manutencao'] + $veiculo['total_combustivel']) / $veiculo['km_atual'];
+                $custo_por_km = ($veiculo['total_manutencao'] + $veiculo['total_combustivel']) / max($veiculo['km_atual'], 1);
 
                 $analise[] = [
                     'veiculo' => $veiculo['placa'],
@@ -149,7 +151,8 @@ class AnaliseAvancada {
                     'num_manutencoes' => $veiculo['num_manutencoes'],
                     'custo_medio_mensal' => $custo_medio_mensal,
                     'custo_por_km' => $custo_por_km,
-                    'recomendacao' => $this->gerarRecomendacaoVidaUtil($idade, $custo_medio_mensal, $custo_por_km)
+                    'recomendacao' => $this->gerarRecomendacaoVidaUtil($idade, $custo_medio_mensal, $custo_por_km),
+                    'data_analise' => date('Y-m-d H:i:s')
                 ];
             }
 
@@ -166,8 +169,8 @@ class AnaliseAvancada {
     public function analisarOtimizacaoRotas() {
         try {
             $sql = "SELECT 
-                r.cidade_origem_id as origem,
-                r.cidade_destino_id as destino,
+                CONCAT(r.estado_origem, ' - ', r.cidade_origem_id) as origem,
+                CONCAT(r.estado_destino, ' - ', r.cidade_destino_id) as destino,
                 COUNT(DISTINCT r.id) as num_viagens,
                 AVG(r.distancia_km) as distancia_media,
                 AVG(TIMESTAMPDIFF(HOUR, r.data_saida, r.data_chegada)) as tempo_medio,
@@ -177,8 +180,8 @@ class AnaliseAvancada {
             JOIN veiculos v ON r.veiculo_id = v.id
             LEFT JOIN abastecimentos a ON r.id = a.rota_id
             WHERE v.empresa_id = :empresa_id
-            AND r.data_rota >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
-            GROUP BY r.cidade_origem_id, r.cidade_destino_id
+            AND r.data_saida >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
+            GROUP BY r.estado_origem, r.cidade_origem_id, r.estado_destino, r.cidade_destino_id
             HAVING num_viagens > 5";
 
             $stmt = $this->pdo->prepare($sql);
@@ -197,7 +200,8 @@ class AnaliseAvancada {
                     'consumo_medio' => $rota['consumo_medio'],
                     'veiculos' => explode(',', $rota['veiculos']),
                     'indice_eficiencia' => $eficiencia,
-                    'sugestoes_otimizacao' => $this->gerarSugestoesOtimizacao($rota, $eficiencia)
+                    'sugestoes_otimizacao' => $this->gerarSugestoesOtimizacao($rota, $eficiencia),
+                    'data_analise' => date('Y-m-d H:i:s')
                 ];
             }
 

@@ -1,0 +1,38 @@
+{
+    "status": {
+        "success": true,
+        "from_cache": false,
+        "ambiente": "homologacao",
+        "status_geral": "online",
+        "status_texto": "Sistema SEFAZ funcionando perfeitamente",
+        "status_cor": "success",
+        "timestamp": "2025-08-30 05:02:14",
+        "detalhes": {
+            "conexao_basica": {
+                "sucesso": true,
+                "tempo": 157.58,
+                "http_code": 403,
+                "erro": "",
+                "ip_destino": "200.233.4.136"
+            },
+            "conexao_certificado": {
+                "sucesso": true,
+                "tempo": 150.53,
+                "http_code": 403,
+                "erro": "",
+                "ip_destino": "200.233.4.136",
+                "certificado_usado": "certificado_icp.pem"
+            },
+            "requisicao_soap": {
+                "sucesso": true,
+                "tempo": 136.44,
+                "http_code": 403,
+                "erro": "",
+                "ip_destino": "200.233.4.136",
+                "resposta_soap": false
+            }
+        }
+    },
+    "timestamp": "2025-08-30 05:02:14",
+    "empresa_id": "1"
+}

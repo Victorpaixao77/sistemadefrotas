@@ -93,6 +93,11 @@ switch ($action) {
         }
         break;
         
+    case 'commission_summary':
+        // Return commission summary for all motorists
+        echo json_encode(getCommissionSummary());
+        break;
+        
     case 'add':
         $data = $_POST;
         echo json_encode(addMotorist($data));
@@ -191,7 +196,11 @@ function getMotoristsList($limit = 5, $page = 1, $status = null, $name = null) {
         // Get summary data
         $sql_summary = "SELECT 
             COUNT(*) as total_motorists,
-            SUM(CASE WHEN disponibilidade_id = 1 THEN 1 ELSE 0 END) as motorists_ativos
+            SUM(CASE WHEN disponibilidade_id = 1 THEN 1 ELSE 0 END) as motorists_ativos,
+            SUM(CASE WHEN disponibilidade_id = 2 THEN 1 ELSE 0 END) as motorists_ferias,
+            SUM(CASE WHEN disponibilidade_id = 3 THEN 1 ELSE 0 END) as motorists_licenca,
+            SUM(CASE WHEN disponibilidade_id = 4 THEN 1 ELSE 0 END) as motorists_inativos,
+            SUM(CASE WHEN disponibilidade_id = 5 THEN 1 ELSE 0 END) as motorists_afastados
             FROM motoristas 
             WHERE empresa_id = :empresa_id";
             
@@ -199,6 +208,26 @@ function getMotoristsList($limit = 5, $page = 1, $status = null, $name = null) {
         $stmt_summary->bindValue(':empresa_id', $empresa_id);
         $stmt_summary->execute();
         $summary = $stmt_summary->fetch(PDO::FETCH_ASSOC);
+        
+        // Get commission data from ROTAS table (not motoristas)
+        $sql_commission = "SELECT 
+            SUM(CASE WHEN r.comissao IS NOT NULL AND r.comissao > 0 THEN r.comissao ELSE 0 END) as total_comissao_mes,
+            COUNT(CASE WHEN r.comissao IS NOT NULL AND r.comissao > 0 THEN 1 END) as rotas_com_comissao_mes,
+            COUNT(DISTINCT r.motorista_id) as motorists_com_comissao_mes
+            FROM rotas r 
+            INNER JOIN motoristas m ON r.motorista_id = m.id 
+            WHERE r.empresa_id = :empresa_id 
+            AND r.status = 'aprovado'
+            AND MONTH(r.data_rota) = MONTH(CURRENT_DATE())
+            AND YEAR(r.data_rota) = YEAR(CURRENT_DATE())";
+            
+        $stmt_commission = $conn->prepare($sql_commission);
+        $stmt_commission->bindValue(':empresa_id', $empresa_id);
+        $stmt_commission->execute();
+        $commission = $stmt_commission->fetch(PDO::FETCH_ASSOC);
+        
+        // Merge summary and commission data
+        $summary = array_merge($summary, $commission);
         
         return [
             'success' => true,
@@ -936,5 +965,80 @@ function deleteMotorist($id) {
     } catch(Exception $e) {
         error_log("General error in deleteMotorist: " . $e->getMessage());
         return ['success' => false, 'error' => 'Erro ao excluir motorista'];
+    }
+}
+
+/**
+ * Get commission summary for all motorists
+ * 
+ * @return array Commission summary data
+ */
+function getCommissionSummary() {
+    try {
+        $conn = getConnection();
+        $empresa_id = $_SESSION['empresa_id'];
+        
+        // Get commission data with financial calculations
+        $sql = "SELECT 
+            COUNT(*) as total_motorists,
+            SUM(CASE WHEN porcentagem_comissao IS NOT NULL THEN porcentagem_comissao ELSE 0 END) as total_comissao_percentual,
+            COUNT(CASE WHEN porcentagem_comissao IS NOT NULL THEN 1 END) as motorists_com_comissao,
+            AVG(CASE WHEN porcentagem_comissao IS NOT NULL THEN porcentagem_comissao ELSE 0 END) as media_comissao,
+            MIN(CASE WHEN porcentagem_comissao IS NOT NULL THEN porcentagem_comissao ELSE 0 END) as min_comissao,
+            MAX(CASE WHEN porcentagem_comissao IS NOT NULL THEN porcentagem_comissao ELSE 0 END) as max_comissao,
+            SUM(CASE WHEN disponibilidade_id = 1 AND porcentagem_comissao IS NOT NULL THEN porcentagem_comissao ELSE 0 END) as comissao_motorists_ativos,
+            COUNT(CASE WHEN disponibilidade_id = 1 AND porcentagem_comissao IS NOT NULL THEN 1 END) as total_ativos_com_comissao
+            FROM motoristas 
+            WHERE empresa_id = :empresa_id";
+            
+        $stmt = $conn->prepare($sql);
+        $stmt->bindValue(':empresa_id', $empresa_id);
+        $stmt->execute();
+        $commission_data = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Get distribution by commission ranges
+        $sql_ranges = "SELECT 
+            CASE 
+                WHEN porcentagem_comissao < 5 THEN '0-5%'
+                WHEN porcentagem_comissao < 10 THEN '5-10%'
+                WHEN porcentagem_comissao < 15 THEN '10-15%'
+                WHEN porcentagem_comissao < 20 THEN '15-20%'
+                ELSE '20%+'
+            END as range_comissao,
+            COUNT(*) as quantidade
+            FROM motoristas 
+            WHERE empresa_id = :empresa_id AND porcentagem_comissao IS NOT NULL
+            GROUP BY 
+                CASE 
+                    WHEN porcentagem_comissao < 5 THEN '0-5%'
+                    WHEN porcentagem_comissao < 10 THEN '5-10%'
+                    WHEN porcentagem_comissao < 15 THEN '10-15%'
+                    WHEN porcentagem_comissao < 20 THEN '15-20%'
+                    ELSE '20%+'
+                END
+            ORDER BY 
+                CASE 
+                    WHEN porcentagem_comissao < 5 THEN 1
+                    WHEN porcentagem_comissao < 10 THEN 2
+                    WHEN porcentagem_comissao < 15 THEN 3
+                    WHEN porcentagem_comissao < 20 THEN 4
+                    ELSE 5
+                END";
+                
+        $stmt_ranges = $conn->prepare($sql_ranges);
+        $stmt_ranges->bindValue(':empresa_id', $empresa_id);
+        $stmt_ranges->execute();
+        $commission_ranges = $stmt_ranges->fetchAll(PDO::FETCH_ASSOC);
+        
+        return [
+            'success' => true,
+            'data' => $commission_data,
+            'ranges' => $commission_ranges
+        ];
+        
+    } catch(PDOException $e) {
+        error_log("Error in getCommissionSummary: " . $e->getMessage());
+        http_response_code(500);
+        return ['success' => false, 'error' => 'Erro ao buscar resumo de comissões'];
     }
 }

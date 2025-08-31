@@ -31,7 +31,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $conn = getConnection();
         
         // Prepare a select statement
-        $sql = "SELECT u.id, u.nome, u.email, u.senha, u.empresa_id, u.status as usuario_status, u.foto_perfil 
+        $sql = "SELECT u.id, u.nome, u.email, u.senha, u.empresa_id, u.status as usuario_status, u.foto_perfil, u.tipo_usuario 
                FROM usuarios u 
                JOIN empresa_clientes e ON u.empresa_id = e.id 
                WHERE u.email = :username";
@@ -57,6 +57,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         $_SESSION["email"] = $row["email"];
                         $_SESSION["empresa_id"] = $row["empresa_id"];
                         $_SESSION["foto_perfil"] = $row["foto_perfil"];
+                        $_SESSION["tipo_usuario"] = $row["tipo_usuario"];
                         
                         // Redirect user to the original URL or index page
                         $redirect_url = isset($_SESSION['redirect_url']) ? $_SESSION['redirect_url'] : 'index.php';
@@ -86,6 +87,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <title>Login - Sistema de Gestão de Frotas</title>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="css/theme.css">
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="logo.png">
+
     <style>
         body {
             background: #101522;

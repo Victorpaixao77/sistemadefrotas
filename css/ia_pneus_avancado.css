@@ -1,0 +1,450 @@
+/* ===== SISTEMA DE IA AVANÇADA PARA PNEUS ===== */
+
+/* Animações para notificações de teste */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+@keyframes pulseTeste {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+}
+
+@keyframes shakeTeste {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+/* Botão de teste principal */
+#teste-ia-pneus {
+    animation: pulseTeste 2s infinite;
+    transition: all 0.3s ease;
+}
+
+#teste-ia-pneus:hover {
+    animation: shakeTeste 0.5s ease;
+    transform: scale(1.1);
+}
+
+/* Menu de testes */
+#menu-teste-ia {
+    backdrop-filter: blur(10px);
+    border: 2px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+#menu-teste-ia:hover {
+    border-color: var(--accent-primary);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+}
+
+#menu-teste-ia button {
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+#menu-teste-ia button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+#menu-teste-ia button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+#menu-teste-ia button:hover::before {
+    left: 100%;
+}
+
+/* Notificações de teste */
+.notificacao-teste {
+    animation: slideInRight 0.3s ease;
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255,255,255,0.2);
+    transition: all 0.3s ease;
+}
+
+.notificacao-teste:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+}
+
+/* Indicadores de alerta para testes */
+.alerta-indicator.teste {
+    animation: pulse-indicator 1s infinite;
+    border: 3px solid white;
+    box-shadow: 0 0 10px currentColor;
+}
+
+.alerta-indicator.teste.critico {
+    background: #e74c3c;
+    color: #e74c3c;
+}
+
+.alerta-indicator.teste.atencao {
+    background: #f39c12;
+    color: #f39c12;
+}
+
+.alerta-indicator.teste.pressao {
+    background: #9c27b0;
+    color: #9c27b0;
+}
+
+/* Pneus de teste */
+.pneu-flex.teste-critico {
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.6), 0 2px 4px rgba(231, 76, 60, 0.4);
+    border: 3px solid rgba(231, 76, 60, 0.5);
+    animation: pulse-critico 1.5s infinite;
+}
+
+.pneu-flex.teste-atencao {
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.6), 0 2px 4px rgba(245, 158, 11, 0.4);
+    border: 3px solid rgba(245, 158, 11, 0.5);
+    animation: pulse-alerta 2s infinite;
+}
+
+.pneu-flex.teste-pressao {
+    box-shadow: 0 4px 12px rgba(156, 39, 176, 0.6), 0 2px 4px rgba(156, 39, 176, 0.4);
+    border: 3px solid rgba(156, 39, 176, 0.5);
+    animation: pulse-pressao 2.5s infinite;
+}
+
+/* Efeitos especiais para testes */
+.efeito-teste {
+    position: relative;
+}
+
+.efeito-teste::after {
+    content: '🧪';
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    font-size: 16px;
+    background: #f39c12;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-5px); }
+    60% { transform: translateY(-3px); }
+}
+
+/* Modal de teste */
+.modal-teste-ia {
+    backdrop-filter: blur(15px);
+    animation: fadeInScale 0.3s ease;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Status de teste */
+.status-teste {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-teste.critico {
+    background: linear-gradient(45deg, #e74c3c, #c0392b);
+    color: white;
+    box-shadow: 0 2px 8px rgba(231, 76, 60, 0.4);
+}
+
+.status-teste.atencao {
+    background: linear-gradient(45deg, #f39c12, #e67e22);
+    color: white;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+}
+
+.status-teste.pressao {
+    background: linear-gradient(45deg, #9c27b0, #8e24aa);
+    color: white;
+    box-shadow: 0 2px 8px rgba(156, 39, 176, 0.4);
+}
+
+.status-teste.teste {
+    background: linear-gradient(45deg, #f39c12, #e67e22);
+    color: white;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+    animation: pulseTeste 2s infinite;
+}
+
+/* Tooltip de teste */
+.tooltip-teste {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.95);
+    color: white;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    max-width: 250px;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    border: 2px solid #f39c12;
+}
+
+.tooltip-teste.show {
+    opacity: 1;
+}
+
+.tooltip-teste::before {
+    content: '🧪 TESTE';
+    display: block;
+    font-weight: bold;
+    color: #f39c12;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+/* Contador de testes */
+.contador-testes {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: rgba(245, 158, 11, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    z-index: 9999;
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255,255,255,0.3);
+    animation: pulseTeste 2s infinite;
+}
+
+/* Log de testes */
+.log-testes {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.9);
+    color: #00ff00;
+    padding: 15px;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    max-width: 400px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 9999;
+    border: 2px solid #00ff00;
+    display: none;
+}
+
+.log-testes.ativo {
+    display: block;
+    animation: slideInLeft 0.3s ease;
+}
+
+@keyframes slideInLeft {
+    from {
+        transform: translateX(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.log-testes .log-entry {
+    margin-bottom: 5px;
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(0,255,0,0.3);
+}
+
+.log-testes .log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-testes .timestamp {
+    color: #888;
+    font-size: 10px;
+}
+
+.log-testes .message {
+    color: #00ff00;
+}
+
+.log-testes .error {
+    color: #ff0000;
+}
+
+.log-testes .success {
+    color: #00ff00;
+}
+
+.log-testes .warning {
+    color: #ffff00;
+}
+
+/* Responsividade para testes */
+@media (max-width: 768px) {
+    #teste-ia-pneus {
+        top: 10px;
+        right: 10px;
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+    
+    #menu-teste-ia {
+        top: 60px;
+        right: 10px;
+        left: 10px;
+        min-width: auto;
+    }
+    
+    .contador-testes {
+        top: 60px;
+        right: 10px;
+    }
+    
+    .log-testes {
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+        max-width: none;
+    }
+}
+
+/* Modo escuro para testes */
+[data-theme="dark"] .log-testes {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #00ff00;
+}
+
+[data-theme="dark"] #menu-teste-ia {
+    background: rgba(30, 30, 40, 0.95);
+    border-color: var(--border-color);
+}
+
+/* Animações de loading para testes */
+.loading-teste {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Efeitos de partículas para testes críticos */
+.particulas-teste {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.particula {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: #e74c3c;
+    border-radius: 50%;
+    animation: particulaFloat 3s infinite linear;
+}
+
+@keyframes particulaFloat {
+    0% {
+        transform: translateY(100vh) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-100px) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+/* Indicadores de progresso para testes */
+.progresso-teste {
+    width: 100%;
+    height: 4px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.progresso-teste .barra {
+    height: 100%;
+    background: linear-gradient(90deg, #f39c12, #e67e22);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    animation: progressoAnimacao 2s infinite;
+}
+
+@keyframes progressoAnimacao {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+} 

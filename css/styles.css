@@ -1162,3 +1162,40 @@ button {
     pointer-events: none;
     cursor: default;
 }
+
+/* Analytics Section padrão para gráficos do dashboard */
+.analytics-section {
+    margin: 20px 0 40px 0;
+}
+.analytics-section .section-header {
+    margin-bottom: 20px;
+}
+.analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-bottom: 20px;
+}
+.analytics-card {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    min-height: 300px;
+}
+.analytics-card .card-header {
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+.analytics-card .card-header h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+.analytics-card .card-body {
+    padding: 15px;
+    height: 300px;
+}
+@media (max-width: 991px) {
+    .analytics-grid {
+        grid-template-columns: 1fr;
+    }
+}

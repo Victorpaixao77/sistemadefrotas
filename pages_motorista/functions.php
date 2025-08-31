@@ -194,16 +194,14 @@ function registrar_abastecimento($dados) {
         $conn = getConnection();
         $stmt = $conn->prepare('
             INSERT INTO abastecimentos (
-                motorista_id, empresa_id, veiculo_id,
-                data_abastecimento, tipo_combustivel,
-                quantidade, preco_litro, valor_total,
-                km_atual, posto, observacoes,
-                status, fonte, data_registro
+                motorista_id, empresa_id, veiculo_id, rota_id,
+                posto, data_abastecimento, litros, valor_litro, valor_total,
+                km_atual, tipo_combustivel, forma_pagamento, observacoes,
+                status, fonte, data_cadastro
             ) VALUES (
-                :motorista_id, :empresa_id, :veiculo_id,
-                :data_abastecimento, :tipo_combustivel,
-                :quantidade, :preco_litro, :valor_total,
-                :km_atual, :posto, :observacoes,
+                :motorista_id, :empresa_id, :veiculo_id, :rota_id,
+                :posto, :data_abastecimento, :litros, :valor_litro, :valor_total,
+                :km_atual, :tipo_combustivel, :forma_pagamento, :observacoes,
                 "pendente", "motorista", NOW()
             )
         ');
@@ -211,13 +209,15 @@ function registrar_abastecimento($dados) {
         $stmt->bindParam(':motorista_id', $dados['motorista_id']);
         $stmt->bindParam(':empresa_id', $dados['empresa_id']);
         $stmt->bindParam(':veiculo_id', $dados['veiculo_id']);
+        $stmt->bindParam(':rota_id', $dados['rota_id'] ?? null);
+        $stmt->bindParam(':posto', $dados['posto']);
         $stmt->bindParam(':data_abastecimento', $dados['data_abastecimento']);
-        $stmt->bindParam(':tipo_combustivel', $dados['tipo_combustivel']);
-        $stmt->bindParam(':quantidade', $dados['quantidade']);
-        $stmt->bindParam(':preco_litro', $dados['preco_litro']);
+        $stmt->bindParam(':litros', $dados['quantidade']);
+        $stmt->bindParam(':valor_litro', $dados['preco_litro']);
         $stmt->bindParam(':valor_total', $dados['valor_total']);
         $stmt->bindParam(':km_atual', $dados['km_atual']);
-        $stmt->bindParam(':posto', $dados['posto']);
+        $stmt->bindParam(':tipo_combustivel', $dados['tipo_combustivel']);
+        $stmt->bindParam(':forma_pagamento', $dados['forma_pagamento'] ?? 'dinheiro');
         $stmt->bindParam(':observacoes', $dados['observacoes']);
         
         $stmt->execute();

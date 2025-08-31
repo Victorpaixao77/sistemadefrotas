@@ -24,6 +24,20 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Setup help button
+    setupHelpButton();
+
+    // Garantir que o botão cancelar sempre fecha o modal, mesmo se renderizado depois
+    setTimeout(function() {
+        const cancelBtn = document.getElementById('cancelMotoristBtn');
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                closeModal('motoristModal');
+            });
+        }
+    }, 500);
 });
 
 let currentPage = 1;
@@ -43,11 +57,14 @@ function initializePage() {
     
     // Setup pagination
     setupPagination();
+    
+    // Setup help button
+    setupHelpButton();
 }
 
 function setupModals() {
-    // Close modal when clicking outside
-    document.querySelectorAll('.modal').forEach(modal => {
+    // Close modal when clicking outside (exclude help modal)
+    document.querySelectorAll('.modal:not(#helpMotoristsModal)').forEach(modal => {
         modal.addEventListener('click', function(e) {
             if (e.target === this) {
                 closeAllModals();
@@ -55,8 +72,8 @@ function setupModals() {
         });
     });
     
-    // Close modal when clicking X button
-    document.querySelectorAll('.close-modal').forEach(button => {
+    // Close modal when clicking X button (exclude help modal)
+    document.querySelectorAll('.modal:not(#helpMotoristsModal) .close-modal').forEach(button => {
         button.addEventListener('click', function() {
             const modal = this.closest('.modal');
             if (modal) {
@@ -64,6 +81,30 @@ function setupModals() {
             }
         });
     });
+    
+    // Close modal when clicking cancel button
+    document.getElementById('cancelMotoristBtn')?.addEventListener('click', function() {
+        document.getElementById('motoristModal').style.display = 'none';
+    });
+    
+    // Special handling for help modal
+    const helpModal = document.getElementById('helpMotoristsModal');
+    if (helpModal) {
+        // Close help modal when clicking outside
+        helpModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.remove('active');
+            }
+        });
+        
+        // Close help modal when clicking X button
+        const helpCloseBtn = helpModal.querySelector('.close-modal');
+        if (helpCloseBtn) {
+            helpCloseBtn.addEventListener('click', function() {
+                helpModal.classList.remove('active');
+            });
+        }
+    }
 }
 
 function switchTab(tabId) {
@@ -153,6 +194,40 @@ function loadMotorists(page = 1) {
             if (data.summary) {
                 document.getElementById('totalMotorists').textContent = data.summary.total_motorists || 0;
                 document.getElementById('activeMotorists').textContent = data.summary.motorists_ativos || 0;
+                
+                // Update Status KPI - show distribution with better formatting
+                const statusItems = [];
+                if (data.summary.motorists_ativos > 0) statusItems.push(`${data.summary.motorists_ativos} Ativos`);
+                if (data.summary.motorists_ferias > 0) statusItems.push(`${data.summary.motorists_ferias} Férias`);
+                if (data.summary.motorists_licenca > 0) statusItems.push(`${data.summary.motorists_licenca} Licença`);
+                if (data.summary.motorists_inativos > 0) statusItems.push(`${data.summary.motorists_inativos} Inativos`);
+                if (data.summary.motorists_afastados > 0) statusItems.push(`${data.summary.motorists_afastados} Afastados`);
+                
+                if (statusItems.length > 0) {
+                    document.getElementById('totalTrips').textContent = statusItems.join(', ');
+                } else {
+                    document.getElementById('totalTrips').textContent = 'N/A';
+                }
+                
+                // Update Commission KPI - show total paid this month
+                if (data.summary.total_comissao_mes > 0 && data.summary.motorists_com_comissao_mes > 0) {
+                    const totalComissao = parseFloat(data.summary.total_comissao_mes) || 0;
+                    document.getElementById('averageRating').textContent = `R$ ${totalComissao.toFixed(2)}`;
+                    
+                    const subtitle = document.querySelector('#averageRating + .metric-subtitle');
+                    if (subtitle) {
+                        subtitle.textContent = `${data.summary.motorists_com_comissao_mes} motoristas`;
+                    }
+                } else {
+                    document.getElementById('averageRating').textContent = 'R$ 0,00';
+                    const subtitle = document.querySelector('#averageRating + .metric-subtitle');
+                    if (subtitle) {
+                        subtitle.textContent = 'Sem comissão no mês';
+                    }
+                }
+                
+                // Log para debug
+                console.log('📊 KPIs atualizados:', data.summary);
             }
             
             // Update pagination
@@ -1125,28 +1200,27 @@ function showAddMotoristModal() {
 }
 
 function initializeCharts() {
-    // Initialize an empty performance chart
-    const ctx = document.getElementById('performanceChart');
-    if (ctx) {
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [{
-                    label: 'Desempenho Mensal',
-                    data: [],
-                    borderColor: '#4CAF50',
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
+    // Initialize any charts if needed
+    console.log('Charts initialized');
+}
+
+// Função para configurar botão de ajuda
+function setupHelpButton() {
+    const helpBtn = document.getElementById('helpBtn');
+    if (helpBtn) {
+        helpBtn.addEventListener('click', function() {
+            const helpModal = document.getElementById('helpMotoristsModal');
+            if (helpModal) {
+                helpModal.classList.add('active');
             }
         });
+    }
+}
+
+// Função específica para fechar modal de ajuda
+function closeHelpModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('active');
     }
 } 

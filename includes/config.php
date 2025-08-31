@@ -50,9 +50,17 @@ define('DEBUG_MODE', true);
 
 // Configuração de logs
 ini_set('log_errors', 1);
-ini_set('error_log', __DIR__ . '/../logs/php_errors.log');
+// Corrigindo o caminho do error_log para usar caminho absoluto
+$log_path = __DIR__ . '/../logs/php_errors.log';
+ini_set('error_log', $log_path);
 error_reporting(E_ALL);
 ini_set('display_errors', 0); // Desativa a exibição de erros na saída
+
+// Garantir que o diretório de logs existe
+$log_dir = dirname($log_path);
+if (!is_dir($log_dir)) {
+    mkdir($log_dir, 0755, true);
+}
 
 // Função para retornar resposta JSON
 function json_response($data, $status = 200) {

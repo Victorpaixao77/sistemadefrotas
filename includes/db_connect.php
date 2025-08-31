@@ -10,10 +10,9 @@ require_once 'config.php';
  */
 function getConnection() {
     try {
-        error_log("Iniciando conexão com o banco de dados");
-        error_log("DB_SERVER: " . DB_SERVER);
-        error_log("DB_NAME: " . DB_NAME);
-        error_log("DB_USERNAME: " . DB_USERNAME);
+        if (DEBUG_MODE) {
+            error_log("Iniciando conexão com o banco de dados");
+        }
         
         // Configura a string de conexão DSN
         $dsn = sprintf(
@@ -22,7 +21,9 @@ function getConnection() {
             DB_NAME
         );
         
-        error_log("DSN: " . $dsn);
+        if (DEBUG_MODE) {
+            error_log("DSN configurado: " . $dsn);
+        }
         
         // Cria conexão PDO
         $conn = new PDO(
@@ -37,12 +38,14 @@ function getConnection() {
             ]
         );
         
-        error_log("Conexão com o banco de dados estabelecida com sucesso");
+        if (DEBUG_MODE) {
+            error_log("Conexão com o banco de dados estabelecida com sucesso");
+        }
         return $conn;
     } catch(PDOException $e) {
         error_log("Falha na conexão: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
         if (DEBUG_MODE) {
+            error_log("Stack trace: " . $e->getTraceAsString());
             throw new PDOException("Erro de conexão: " . $e->getMessage());
         } else {
             throw new PDOException("Falha na conexão com o banco de dados. Tente novamente mais tarde.");
@@ -60,18 +63,24 @@ function getConnection() {
  */
 function executeQuery($conn, $sql, $params = []) {
     try {
-        error_log("Executando consulta: " . $sql);
-        error_log("Parâmetros: " . print_r($params, true));
+        if (DEBUG_MODE) {
+            error_log("Executando consulta: " . $sql);
+            error_log("Parâmetros: " . print_r($params, true));
+        }
         
         $stmt = $conn->prepare($sql);
         $stmt->execute($params);
         $result = $stmt->fetchAll();
         
-        error_log("Resultados encontrados: " . count($result));
+        if (DEBUG_MODE) {
+            error_log("Resultados encontrados: " . count($result));
+        }
         return $result;
     } catch(PDOException $e) {
         error_log("Erro na consulta: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
+        if (DEBUG_MODE) {
+            error_log("Stack trace: " . $e->getTraceAsString());
+        }
         throw $e;
     }
 }
@@ -86,18 +95,24 @@ function executeQuery($conn, $sql, $params = []) {
  */
 function fetchOne($conn, $sql, $params = []) {
     try {
-        error_log("Executando consulta para uma linha: " . $sql);
-        error_log("Parâmetros: " . print_r($params, true));
+        if (DEBUG_MODE) {
+            error_log("Executando consulta para uma linha: " . $sql);
+            error_log("Parâmetros: " . print_r($params, true));
+        }
         
         $stmt = $conn->prepare($sql);
         $stmt->execute($params);
         $result = $stmt->fetch();
         
-        error_log("Resultado encontrado: " . ($result ? "Sim" : "Não"));
+        if (DEBUG_MODE) {
+            error_log("Resultado encontrado: " . ($result ? "Sim" : "Não"));
+        }
         return $result;
     } catch(PDOException $e) {
         error_log("Erro na consulta: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
+        if (DEBUG_MODE) {
+            error_log("Stack trace: " . $e->getTraceAsString());
+        }
         throw $e;
     }
 }
@@ -112,18 +127,24 @@ function fetchOne($conn, $sql, $params = []) {
  */
 function executeNonQuery($conn, $sql, $params = []) {
     try {
-        error_log("Executando consulta sem retorno: " . $sql);
-        error_log("Parâmetros: " . print_r($params, true));
+        if (DEBUG_MODE) {
+            error_log("Executando consulta sem retorno: " . $sql);
+            error_log("Parâmetros: " . print_r($params, true));
+        }
         
         $stmt = $conn->prepare($sql);
         $stmt->execute($params);
         $affected = $stmt->rowCount();
         
-        error_log("Linhas afetadas: " . $affected);
+        if (DEBUG_MODE) {
+            error_log("Linhas afetadas: " . $affected);
+        }
         return $affected;
     } catch(PDOException $e) {
         error_log("Erro na execução: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
+        if (DEBUG_MODE) {
+            error_log("Stack trace: " . $e->getTraceAsString());
+        }
         throw $e;
     }
 }

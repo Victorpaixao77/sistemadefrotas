@@ -9,7 +9,7 @@ try {
 
     // Criando a conexão usando PDO
     $pdo = new PDO(
-        "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8",
+        "mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4",
         $username,
         $password,
         [
@@ -18,6 +18,9 @@ try {
             PDO::ATTR_EMULATE_PREPARES => false
         ]
     );
+
+    // Configurar charset explicitamente
+    $pdo->exec('SET NAMES utf8mb4');
 
     // Se chegou até aqui, a conexão foi estabelecida com sucesso
     // echo "Conexão realizada com sucesso!";

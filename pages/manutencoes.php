@@ -101,7 +101,7 @@ function getKPIMetrics($conn) {
         
         // MTBF e MTTR (últimos 6 meses)
         $sql_mtbf_mttr = "SELECT 
-            SUM(v.quilometragem) as total_km,
+            SUM(v.km_atual) as total_km,
             COUNT(DISTINCT m.id) as total_falhas,
             SUM(TIMESTAMPDIFF(HOUR, m.data_manutencao, m.data_conclusao)) as total_horas_manutencao
             FROM manutencoes m
@@ -117,7 +117,7 @@ function getKPIMetrics($conn) {
         // Custo por km
         $sql_custo_km = "SELECT 
             SUM(m.valor) as custo_total,
-            SUM(v.quilometragem) as km_total
+            SUM(v.km_atual) as km_total
             FROM manutencoes m
             JOIN veiculos v ON m.veiculo_id = v.id
             WHERE m.empresa_id = :empresa_id";

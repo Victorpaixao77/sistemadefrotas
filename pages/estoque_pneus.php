@@ -352,6 +352,5 @@ error_log("Dados dos pneus: " . json_encode($pneus));
     <script src="../js/sidebar.js"></script>
     <script src="../js/sortable.js"></script>
     <script src="../js/charts.js"></script>
-    <script src="../js/header.js"></script>
 </body>
 </html> 

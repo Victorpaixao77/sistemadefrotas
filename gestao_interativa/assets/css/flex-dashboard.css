@@ -1,0 +1,207 @@
+/* ===== DASHBOARD DO MODO FLEXÍVEL ===== */
+
+.flex-dashboard {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color);
+}
+
+.flex-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: var(--bg-primary);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.stat-card i {
+    font-size: 24px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.stat-card .stat-number {
+    font-size: 28px;
+    font-weight: bold;
+    color: var(--text-primary);
+    display: block;
+    margin-bottom: 4px;
+}
+
+.stat-card .stat-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+    display: block;
+}
+
+/* Cores específicas para cada tipo de estatística */
+.stat-card.pneus-alocados i {
+    color: #28a745;
+}
+
+.stat-card.pneus-criticos i {
+    color: #dc3545;
+}
+
+.stat-card.custo-total i {
+    color: #ffc107;
+}
+
+.stat-card.pneus-alerta i {
+    color: #fd7e14;
+}
+
+.stat-card.pneus-manutencao i {
+    color: #6f42c1;
+}
+
+/* Animações para números */
+.stat-number {
+    animation: countUp 1s ease-out;
+}
+
+@keyframes countUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Indicadores de status */
+.status-indicator {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #28a745;
+}
+
+.status-indicator.critical {
+    background: #dc3545;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.warning {
+    background: #ffc107;
+}
+
+.status-indicator.info {
+    background: #17a2b8;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+    }
+}
+
+/* Barra de progresso de desgaste */
+.wear-progress {
+    margin-top: 12px;
+}
+
+.wear-progress .progress-bar {
+    height: 6px;
+    background: var(--bg-secondary);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.wear-progress .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #ffc107, #dc3545);
+    transition: width 0.3s ease;
+}
+
+.wear-progress .progress-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .flex-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    
+    .stat-card {
+        padding: 12px;
+    }
+    
+    .stat-card .stat-number {
+        font-size: 24px;
+    }
+    
+    .stat-card i {
+        font-size: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .flex-stats {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Temas escuro/claro */
+[data-theme="dark"] .flex-dashboard {
+    background: var(--bg-primary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .stat-card {
+    background: var(--bg-secondary);
+    border-color: var(--border-color);
+}
+
+/* Estados de carregamento */
+.flex-dashboard.loading .stat-card {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.flex-dashboard.loading .stat-number {
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200px 0;
+    }
+    100% {
+        background-position: calc(200px + 100%) 0;
+    }
+} 
