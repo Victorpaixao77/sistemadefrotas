@@ -3,26 +3,29 @@
 
 // Configuração da sessão
 function configure_session() {
-    // Configurações básicas da sessão
-    ini_set('session.cookie_httponly', 1);
-    ini_set('session.use_only_cookies', 1);
-    ini_set('session.use_strict_mode', 1);
-    ini_set('session.cookie_secure', 0); // Define como 0 para HTTP
-    ini_set('session.gc_maxlifetime', 86400); // 24 horas
-    ini_set('session.cookie_lifetime', 86400); // 24 horas
-    
-    // Define o nome da sessão
-    session_name('sistema_frotas_session');
-    
-    // Define parâmetros do cookie da sessão
-    session_set_cookie_params([
-        'lifetime' => 86400,          // 24 horas
-        'path' => '/sistema-frotas',  // Caminho da aplicação
-        'domain' => '',
-        'secure' => false,            // Define como false para HTTP
-        'httponly' => true,
-        'samesite' => 'Lax'
-    ]);
+    // Só configura se a sessão não estiver ativa
+    if (session_status() === PHP_SESSION_NONE) {
+        // Configurações básicas da sessão
+        ini_set('session.cookie_httponly', 1);
+        ini_set('session.use_only_cookies', 1);
+        ini_set('session.use_strict_mode', 1);
+        ini_set('session.cookie_secure', 0); // Define como 0 para HTTP
+        ini_set('session.gc_maxlifetime', 86400); // 24 horas
+        ini_set('session.cookie_lifetime', 86400); // 24 horas
+        
+        // Define o nome da sessão
+        session_name('sistema_frotas_session');
+        
+        // Define parâmetros do cookie da sessão
+        session_set_cookie_params([
+            'lifetime' => 86400,          // 24 horas
+            'path' => '/sistema-frotas',  // Caminho da aplicação
+            'domain' => '',
+            'secure' => false,            // Define como false para HTTP
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+    }
 }
 
 // Configura a sessão antes de qualquer coisa

@@ -82,7 +82,7 @@ class AnaliseAvancada {
             WHERE v.empresa_id = :empresa_id
             AND r.data_saida >= DATE_SUB(NOW(), INTERVAL 3 MONTH)
             GROUP BY m.id, v.id
-            HAVING num_viagens > 5";
+            HAVING num_viagens > 2";
 
             $stmt = $this->pdo->prepare($sql);
             $stmt->execute(['empresa_id' => $this->empresa_id]);

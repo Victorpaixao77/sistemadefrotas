@@ -106,17 +106,75 @@ document.addEventListener('DOMContentLoaded', function() {
     // Salvar abastecimento
     saveBtn.addEventListener('click', function() {
         const form = document.getElementById('refuelForm');
+        
+        // Valida se os campos obrigatórios estão preenchidos
+        const motoristaId = form.motorista_id.value;
+        const veiculoId = form.veiculo_id.value;
+        const rotaId = form.rota_id.value;
+        
+        if (!motoristaId) {
+            alert('Por favor, selecione um motorista');
+            return;
+        }
+        if (!veiculoId) {
+            alert('Por favor, selecione um veículo');
+            return;
+        }
+        if (!rotaId) {
+            alert('Por favor, selecione uma rota');
+            return;
+        }
+        
         // Corrige campos numéricos para o formato correto
         form.litros.value = form.litros.value.replace(/\./g, '').replace(',', '.');
         form.valor_litro.value = form.valor_litro.value.replace(/\./g, '').replace(',', '.');
         form.valor_total.value = form.valor_total.value.replace(/\./g, '').replace(',', '.');
-        const formData = new FormData(form);
+        
+        // Corrige campos ARLA se existirem
+        if (form.litros_arla) {
+            form.litros_arla.value = form.litros_arla.value.replace(/\./g, '').replace(',', '.');
+        }
+        if (form.valor_litro_arla) {
+            form.valor_litro_arla.value = form.valor_litro_arla.value.replace(/\./g, '').replace(',', '.');
+        }
+        if (form.valor_total_arla) {
+            form.valor_total_arla.value = form.valor_total_arla.value.replace(/\./g, '').replace(',', '.');
+        }
+        
         const refuelId = document.getElementById('refuelId').value;
+        
+        // Debug: verificar valores dos campos (apenas em caso de erro)
+        // console.log('Valores do formulário:', {
+        //     motoristaId: form.motorista_id.value,
+        //     veiculoId: form.veiculo_id.value,
+        //     rotaId: form.rota_id.value,
+        //     refuelId: refuelId
+        // });
+        
+        // Preparar dados para envio
+        const formData = new FormData(form);
+        
+        // Garantir que os campos obrigatórios estejam no FormData
+        if (form.rota_id.value) {
+            formData.set('rota_id', form.rota_id.value);
+        }
+        if (form.motorista_id.value) {
+            formData.set('motorista_id', form.motorista_id.value);
+        }
+        if (form.veiculo_id.value) {
+            formData.set('veiculo_id', form.veiculo_id.value);
+        }
         
         formData.append('action', refuelId ? 'update' : 'create');
         if (refuelId) {
             formData.append('id', refuelId);
         }
+        
+        // Debug: verificar FormData (apenas em caso de erro)
+        // console.log('FormData contents:');
+        // for (let [key, value] of formData.entries()) {
+        //     console.log(key, value);
+        // }
 
         fetch('../api/refuel_actions.php', {
             method: 'POST',
@@ -363,6 +421,25 @@ function updateRefuelingsTable(refuelings) {
                 <td>${formatNumber(refuel.litros, 1)} L</td>
                 <td>R$ ${formatNumber(refuel.valor_litro, 2)}</td>
                 <td>R$ ${formatNumber(refuel.valor_total, 2)}</td>
+                <td>
+                    ${refuel.inclui_arla == 1 ? 
+                        (() => {
+                            const percentual = refuel.litros > 0 ? (refuel.litros_arla / refuel.litros) * 100 : 0;
+                            let classePercentual = '';
+                            if (percentual >= 3 && percentual <= 5) {
+                                classePercentual = 'percentual-ok';
+                            } else if (percentual > 5) {
+                                classePercentual = 'percentual-alto';
+                            } else {
+                                classePercentual = 'percentual-baixo';
+                            }
+                            return `<span class="percentual-arla ${classePercentual}">
+                                ${formatNumber(percentual, 1)}%
+                            </span>`;
+                        })() : 
+                        '<span class="text-muted">-</span>'
+                    }
+                </td>
                 <td>${formatNumber(refuel.km_atual, 0)}</td>
                 <td>${refuel.forma_pagamento || '-'}</td>
                 <td>${rotaInfo}</td>
@@ -386,9 +463,101 @@ function updateRefuelingsTable(refuelings) {
         // Configura eventos dos botões
         setupTableButtons();
     } else {
-        tbody.innerHTML = '<tr><td colspan="11" class="text-center">Nenhum abastecimento encontrado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center">Nenhum abastecimento encontrado</td></tr>';
     }
     console.log('Tabela atualizada!');
+}
+
+function setupArlaFields() {
+    const incluiArlaCheckbox = document.getElementById('inclui_arla');
+    const camposArla = document.getElementById('campos_arla');
+    const litrosArlaInput = document.getElementById('litros_arla');
+    const valorLitroArlaInput = document.getElementById('valor_litro_arla');
+    const valorTotalArlaInput = document.getElementById('valor_total_arla');
+    
+    if (!incluiArlaCheckbox || !camposArla) return;
+    
+    // Controla a exibição dos campos ARLA
+    incluiArlaCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            camposArla.style.display = 'grid';
+            // Torna os campos obrigatórios quando ARLA está marcado
+            if (litrosArlaInput) litrosArlaInput.required = true;
+            if (valorLitroArlaInput) valorLitroArlaInput.required = true;
+        } else {
+            camposArla.style.display = 'none';
+            // Remove obrigatoriedade e limpa os campos
+            if (litrosArlaInput) {
+                litrosArlaInput.required = false;
+                litrosArlaInput.value = '';
+            }
+            if (valorLitroArlaInput) {
+                valorLitroArlaInput.required = false;
+                valorLitroArlaInput.value = '';
+            }
+            if (valorTotalArlaInput) {
+                valorTotalArlaInput.required = false;
+                valorTotalArlaInput.value = '';
+            }
+        }
+    });
+    
+    // Cálculo automático do valor total ARLA
+    function calcularValorTotalArla() {
+        if (!litrosArlaInput || !valorLitroArlaInput || !valorTotalArlaInput) return;
+        
+        const litros = parseFloat(litrosArlaInput.value.replace(/\./g, '').replace(',', '.')) || 0;
+        const valorLitro = parseFloat(valorLitroArlaInput.value.replace(/\./g, '').replace(',', '.')) || 0;
+        const valorTotal = litros * valorLitro;
+        
+        if (!isNaN(valorTotal)) {
+            valorTotalArlaInput.value = valorTotal.toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+        
+        // Validação da porcentagem ARLA
+        validarPercentualArla();
+    }
+    
+    // Validação da porcentagem ARLA
+    function validarPercentualArla() {
+        if (!litrosArlaInput) return;
+        
+        const litrosDiesel = parseFloat(document.getElementById('litros').value.replace(/\./g, '').replace(',', '.')) || 0;
+        const litrosArla = parseFloat(litrosArlaInput.value.replace(/\./g, '').replace(',', '.')) || 0;
+        
+        if (litrosDiesel > 0 && litrosArla > 0) {
+            const percentual = (litrosArla / litrosDiesel) * 100;
+            
+            // Remove classes anteriores
+            litrosArlaInput.classList.remove('percentual-ok', 'percentual-alto', 'percentual-baixo');
+            
+            if (percentual >= 3 && percentual <= 5) {
+                litrosArlaInput.classList.add('percentual-ok');
+                litrosArlaInput.title = `Percentual ARLA: ${percentual.toFixed(1)}% - Dentro da faixa recomendada (3-5%)`;
+            } else if (percentual > 5) {
+                litrosArlaInput.classList.add('percentual-alto');
+                litrosArlaInput.title = `Percentual ARLA: ${percentual.toFixed(1)}% - ACIMA da faixa recomendada (3-5%)`;
+            } else {
+                litrosArlaInput.classList.add('percentual-baixo');
+                litrosArlaInput.title = `Percentual ARLA: ${percentual.toFixed(1)}% - ABAIXO da faixa recomendada (3-5%)`;
+            }
+        } else {
+            litrosArlaInput.classList.remove('percentual-ok', 'percentual-alto', 'percentual-baixo');
+            litrosArlaInput.title = '';
+        }
+    }
+    
+    if (litrosArlaInput) litrosArlaInput.addEventListener('input', calcularValorTotalArla);
+    if (valorLitroArlaInput) valorLitroArlaInput.addEventListener('input', calcularValorTotalArla);
+    
+    // Adiciona listener para o campo de litros de diesel para validar porcentagem ARLA
+    const litrosDieselInput = document.getElementById('litros');
+    if (litrosDieselInput) {
+        litrosDieselInput.addEventListener('input', validarPercentualArla);
+    }
 }
 
 function setupValorTotalCalc() {
@@ -484,7 +653,7 @@ function showEditRefuelModal(id) {
                 
                 // Preencher select de veículo apenas com o valor do banco
                 const veiculoSelect = document.getElementById('veiculo_id');
-                veiculoSelect.innerHTML = '';
+                veiculoSelect.innerHTML = '<option value="">Selecione um veículo</option>';
                 if (refuel.veiculo_id) {
                     const option = document.createElement('option');
                     option.value = refuel.veiculo_id;
@@ -495,7 +664,7 @@ function showEditRefuelModal(id) {
 
                 // Preencher select de motorista apenas com o valor do banco
                 const motoristaSelect = document.getElementById('motorista_id');
-                motoristaSelect.innerHTML = '';
+                motoristaSelect.innerHTML = '<option value="">Selecione um motorista</option>';
                 if (refuel.motorista_id) {
                     const option = document.createElement('option');
                     option.value = refuel.motorista_id;
@@ -506,7 +675,7 @@ function showEditRefuelModal(id) {
 
                 // Preencher select de rota apenas com o valor do banco
                 const rotaSelect = document.getElementById('rota_id');
-                rotaSelect.innerHTML = '';
+                rotaSelect.innerHTML = '<option value="">Selecione a rota</option>';
                 if (refuel.rota_id) {
                     const option = document.createElement('option');
                     option.value = refuel.rota_id;
@@ -538,6 +707,32 @@ function showEditRefuelModal(id) {
                 document.getElementById('forma_pagamento').value = refuel.forma_pagamento;
                 document.getElementById('observacoes').value = refuel.observacoes || '';
                 
+                // Preencher campos ARLA
+                const incluiArlaCheckbox = document.getElementById('inclui_arla');
+                const camposArla = document.getElementById('campos_arla');
+                
+                if (refuel.inclui_arla == 1) {
+                    incluiArlaCheckbox.checked = true;
+                    camposArla.style.display = 'grid';
+                    
+                    // Formata os valores ARLA
+                    document.getElementById('litros_arla').value = Number(refuel.litros_arla || 0).toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
+                    document.getElementById('valor_litro_arla').value = Number(refuel.valor_litro_arla || 0).toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
+                    document.getElementById('valor_total_arla').value = Number(refuel.valor_total_arla || 0).toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
+                } else {
+                    incluiArlaCheckbox.checked = false;
+                    camposArla.style.display = 'none';
+                }
+                
                 // Exibe o comprovante atual se existir
                 const comprovanteAtual = document.getElementById('comprovante_atual');
                 if (refuel.comprovante) {
@@ -556,6 +751,9 @@ function showEditRefuelModal(id) {
                 
                 // Configura os cálculos automáticos
                 setupValorTotalCalc();
+                
+                // Configura campos ARLA
+                setupArlaFields();
                 
                 // Exibe o modal
                 document.getElementById('refuelModal').classList.add('active');

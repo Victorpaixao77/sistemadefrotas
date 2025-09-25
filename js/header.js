@@ -25,6 +25,9 @@ function initNotifications() {
 
     if (!notificationBtn || !notificationDropdown) return;
 
+    // Carregar notificações no carregamento inicial da página
+    carregarNotificacoesIA(false);
+
     // Função para carregar notificações (padrão: só não lidas, todas se true)
     function carregarNotificacoesIA(verTodas = false) {
         const url = verTodas ? '/sistema-frotas/notificacoes/notificacoes.php?todas=1' : '/sistema-frotas/notificacoes/notificacoes.php';
@@ -33,7 +36,7 @@ function initNotifications() {
             .then(data => {
                 notificationList.innerHTML = '';
                 let unreadCount = 0;
-                if (data.success && data.notificacoes.length)
+                if (data.success && data.notificacoes.length) {
                     data.notificacoes.forEach(n => {
                         let iconClass = 'info';
                         if (n.tipo === 'manutencao') iconClass = 'warning';
@@ -54,11 +57,14 @@ function initNotifications() {
                             </div>
                         `;
                     });
-                else {
+                } else {
                     notificationList.innerHTML = '<div style="padding:16px;color:#b8c2d0">Nenhuma notificação encontrada.</div>';
                 }
-                badge.textContent = unreadCount;
-                badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+                
+                // Usar o total real de notificações não lidas se disponível
+                const totalReal = data.total_real_nao_lidas || unreadCount;
+                badge.textContent = totalReal;
+                badge.style.display = totalReal > 0 ? 'flex' : 'none';
             });
     }
 
@@ -95,7 +101,7 @@ function initNotifications() {
         e.stopPropagation();
     });
 
-    // Limpar todas as notificações (marca como lidas no banco e visual)
+    // Limpar notificações regulares (marca como lidas no banco e visual)
     if (notificationClearBtn) {
         notificationClearBtn.addEventListener('click', function() {
             fetch('/sistema-frotas/notificacoes/limpar_notificacoes.php', { method: 'POST' })
@@ -105,6 +111,15 @@ function initNotifications() {
                         notificationList.innerHTML = '<div style="padding:16px;color:#b8c2d0">Nenhuma notificação encontrada.</div>';
                         badge.textContent = '0';
                         badge.style.display = 'none';
+                        
+                        // Atualiza também o badge de IA se existir
+                        const iaBadge = document.getElementById('iaNotificationBadge');
+                        if (iaBadge) {
+                            // Recarrega as notificações de IA para atualizar o contador
+                            if (typeof window.carregarIANotificacoes === 'function') {
+                                window.carregarIANotificacoes();
+                            }
+                        }
                     }
                 });
         });
@@ -238,7 +253,9 @@ function getDefaultColorValue(variable) {
         '--accent-primary': '#3b82f6',
         '--bg-secondary': '#1a2332',
         '--bg-primary': '#0f1824',
-        '--bg-sidebar': '#121a29'
+        '--bg-sidebar': '#121a29',
+        '--card-bg': '#1e293b',
+        '--bg-tertiary': '#243041'
     };
     
     return defaultColors[variable] || '#000000';

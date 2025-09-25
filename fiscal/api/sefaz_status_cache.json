@@ -6,18 +6,18 @@
         "status_geral": "online",
         "status_texto": "Sistema SEFAZ funcionando perfeitamente",
         "status_cor": "success",
-        "timestamp": "2025-08-30 05:02:14",
+        "timestamp": "2025-09-19 01:32:08",
         "detalhes": {
             "conexao_basica": {
                 "sucesso": true,
-                "tempo": 157.58,
+                "tempo": 224.59,
                 "http_code": 403,
                 "erro": "",
                 "ip_destino": "200.233.4.136"
             },
             "conexao_certificado": {
                 "sucesso": true,
-                "tempo": 150.53,
+                "tempo": 139.85,
                 "http_code": 403,
                 "erro": "",
                 "ip_destino": "200.233.4.136",
@@ -25,7 +25,7 @@
             },
             "requisicao_soap": {
                 "sucesso": true,
-                "tempo": 136.44,
+                "tempo": 169.24,
                 "http_code": 403,
                 "erro": "",
                 "ip_destino": "200.233.4.136",
@@ -33,6 +33,6 @@
             }
         }
     },
-    "timestamp": "2025-08-30 05:02:14",
-    "empresa_id": "1"
+    "timestamp": "2025-09-19 01:32:08",
+    "empresa_id": "3"
 }

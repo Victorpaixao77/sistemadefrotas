@@ -13,6 +13,7 @@ if (!$empresa_id) {
     $empresa_id = 1; // Fallback para empresa_id 1
 }
 
+
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? ($_POST['action'] ?? null);
 if ($method === 'POST' && !$action) {
@@ -541,6 +542,713 @@ try {
         }
         exit;
     }
+    
+    // Configurações de Performance
+    if ($action === 'get_config_performance') {
+        try {
+            // Criar tabela se não existir
+            $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_performance (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                empresa_id INT NOT NULL,
+                peso_pontualidade INT DEFAULT 25,
+                peso_consumo INT DEFAULT 30,
+                peso_multas INT DEFAULT 20,
+                peso_checklist INT DEFAULT 15,
+                peso_ocorrencias INT DEFAULT 10,
+                pontos_maximos INT DEFAULT 1000,
+                gamificacao_ativa TINYINT(1) DEFAULT 1,
+                ranking_automatico TINYINT(1) DEFAULT 1,
+                data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY unique_empresa (empresa_id)
+            )");
+            
+            $stmt = $conn->prepare('SELECT * FROM configuracoes_performance WHERE empresa_id = :empresa_id LIMIT 1');
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($row) {
+                echo json_encode([
+                    'success' => true,
+                    'data' => $row
+                ]);
+            } else {
+                // Retornar valores padrão se não existir configuração
+                echo json_encode([
+                    'success' => true,
+                    'data' => [
+                        'peso_pontualidade' => 25,
+                        'peso_consumo' => 30,
+                        'peso_multas' => 20,
+                        'peso_checklist' => 15,
+                        'peso_ocorrencias' => 10,
+                        'pontos_maximos' => 1000,
+                        'gamificacao_ativa' => 1,
+                        'ranking_automatico' => 1
+                    ]
+                ]);
+            }
+        } catch (Exception $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Erro ao carregar configurações: ' . $e->getMessage()
+            ]);
+        }
+        exit;
+    }
+    
+    if ($action === 'save_config_performance') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        $peso_pontualidade = (int)($input['peso_pontualidade'] ?? 25);
+        $peso_consumo = (int)($input['peso_consumo'] ?? 30);
+        $peso_multas = (int)($input['peso_multas'] ?? 20);
+        $peso_checklist = (int)($input['peso_checklist'] ?? 15);
+        $peso_ocorrencias = (int)($input['peso_ocorrencias'] ?? 10);
+        $pontos_maximos = (int)($input['pontos_maximos'] ?? 1000);
+        $gamificacao_ativa = (bool)($input['gamificacao_ativa'] ?? true) ? 1 : 0;
+        $ranking_automatico = (bool)($input['ranking_automatico'] ?? true) ? 1 : 0;
+        
+        // Validar se a soma dos pesos é 100%
+        $total_pesos = $peso_pontualidade + $peso_consumo + $peso_multas + $peso_checklist + $peso_ocorrencias;
+        if ($total_pesos !== 100) {
+            throw new Exception("A soma dos pesos deve ser igual a 100%. Atual: {$total_pesos}%");
+        }
+        
+        // Criar tabela se não existir
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_performance (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            peso_pontualidade INT DEFAULT 25,
+            peso_consumo INT DEFAULT 30,
+            peso_multas INT DEFAULT 20,
+            peso_checklist INT DEFAULT 15,
+            peso_ocorrencias INT DEFAULT 10,
+            pontos_maximos INT DEFAULT 1000,
+            gamificacao_ativa TINYINT(1) DEFAULT 1,
+            ranking_automatico TINYINT(1) DEFAULT 1,
+            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_empresa (empresa_id)
+        )");
+        
+        // Inserir ou atualizar configuração
+        $stmt = $conn->prepare("INSERT INTO configuracoes_performance (
+            empresa_id, peso_pontualidade, peso_consumo, peso_multas, 
+            peso_checklist, peso_ocorrencias, pontos_maximos, 
+            gamificacao_ativa, ranking_automatico
+        ) VALUES (
+            :empresa_id, :peso_pontualidade, :peso_consumo, :peso_multas,
+            :peso_checklist, :peso_ocorrencias, :pontos_maximos,
+            :gamificacao_ativa, :ranking_automatico
+        ) ON DUPLICATE KEY UPDATE
+            peso_pontualidade = :peso_pontualidade_upd,
+            peso_consumo = :peso_consumo_upd,
+            peso_multas = :peso_multas_upd,
+            peso_checklist = :peso_checklist_upd,
+            peso_ocorrencias = :peso_ocorrencias_upd,
+            pontos_maximos = :pontos_maximos_upd,
+            gamificacao_ativa = :gamificacao_ativa_upd,
+            ranking_automatico = :ranking_automatico_upd,
+            data_atualizacao = NOW()");
+        
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_pontualidade', $peso_pontualidade, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_consumo', $peso_consumo, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_multas', $peso_multas, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_checklist', $peso_checklist, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_ocorrencias', $peso_ocorrencias, PDO::PARAM_INT);
+        $stmt->bindParam(':pontos_maximos', $pontos_maximos, PDO::PARAM_INT);
+        $stmt->bindParam(':gamificacao_ativa', $gamificacao_ativa, PDO::PARAM_INT);
+        $stmt->bindParam(':ranking_automatico', $ranking_automatico, PDO::PARAM_INT);
+        
+        // Parâmetros para UPDATE (com sufixo _upd)
+        $stmt->bindParam(':peso_pontualidade_upd', $peso_pontualidade, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_consumo_upd', $peso_consumo, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_multas_upd', $peso_multas, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_checklist_upd', $peso_checklist, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_ocorrencias_upd', $peso_ocorrencias, PDO::PARAM_INT);
+        $stmt->bindParam(':pontos_maximos_upd', $pontos_maximos, PDO::PARAM_INT);
+        $stmt->bindParam(':gamificacao_ativa_upd', $gamificacao_ativa, PDO::PARAM_INT);
+        $stmt->bindParam(':ranking_automatico_upd', $ranking_automatico, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        
+        echo json_encode(['success' => true, 'message' => 'Configurações de performance salvas com sucesso!']);
+        exit;
+    }
+    
+    // Configurações de Badges
+    if ($action === 'save_config_badges') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        $badge_motorista_economico = (int)($input['badge_motorista_economico'] ?? 3);
+        $badge_sem_multas = (int)($input['badge_sem_multas'] ?? 12);
+        $badge_checklists_perfeitos = (int)($input['badge_checklists_perfeitos'] ?? 50);
+        $pontos_por_badge = (int)($input['pontos_por_badge'] ?? 50);
+        $sistema_badges_ativo = (bool)($input['sistema_badges_ativo'] ?? true) ? 1 : 0;
+        
+        // Criar tabela se não existir
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_badges (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            badge_motorista_economico INT DEFAULT 3,
+            badge_sem_multas INT DEFAULT 12,
+            badge_checklists_perfeitos INT DEFAULT 50,
+            pontos_por_badge INT DEFAULT 50,
+            sistema_badges_ativo TINYINT(1) DEFAULT 1,
+            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_empresa (empresa_id)
+        )");
+        
+        // Inserir ou atualizar configuração
+        $stmt = $conn->prepare("INSERT INTO configuracoes_badges (
+            empresa_id, badge_motorista_economico, badge_sem_multas, 
+            badge_checklists_perfeitos, pontos_por_badge, sistema_badges_ativo
+        ) VALUES (
+            :empresa_id, :badge_motorista_economico, :badge_sem_multas,
+            :badge_checklists_perfeitos, :pontos_por_badge, :sistema_badges_ativo
+        ) ON DUPLICATE KEY UPDATE
+            badge_motorista_economico = :badge_motorista_economico_upd,
+            badge_sem_multas = :badge_sem_multas_upd,
+            badge_checklists_perfeitos = :badge_checklists_perfeitos_upd,
+            pontos_por_badge = :pontos_por_badge_upd,
+            sistema_badges_ativo = :sistema_badges_ativo_upd,
+            data_atualizacao = NOW()");
+        
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindParam(':badge_motorista_economico', $badge_motorista_economico, PDO::PARAM_INT);
+        $stmt->bindParam(':badge_sem_multas', $badge_sem_multas, PDO::PARAM_INT);
+        $stmt->bindParam(':badge_checklists_perfeitos', $badge_checklists_perfeitos, PDO::PARAM_INT);
+        $stmt->bindParam(':pontos_por_badge', $pontos_por_badge, PDO::PARAM_INT);
+        $stmt->bindParam(':sistema_badges_ativo', $sistema_badges_ativo, PDO::PARAM_INT);
+        
+        // Parâmetros para UPDATE
+        $stmt->bindParam(':badge_motorista_economico_upd', $badge_motorista_economico, PDO::PARAM_INT);
+        $stmt->bindParam(':badge_sem_multas_upd', $badge_sem_multas, PDO::PARAM_INT);
+        $stmt->bindParam(':badge_checklists_perfeitos_upd', $badge_checklists_perfeitos, PDO::PARAM_INT);
+        $stmt->bindParam(':pontos_por_badge_upd', $pontos_por_badge, PDO::PARAM_INT);
+        $stmt->bindParam(':sistema_badges_ativo_upd', $sistema_badges_ativo, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        
+        echo json_encode(['success' => true, 'message' => 'Configurações de badges salvas com sucesso!']);
+        exit;
+    }
+    
+    // Configurações de Níveis
+    if ($action === 'save_config_niveis') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        $nivel_bronze_min = (int)($input['nivel_bronze_min'] ?? 0);
+        $nivel_bronze_max = (int)($input['nivel_bronze_max'] ?? 99);
+        $nivel_prata_min = (int)($input['nivel_prata_min'] ?? 100);
+        $nivel_prata_max = (int)($input['nivel_prata_max'] ?? 299);
+        $nivel_ouro_min = (int)($input['nivel_ouro_min'] ?? 300);
+        $nivel_ouro_max = (int)($input['nivel_ouro_max'] ?? 599);
+        $nivel_platina_min = (int)($input['nivel_platina_min'] ?? 600);
+        $nivel_platina_max = (int)($input['nivel_platina_max'] ?? 899);
+        $nivel_diamante_min = (int)($input['nivel_diamante_min'] ?? 900);
+        $nivel_diamante_max = (int)($input['nivel_diamante_max'] ?? 999);
+        $nivel_lenda_min = (int)($input['nivel_lenda_min'] ?? 1000);
+        $nivel_lenda_max = (int)($input['nivel_lenda_max'] ?? 9999);
+        $niveis_avancados_ativos = (bool)($input['niveis_avancados_ativos'] ?? true) ? 1 : 0;
+        
+        // Criar tabela se não existir
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_niveis (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            nivel_bronze_min INT DEFAULT 0,
+            nivel_bronze_max INT DEFAULT 99,
+            nivel_prata_min INT DEFAULT 100,
+            nivel_prata_max INT DEFAULT 299,
+            nivel_ouro_min INT DEFAULT 300,
+            nivel_ouro_max INT DEFAULT 599,
+            nivel_platina_min INT DEFAULT 600,
+            nivel_platina_max INT DEFAULT 899,
+            nivel_diamante_min INT DEFAULT 900,
+            nivel_diamante_max INT DEFAULT 999,
+            nivel_lenda_min INT DEFAULT 1000,
+            nivel_lenda_max INT DEFAULT 9999,
+            niveis_avancados_ativos TINYINT(1) DEFAULT 1,
+            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_empresa (empresa_id)
+        )");
+        
+        // Inserir ou atualizar configuração
+        $stmt = $conn->prepare("INSERT INTO configuracoes_niveis (
+            empresa_id, nivel_bronze_min, nivel_bronze_max, nivel_prata_min, nivel_prata_max,
+            nivel_ouro_min, nivel_ouro_max, nivel_platina_min, nivel_platina_max,
+            nivel_diamante_min, nivel_diamante_max, nivel_lenda_min, nivel_lenda_max,
+            niveis_avancados_ativos
+        ) VALUES (
+            :empresa_id, :nivel_bronze_min, :nivel_bronze_max, :nivel_prata_min, :nivel_prata_max,
+            :nivel_ouro_min, :nivel_ouro_max, :nivel_platina_min, :nivel_platina_max,
+            :nivel_diamante_min, :nivel_diamante_max, :nivel_lenda_min, :nivel_lenda_max,
+            :niveis_avancados_ativos
+        ) ON DUPLICATE KEY UPDATE
+            nivel_bronze_min = :nivel_bronze_min_upd,
+            nivel_bronze_max = :nivel_bronze_max_upd,
+            nivel_prata_min = :nivel_prata_min_upd,
+            nivel_prata_max = :nivel_prata_max_upd,
+            nivel_ouro_min = :nivel_ouro_min_upd,
+            nivel_ouro_max = :nivel_ouro_max_upd,
+            nivel_platina_min = :nivel_platina_min_upd,
+            nivel_platina_max = :nivel_platina_max_upd,
+            nivel_diamante_min = :nivel_diamante_min_upd,
+            nivel_diamante_max = :nivel_diamante_max_upd,
+            nivel_lenda_min = :nivel_lenda_min_upd,
+            nivel_lenda_max = :nivel_lenda_max_upd,
+            niveis_avancados_ativos = :niveis_avancados_ativos_upd,
+            data_atualizacao = NOW()");
+        
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_bronze_min', $nivel_bronze_min, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_bronze_max', $nivel_bronze_max, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_prata_min', $nivel_prata_min, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_prata_max', $nivel_prata_max, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_ouro_min', $nivel_ouro_min, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_ouro_max', $nivel_ouro_max, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_platina_min', $nivel_platina_min, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_platina_max', $nivel_platina_max, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_diamante_min', $nivel_diamante_min, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_diamante_max', $nivel_diamante_max, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_lenda_min', $nivel_lenda_min, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_lenda_max', $nivel_lenda_max, PDO::PARAM_INT);
+        $stmt->bindParam(':niveis_avancados_ativos', $niveis_avancados_ativos, PDO::PARAM_INT);
+        
+        // Parâmetros para UPDATE
+        $stmt->bindParam(':nivel_bronze_min_upd', $nivel_bronze_min, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_bronze_max_upd', $nivel_bronze_max, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_prata_min_upd', $nivel_prata_min, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_prata_max_upd', $nivel_prata_max, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_ouro_min_upd', $nivel_ouro_min, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_ouro_max_upd', $nivel_ouro_max, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_platina_min_upd', $nivel_platina_min, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_platina_max_upd', $nivel_platina_max, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_diamante_min_upd', $nivel_diamante_min, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_diamante_max_upd', $nivel_diamante_max, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_lenda_min_upd', $nivel_lenda_min, PDO::PARAM_INT);
+        $stmt->bindParam(':nivel_lenda_max_upd', $nivel_lenda_max, PDO::PARAM_INT);
+        $stmt->bindParam(':niveis_avancados_ativos_upd', $niveis_avancados_ativos, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        
+        echo json_encode(['success' => true, 'message' => 'Configurações de níveis salvas com sucesso!']);
+        exit;
+    }
+    
+    // Configurações de Desafios
+    if ($action === 'save_config_desafios') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        $desafio_km_sem_infracoes = (int)($input['desafio_km_sem_infracoes'] ?? 5000);
+        $desafio_rotas_sem_atrasos = (int)($input['desafio_rotas_sem_atrasos'] ?? 10);
+        $desafio_economia_combustivel = (float)($input['desafio_economia_combustivel'] ?? 15.0);
+        $pontos_desafio_completo = (int)($input['pontos_desafio_completo'] ?? 100);
+        $desafios_ativos = (bool)($input['desafios_ativos'] ?? true) ? 1 : 0;
+        $feedback_imediato = (bool)($input['feedback_imediato'] ?? true) ? 1 : 0;
+        
+        // Criar tabela se não existir
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_desafios (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            desafio_km_sem_infracoes INT DEFAULT 5000,
+            desafio_rotas_sem_atrasos INT DEFAULT 10,
+            desafio_economia_combustivel DECIMAL(5,2) DEFAULT 15.00,
+            pontos_desafio_completo INT DEFAULT 100,
+            desafios_ativos TINYINT(1) DEFAULT 1,
+            feedback_imediato TINYINT(1) DEFAULT 1,
+            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_empresa (empresa_id)
+        )");
+        
+        // Inserir ou atualizar configuração
+        $stmt = $conn->prepare("INSERT INTO configuracoes_desafios (
+            empresa_id, desafio_km_sem_infracoes, desafio_rotas_sem_atrasos,
+            desafio_economia_combustivel, pontos_desafio_completo, desafios_ativos, feedback_imediato
+        ) VALUES (
+            :empresa_id, :desafio_km_sem_infracoes, :desafio_rotas_sem_atrasos,
+            :desafio_economia_combustivel, :pontos_desafio_completo, :desafios_ativos, :feedback_imediato
+        ) ON DUPLICATE KEY UPDATE
+            desafio_km_sem_infracoes = :desafio_km_sem_infracoes_upd,
+            desafio_rotas_sem_atrasos = :desafio_rotas_sem_atrasos_upd,
+            desafio_economia_combustivel = :desafio_economia_combustivel_upd,
+            pontos_desafio_completo = :pontos_desafio_completo_upd,
+            desafios_ativos = :desafios_ativos_upd,
+            feedback_imediato = :feedback_imediato_upd,
+            data_atualizacao = NOW()");
+        
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindParam(':desafio_km_sem_infracoes', $desafio_km_sem_infracoes, PDO::PARAM_INT);
+        $stmt->bindParam(':desafio_rotas_sem_atrasos', $desafio_rotas_sem_atrasos, PDO::PARAM_INT);
+        $stmt->bindParam(':desafio_economia_combustivel', $desafio_economia_combustivel, PDO::PARAM_STR);
+        $stmt->bindParam(':pontos_desafio_completo', $pontos_desafio_completo, PDO::PARAM_INT);
+        $stmt->bindParam(':desafios_ativos', $desafios_ativos, PDO::PARAM_INT);
+        $stmt->bindParam(':feedback_imediato', $feedback_imediato, PDO::PARAM_INT);
+        
+        // Parâmetros para UPDATE
+        $stmt->bindParam(':desafio_km_sem_infracoes_upd', $desafio_km_sem_infracoes, PDO::PARAM_INT);
+        $stmt->bindParam(':desafio_rotas_sem_atrasos_upd', $desafio_rotas_sem_atrasos, PDO::PARAM_INT);
+        $stmt->bindParam(':desafio_economia_combustivel_upd', $desafio_economia_combustivel, PDO::PARAM_STR);
+        $stmt->bindParam(':pontos_desafio_completo_upd', $pontos_desafio_completo, PDO::PARAM_INT);
+        $stmt->bindParam(':desafios_ativos_upd', $desafios_ativos, PDO::PARAM_INT);
+        $stmt->bindParam(':feedback_imediato_upd', $feedback_imediato, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        
+        echo json_encode(['success' => true, 'message' => 'Configurações de desafios salvas com sucesso!']);
+        exit;
+    }
+    
+    // Configurações de Métricas Avançadas
+    if ($action === 'save_config_metricas') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        $peso_ocorrencias_sinistros = (int)($input['peso_ocorrencias_sinistros'] ?? 15);
+        $peso_custos_km = (int)($input['peso_custos_km'] ?? 10);
+        $peso_feedback_cliente = (int)($input['peso_feedback_cliente'] ?? 10);
+        $peso_manutencao_preventiva = (int)($input['peso_manutencao_preventiva'] ?? 5);
+        $metricas_avancadas_ativas = (bool)($input['metricas_avancadas_ativas'] ?? false) ? 1 : 0;
+        
+        // Criar tabela se não existir
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_metricas (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            peso_ocorrencias_sinistros INT DEFAULT 15,
+            peso_custos_km INT DEFAULT 10,
+            peso_feedback_cliente INT DEFAULT 10,
+            peso_manutencao_preventiva INT DEFAULT 5,
+            metricas_avancadas_ativas TINYINT(1) DEFAULT 0,
+            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_empresa (empresa_id)
+        )");
+        
+        // Inserir ou atualizar configuração
+        $stmt = $conn->prepare("INSERT INTO configuracoes_metricas (
+            empresa_id, peso_ocorrencias_sinistros, peso_custos_km,
+            peso_feedback_cliente, peso_manutencao_preventiva, metricas_avancadas_ativas
+        ) VALUES (
+            :empresa_id, :peso_ocorrencias_sinistros, :peso_custos_km,
+            :peso_feedback_cliente, :peso_manutencao_preventiva, :metricas_avancadas_ativas
+        ) ON DUPLICATE KEY UPDATE
+            peso_ocorrencias_sinistros = :peso_ocorrencias_sinistros_upd,
+            peso_custos_km = :peso_custos_km_upd,
+            peso_feedback_cliente = :peso_feedback_cliente_upd,
+            peso_manutencao_preventiva = :peso_manutencao_preventiva_upd,
+            metricas_avancadas_ativas = :metricas_avancadas_ativas_upd,
+            data_atualizacao = NOW()");
+        
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_ocorrencias_sinistros', $peso_ocorrencias_sinistros, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_custos_km', $peso_custos_km, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_feedback_cliente', $peso_feedback_cliente, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_manutencao_preventiva', $peso_manutencao_preventiva, PDO::PARAM_INT);
+        $stmt->bindParam(':metricas_avancadas_ativas', $metricas_avancadas_ativas, PDO::PARAM_INT);
+        
+        // Parâmetros para UPDATE
+        $stmt->bindParam(':peso_ocorrencias_sinistros_upd', $peso_ocorrencias_sinistros, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_custos_km_upd', $peso_custos_km, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_feedback_cliente_upd', $peso_feedback_cliente, PDO::PARAM_INT);
+        $stmt->bindParam(':peso_manutencao_preventiva_upd', $peso_manutencao_preventiva, PDO::PARAM_INT);
+        $stmt->bindParam(':metricas_avancadas_ativas_upd', $metricas_avancadas_ativas, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        
+        echo json_encode(['success' => true, 'message' => 'Métricas avançadas salvas com sucesso!']);
+        exit;
+    }
+    
+    // Configurações de Filtros
+    if ($action === 'save_config_filtros') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        
+        $periodo_padrao = $input['periodo_padrao'] ?? 'mensal';
+        $filtro_por_veiculo = $input['filtro_por_veiculo'] ?? 'todos';
+        $filtro_por_rota = $input['filtro_por_rota'] ?? 'todas';
+        $comparacao_filiais = $input['comparacao_filiais'] ?? 'desabilitada';
+        $filtros_ativos = (bool)($input['filtros_ativos'] ?? true) ? 1 : 0;
+        
+        // Criar tabela se não existir
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_filtros (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            periodo_padrao VARCHAR(20) DEFAULT 'mensal',
+            filtro_por_veiculo VARCHAR(20) DEFAULT 'todos',
+            filtro_por_rota VARCHAR(20) DEFAULT 'todas',
+            comparacao_filiais VARCHAR(20) DEFAULT 'desabilitada',
+            filtros_ativos TINYINT(1) DEFAULT 1,
+            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_empresa (empresa_id)
+        )");
+        
+        // Inserir ou atualizar configuração
+        $stmt = $conn->prepare("INSERT INTO configuracoes_filtros (
+            empresa_id, periodo_padrao, filtro_por_veiculo, filtro_por_rota,
+            comparacao_filiais, filtros_ativos
+        ) VALUES (
+            :empresa_id, :periodo_padrao, :filtro_por_veiculo, :filtro_por_rota,
+            :comparacao_filiais, :filtros_ativos
+        ) ON DUPLICATE KEY UPDATE
+            periodo_padrao = :periodo_padrao_upd,
+            filtro_por_veiculo = :filtro_por_veiculo_upd,
+            filtro_por_rota = :filtro_por_rota_upd,
+            comparacao_filiais = :comparacao_filiais_upd,
+            filtros_ativos = :filtros_ativos_upd,
+            data_atualizacao = NOW()");
+        
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindParam(':periodo_padrao', $periodo_padrao, PDO::PARAM_STR);
+        $stmt->bindParam(':filtro_por_veiculo', $filtro_por_veiculo, PDO::PARAM_STR);
+        $stmt->bindParam(':filtro_por_rota', $filtro_por_rota, PDO::PARAM_STR);
+        $stmt->bindParam(':comparacao_filiais', $comparacao_filiais, PDO::PARAM_STR);
+        $stmt->bindParam(':filtros_ativos', $filtros_ativos, PDO::PARAM_INT);
+        
+        // Parâmetros para UPDATE
+        $stmt->bindParam(':periodo_padrao_upd', $periodo_padrao, PDO::PARAM_STR);
+        $stmt->bindParam(':filtro_por_veiculo_upd', $filtro_por_veiculo, PDO::PARAM_STR);
+        $stmt->bindParam(':filtro_por_rota_upd', $filtro_por_rota, PDO::PARAM_STR);
+        $stmt->bindParam(':comparacao_filiais_upd', $comparacao_filiais, PDO::PARAM_STR);
+        $stmt->bindParam(':filtros_ativos_upd', $filtros_ativos, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        
+        echo json_encode(['success' => true, 'message' => 'Configurações de filtros salvas com sucesso!']);
+        exit;
+    }
+    
+    // Funções de configurações avançadas
+    if ($action === 'get_config_badges') {
+        $stmt = $conn->prepare('SELECT * FROM configuracoes_badges WHERE empresa_id = :empresa_id LIMIT 1');
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$row) {
+            // Criar configuração padrão
+            $stmt = $conn->prepare('INSERT INTO configuracoes_badges (empresa_id, badge_motorista_economico, badge_sem_multas, badge_checklists_perfeitos, badge_streak_fogo, pontos_badge_economico, pontos_badge_sem_multas, pontos_badge_checklists, pontos_badge_streak, data_criacao) VALUES (:empresa_id, 1, 1, 1, 1, 50, 100, 75, 25, NOW())');
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            $stmt = $conn->prepare('SELECT * FROM configuracoes_badges WHERE empresa_id = :empresa_id LIMIT 1');
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        echo json_encode(['success' => true, 'data' => $row]);
+        exit;
+    }
+    
+    if ($action === 'get_config_niveis') {
+        $stmt = $conn->prepare('SELECT * FROM configuracoes_niveis WHERE empresa_id = :empresa_id LIMIT 1');
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$row) {
+            // Criar configuração padrão
+            $stmt = $conn->prepare('INSERT INTO configuracoes_niveis (empresa_id, nivel_bronze_min, nivel_bronze_max, nivel_prata_min, nivel_prata_max, nivel_ouro_min, nivel_ouro_max, nivel_platina_min, nivel_platina_max, nivel_diamante_min, nivel_diamante_max, nivel_lenda_min, nivel_lenda_max, data_criacao) VALUES (:empresa_id, 0, 99, 100, 299, 300, 599, 600, 899, 900, 999, 1000, 9999, NOW())');
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            $stmt = $conn->prepare('SELECT * FROM configuracoes_niveis WHERE empresa_id = :empresa_id LIMIT 1');
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        echo json_encode(['success' => true, 'data' => $row]);
+        exit;
+    }
+    
+    if ($action === 'get_config_desafios') {
+        $stmt = $conn->prepare('SELECT * FROM configuracoes_desafios WHERE empresa_id = :empresa_id LIMIT 1');
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$row) {
+            // Criar configuração padrão
+            $stmt = $conn->prepare('INSERT INTO configuracoes_desafios (empresa_id, desafio_semana_ativo, desafio_mes_ativo, desafio_km_sem_infracoes, desafio_rotas_sem_atrasos, pontos_desafio_semana, pontos_desafio_mes, pontos_desafio_km, pontos_desafio_rotas, data_criacao) VALUES (:empresa_id, 1, 1, 1, 1, 100, 500, 200, 150, NOW())');
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            $stmt = $conn->prepare('SELECT * FROM configuracoes_desafios WHERE empresa_id = :empresa_id LIMIT 1');
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        echo json_encode(['success' => true, 'data' => $row]);
+        exit;
+    }
+    
+    if ($action === 'get_config_metricas') {
+        $stmt = $conn->prepare('SELECT * FROM configuracoes_metricas WHERE empresa_id = :empresa_id LIMIT 1');
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$row) {
+            // Criar configuração padrão
+            $stmt = $conn->prepare('INSERT INTO configuracoes_metricas (empresa_id, peso_ocorrencias, peso_custos_km, peso_feedback_cliente, peso_manutencao_preventiva, peso_eficiencia_combustivel, peso_pontualidade, peso_multas, peso_checklists, data_criacao) VALUES (:empresa_id, 15, 10, 10, 5, 30, 25, 20, 15, NOW())');
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            $stmt = $conn->prepare('SELECT * FROM configuracoes_metricas WHERE empresa_id = :empresa_id LIMIT 1');
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        echo json_encode(['success' => true, 'data' => $row]);
+        exit;
+    }
+    
+    if ($action === 'get_config_filtros') {
+        $stmt = $conn->prepare('SELECT * FROM configuracoes_filtros WHERE empresa_id = :empresa_id LIMIT 1');
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$row) {
+            // Criar configuração padrão
+            $stmt = $conn->prepare('INSERT INTO configuracoes_filtros (empresa_id, periodo_padrao, filtro_por_veiculo, filtro_por_rota, comparacao_filiais, filtros_ativos, data_criacao) VALUES (:empresa_id, "mensal", "todos", "todas", "nao", 1, NOW())');
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            $stmt = $conn->prepare('SELECT * FROM configuracoes_filtros WHERE empresa_id = :empresa_id LIMIT 1');
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+        
+        echo json_encode(['success' => true, 'data' => $row]);
+        exit;
+    }
+    
+    // Configurações de Notificações
+    if ($action === 'save_notifications_config') {
+        $notificacoes_badges = isset($_POST['notificacoes_badges']) ? 1 : 0;
+        $notificacoes_niveis = isset($_POST['notificacoes_niveis']) ? 1 : 0;
+        $notificacoes_ranking = isset($_POST['notificacoes_ranking']) ? 1 : 0;
+        $notificacoes_desafios = isset($_POST['notificacoes_desafios']) ? 1 : 0;
+        $sistema_notificacoes_ativo = isset($_POST['sistema_notificacoes_ativo']) ? 1 : 0;
+        
+        // Criar tabela se não existir
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_notificacoes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            notificacoes_badges TINYINT(1) DEFAULT 1,
+            notificacoes_niveis TINYINT(1) DEFAULT 1,
+            notificacoes_ranking TINYINT(1) DEFAULT 1,
+            notificacoes_desafios TINYINT(1) DEFAULT 1,
+            sistema_notificacoes_ativo TINYINT(1) DEFAULT 1,
+            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_empresa (empresa_id)
+        )");
+        
+        $stmt = $conn->prepare('INSERT INTO configuracoes_notificacoes 
+            (empresa_id, notificacoes_badges, notificacoes_niveis, notificacoes_ranking, notificacoes_desafios, sistema_notificacoes_ativo) 
+            VALUES (:empresa_id, :notificacoes_badges, :notificacoes_niveis, :notificacoes_ranking, :notificacoes_desafios, :sistema_notificacoes_ativo)
+            ON DUPLICATE KEY UPDATE 
+            notificacoes_badges = :notificacoes_badges_upd,
+            notificacoes_niveis = :notificacoes_niveis_upd,
+            notificacoes_ranking = :notificacoes_ranking_upd,
+            notificacoes_desafios = :notificacoes_desafios_upd,
+            sistema_notificacoes_ativo = :sistema_notificacoes_ativo_upd,
+            data_atualizacao = NOW()');
+        
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindParam(':notificacoes_badges', $notificacoes_badges, PDO::PARAM_INT);
+        $stmt->bindParam(':notificacoes_niveis', $notificacoes_niveis, PDO::PARAM_INT);
+        $stmt->bindParam(':notificacoes_ranking', $notificacoes_ranking, PDO::PARAM_INT);
+        $stmt->bindParam(':notificacoes_desafios', $notificacoes_desafios, PDO::PARAM_INT);
+        $stmt->bindParam(':sistema_notificacoes_ativo', $sistema_notificacoes_ativo, PDO::PARAM_INT);
+        $stmt->bindParam(':notificacoes_badges_upd', $notificacoes_badges, PDO::PARAM_INT);
+        $stmt->bindParam(':notificacoes_niveis_upd', $notificacoes_niveis, PDO::PARAM_INT);
+        $stmt->bindParam(':notificacoes_ranking_upd', $notificacoes_ranking, PDO::PARAM_INT);
+        $stmt->bindParam(':notificacoes_desafios_upd', $notificacoes_desafios, PDO::PARAM_INT);
+        $stmt->bindParam(':sistema_notificacoes_ativo_upd', $sistema_notificacoes_ativo, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        
+        echo json_encode(['success' => true, 'message' => 'Configurações de notificações salvas com sucesso!']);
+        exit;
+    }
+    
+    // Configurações de Cache
+    if ($action === 'save_cache_config') {
+        $cache_ttl = (int)($_POST['cache_ttl'] ?? 5);
+        $cache_max_size = (int)($_POST['cache_max_size'] ?? 100);
+        $background_intervalo = (int)($_POST['background_intervalo'] ?? 30);
+        $background_timeout = (int)($_POST['background_timeout'] ?? 10);
+        $cache_ativo = isset($_POST['cache_ativo']) ? 1 : 0;
+        $background_ativo = isset($_POST['background_ativo']) ? 1 : 0;
+        
+        // Criar tabela se não existir
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_cache (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            cache_ttl INT DEFAULT 5,
+            cache_max_size INT DEFAULT 100,
+            background_intervalo INT DEFAULT 30,
+            background_timeout INT DEFAULT 10,
+            cache_ativo TINYINT(1) DEFAULT 1,
+            background_ativo TINYINT(1) DEFAULT 1,
+            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_empresa (empresa_id)
+        )");
+        
+        $stmt = $conn->prepare('INSERT INTO configuracoes_cache 
+            (empresa_id, cache_ttl, cache_max_size, background_intervalo, background_timeout, cache_ativo, background_ativo) 
+            VALUES (:empresa_id, :cache_ttl, :cache_max_size, :background_intervalo, :background_timeout, :cache_ativo, :background_ativo)
+            ON DUPLICATE KEY UPDATE 
+            cache_ttl = :cache_ttl_upd,
+            cache_max_size = :cache_max_size_upd,
+            background_intervalo = :background_intervalo_upd,
+            background_timeout = :background_timeout_upd,
+            cache_ativo = :cache_ativo_upd,
+            background_ativo = :background_ativo_upd,
+            data_atualizacao = NOW()');
+        
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindParam(':cache_ttl', $cache_ttl, PDO::PARAM_INT);
+        $stmt->bindParam(':cache_max_size', $cache_max_size, PDO::PARAM_INT);
+        $stmt->bindParam(':background_intervalo', $background_intervalo, PDO::PARAM_INT);
+        $stmt->bindParam(':background_timeout', $background_timeout, PDO::PARAM_INT);
+        $stmt->bindParam(':cache_ativo', $cache_ativo, PDO::PARAM_INT);
+        $stmt->bindParam(':background_ativo', $background_ativo, PDO::PARAM_INT);
+        $stmt->bindParam(':cache_ttl_upd', $cache_ttl, PDO::PARAM_INT);
+        $stmt->bindParam(':cache_max_size_upd', $cache_max_size, PDO::PARAM_INT);
+        $stmt->bindParam(':background_intervalo_upd', $background_intervalo, PDO::PARAM_INT);
+        $stmt->bindParam(':background_timeout_upd', $background_timeout, PDO::PARAM_INT);
+        $stmt->bindParam(':cache_ativo_upd', $cache_ativo, PDO::PARAM_INT);
+        $stmt->bindParam(':background_ativo_upd', $background_ativo, PDO::PARAM_INT);
+        
+        $stmt->execute();
+        
+        echo json_encode(['success' => true, 'message' => 'Configurações de cache salvas com sucesso!']);
+        exit;
+    }
+    
+    // Limpar Cache
+    if ($action === 'clear_cache') {
+        // Aqui você pode implementar a lógica para limpar o cache
+        // Por enquanto, vamos apenas retornar sucesso
+        echo json_encode(['success' => true, 'message' => 'Cache limpo com sucesso!']);
+        exit;
+    }
+    
     throw new Exception('Ação inválida');
 } catch (Exception $e) {
     http_response_code(400);

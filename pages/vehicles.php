@@ -587,7 +587,10 @@ $total_pages = $result['total_pages'];
                         
                         <div class="form-group">
                             <label for="km_atual">Quilometragem</label>
-                            <input type="number" id="km_atual" name="km_atual" min="0" step="0.01">
+                            <input type="number" id="km_atual" name="km_atual" min="0" step="0.01" placeholder="Ex: 150000">
+                            <small class="form-text" style="color: #6c757d; font-size: 0.875rem; margin-top: 4px;">
+                                <i class="fas fa-info-circle"></i> Insira a quilometragem atual do veículo
+                            </small>
                         </div>
                         
                         <div class="form-group">

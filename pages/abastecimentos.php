@@ -90,7 +90,7 @@ $total_paginas = $resultado['total_paginas'];
     <title>Sistema de Gestão de Frotas - <?php echo $page_title; ?></title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
+    <link rel="icon" type="image/png" href="../logo.png">
     
     <!-- CSS Files -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -229,6 +229,7 @@ $total_paginas = $resultado['total_paginas'];
                                 <th>Litros</th>
                                 <th>Valor/L</th>
                                 <th>Valor Total</th>
+                                <th>ARLA</th>
                                 <th>Km</th>
                                 <th>Forma Pgto</th>
                                 <th>Rota</th>
@@ -246,6 +247,30 @@ $total_paginas = $resultado['total_paginas'];
                                     <td><?php echo number_format($abastecimento['litros'], 2, ',', '.'); ?></td>
                                     <td>R$ <?php echo number_format($abastecimento['valor_litro'], 2, ',', '.'); ?></td>
                                     <td>R$ <?php echo number_format($abastecimento['valor_total'], 2, ',', '.'); ?></td>
+                                    <td>
+                                        <?php if (!empty($abastecimento['inclui_arla']) && $abastecimento['inclui_arla'] == 1): ?>
+                                            <?php 
+                                            $percentual_arla = 0;
+                                            if ($abastecimento['litros'] > 0) {
+                                                $percentual_arla = ($abastecimento['litros_arla'] / $abastecimento['litros']) * 100;
+                                            }
+                                            $classe_percentual = '';
+                                            if ($percentual_arla >= 3 && $percentual_arla <= 5) {
+                                                $classe_percentual = 'percentual-ok';
+                                            } elseif ($percentual_arla > 5) {
+                                                $classe_percentual = 'percentual-alto';
+                                            } else {
+                                                $classe_percentual = 'percentual-baixo';
+                                            }
+                                            
+                                            ?>
+                                            <span class="percentual-arla <?php echo $classe_percentual; ?>">
+                                                <?php echo number_format($percentual_arla, 1, ',', '.'); ?>%
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="text-muted">-</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?php echo number_format($abastecimento['km_atual'], 0, ',', '.'); ?></td>
                                     <td><?php echo htmlspecialchars($abastecimento['forma_pagamento']); ?></td>
                                     <td><?php 
@@ -275,7 +300,7 @@ $total_paginas = $resultado['total_paginas'];
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="11" class="text-center">Nenhum abastecimento encontrado</td>
+                                    <td colspan="12" class="text-center">Nenhum abastecimento encontrado</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
@@ -398,6 +423,13 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                         
                         <div class="form-group">
+                            <label for="rota_id">Rota*</label>
+                            <select id="rota_id" name="rota_id" required>
+                                <option value="">Selecione a rota</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
                             <label for="tipo_combustivel">Combustível*</label>
                             <select id="tipo_combustivel" name="tipo_combustivel" required>
                                 <option value="">Selecione o combustível</option>
@@ -425,7 +457,11 @@ $total_paginas = $resultado['total_paginas'];
                         
                         <div class="form-group">
                             <label for="km_atual">Quilometragem*</label>
-                            <input type="number" id="km_atual" name="km_atual" required>
+                            <input type="number" id="km_atual" name="km_atual" required placeholder="Ex: 150000">
+                            <small class="form-text" style="color: #6c757d; font-size: 0.875rem; margin-top: 4px;">
+                                <i class="fas fa-info-circle"></i> <span id="km_atual_help">Selecione uma rota para validar a quilometragem</span>
+                            </small>
+                            <div id="km_atual_validation" style="margin-top: 5px; font-size: 0.875rem;"></div>
                         </div>
                         
                         <div class="form-group">
@@ -443,12 +479,38 @@ $total_paginas = $resultado['total_paginas'];
                                 <option value="PIX">PIX</option>
                             </select>
                         </div>
+                    </div>
+                    
+                    <!-- Seção ARLA -->
+                    <div class="form-group full-width">
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="inclui_arla" name="inclui_arla" value="1">
+                                <span class="checkmark"></span>
+                                Este abastecimento incluiu ARLA?
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">
+                            <i class="fas fa-info-circle"></i>
+                            A porcentagem ideal de ARLA é de 3% a 5% em relação ao volume de diesel.
+                        </small>
+                    </div>
+                    
+                    <!-- Campos ARLA (inicialmente ocultos) -->
+                    <div id="campos_arla" class="form-grid" style="display: none;">
+                        <div class="form-group">
+                            <label for="litros_arla">Litros ARLA</label>
+                            <input type="text" id="litros_arla" name="litros_arla" class="numeric-input">
+                        </div>
                         
                         <div class="form-group">
-                            <label for="rota_id">Rota*</label>
-                            <select id="rota_id" name="rota_id" required>
-                                <option value="">Selecione a rota</option>
-                            </select>
+                            <label for="valor_litro_arla">Valor/Litro ARLA</label>
+                            <input type="text" id="valor_litro_arla" name="valor_litro_arla" class="numeric-input">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="valor_total_arla">Valor Total ARLA</label>
+                            <input type="text" id="valor_total_arla" name="valor_total_arla" class="numeric-input" readonly>
                         </div>
                     </div>
                     
@@ -687,6 +749,25 @@ $total_paginas = $resultado['total_paginas'];
                         <td>${formatNumber(refuel.litros, 1)} L</td>
                         <td>R$ ${formatNumber(refuel.valor_litro, 2)}</td>
                         <td>R$ ${formatNumber(refuel.valor_total, 2)}</td>
+                        <td>
+                            ${refuel.inclui_arla == 1 ? 
+                                (() => {
+                                    const percentual = refuel.litros > 0 ? (refuel.litros_arla / refuel.litros) * 100 : 0;
+                                    let classePercentual = '';
+                                    if (percentual >= 3 && percentual <= 5) {
+                                        classePercentual = 'percentual-ok';
+                                    } else if (percentual > 5) {
+                                        classePercentual = 'percentual-alto';
+                                    } else {
+                                        classePercentual = 'percentual-baixo';
+                                    }
+                                    return `<span class="percentual-arla ${classePercentual}">
+                                        ${formatNumber(percentual, 1)}%
+                                    </span>`;
+                                })() : 
+                                '<span class="text-muted">-</span>'
+                            }
+                        </td>
                         <td>${formatNumber(refuel.km_atual, 0)}</td>
                         <td>${refuel.forma_pagamento || '-'}</td>
                         <td>${refuel.cidade_origem_nome || '-'} → ${refuel.cidade_destino_nome || '-'}</td>
@@ -710,7 +791,7 @@ $total_paginas = $resultado['total_paginas'];
                 // Configura eventos dos botões
                 setupTableButtons();
             } else {
-                tbody.innerHTML = '<tr><td colspan="11" class="text-center">Nenhum abastecimento encontrado</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" class="text-center">Nenhum abastecimento encontrado</td></tr>';
             }
         }
         
@@ -996,6 +1077,9 @@ $total_paginas = $resultado['total_paginas'];
             // Setup automatic total calculation
             setupValorTotalCalc();
             
+            // Setup ARLA fields
+            setupArlaFields();
+            
             // Setup numeric inputs
             setupNumericInputs();
         }
@@ -1035,6 +1119,50 @@ $total_paginas = $resultado['total_paginas'];
             
             litrosInput.addEventListener('input', calcularValorTotal);
             valorLitroInput.addEventListener('input', calcularValorTotal);
+        }
+        
+        function setupArlaFields() {
+            const incluiArlaCheckbox = document.getElementById('inclui_arla');
+            const camposArla = document.getElementById('campos_arla');
+            const litrosArlaInput = document.getElementById('litros_arla');
+            const valorLitroArlaInput = document.getElementById('valor_litro_arla');
+            const valorTotalArlaInput = document.getElementById('valor_total_arla');
+            
+            // Controla a exibição dos campos ARLA
+            incluiArlaCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    camposArla.style.display = 'grid';
+                    // Torna os campos obrigatórios quando ARLA está marcado
+                    litrosArlaInput.required = true;
+                    valorLitroArlaInput.required = true;
+                } else {
+                    camposArla.style.display = 'none';
+                    // Remove obrigatoriedade e limpa os campos
+                    litrosArlaInput.required = false;
+                    valorLitroArlaInput.required = false;
+                    valorTotalArlaInput.required = false;
+                    litrosArlaInput.value = '';
+                    valorLitroArlaInput.value = '';
+                    valorTotalArlaInput.value = '';
+                }
+            });
+            
+            // Cálculo automático do valor total ARLA
+            function calcularValorTotalArla() {
+                const litros = parseFloat(litrosArlaInput.value.replace(/\./g, '').replace(',', '.')) || 0;
+                const valorLitro = parseFloat(valorLitroArlaInput.value.replace(/\./g, '').replace(',', '.')) || 0;
+                const valorTotal = litros * valorLitro;
+                
+                if (!isNaN(valorTotal)) {
+                    valorTotalArlaInput.value = valorTotal.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
+                }
+            }
+            
+            litrosArlaInput.addEventListener('input', calcularValorTotalArla);
+            valorLitroArlaInput.addEventListener('input', calcularValorTotalArla);
         }
         
         function closeAllModals() {
@@ -1162,6 +1290,120 @@ $total_paginas = $resultado['total_paginas'];
         window.loadRefuelingSummary = loadRefuelingSummary;
         window.loadConsumptionChart = loadConsumptionChart;
         window.loadEfficiencyChart = loadEfficiencyChart;
+
+        // ===== VALIDAÇÃO DE QUILOMETRAGEM PARA ABASTECIMENTOS =====
+        
+        // Função para validar quilometragem do abastecimento
+        async function validarKmAbastecimento(rotaId, kmAbastecimento) {
+            if (!rotaId || !kmAbastecimento) {
+                return { valido: false, mensagem: 'Dados insuficientes para validação' };
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('action', 'validar_km_abastecimento');
+                formData.append('rota_id', rotaId);
+                formData.append('km_abastecimento', kmAbastecimento);
+                
+                const response = await fetch('../api/validar_quilometragem.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Erro na validação de quilometragem:', error);
+                return { valido: false, mensagem: 'Erro na validação' };
+            }
+        }
+        
+        // Função para obter informações de abastecimentos da rota
+        async function obterAbastecimentosRota(rotaId) {
+            if (!rotaId) return null;
+            
+            try {
+                const response = await fetch(`../api/validar_quilometragem.php?action=obter_abastecimentos_rota&rota_id=${rotaId}`);
+                const data = await response.json();
+                return data.success ? data : null;
+            } catch (error) {
+                console.error('Erro ao obter abastecimentos da rota:', error);
+                return null;
+            }
+        }
+        
+        // Configurar validação quando rota for selecionada
+        function configurarValidacaoKmAbastecimento() {
+            const rotaSelect = document.getElementById('rota_id');
+            const kmAtualInput = document.getElementById('km_atual');
+            const kmAtualHelp = document.getElementById('km_atual_help');
+            const kmAtualValidation = document.getElementById('km_atual_validation');
+            
+            if (!rotaSelect || !kmAtualInput) return;
+            
+            // Quando rota for selecionada
+            rotaSelect.addEventListener('change', async function() {
+                const rotaId = this.value;
+                
+                if (rotaId) {
+                    const dadosRota = await obterAbastecimentosRota(rotaId);
+                    if (dadosRota) {
+                        let helpText = `<i class="fas fa-info-circle"></i> KM Saída da rota: ${dadosRota.km_saida_rota.toLocaleString('pt-BR')} km`;
+                        let minValue = dadosRota.km_saida_rota + 1;
+                        
+                        if (dadosRota.total_abastecimentos > 0) {
+                            helpText += `<br><i class="fas fa-gas-pump"></i> Último abastecimento: ${dadosRota.km_ultimo_abastecimento.toLocaleString('pt-BR')} km`;
+                            helpText += `<br><i class="fas fa-list"></i> Total de abastecimentos: ${dadosRota.total_abastecimentos}`;
+                            minValue = dadosRota.km_ultimo_abastecimento + 1;
+                        } else {
+                            helpText += `<br><i class="fas fa-plus"></i> Primeiro abastecimento da rota`;
+                        }
+                        
+                        helpText += `<br><i class="fas fa-exclamation-triangle"></i> Quilometragem deve ser maior que ${minValue.toLocaleString('pt-BR')} km`;
+                        
+                        kmAtualHelp.innerHTML = helpText;
+                        kmAtualInput.placeholder = `Mín: ${minValue.toLocaleString('pt-BR')}`;
+                        kmAtualInput.min = minValue;
+                    }
+                } else {
+                    kmAtualHelp.innerHTML = '<i class="fas fa-info-circle"></i> Selecione uma rota para validar a quilometragem';
+                    kmAtualInput.placeholder = 'Ex: 150000';
+                    kmAtualInput.min = '';
+                }
+                
+                // Limpar validação anterior
+                kmAtualValidation.innerHTML = '';
+            });
+            
+            // Quando quilometragem for digitada
+            kmAtualInput.addEventListener('blur', async function() {
+                const rotaId = rotaSelect.value;
+                const kmAbastecimento = this.value;
+                
+                if (rotaId && kmAbastecimento) {
+                    const validacao = await validarKmAbastecimento(rotaId, kmAbastecimento);
+                    
+                    if (validacao.valido) {
+                        kmAtualValidation.innerHTML = `<div style="color: #28a745;"><i class="fas fa-check-circle"></i> ${validacao.mensagem}</div>`;
+                        kmAtualInput.style.borderColor = '#28a745';
+                    } else {
+                        kmAtualValidation.innerHTML = `<div style="color: #dc3545;"><i class="fas fa-exclamation-triangle"></i> ${validacao.mensagem}</div>`;
+                        kmAtualInput.style.borderColor = '#dc3545';
+                    }
+                } else {
+                    kmAtualValidation.innerHTML = '';
+                    kmAtualInput.style.borderColor = '';
+                }
+            });
+        }
+        
+        // Inicializar validação quando DOM estiver carregado
+        document.addEventListener('DOMContentLoaded', function() {
+            // Aguardar um pouco para garantir que todos os elementos estejam carregados
+            setTimeout(() => {
+                configurarValidacaoKmAbastecimento();
+            }, 500);
+        });
     </script>
     <script src="../js/abastecimentos.js"></script>
     <style>
@@ -1279,6 +1521,138 @@ $total_paginas = $resultado['total_paginas'];
 
     .numeric-input {
         text-align: right;
+    }
+
+    /* Estilos para checkbox personalizado */
+    .checkbox-group {
+        margin: 15px 0;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        cursor: pointer;
+        font-size: 1rem;
+        color: var(--text-primary);
+        user-select: none;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+        display: none;
+    }
+
+    .checkmark {
+        width: 20px;
+        height: 20px;
+        border: 2px solid var(--border-color);
+        border-radius: 4px;
+        margin-right: 10px;
+        position: relative;
+        background-color: var(--bg-secondary);
+        transition: all 0.3s ease;
+    }
+
+    .checkbox-label input[type="checkbox"]:checked + .checkmark {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+
+    .checkbox-label input[type="checkbox"]:checked + .checkmark::after {
+        content: '✓';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+    }
+
+    .checkbox-label:hover .checkmark {
+        border-color: var(--primary-color);
+    }
+
+    /* Estilos para campos ARLA */
+    #campos_arla {
+        margin-top: 15px;
+        padding: 15px;
+        background-color: var(--bg-tertiary);
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+    }
+
+    #campos_arla .form-group {
+        margin-bottom: 15px;
+    }
+
+    #campos_arla .form-group:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Estilos para informação ARLA na tabela */
+    .arla-info {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        font-size: 0.875rem;
+        line-height: 1.2;
+    }
+
+    .arla-info i {
+        margin-bottom: 2px;
+    }
+
+    .arla-info small {
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+    }
+
+    /* Estilos para porcentagem ARLA */
+    .percentual-arla {
+        font-weight: bold;
+        font-size: 0.9rem;
+        padding: 4px 8px;
+        border-radius: 12px;
+        display: inline-block;
+        text-align: center;
+        min-width: 50px;
+    }
+
+    .percentual-ok {
+        background-color: #28a745 !important;
+        color: #ffffff !important;
+        border: 2px solid #28a745 !important;
+        font-weight: bold !important;
+    }
+
+    .percentual-alto {
+        background-color: #dc3545 !important;
+        color: #ffffff !important;
+        border: 2px solid #dc3545 !important;
+        font-weight: bold !important;
+    }
+
+    .percentual-baixo {
+        background-color: #ffc107 !important;
+        color: #000000 !important;
+        border: 2px solid #ffc107 !important;
+        font-weight: bold !important;
+    }
+
+    /* Estilos para campos de input com validação ARLA */
+    #litros_arla.percentual-ok {
+        border-color: #28a745;
+        background-color: #d4edda;
+    }
+
+    #litros_arla.percentual-alto {
+        border-color: #dc3545;
+        background-color: #f8d7da;
+    }
+
+    #litros_arla.percentual-baixo {
+        border-color: #ffc107;
+        background-color: #fff3cd;
     }
 
     @media (max-width: 768px) {

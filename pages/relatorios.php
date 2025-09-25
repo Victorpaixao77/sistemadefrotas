@@ -2,6 +2,8 @@
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/permissions.php';
+require_once '../includes/auto_reports.php';
 
 // Configure session before starting it
 configure_session();
@@ -11,6 +13,9 @@ session_start();
 
 // Check if user is logged in, if not redirect to login page
 require_authentication();
+
+// Verificar permissão para acessar relatórios avançados
+require_permission('access_advanced_reports');
 
 // Set page title
 $page_title = "Relatórios";
@@ -506,6 +511,216 @@ function getReportData($reportType, $month, $year) {
                         ORDER BY total_frete DESC";
                 break;
                 
+            // NOVOS RELATÓRIOS AVANÇADOS
+            case 'produtividade_motoristas':
+                $sql = "
+                    SELECT 
+                        m.id,
+                        m.nome,
+                        m.cpf,
+                        COUNT(r.id) as total_rotas,
+                        COALESCE(SUM(r.distancia_km), 0) as km_rodados,
+                        COALESCE(AVG(r.eficiencia_viagem), 0) as avaliacao_media,
+                        COALESCE(SUM(CASE WHEN r.status = 'aprovado' THEN 1 ELSE 0 END), 0) as rotas_concluidas,
+                        COALESCE(SUM(CASE WHEN r.status = 'pendente' THEN 1 ELSE 0 END), 0) as rotas_em_andamento,
+                        COALESCE(SUM(CASE WHEN r.status = 'rejeitado' THEN 1 ELSE 0 END), 0) as rotas_rejeitadas,
+                        COALESCE(SUM(r.distancia_km) / NULLIF(COUNT(r.id), 0), 0) as km_medio_por_rota
+                    FROM motoristas m
+                    LEFT JOIN rotas r ON m.id = r.motorista_id 
+                        AND YEAR(r.data_saida) = :year 
+                        AND MONTH(r.data_saida) = :month
+                    WHERE m.empresa_id = :empresa_id
+                    GROUP BY m.id, m.nome, m.cpf
+                    ORDER BY km_rodados DESC
+                ";
+                break;
+                
+            case 'consumo_combustivel':
+                $sql = "
+                    SELECT 
+                        v.id as veiculo_id,
+                        v.placa,
+                        v.modelo,
+                        v.marca,
+                        m.nome as motorista,
+                        COUNT(a.id) as total_abastecimentos,
+                        COALESCE(SUM(a.litros), 0) as total_litros,
+                        COALESCE(SUM(a.valor_total), 0) as total_gasto,
+                        COALESCE(AVG(a.valor_litro), 0) as preco_medio_litro,
+                        0 as consumo_medio
+                    FROM veiculos v
+                    LEFT JOIN abastecimentos a ON v.id = a.veiculo_id 
+                        AND YEAR(a.data_abastecimento) = :year 
+                        AND MONTH(a.data_abastecimento) = :month
+                        AND a.status = 'aprovado'
+                    LEFT JOIN motoristas m ON a.motorista_id = m.id
+                    WHERE v.empresa_id = :empresa_id
+                    GROUP BY v.id, v.placa, v.modelo, v.marca, m.nome
+                    HAVING total_abastecimentos > 0
+                    ORDER BY total_abastecimentos DESC
+                ";
+                break;
+                
+            case 'custo_por_km':
+                $sql = "
+                    SELECT 
+                        v.id as veiculo_id,
+                        v.placa,
+                        v.modelo,
+                        v.marca,
+                        COALESCE(SUM(r.distancia_km), 0) as km_total,
+                        COALESCE(SUM(a.valor_total), 0) as custo_combustivel,
+                        0 as custo_despesas_viagem,
+                        0 as custo_despesas_fixas,
+                        0 as custo_manutencao,
+                        COALESCE(
+                            SUM(a.valor_total) / NULLIF(SUM(r.distancia_km), 0), 0
+                        ) as custo_por_km
+                    FROM veiculos v
+                    LEFT JOIN rotas r ON v.id = r.veiculo_id 
+                        AND YEAR(r.data_saida) = :year 
+                        AND MONTH(r.data_saida) = :month
+                    LEFT JOIN abastecimentos a ON v.id = a.veiculo_id 
+                        AND YEAR(a.data_abastecimento) = :year2 
+                        AND MONTH(a.data_abastecimento) = :month2
+                        AND a.status = 'aprovado'
+                    WHERE v.empresa_id = :empresa_id
+                    GROUP BY v.id, v.placa, v.modelo, v.marca
+                    HAVING km_total > 0
+                    ORDER BY custo_por_km DESC
+                ";
+                break;
+                
+            case 'rentabilidade_rotas':
+                $sql = "
+                    SELECT 
+                        r.id,
+                        CONCAT(r.estado_origem, ' - ', r.estado_destino) as rota,
+                        r.distancia_km,
+                        r.data_saida,
+                        v.placa,
+                        m.nome as motorista,
+                        r.frete,
+                        r.comissao,
+                        COALESCE(SUM(dv.total_despviagem), 0) as despesas_viagem,
+                        0 as custo_combustivel,
+                        0 as custo_manutencao,
+                        COALESCE(SUM(dv.total_despviagem), 0) as custo_total,
+                        COALESCE(
+                            r.frete - r.comissao - SUM(dv.total_despviagem), 0
+                        ) as lucro_estimado,
+                        COALESCE(
+                            (r.frete - r.comissao - SUM(dv.total_despviagem)) / 
+                            NULLIF(r.distancia_km, 0), 0
+                        ) as lucro_por_km
+                    FROM rotas r
+                    LEFT JOIN veiculos v ON r.veiculo_id = v.id
+                    LEFT JOIN motoristas m ON r.motorista_id = m.id
+                    LEFT JOIN despesas_viagem dv ON r.id = dv.rota_id
+                    WHERE r.empresa_id = :empresa_id
+                        AND YEAR(r.data_saida) = :year 
+                        AND MONTH(r.data_saida) = :month
+                    GROUP BY r.id, r.estado_origem, r.estado_destino, r.distancia_km, r.data_saida, v.placa, m.nome, r.frete, r.comissao
+                    ORDER BY lucro_estimado DESC
+                ";
+                break;
+                
+            case 'multas_motorista_veiculo':
+                $sql = "
+                    SELECT 
+                        m.id as motorista_id,
+                        m.nome as motorista,
+                        m.cpf,
+                        v.id as veiculo_id,
+                        v.placa,
+                        v.modelo,
+                        COUNT(mu.id) as total_multas,
+                        COALESCE(SUM(mu.valor), 0) as valor_total_multas,
+                        COALESCE(SUM(mu.pontos), 0) as total_pontos,
+                        COALESCE(AVG(mu.valor), 0) as valor_medio_multas,
+                        COALESCE(SUM(CASE WHEN mu.status_pagamento = 'pago' THEN 1 ELSE 0 END), 0) as multas_pagas,
+                        COALESCE(SUM(CASE WHEN mu.status_pagamento = 'pendente' THEN 1 ELSE 0 END), 0) as multas_pendentes
+                    FROM motoristas m
+                    LEFT JOIN multas mu ON m.id = mu.motorista_id 
+                        AND YEAR(mu.data_infracao) = :year 
+                        AND MONTH(mu.data_infracao) = :month
+                    LEFT JOIN veiculos v ON mu.veiculo_id = v.id
+                    WHERE m.empresa_id = :empresa_id
+                    GROUP BY m.id, m.nome, m.cpf, v.id, v.placa, v.modelo
+                    HAVING total_multas > 0
+                    ORDER BY total_multas DESC, valor_total_multas DESC
+                ";
+                break;
+                
+            case 'ocupacao_frota':
+                $sql = "
+                    SELECT 
+                        v.id,
+                        v.placa,
+                        v.modelo,
+                        v.marca,
+                        COUNT(r.id) as total_viagens,
+                        COALESCE(SUM(r.distancia_km), 0) as km_total,
+                        COALESCE(AVG(r.distancia_km), 0) as km_medio_por_viagem,
+                        COALESCE(SUM(CASE WHEN r.status = 'aprovado' THEN 1 ELSE 0 END), 0) as viagens_concluidas,
+                        COALESCE(SUM(CASE WHEN r.status = 'pendente' THEN 1 ELSE 0 END), 0) as viagens_em_andamento,
+                        COALESCE(SUM(CASE WHEN r.status = 'rejeitado' THEN 1 ELSE 0 END), 0) as viagens_rejeitadas,
+                        COALESCE(
+                            (COUNT(r.id) * 100.0) / 30, 0
+                        ) as percentual_ocupacao
+                    FROM veiculos v
+                    LEFT JOIN rotas r ON v.id = r.veiculo_id 
+                        AND YEAR(r.data_saida) = :year 
+                        AND MONTH(r.data_saida) = :month
+                    WHERE v.empresa_id = :empresa_id
+                    GROUP BY v.id, v.placa, v.modelo, v.marca
+                    ORDER BY total_viagens DESC
+                ";
+                break;
+                
+            case 'veiculos_ociosos':
+                $sql = "
+                    SELECT 
+                        v.id,
+                        v.placa,
+                        v.modelo,
+                        v.marca,
+                        v.km_atual,
+                        'Ativo' as status,
+                        COALESCE(MAX(r.data_saida), 'Nunca') as ultima_viagem,
+                        DATEDIFF(CURDATE(), COALESCE(MAX(r.data_saida), v.created_at)) as dias_sem_viagem
+                    FROM veiculos v
+                    LEFT JOIN rotas r ON v.id = r.veiculo_id 
+                        AND YEAR(r.data_saida) = :year 
+                        AND MONTH(r.data_saida) = :month
+                    WHERE v.empresa_id = :empresa_id
+                    GROUP BY v.id, v.placa, v.modelo, v.marca, v.km_atual, v.created_at
+                    HAVING COUNT(r.id) = 0 OR MAX(r.data_saida) < DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                    ORDER BY dias_sem_viagem DESC
+                ";
+                break;
+                
+            case 'custos_manutencao_veiculo':
+                $sql = "
+                    SELECT 
+                        v.id,
+                        v.placa,
+                        v.modelo,
+                        v.marca,
+                        COUNT(pm.id) as total_manutencoes,
+                        COALESCE(SUM(pm.custo), 0) as custo_total_manutencao,
+                        COALESCE(AVG(pm.custo), 0) as custo_medio_manutencao,
+                        COALESCE(MAX(pm.data_manutencao), 'Nunca') as ultima_manutencao
+                    FROM veiculos v
+                    LEFT JOIN pneu_manutencao pm ON v.id = pm.veiculo_id 
+                        AND YEAR(pm.data_manutencao) = :year 
+                        AND MONTH(pm.data_manutencao) = :month
+                    WHERE v.empresa_id = :empresa_id
+                    GROUP BY v.id, v.placa, v.modelo, v.marca
+                    ORDER BY custo_total_manutencao DESC
+                ";
+                break;
+                
             default:
                 throw new Exception("Tipo de relatório inválido");
         }
@@ -539,10 +754,16 @@ function getReportData($reportType, $month, $year) {
         }
         
         // Adicionar empresa_id para relatórios que precisam
-        if (in_array($reportType, ['vida_util_pneus', 'custos_veiculo', 'eficiencia_frota', 'historico_manutencoes', 'analise_preditiva', 'otimizacao_pneus'])) {
+        if (in_array($reportType, ['vida_util_pneus', 'custos_veiculo', 'eficiencia_frota', 'historico_manutencoes', 'analise_preditiva', 'otimizacao_pneus', 'produtividade_motoristas', 'consumo_combustivel', 'custo_por_km', 'rentabilidade_rotas', 'multas_motorista_veiculo', 'ocupacao_frota', 'veiculos_ociosos', 'custos_manutencao_veiculo'])) {
             $empresa_id = $_SESSION['empresa_id'] ?? 1;
             $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
             error_log("Parâmetro empresa_id para $reportType: $empresa_id");
+        }
+        
+        // Adicionar parâmetros duplicados para relatórios específicos
+        if ($reportType === 'custo_por_km') {
+            $stmt->bindParam(':year2', $year, PDO::PARAM_INT);
+            $stmt->bindParam(':month2', $month, PDO::PARAM_INT);
         }
         
         // Executar a query
@@ -1150,7 +1371,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="reports-grid">
                         <!-- Relatório de NF-e Recebidas -->
                         <div class="report-card">
-                            <h3>📄 Relatório de NF-e Recebidas</h3>
+                            <h3> Relatório de NF-e Recebidas</h3>
                             <p>Todas as NF-e recebidas dos clientes no período.</p>
                             <div class="report-actions">
                                 <button class="btn-pdf" onclick="showFiscalReportForm('nfe_recebidas', 'pdf')">
@@ -1164,7 +1385,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         <!-- Relatório de CT-e Emitidos -->
                         <div class="report-card">
-                            <h3>🚛 Relatório de CT-e Emitidos</h3>
+                            <h3> Relatório de CT-e Emitidos</h3>
                             <p>Conhecimentos de transporte emitidos e seus status.</p>
                             <div class="report-actions">
                                 <button class="btn-pdf" onclick="showFiscalReportForm('cte_emitidos', 'pdf')">
@@ -1178,7 +1399,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         <!-- Relatório de MDF-e Gerados -->
                         <div class="report-card">
-                            <h3>📋 Relatório de MDF-e Gerados</h3>
+                            <h3> Relatório de MDF-e Gerados</h3>
                             <p>Manifestos de documentos fiscais e controle de viagens.</p>
                             <div class="report-actions">
                                 <button class="btn-pdf" onclick="showFiscalReportForm('mdfe_gerados', 'pdf')">
@@ -1192,7 +1413,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         <!-- Relatório de Eventos Fiscais -->
                         <div class="report-card">
-                            <h3>📝 Relatório de Eventos Fiscais</h3>
+                            <h3> Relatório de Eventos Fiscais</h3>
                             <p>Cancelamentos, correções e outros eventos fiscais.</p>
                             <div class="report-actions">
                                 <button class="btn-pdf" onclick="showFiscalReportForm('eventos_fiscais', 'pdf')">
@@ -1206,7 +1427,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         <!-- Relatório de Status SEFAZ -->
                         <div class="report-card">
-                            <h3>🔄 Relatório de Status SEFAZ</h3>
+                            <h3> Relatório de Status SEFAZ</h3>
                             <p>Status de envio e retorno dos documentos na SEFAZ.</p>
                             <div class="report-actions">
                                 <button class="btn-pdf" onclick="showFiscalReportForm('status_sefaz', 'pdf')">
@@ -1220,7 +1441,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         <!-- Relatório de Viagens Completas -->
                         <div class="report-card">
-                            <h3>🗺️ Relatório de Viagens Completas</h3>
+                            <h3> Relatório de Viagens Completas</h3>
                             <p>Viagens com NF-e, CT-e e MDF-e vinculados.</p>
                             <div class="report-actions">
                                 <button class="btn-pdf" onclick="showFiscalReportForm('viagens_completas', 'pdf')">
@@ -1234,7 +1455,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         <!-- Relatório de Alertas e Validações -->
                         <div class="report-card">
-                            <h3>⚠️ Relatório de Alertas</h3>
+                            <h3> Relatório de Alertas</h3>
                             <p>Alertas automáticos e validações de consistência.</p>
                             <div class="report-actions">
                                 <button class="btn-pdf" onclick="showFiscalReportForm('alertas_validacoes', 'pdf')">
@@ -1248,7 +1469,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         
                         <!-- Relatório de Timeline de Documentos -->
                         <div class="report-card">
-                            <h3>📅 Timeline de Documentos</h3>
+                            <h3> Timeline de Documentos</h3>
                             <p>Histórico cronológico de eventos por documento.</p>
                             <div class="report-actions">
                                 <button class="btn-pdf" onclick="showFiscalReportForm('timeline_documentos', 'pdf')">
@@ -1257,6 +1478,171 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 <button class="btn-excel" onclick="showFiscalReportForm('timeline_documentos', 'excel')">
                                     <i class="fas fa-file-excel"></i> Excel
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Seção de Relatórios Avançados -->
+                <div class="dashboard-section">
+                    <h2><i class="fas fa-chart-bar"></i> Relatórios Avançados</h2>
+                    <div class="reports-grid">
+                        <!-- Relatório de Produtividade dos Motoristas -->
+                        <div class="report-card">
+                            <h3> Produtividade dos Motoristas</h3>
+                            <p>Análise de produtividade, km rodados e eficiência por motorista.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('produtividade_motoristas', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('produtividade_motoristas', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Consumo de Combustível -->
+                        <div class="report-card">
+                            <h3> Consumo de Combustível</h3>
+                            <p>Análise de consumo médio de combustível por veículo e motorista.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('consumo_combustivel', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('consumo_combustivel', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Custo por Km -->
+                        <div class="report-card">
+                            <h3> Custo por Km</h3>
+                            <p>Análise de custos operacionais por quilômetro rodado.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('custo_por_km', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('custo_por_km', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Rentabilidade de Rotas -->
+                        <div class="report-card">
+                            <h3> Rentabilidade de Rotas</h3>
+                            <p>Análise de lucratividade e rentabilidade por rota.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('rentabilidade_rotas', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('rentabilidade_rotas', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Multas por Motorista/Veículo -->
+                        <div class="report-card">
+                            <h3> Multas por Motorista/Veículo</h3>
+                            <p>Controle de multas e infrações por motorista e veículo.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('multas_motorista_veiculo', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('multas_motorista_veiculo', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Ocupação da Frota -->
+                        <div class="report-card">
+                            <h3> Ocupação da Frota</h3>
+                            <p>Análise de utilização e ocupação da frota de veículos.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('ocupacao_frota', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('ocupacao_frota', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Veículos Ociosos -->
+                        <div class="report-card">
+                            <h3> Veículos Ociosos</h3>
+                            <p>Identificação de veículos subutilizados ou ociosos.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('veiculos_ociosos', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('veiculos_ociosos', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Relatório de Custos de Manutenção por Veículo -->
+                        <div class="report-card">
+                            <h3> Custos de Manutenção por Veículo</h3>
+                            <p>Análise de custos de manutenção e peças por veículo.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('custos_manutencao_veiculo', 'pdf')">
+                                    <i class="fas fa-file-pdf"></i> PDF
+                                </button>
+                                <button class="btn-excel" onclick="showReportForm('custos_manutencao_veiculo', 'excel')">
+                                    <i class="fas fa-file-excel"></i> Excel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Relatórios Automáticos -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-robot"></i> Relatórios Automáticos
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="auto-report-card" onclick="generateAutoReport('gamificacao_semanal')">
+                                        <div class="auto-report-icon">
+                                            <i class="fas fa-trophy"></i>
+                                        </div>
+                                        <h6>Gamificação Semanal</h6>
+                                        <p>Relatório automático de pontos e níveis dos motoristas</p>
+                                        <small class="text-muted">Gerado toda segunda-feira</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="auto-report-card" onclick="generateAutoReport('ranking_mensal')">
+                                        <div class="auto-report-icon">
+                                            <i class="fas fa-chart-line"></i>
+                                        </div>
+                                        <h6>Ranking Mensal</h6>
+                                        <p>Relatório de performance e ranking dos motoristas</p>
+                                        <small class="text-muted">Gerado todo dia 1º do mês</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="auto-report-card" onclick="generateAutoReport('performance_geral')">
+                                        <div class="auto-report-icon">
+                                            <i class="fas fa-chart-bar"></i>
+                                        </div>
+                                        <h6>Performance Geral</h6>
+                                        <p>Relatório completo de performance da frota</p>
+                                        <small class="text-muted">Gerado todo dia 1º do mês</small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1314,6 +1700,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
     
     <!-- JavaScript Files -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     
@@ -1357,6 +1744,244 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             e.preventDefault();
             this.submit();
         });
+        
+        // Função para gerar relatórios automáticos
+        function generateAutoReport(reportType) {
+            const reportNames = {
+                'gamificacao_semanal': 'Gamificação Semanal',
+                'ranking_mensal': 'Ranking Mensal',
+                'performance_geral': 'Performance Geral'
+            };
+            
+            if (confirm(`Gerar relatório de ${reportNames[reportType]}?`)) {
+                // Mostrar loading
+                const loadingHtml = `
+                    <div class="text-center p-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="sr-only">Carregando...</span>
+                        </div>
+                        <p class="mt-2">Gerando relatório...</p>
+                    </div>
+                `;
+                
+                // Criar modal para mostrar o relatório
+                const modal = document.createElement('div');
+                modal.className = 'modal fade';
+                modal.id = 'autoReportModal';
+                modal.innerHTML = `
+                    <div class="modal-dialog modal-xl">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${reportNames[reportType]}</h5>
+                                <button type="button" class="close" onclick="closeAutoReportModal()">
+                                    <span>&times;</span>
+                                </button>
+                            </div>
+                            <div class="modal-body" id="reportContent">
+                                ${loadingHtml}
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" onclick="closeAutoReportModal()">Fechar</button>
+                                <button type="button" class="btn btn-primary" onclick="downloadAutoReport('${reportType}')">Download PDF</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+                // Tentar usar Bootstrap 5 nativo primeiro, depois jQuery como fallback
+                try {
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        const modalInstance = new bootstrap.Modal(modal);
+                        modalInstance.show();
+                    } else if (typeof $ !== 'undefined' && $.fn.modal) {
+                        $(modal).modal('show');
+                    } else {
+                        // Fallback para JavaScript puro
+                        modal.style.display = 'block';
+                        modal.classList.add('show');
+                        document.body.classList.add('modal-open');
+                        
+                        // Adicionar backdrop
+                        const backdrop = document.createElement('div');
+                        backdrop.className = 'modal-backdrop fade show';
+                        backdrop.id = 'modalBackdrop';
+                        document.body.appendChild(backdrop);
+                    }
+                } catch (error) {
+                    console.error('Erro ao abrir modal:', error);
+                    // Fallback para JavaScript puro
+                    modal.style.display = 'block';
+                    modal.classList.add('show');
+                    document.body.classList.add('modal-open');
+                }
+                
+                // Fazer requisição para gerar o relatório
+                fetch('../api/auto_reports.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `action=generate_report&report_type=${reportType}&empresa_id=<?php echo $_SESSION['empresa_id']; ?>`
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('reportContent').innerHTML = data.html;
+                    } else {
+                        document.getElementById('reportContent').innerHTML = `
+                            <div class="alert alert-danger">
+                                <h5>Erro ao gerar relatório</h5>
+                                <p>${data.error || 'Erro desconhecido'}</p>
+                            </div>
+                        `;
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('reportContent').innerHTML = `
+                        <div class="alert alert-danger">
+                            <h5>Erro de conexão</h5>
+                            <p>Não foi possível gerar o relatório. Tente novamente.</p>
+                        </div>
+                    `;
+                });
+            }
+        }
+        
+        // Função para download do relatório
+        function downloadAutoReport(reportType) {
+            window.open(`../api/auto_reports.php?action=download&report_type=${reportType}&empresa_id=<?php echo $_SESSION['empresa_id']; ?>`, '_blank');
+        }
+        
+        // Função para fechar modal de relatório
+        function closeAutoReportModal() {
+            const modal = document.getElementById('autoReportModal');
+            if (modal) {
+                // Tentar usar Bootstrap 5 nativo primeiro
+                try {
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                        const modalInstance = bootstrap.Modal.getInstance(modal);
+                        if (modalInstance) {
+                            modalInstance.hide();
+                        } else {
+                            const newInstance = new bootstrap.Modal(modal);
+                            newInstance.hide();
+                        }
+                    } else if (typeof $ !== 'undefined' && $.fn.modal) {
+                        $(modal).modal('hide');
+                    } else {
+                        // Fallback para JavaScript puro
+                        modal.style.display = 'none';
+                        modal.classList.remove('show');
+                        document.body.classList.remove('modal-open');
+                        
+                        // Remover backdrop
+                        const backdrop = document.getElementById('modalBackdrop');
+                        if (backdrop) {
+                            backdrop.remove();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Erro ao fechar modal:', error);
+                    // Fallback para JavaScript puro
+                    modal.style.display = 'none';
+                    modal.classList.remove('show');
+                    document.body.classList.remove('modal-open');
+                    
+                    const backdrop = document.getElementById('modalBackdrop');
+                    if (backdrop) {
+                        backdrop.remove();
+                    }
+                }
+                
+                // Sempre remover o modal do DOM após um pequeno delay
+                setTimeout(() => {
+                    if (modal && modal.parentNode) {
+                        modal.remove();
+                    }
+                    
+                    // Limpar qualquer backdrop restante
+                    const backdrops = document.querySelectorAll('.modal-backdrop');
+                    backdrops.forEach(backdrop => backdrop.remove());
+                    
+                    // Restaurar scroll da página
+                    document.body.style.overflow = 'auto';
+                    document.body.classList.remove('modal-open');
+                }, 300);
+            }
+        }
+        
+        // Adicionar event listeners para fechar modal
+        document.addEventListener('click', function(e) {
+            // Fechar ao clicar no botão X
+            if (e.target.classList.contains('close') || e.target.closest('.close')) {
+                closeAutoReportModal();
+            }
+            
+            // Fechar ao clicar no backdrop
+            if (e.target.classList.contains('modal') && e.target.id === 'autoReportModal') {
+                closeAutoReportModal();
+            }
+            
+            // Fechar ao clicar no botão "Fechar"
+            if (e.target.textContent === 'Fechar' && e.target.classList.contains('btn-secondary')) {
+                closeAutoReportModal();
+            }
+        });
+        
+        // Fechar com tecla ESC
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('autoReportModal');
+                if (modal && modal.style.display !== 'none') {
+                    closeAutoReportModal();
+                }
+            }
+        });
     </script>
+    
+    <style>
+    .auto-report-card {
+        background: #f8f9fa;
+        border: 2px solid #e9ecef;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+    
+    .auto-report-card:hover {
+        border-color: #007bff;
+        background: #e3f2fd;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,123,255,0.2);
+    }
+    
+    .auto-report-icon {
+        font-size: 2.5rem;
+        color: #007bff;
+        margin-bottom: 15px;
+    }
+    
+    .auto-report-card h6 {
+        color: #333;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    
+    .auto-report-card p {
+        color: #666;
+        font-size: 14px;
+        margin-bottom: 10px;
+    }
+    
+    .auto-report-card small {
+        color: #999;
+        font-size: 12px;
+    }
+    </style>
 </body>
 </html> 

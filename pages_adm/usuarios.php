@@ -45,6 +45,93 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $_POST['tipo_usuario'],
                         $_POST['tipo_usuario'] == 'admin' ? 1 : 0
                     ]);
+                    
+                    // Obter o ID do usuário recém-criado
+                    $usuario_id = $pdo->lastInsertId();
+                    
+                    // Definir permissões granulares baseadas no tipo de usuário
+                    if ($_POST['tipo_usuario'] == 'admin') {
+                        // Definir todas as permissões de admin
+                        $permissoes_admin = [
+                            'pode_editar_usuarios_sistema' => 1,
+                            'pode_criar_usuarios_sistema' => 1,
+                            'pode_acessar_lucratividade' => 1,
+                            'pode_acessar_relatorios_avancados' => 1,
+                            'pode_gerenciar_configuracoes' => 1,
+                            'pode_aprovar_abastecimentos' => 1,
+                            'pode_ver_dados_financeiros' => 1
+                        ];
+                        
+                        $sql_permissoes = "UPDATE usuarios SET ";
+                        $params_permissoes = [];
+                        $campos = [];
+                        
+                        foreach ($permissoes_admin as $campo => $valor) {
+                            $campos[] = "{$campo} = ?";
+                            $params_permissoes[] = $valor;
+                        }
+                        
+                        $sql_permissoes .= implode(', ', $campos) . " WHERE id = ?";
+                        $params_permissoes[] = $usuario_id;
+                        
+                        $stmt_permissoes = $pdo->prepare($sql_permissoes);
+                        $stmt_permissoes->execute($params_permissoes);
+                        
+                    } elseif ($_POST['tipo_usuario'] == 'gestor') {
+                        // Definir permissões de gestor
+                        $permissoes_gestor = [
+                            'pode_editar_usuarios_sistema' => 0,
+                            'pode_criar_usuarios_sistema' => 0,
+                            'pode_acessar_lucratividade' => 1,
+                            'pode_acessar_relatorios_avancados' => 1,
+                            'pode_gerenciar_configuracoes' => 0,
+                            'pode_aprovar_abastecimentos' => 1,
+                            'pode_ver_dados_financeiros' => 1
+                        ];
+                        
+                        $sql_permissoes = "UPDATE usuarios SET ";
+                        $params_permissoes = [];
+                        $campos = [];
+                        
+                        foreach ($permissoes_gestor as $campo => $valor) {
+                            $campos[] = "{$campo} = ?";
+                            $params_permissoes[] = $valor;
+                        }
+                        
+                        $sql_permissoes .= implode(', ', $campos) . " WHERE id = ?";
+                        $params_permissoes[] = $usuario_id;
+                        
+                        $stmt_permissoes = $pdo->prepare($sql_permissoes);
+                        $stmt_permissoes->execute($params_permissoes);
+                        
+                    } else {
+                        // Definir permissões de motorista (padrão)
+                        $permissoes_motorista = [
+                            'pode_editar_usuarios_sistema' => 0,
+                            'pode_criar_usuarios_sistema' => 0,
+                            'pode_acessar_lucratividade' => 0,
+                            'pode_acessar_relatorios_avancados' => 0,
+                            'pode_gerenciar_configuracoes' => 0,
+                            'pode_aprovar_abastecimentos' => 0,
+                            'pode_ver_dados_financeiros' => 0
+                        ];
+                        
+                        $sql_permissoes = "UPDATE usuarios SET ";
+                        $params_permissoes = [];
+                        $campos = [];
+                        
+                        foreach ($permissoes_motorista as $campo => $valor) {
+                            $campos[] = "{$campo} = ?";
+                            $params_permissoes[] = $valor;
+                        }
+                        
+                        $sql_permissoes .= implode(', ', $campos) . " WHERE id = ?";
+                        $params_permissoes[] = $usuario_id;
+                        
+                        $stmt_permissoes = $pdo->prepare($sql_permissoes);
+                        $stmt_permissoes->execute($params_permissoes);
+                    }
+                    
                     $mensagem = "Usuário cadastrado com sucesso!";
                     $tipo_mensagem = "success";
                 } catch (Exception $e) {
@@ -91,6 +178,89 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $sql .= " WHERE id = ?";
                     $stmt = $pdo->prepare($sql);
                     $stmt->execute($params);
+
+                    // Atualizar permissões granulares baseadas no tipo de usuário
+                    if ($_POST['tipo_usuario'] == 'admin') {
+                        // Definir todas as permissões de admin
+                        $permissoes_admin = [
+                            'pode_editar_usuarios_sistema' => 1,
+                            'pode_criar_usuarios_sistema' => 1,
+                            'pode_acessar_lucratividade' => 1,
+                            'pode_acessar_relatorios_avancados' => 1,
+                            'pode_gerenciar_configuracoes' => 1,
+                            'pode_aprovar_abastecimentos' => 1,
+                            'pode_ver_dados_financeiros' => 1
+                        ];
+                        
+                        $sql_permissoes = "UPDATE usuarios SET ";
+                        $params_permissoes = [];
+                        $campos = [];
+                        
+                        foreach ($permissoes_admin as $campo => $valor) {
+                            $campos[] = "{$campo} = ?";
+                            $params_permissoes[] = $valor;
+                        }
+                        
+                        $sql_permissoes .= implode(', ', $campos) . " WHERE id = ?";
+                        $params_permissoes[] = $_POST['id'];
+                        
+                        $stmt_permissoes = $pdo->prepare($sql_permissoes);
+                        $stmt_permissoes->execute($params_permissoes);
+                        
+                    } elseif ($_POST['tipo_usuario'] == 'gestor') {
+                        // Definir permissões de gestor
+                        $permissoes_gestor = [
+                            'pode_editar_usuarios_sistema' => 0,
+                            'pode_criar_usuarios_sistema' => 0,
+                            'pode_acessar_lucratividade' => 1,
+                            'pode_acessar_relatorios_avancados' => 1,
+                            'pode_gerenciar_configuracoes' => 0,
+                            'pode_aprovar_abastecimentos' => 1,
+                            'pode_ver_dados_financeiros' => 1
+                        ];
+                        
+                        $sql_permissoes = "UPDATE usuarios SET ";
+                        $params_permissoes = [];
+                        $campos = [];
+                        
+                        foreach ($permissoes_gestor as $campo => $valor) {
+                            $campos[] = "{$campo} = ?";
+                            $params_permissoes[] = $valor;
+                        }
+                        
+                        $sql_permissoes .= implode(', ', $campos) . " WHERE id = ?";
+                        $params_permissoes[] = $_POST['id'];
+                        
+                        $stmt_permissoes = $pdo->prepare($sql_permissoes);
+                        $stmt_permissoes->execute($params_permissoes);
+                        
+                    } else {
+                        // Definir permissões de motorista (padrão)
+                        $permissoes_motorista = [
+                            'pode_editar_usuarios_sistema' => 0,
+                            'pode_criar_usuarios_sistema' => 0,
+                            'pode_acessar_lucratividade' => 0,
+                            'pode_acessar_relatorios_avancados' => 0,
+                            'pode_gerenciar_configuracoes' => 0,
+                            'pode_aprovar_abastecimentos' => 0,
+                            'pode_ver_dados_financeiros' => 0
+                        ];
+                        
+                        $sql_permissoes = "UPDATE usuarios SET ";
+                        $params_permissoes = [];
+                        $campos = [];
+                        
+                        foreach ($permissoes_motorista as $campo => $valor) {
+                            $campos[] = "{$campo} = ?";
+                            $params_permissoes[] = $valor;
+                        }
+                        
+                        $sql_permissoes .= implode(', ', $campos) . " WHERE id = ?";
+                        $params_permissoes[] = $_POST['id'];
+                        
+                        $stmt_permissoes = $pdo->prepare($sql_permissoes);
+                        $stmt_permissoes->execute($params_permissoes);
+                    }
 
                     $mensagem = "Usuário atualizado com sucesso!";
                     $tipo_mensagem = "success";

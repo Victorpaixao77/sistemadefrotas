@@ -70,6 +70,16 @@ try {
                 }
             }
             
+            // Valida campos ARLA se inclui_arla for true
+            if (!empty($data['inclui_arla']) && $data['inclui_arla'] == '1') {
+                $required_fields_arla = ['litros_arla', 'valor_litro_arla', 'valor_total_arla'];
+                foreach ($required_fields_arla as $field) {
+                    if (empty($data[$field])) {
+                        throw new Exception("Campo obrigatório não preenchido: $field");
+                    }
+                }
+            }
+            
             // Definir status conforme perfil
             $status = 'pendente';
             $fonte = 'motorista';
@@ -98,12 +108,14 @@ try {
                 empresa_id, veiculo_id, motorista_id, posto,
                 data_abastecimento, litros, valor_litro, valor_total,
                 km_atual, tipo_combustivel, forma_pagamento, observacoes,
-                rota_id, data_cadastro, comprovante, status, fonte
+                rota_id, data_cadastro, comprovante, status, fonte,
+                inclui_arla, litros_arla, valor_litro_arla, valor_total_arla
             ) VALUES (
                 :empresa_id, :veiculo_id, :motorista_id, :posto,
                 :data_abastecimento, :litros, :valor_litro, :valor_total,
                 :km_atual, :tipo_combustivel, :forma_pagamento, :observacoes,
-                :rota_id, NOW(), :comprovante, :status, :fonte
+                :rota_id, NOW(), :comprovante, :status, :fonte,
+                :inclui_arla, :litros_arla, :valor_litro_arla, :valor_total_arla
             )";
             
             // Processar o upload do comprovante
@@ -146,6 +158,10 @@ try {
             $stmt->bindValue(':comprovante', $comprovante_path);
             $stmt->bindValue(':status', $status);
             $stmt->bindValue(':fonte', $fonte);
+            $stmt->bindValue(':inclui_arla', !empty($data['inclui_arla']) ? 1 : 0);
+            $stmt->bindValue(':litros_arla', !empty($data['litros_arla']) ? $data['litros_arla'] : null);
+            $stmt->bindValue(':valor_litro_arla', !empty($data['valor_litro_arla']) ? $data['valor_litro_arla'] : null);
+            $stmt->bindValue(':valor_total_arla', !empty($data['valor_total_arla']) ? $data['valor_total_arla'] : null);
             
             $stmt->execute();
             
@@ -179,6 +195,16 @@ try {
                 }
             }
             
+            // Valida campos ARLA se inclui_arla for true
+            if (!empty($data['inclui_arla']) && $data['inclui_arla'] == '1') {
+                $required_fields_arla = ['litros_arla', 'valor_litro_arla', 'valor_total_arla'];
+                foreach ($required_fields_arla as $field) {
+                    if (empty($data[$field])) {
+                        throw new Exception("Campo obrigatório não preenchido: $field");
+                    }
+                }
+            }
+            
             // Atualiza o abastecimento
             $sql = "UPDATE abastecimentos SET 
                 veiculo_id = :veiculo_id,
@@ -193,7 +219,11 @@ try {
                 forma_pagamento = :forma_pagamento,
                 observacoes = :observacoes,
                 rota_id = :rota_id,
-                comprovante = :comprovante
+                comprovante = :comprovante,
+                inclui_arla = :inclui_arla,
+                litros_arla = :litros_arla,
+                valor_litro_arla = :valor_litro_arla,
+                valor_total_arla = :valor_total_arla
             WHERE id = :id AND empresa_id = :empresa_id";
             
             // Processar o upload do comprovante
@@ -248,6 +278,10 @@ try {
             $stmt->bindValue(':observacoes', $data['observacoes'] ?? null);
             $stmt->bindValue(':rota_id', $data['rota_id']);
             $stmt->bindValue(':comprovante', $comprovante_path);
+            $stmt->bindValue(':inclui_arla', !empty($data['inclui_arla']) ? 1 : 0);
+            $stmt->bindValue(':litros_arla', !empty($data['litros_arla']) ? $data['litros_arla'] : null);
+            $stmt->bindValue(':valor_litro_arla', !empty($data['valor_litro_arla']) ? $data['valor_litro_arla'] : null);
+            $stmt->bindValue(':valor_total_arla', !empty($data['valor_total_arla']) ? $data['valor_total_arla'] : null);
             
             $stmt->execute();
             
@@ -469,12 +503,14 @@ try {
                     empresa_id, data_abastecimento, veiculo_id, motorista_id,
                     posto, litros, valor_litro, valor_total, km_atual,
                     tipo_combustivel, forma_pagamento, observacoes, rota_id,
-                    data_cadastro, status, fonte
+                    data_cadastro, status, fonte, inclui_arla, litros_arla, 
+                    valor_litro_arla, valor_total_arla
                 ) VALUES (
                     :empresa_id, :data_abastecimento, :veiculo_id, :motorista_id,
                     :posto, :litros, :valor_litro, :valor_total, :km_atual,
                     :tipo_combustivel, :forma_pagamento, :observacoes, :rota_id,
-                    NOW(), :status, :fonte
+                    NOW(), :status, :fonte, :inclui_arla, :litros_arla, 
+                    :valor_litro_arla, :valor_total_arla
                 )";
 
                 $stmt = $conn->prepare($sql);
@@ -514,6 +550,10 @@ try {
                 $stmt->bindValue(':rota_id', $_POST['rota_id']);
                 $stmt->bindValue(':status', $status);
                 $stmt->bindValue(':fonte', $fonte);
+                $stmt->bindValue(':inclui_arla', !empty($_POST['inclui_arla']) ? 1 : 0);
+                $stmt->bindValue(':litros_arla', !empty($_POST['litros_arla']) ? str_replace(',', '.', $_POST['litros_arla']) : null);
+                $stmt->bindValue(':valor_litro_arla', !empty($_POST['valor_litro_arla']) ? str_replace(',', '.', $_POST['valor_litro_arla']) : null);
+                $stmt->bindValue(':valor_total_arla', !empty($_POST['valor_total_arla']) ? str_replace(',', '.', $_POST['valor_total_arla']) : null);
 
                 $stmt->execute();
 
@@ -540,15 +580,31 @@ try {
                     throw new Exception("ID do abastecimento não fornecido");
                 }
 
+                // Debug: verificar dados recebidos (apenas em caso de erro)
+                // error_log("Dados recebidos no update: " . print_r($_POST, true));
+                
                 // Validate required fields
                 $required_fields = [
-                    'data_abastecimento', 'veiculo_id', 'motorista_id', 'posto',
+                    'data_abastecimento', 'veiculo_id', 'posto',
                     'litros', 'valor_litro', 'valor_total', 'km_atual',
-                    'tipo_combustivel', 'forma_pagamento', 'rota_id'
+                    'tipo_combustivel', 'forma_pagamento'
                 ];
+                
+                // Validação específica para motorista_id
+                if (!isset($_POST['motorista_id']) || $_POST['motorista_id'] === '' || $_POST['motorista_id'] === null || $_POST['motorista_id'] === '0') {
+                    error_log("Motorista ID não encontrado ou vazio: " . var_export($_POST['motorista_id'] ?? 'NOT_SET', true));
+                    throw new Exception("Campo obrigatório não preenchido: motorista_id");
+                }
+                
+                // Validação específica para rota_id
+                if (!isset($_POST['rota_id']) || $_POST['rota_id'] === '' || $_POST['rota_id'] === null || $_POST['rota_id'] === '0') {
+                    error_log("Rota ID não encontrado ou vazio: " . var_export($_POST['rota_id'] ?? 'NOT_SET', true));
+                    throw new Exception("Campo obrigatório não preenchido: rota_id");
+                }
 
                 foreach ($required_fields as $field) {
-                    if (empty($_POST[$field])) {
+                    if (!isset($_POST[$field]) || $_POST[$field] === '' || $_POST[$field] === null) {
+                        error_log("Campo obrigatório vazio: $field = " . var_export($_POST[$field] ?? 'NULL', true));
                         throw new Exception("Campo obrigatório não preenchido: $field");
                     }
                 }
@@ -566,7 +622,11 @@ try {
                     tipo_combustivel = :tipo_combustivel,
                     forma_pagamento = :forma_pagamento,
                     observacoes = :observacoes,
-                    rota_id = :rota_id
+                    rota_id = :rota_id,
+                    inclui_arla = :inclui_arla,
+                    litros_arla = :litros_arla,
+                    valor_litro_arla = :valor_litro_arla,
+                    valor_total_arla = :valor_total_arla
                 WHERE id = :id AND empresa_id = :empresa_id";
 
                 $stmt = $conn->prepare($sql);
@@ -584,6 +644,10 @@ try {
                 $stmt->bindValue(':forma_pagamento', $_POST['forma_pagamento']);
                 $stmt->bindValue(':observacoes', $_POST['observacoes'] ?? null);
                 $stmt->bindValue(':rota_id', $_POST['rota_id']);
+                $stmt->bindValue(':inclui_arla', !empty($_POST['inclui_arla']) ? 1 : 0);
+                $stmt->bindValue(':litros_arla', !empty($_POST['litros_arla']) ? str_replace(',', '.', $_POST['litros_arla']) : null);
+                $stmt->bindValue(':valor_litro_arla', !empty($_POST['valor_litro_arla']) ? str_replace(',', '.', $_POST['valor_litro_arla']) : null);
+                $stmt->bindValue(':valor_total_arla', !empty($_POST['valor_total_arla']) ? str_replace(',', '.', $_POST['valor_total_arla']) : null);
 
                 $stmt->execute();
 

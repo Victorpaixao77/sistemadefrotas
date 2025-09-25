@@ -53,7 +53,7 @@ $page_title = 'Meu Perfil';
                         <form method="post" enctype="multipart/form-data" action="../includes/perfil_update.php">
                             <input type="hidden" name="acao" value="foto">
                             <label for="foto_perfil">
-                                <img src="<?php echo $user['foto_perfil'] ? '../uploads/perfil/' . htmlspecialchars($user['foto_perfil']) : '../img/user-default.png'; ?>" alt="Foto de Perfil" class="profile-avatar" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc;">
+                                <img src="<?php echo $user['foto_perfil'] ? '../uploads/perfil/' . htmlspecialchars($user['foto_perfil']) : '../img/user-default.png'; ?>" alt="Foto de Perfil" class="profile-avatar" style="width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc;" onerror="this.src='../img/user-default.png'">
                             </label>
                             <input type="file" id="foto_perfil" name="foto_perfil" accept="image/*" style="display:none;">
                             <div style="margin-top: 8px;">

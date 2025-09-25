@@ -27,7 +27,10 @@ document.addEventListener('DOMContentLoaded', function() {
 function waitForChartJS() {
     if (typeof Chart !== 'undefined') {
         // Chart.js is loaded, initialize only existing charts
-        initFinancialChart();
+        // Only initialize financial chart if canvas exists
+        if (document.getElementById('financialChart')) {
+            initFinancialChart();
+        }
         
         // Only initialize other charts if their canvas elements exist
         if (document.getElementById('fuelConsumptionChart')) {

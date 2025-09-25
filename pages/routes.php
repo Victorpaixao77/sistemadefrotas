@@ -93,6 +93,9 @@ $total_paginas = $resultado['total_paginas'];
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../logo.png">
+    
     <!-- Chart.js for analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -244,6 +247,59 @@ $total_paginas = $resultado['total_paginas'];
                 height: 250px;
             }
         }
+
+
+
+        /* Estilos para botões do modal do mapa */
+        #filtroMesMapa:focus {
+            outline: none;
+            border-color: #28a745;
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
+        }
+
+        /* Efeitos hover para botões do modal do mapa */
+        button[onclick="desenhaMapaComRotas()"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+        }
+
+        #btnAlternarMapa:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(25, 118, 210, 0.4);
+        }
+
+        #btnLimparMapa:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+        }
+
+        /* Efeito de brilho para botões do modal */
+        button[onclick="desenhaMapaComRotas()"]:hover::before,
+        #btnAlternarMapa:hover::before,
+        #btnLimparMapa:hover::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        button[onclick="desenhaMapaComRotas()"]:hover::before,
+        #btnAlternarMapa:hover::before,
+        #btnLimparMapa:hover::before {
+            left: 100%;
+        }
+
+        /* Posicionamento relativo para efeito de brilho */
+        button[onclick="desenhaMapaComRotas()"],
+        #btnAlternarMapa,
+        #btnLimparMapa {
+            position: relative;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
@@ -263,6 +319,9 @@ $total_paginas = $resultado['total_paginas'];
                     <div class="dashboard-actions">
                         <button id="addRouteBtn" class="btn-add-widget">
                             <i class="fas fa-plus"></i> Nova Rota
+                        </button>
+                        <button id="simulateRouteBtn" class="btn-add-widget" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);">
+                            <i class="fas fa-route"></i> Simular Rota
                         </button>
                         <div class="view-controls">
                             <button id="filterBtn" class="btn-restore-layout" title="Filtros">
@@ -645,7 +704,11 @@ $total_paginas = $resultado['total_paginas'];
                             
                             <div class="form-group">
                                 <label for="km_saida">KM Saída</label>
-                                <input type="number" id="km_saida" name="km_saida" step="0.01">
+                                <input type="number" id="km_saida" name="km_saida" step="0.01" placeholder="Ex: 150000">
+                                <small class="form-text" style="color: #6c757d; font-size: 0.875rem; margin-top: 4px;">
+                                    <i class="fas fa-info-circle"></i> <span id="km_saida_help">Selecione um veículo para validar a quilometragem</span>
+                                </small>
+                                <div id="km_saida_validation" style="margin-top: 5px; font-size: 0.875rem;"></div>
                             </div>
                             
                             <div class="form-group">
@@ -903,6 +966,104 @@ $total_paginas = $resultado['total_paginas'];
         </div>
     </div>
 
+    <!-- Route Simulation Modal -->
+    <div class="modal" id="routeSimulationModal">
+        <div class="modal-content" style="width: 90%; max-width: 1200px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h2>🚛 Simulador de Rota</h2>
+                <span class="close-modal" onclick="closeSimulationModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                    <!-- Formulário de Simulação -->
+                    <div class="simulation-form">
+                        <h3 style="color: #1976d2; margin-bottom: 15px;">📍 Configuração da Rota</h3>
+                        
+                        <div class="form-group">
+                            <label for="simOrigin">Origem:</label>
+                            <input type="text" id="simOrigin" placeholder="Ex: São Paulo, SP" style="width: 100%; padding: 10px; border: 2px solid #e1e5e9; border-radius: 8px;">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="simDestination">Destino:</label>
+                            <input type="text" id="simDestination" placeholder="Ex: Rio de Janeiro, RJ" style="width: 100%; padding: 10px; border: 2px solid #e1e5e9; border-radius: 8px;">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="simVehicle">Veículo:</label>
+                            <select id="simVehicle" style="width: 100%; padding: 10px; border: 2px solid #e1e5e9; border-radius: 8px;">
+                                <option value="">Selecione um veículo</option>
+                                <!-- Opções serão preenchidas via JavaScript -->
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="simFuelPrice">Preço do Combustível (R$/L):</label>
+                            <input type="number" id="simFuelPrice" step="0.01" value="5.50" style="width: 100%; padding: 10px; border: 2px solid #e1e5e9; border-radius: 8px;">
+                        </div>
+                        
+                        <button id="simulateRouteBtnModal" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 10px;">
+                            <i class="fas fa-calculator"></i> Simular Rota
+                        </button>
+                    </div>
+                    
+                    <!-- Mapa de Simulação -->
+                    <div class="simulation-map">
+                        <h3 style="color: #1976d2; margin-bottom: 15px;">🗺️ Mapa da Rota</h3>
+                        <div id="simulationMap" style="width: 100%; height: 400px; border: 2px solid #e1e5e9; border-radius: 8px;"></div>
+                        
+                        <!-- Mensagens de status (baseadas no example.html) -->
+                        <div id="simulationInfo" style="display: none; background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%); border: 1px solid #bee5eb; color: #0c5460; padding: 12px; border-radius: 8px; margin: 10px 0; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
+                        <div id="simulationError" style="display: none; background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); border: 1px solid #f5c6cb; color: #721c24; padding: 12px; border-radius: 8px; margin: 10px 0; font-weight: 500; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"></div>
+                    </div>
+                </div>
+                
+                <!-- Resultados da Simulação -->
+                <div id="simulationResults" style="display: none;">
+                    <h3 style="color: #1976d2; margin-bottom: 15px;">📊 Resultados da Simulação</h3>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                        <!-- Informações Básicas -->
+                        <div class="result-card" style="background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%); padding: 15px; border-radius: 8px; border-left: 4px solid #28a745; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h4 style="margin: 0 0 10px 0; color: #2e7d32; font-weight: 600;">📏 Distância</h4>
+                            <p style="margin: 5px 0; font-size: 18px; font-weight: bold; color: #1b5e20; text-shadow: 0 1px 2px rgba(0,0,0,0.1);" id="simDistance">-</p>
+                            <p style="margin: 5px 0; color: #2e7d32; font-weight: 500;" id="simDuration">-</p>
+                        </div>
+                        
+                        <!-- Custos de Combustível -->
+                        <div class="result-card" style="background: linear-gradient(135deg, #fff3e0 0%, #fce4ec 100%); padding: 15px; border-radius: 8px; border-left: 4px solid #ff6b6b; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h4 style="margin: 0 0 10px 0; color: #e65100; font-weight: 600;">⛽ Combustível</h4>
+                            <p style="margin: 5px 0; font-size: 18px; font-weight: bold; color: #bf360c; text-shadow: 0 1px 2px rgba(0,0,0,0.1);" id="simFuelCost">-</p>
+                            <p style="margin: 5px 0; color: #d84315; font-weight: 500;" id="simFuelLiters">-</p>
+                        </div>
+                        
+                        <!-- Pedágios -->
+                        <div class="result-card" style="background: linear-gradient(135deg, #f3e5f5 0%, #e1f5fe 100%); padding: 15px; border-radius: 8px; border-left: 4px solid #ffa726; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h4 style="margin: 0 0 10px 0; color: #e65100; font-weight: 600;">🛣️ Pedágios</h4>
+                            <p style="margin: 5px 0; font-size: 18px; font-weight: bold; color: #bf360c; text-shadow: 0 1px 2px rgba(0,0,0,0.1);" id="simTolls">-</p>
+                            <p style="margin: 5px 0; color: #d84315; font-weight: 500;" id="simTollCount">-</p>
+                        </div>
+                        
+                        <!-- Custo Total -->
+                        <div class="result-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+                            <h4 style="margin: 0 0 10px 0; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">💰 Custo Total</h4>
+                            <p style="margin: 5px 0; font-size: 24px; font-weight: bold; text-shadow: 0 2px 4px rgba(0,0,0,0.3);" id="simTotalCost">-</p>
+                            <p style="margin: 5px 0; opacity: 0.9; font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,0.3);" id="simCostPerKm">-</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Detalhes da Rota -->
+                    <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 20px; border-radius: 8px; margin-top: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #dee2e6;">
+                        <h4 style="color: #1976d2; margin-bottom: 15px; font-weight: 600; text-shadow: 0 1px 2px rgba(0,0,0,0.1);">🛣️ Detalhes da Rota</h4>
+                        <div id="routeDetails" style="max-height: 200px; overflow-y: auto; color: #333; line-height: 1.6;">
+                            <!-- Detalhes serão preenchidos via JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Help Modal -->
     <div class="modal" id="helpRouteModal">
         <div class="modal-content">
@@ -1053,13 +1214,47 @@ $total_paginas = $resultado['total_paginas'];
         padding: 24px;
         position: relative;">
         <button onclick="fecharModalMapa()" style="position: absolute; top: 8px; right: 8px; background: none; border: none; font-size: 1.5rem; color: #1976d2;">&times;</button>
-        <div style="text-align:center; margin-bottom: 10px;">
-          <input type="month" id="filtroMesMapa" style="font-size:1rem; padding:4px;">
-          <button onclick="desenhaMapaComRotas()" style="font-size:1rem; padding:4px 12px;">Filtrar</button>
+        <div style="text-align:center; margin-bottom: 15px;">
+          <div style="display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+            <input type="month" id="filtroMesMapa" style="font-size:1rem; padding:8px 12px; border:2px solid #e1e5e9; border-radius:8px; background:white; color:#333; transition: border-color 0.3s ease;" placeholder="Selecione o mês/ano">
+            <button onclick="desenhaMapaComRotas()" style="font-size:1rem; padding:8px 16px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);">
+              <i class="fas fa-filter"></i> Filtrar
+            </button>
+            <button id="btnAlternarMapa" style="font-size:1rem; padding:8px 16px; background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(25, 118, 210, 0.3);">
+              <i class="fas fa-map-marked-alt"></i> Google Maps
+            </button>
+            <button id="btnLimparMapa" style="font-size:1rem; padding:8px 16px; background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); color:white; border:none; border-radius:8px; font-weight:600; cursor:pointer; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);">
+              <i class="fas fa-eraser"></i> Limpar
+            </button>
         </div>
-        <button id="btnModoCoordenadas" style="font-size:1rem; padding:4px 12px; margin-left:10px;">Modo Coordenadas</button>
-        <span id="coordenadaInfo" style="margin-left:10px; color:#1976d2; font-weight:bold;"></span>
+        </div>
+        <div style="margin: 15px 0; display: flex; justify-content: center; align-items: center; flex-direction: column; gap: 8px;">
+          <span id="coordenadaInfo" style="color:#1976d2; font-weight:bold; font-size: 0.9rem;"></span>
+          <div id="mapStats" style="background: linear-gradient(135deg, rgba(25, 118, 210, 0.1) 0%, rgba(25, 118, 210, 0.05) 100%); padding: 12px 20px; border-radius: 12px; color: #1976d2; font-weight: bold; border: 2px solid rgba(25, 118, 210, 0.2); box-shadow: 0 2px 8px rgba(25, 118, 210, 0.1); text-align: center; min-width: 300px;">
+            <div style="display: flex; justify-content: center; align-items: center; gap: 15px; flex-wrap: wrap;">
+              <span style="display: flex; align-items: center; gap: 5px;">
+                <i class="fas fa-route" style="color: #1976d2;"></i>
+                <span id="totalRotasMapa">0</span> rotas
+              </span>
+              <span style="color: #666;">|</span>
+              <span style="display: flex; align-items: center; gap: 5px;">
+                <i class="fas fa-road" style="color: #1976d2;"></i>
+                <span id="totalKmMapa">0</span> km
+              </span>
+              <span style="color: #666;">|</span>
+              <span style="display: flex; align-items: center; gap: 5px;">
+                <i class="fas fa-dollar-sign" style="color: #1976d2;"></i>
+                <span id="totalFreteMapa">R$ 0,00</span>
+              </span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Mapa Canvas (atual) -->
         <canvas id="mapCanvas" width="800" height="700" style="display: block; margin: 0 auto;"></canvas>
+        
+        <!-- Google Maps -->
+        <div id="googleMap" style="width: 800px; height: 700px; margin: 0 auto; display: none;"></div>
       </div>
     </div>
 
@@ -1083,7 +1278,40 @@ $total_paginas = $resultado['total_paginas'];
     <script src="../js/sidebar.js"></script>
     <script src="../js/routes.js"></script>
     
+    <!-- Google Maps Scripts -->
+    <script src="../google-maps/maps.js"></script>
+    <script src="../google-maps/route-manager.js"></script>
+    <script src="../google-maps/geolocation.js"></script>
+    
+    <!-- Script do Mapa - Carregado por último -->
     <script>
+        // Namespace para evitar conflitos
+        window.MapRoutes = window.MapRoutes || {};
+        
+        // Verificar se as variáveis já foram declaradas
+        if (typeof window.MapRoutes.googleMap === 'undefined') {
+            window.MapRoutes.googleMap = null;
+        }
+        if (typeof window.MapRoutes.googleMapManager === 'undefined') {
+            window.MapRoutes.googleMapManager = null;
+        }
+        if (typeof window.MapRoutes.routeManager === 'undefined') {
+            window.MapRoutes.routeManager = null;
+        }
+        if (typeof window.MapRoutes.isGoogleMapActive === 'undefined') {
+            window.MapRoutes.isGoogleMapActive = false;
+        }
+        if (typeof window.MapRoutes.routesData === 'undefined') {
+            window.MapRoutes.routesData = [];
+        }
+        
+        // Usar as variáveis do namespace
+        let googleMap = window.MapRoutes.googleMap;
+        let googleMapManager = window.MapRoutes.googleMapManager;
+        let routeManager = window.MapRoutes.routeManager;
+        let isGoogleMapActive = window.MapRoutes.isGoogleMapActive;
+        let routesData = window.MapRoutes.routesData;
+
         // Função para mostrar o modal de ajuda
         function showHelpModal() {
             const modal = document.getElementById('helpRouteModal');
@@ -1100,10 +1328,6 @@ $total_paginas = $resultado['total_paginas'];
             }
         }
 
-        document.getElementById('btnMapaRotas').onclick = function() {
-            document.getElementById('modalMapaRotas').style.display = 'flex';
-            desenhaMapaComRotas();
-        };
 
         function fecharModalMapa() {
             document.getElementById('modalMapaRotas').style.display = 'none';
@@ -1258,12 +1482,6 @@ $total_paginas = $resultado['total_paginas'];
         });
 
         let modoCoordenadas = false;
-        document.getElementById('btnModoCoordenadas').onclick = function() {
-            modoCoordenadas = !modoCoordenadas;
-            this.style.background = modoCoordenadas ? '#1976d2' : '';
-            this.style.color = modoCoordenadas ? '#fff' : '';
-            document.getElementById('coordenadaInfo').textContent = modoCoordenadas ? 'Clique no mapa para capturar X/Y' : '';
-        };
 
         document.getElementById('mapCanvas').addEventListener('click', function(e) {
             if (!modoCoordenadas) return;
@@ -1275,6 +1493,847 @@ $total_paginas = $resultado['total_paginas'];
                 navigator.clipboard.writeText(`${x},${y}`);
             }
         });
+
+        // ===== GOOGLE MAPS INTEGRATION =====
+        
+        // Simulador de Rotas (baseado no example.html)
+        let simulationMap = null;
+        let simulationRouteManager = null;
+
+        // Função para inicializar o simulador
+        function initRouteSimulator() {
+            console.log('Inicializando simulador de rotas...');
+            
+            // Verificar se os scripts estão carregados
+            if (typeof GoogleMapsManager === 'undefined') {
+                console.error('GoogleMapsManager não está disponível');
+                showSimulationError('GoogleMapsManager não está disponível');
+                return;
+            }
+            
+            if (typeof RouteManager === 'undefined') {
+                console.error('RouteManager não está disponível');
+                showSimulationError('RouteManager não está disponível');
+                return;
+            }
+            
+            // Event listeners do simulador
+            const simulateBtn = document.getElementById('simulateRouteBtnModal');
+            if (simulateBtn) {
+                console.log('Botão de simular encontrado no modal');
+                simulateBtn.addEventListener('click', simulateRoute);
+            } else {
+                console.error('Botão de simular não encontrado no modal');
+            }
+            
+            // Preencher opções de veículos padrão
+            loadDefaultVehicles();
+            console.log('Simulador inicializado');
+        }
+
+        // Carregar veículos padrão para simulação
+        function loadDefaultVehicles() {
+            const select = document.getElementById('simVehicle');
+            select.innerHTML = `
+                <option value="">Selecione um tipo de veículo</option>
+                <option value="caminhao_pequeno">Caminhão Pequeno (8-10 km/L)</option>
+                <option value="caminhao_medio">Caminhão Médio (6-8 km/L)</option>
+                <option value="caminhao_grande">Caminhão Grande (4-6 km/L)</option>
+                <option value="carreta">Carreta (3-5 km/L)</option>
+                <option value="van">Van (10-12 km/L)</option>
+                <option value="pickup">Pickup (8-10 km/L)</option>
+            `;
+        }
+
+        // Obter consumo baseado no tipo de veículo
+        function getVehicleConsumption(vehicleType) {
+            const consumptions = {
+                'caminhao_pequeno': 9.0,
+                'caminhao_medio': 7.0,
+                'caminhao_grande': 5.0,
+                'carreta': 4.0,
+                'van': 11.0,
+                'pickup': 9.0
+            };
+            
+            return consumptions[vehicleType] || 8.0; // Padrão se não selecionado
+        }
+
+        // Simular rota (baseado no example.html)
+        async function simulateRoute() {
+            console.log('Função simulateRoute chamada');
+            
+            const origin = document.getElementById('simOrigin').value;
+            const destination = document.getElementById('simDestination').value;
+            const fuelPrice = parseFloat(document.getElementById('simFuelPrice').value);
+            const vehicleType = document.getElementById('simVehicle').value;
+
+            console.log('Valores:', { origin, destination, fuelPrice, vehicleType });
+
+            if (!origin || !destination) {
+                showSimulationError('Por favor, preencha origem e destino');
+                return;
+            }
+
+            try {
+                showSimulationInfo('Inicializando simulador...');
+                console.log('Iniciando simulação...');
+                
+                // Obter chave da API do Google Maps
+                showSimulationInfo('Obtendo chave da API...');
+                const response = await fetch('../google-maps/api.php?action=get_config', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (!data.success || !data.data.google_maps_api_key) {
+                    showSimulationError('Chave da API do Google Maps não configurada');
+                    return;
+                }
+
+                console.log('Chave da API obtida:', data.data.google_maps_api_key);
+
+                // Inicializar Google Maps para simulação
+                showSimulationInfo('Carregando Google Maps...');
+                await initSimulationMap(data.data.google_maps_api_key);
+                
+                showSimulationInfo('Calculando rota...');
+                
+                // Calcular rota usando RouteManager
+                console.log('Iniciando cálculo da rota...');
+                
+                // Adicionar timeout para evitar travamento
+                const routePromise = simulationRouteManager.calculateRoute(origin, destination);
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout: Cálculo da rota demorou muito')), 30000)
+                );
+                
+                const result = await Promise.race([routePromise, timeoutPromise]);
+                console.log('Resultado do cálculo:', result);
+                
+                if (result) {
+                    console.log('Rota calculada com sucesso, obtendo informações...');
+                    // Obter informações da rota
+                    const routeInfo = simulationRouteManager.getRouteInfo();
+                    console.log('Informações da rota:', routeInfo);
+                    
+                    if (routeInfo) {
+                        // Calcular custos
+                        const fuelConsumption = getVehicleConsumption(vehicleType);
+                        const distance = parseFloat(routeInfo.distance.text.replace(/[^\d.]/g, ''));
+                        const fuelLiters = distance / fuelConsumption;
+                        const fuelCost = fuelLiters * fuelPrice;
+                        const tollCost = calculateTollCost(distance);
+                        const totalCost = fuelCost + tollCost;
+                        
+                        console.log('Custos calculados:', { distance, fuelLiters, fuelCost, tollCost, totalCost });
+                        
+                        // Exibir resultados
+                        displaySimulationResults(routeInfo, distance, fuelLiters, fuelCost, tollCost, totalCost, fuelConsumption);
+                        showSimulationInfo('Rota calculada com sucesso!');
+                    } else {
+                        console.error('Informações da rota não disponíveis');
+                        showSimulationError('Informações da rota não disponíveis');
+                    }
+                } else {
+                    console.error('Resultado do cálculo é null');
+                    showSimulationError('Não foi possível calcular a rota');
+                }
+                
+            } catch (error) {
+                console.error('Erro na simulação:', error);
+                showSimulationError('Erro ao simular rota: ' + error.message);
+            }
+        }
+
+        // Inicializar mapa de simulação (baseado no example.html)
+        async function initSimulationMap(apiKey) {
+            if (simulationMap) return;
+
+            console.log('Inicializando mapa de simulação...');
+
+            // Verificar se Google Maps API está carregada
+            if (!window.google || !window.google.maps) {
+                console.log('Google Maps API não carregada, carregando...');
+                await loadGoogleMapsAPI(apiKey);
+            }
+
+            // Aguardar um pouco mais para garantir que a API esteja totalmente carregada
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Inicializar GoogleMapsManager
+            if (!window.googleMapsManager) {
+                window.googleMapsManager = new GoogleMapsManager();
+            }
+
+            // Inicializar com a chave da API
+            console.log('Inicializando GoogleMapsManager...');
+            await window.googleMapsManager.init(apiKey);
+
+            // Verificar se o elemento do mapa existe
+            const mapElement = document.getElementById('simulationMap');
+            if (!mapElement) {
+                throw new Error('Elemento simulationMap não encontrado');
+            }
+            
+            console.log('Elemento do mapa encontrado, criando mapa...');
+            
+            // Criar mapa
+            simulationMap = await window.googleMapsManager.createMap('simulationMap', {
+                zoom: 6,
+                center: { lat: -23.5505, lng: -46.6333 }
+            });
+
+            // Inicializar RouteManager
+            console.log('Inicializando RouteManager...');
+            
+            // Verificar se RouteManager está disponível
+            if (typeof RouteManager === 'undefined') {
+                console.log('RouteManager não encontrado, aguardando carregamento...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                if (typeof RouteManager === 'undefined') {
+                    throw new Error('RouteManager não está disponível. Verifique se route-manager.js está carregado.');
+                }
+            }
+            
+            simulationRouteManager = new RouteManager();
+            console.log('RouteManager criado:', simulationRouteManager);
+            
+            simulationRouteManager.init(simulationMap);
+            console.log('RouteManager inicializado com mapa');
+            
+            console.log('Mapa de simulação inicializado com sucesso');
+        }
+
+        // Função para carregar Google Maps API
+        function loadGoogleMapsAPI(apiKey) {
+            return new Promise((resolve, reject) => {
+                // Verificar se já está carregando
+                if (window.googleMapsLoading) {
+                    window.googleMapsLoading.then(resolve).catch(reject);
+                    return;
+                }
+
+                // Verificar se já está carregada
+                if (window.google && window.google.maps && window.google.maps.Map) {
+                    console.log('Google Maps API já está carregada');
+                    resolve();
+                    return;
+                }
+
+                console.log('Carregando Google Maps API...');
+                window.googleMapsLoading = new Promise((resolveLoading, rejectLoading) => {
+                    const script = document.createElement('script');
+                    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry&loading=async`;
+                    script.async = true;
+                    script.defer = true;
+                    
+                    script.onload = () => {
+                        console.log('Script Google Maps carregado, aguardando API...');
+                        
+                        // Aguardar um pouco para garantir que a API esteja totalmente carregada
+                        const checkAPI = () => {
+                            if (window.google && window.google.maps && window.google.maps.Map) {
+                                console.log('Google Maps API carregada com sucesso');
+                                resolveLoading();
+                            } else {
+                                console.log('Aguardando Google Maps API...');
+                                setTimeout(checkAPI, 100);
+                            }
+                        };
+                        
+                        setTimeout(checkAPI, 500);
+                    };
+                    
+                    script.onerror = () => {
+                        console.error('Erro ao carregar Google Maps API');
+                        rejectLoading(new Error('Erro ao carregar Google Maps API'));
+                    };
+                    
+                    document.head.appendChild(script);
+                });
+
+                window.googleMapsLoading.then(resolve).catch(reject);
+            });
+        }
+
+        // Exibir resultados da simulação
+        function displaySimulationResults(routeInfo, distance, fuelLiters, fuelCost, tollCost, totalCost, fuelConsumption) {
+            // Atualizar cards de resultados
+            document.getElementById('simDistance').textContent = `${distance.toFixed(1)} km`;
+            document.getElementById('simDuration').textContent = routeInfo.duration.text;
+            document.getElementById('simFuelCost').textContent = `R$ ${fuelCost.toFixed(2)}`;
+            document.getElementById('simFuelLiters').textContent = `${fuelLiters.toFixed(1)} litros`;
+            document.getElementById('simTolls').textContent = `R$ ${tollCost.toFixed(2)}`;
+            document.getElementById('simTollCount').textContent = `${Math.floor(distance / 100)} pedágios`;
+            document.getElementById('simTotalCost').textContent = `R$ ${totalCost.toFixed(2)}`;
+            document.getElementById('simCostPerKm').textContent = `R$ ${(totalCost / distance).toFixed(2)}/km`;
+            
+            // Detalhes da rota
+            displayRouteDetails(routeInfo, distance, fuelLiters, fuelConsumption);
+            
+            // Mostrar resultados
+            document.getElementById('simulationResults').style.display = 'block';
+        }
+
+        // Calcular custo de pedágios (simulação)
+        function calculateTollCost(distance) {
+            let tollCost = 0;
+            
+            if (distance > 50) tollCost += 5.00;
+            if (distance > 150) tollCost += 8.50;
+            if (distance > 300) tollCost += 12.00;
+            if (distance > 500) tollCost += 15.00;
+            if (distance > 800) tollCost += 20.00;
+            
+            return tollCost;
+        }
+
+        // Exibir detalhes da rota
+        function displayRouteDetails(routeInfo, distance, fuelLiters, fuelConsumption) {
+            const detailsDiv = document.getElementById('routeDetails');
+            detailsDiv.innerHTML = '';
+            
+            let html = '<div style="font-size: 14px; color: #333;">';
+            
+            // Informações de abastecimento
+            html += `
+                <div style="margin-bottom: 15px; padding: 12px; background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%); border-radius: 8px; border-left: 4px solid #2196f3; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <h4 style="margin: 0 0 10px 0; color: #1976d2; font-weight: 600;">⛽ Informações de Abastecimento</h4>
+                    <p style="margin: 5px 0; color: #333;"><strong style="color: #1976d2;">Consumo estimado:</strong> ${fuelConsumption} km/L</p>
+                    <p style="margin: 5px 0; color: #333;"><strong style="color: #1976d2;">Combustível necessário:</strong> ${fuelLiters.toFixed(1)} litros</p>
+                    <p style="margin: 5px 0; color: #333;"><strong style="color: #1976d2;">Autonomia:</strong> ${(fuelConsumption * 50).toFixed(0)} km (tanque de 50L)</p>
+                    <p style="margin: 5px 0; color: #333;"><strong style="color: #1976d2;">Recomendação:</strong> ${distance > (fuelConsumption * 50) ? 'Abastecer antes da viagem' : 'Tanque suficiente para a viagem'}</p>
+                </div>
+            `;
+            
+            // Informações da rota
+            html += `
+                <div style="margin-bottom: 15px; padding: 12px; background: linear-gradient(135deg, #e8f5e8 0%, #f1f8e9 100%); border-radius: 8px; border-left: 4px solid #4caf50; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <h4 style="margin: 0 0 10px 0; color: #2e7d32; font-weight: 600;">🛣️ Informações da Rota</h4>
+                    <p style="margin: 5px 0; color: #333;"><strong style="color: #2e7d32;">Origem:</strong> ${routeInfo.start_address}</p>
+                    <p style="margin: 5px 0; color: #333;"><strong style="color: #2e7d32;">Destino:</strong> ${routeInfo.end_address}</p>
+                    <p style="margin: 5px 0; color: #333;"><strong style="color: #2e7d32;">Distância:</strong> ${routeInfo.distance.text}</p>
+                    <p style="margin: 5px 0; color: #333;"><strong style="color: #2e7d32;">Duração:</strong> ${routeInfo.duration.text}</p>
+                </div>
+            `;
+            
+            html += '</div>';
+            detailsDiv.innerHTML = html;
+        }
+
+        // Funções de exibição de mensagens (baseadas no example.html)
+        function showSimulationInfo(message) {
+            const infoDiv = document.getElementById('simulationInfo');
+            const errorDiv = document.getElementById('simulationError');
+            
+            if (infoDiv) {
+                infoDiv.innerHTML = message;
+                infoDiv.style.display = 'block';
+            }
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+            }
+        }
+
+        function showSimulationError(message) {
+            const infoDiv = document.getElementById('simulationInfo');
+            const errorDiv = document.getElementById('simulationError');
+            
+            if (errorDiv) {
+                errorDiv.innerHTML = message;
+                errorDiv.style.display = 'block';
+            }
+            if (infoDiv) {
+                infoDiv.style.display = 'none';
+            }
+        }
+
+        // Função para fechar o modal de simulação
+        function closeSimulationModal() {
+            const modal = document.getElementById('routeSimulationModal');
+            if (modal) {
+                modal.style.display = 'none';
+                console.log('Modal de simulação fechado');
+            }
+        }
+
+
+        // Aguardar o DOM estar carregado
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM carregado - Configurando event listeners...');
+            
+            // Aguardar um pouco mais para garantir que todos os scripts foram carregados
+            setTimeout(function() {
+                const btnMapaRotas = document.getElementById('btnMapaRotas');
+                if (btnMapaRotas) {
+                    console.log('Botão do mapa encontrado, configurando click...');
+                    btnMapaRotas.onclick = function() {
+                        console.log('Botão do mapa clicado!');
+                        document.getElementById('modalMapaRotas').style.display = 'flex';
+                        desenhaMapaComRotas();
+                    };
+                } else {
+                    console.error('Botão do mapa não encontrado!');
+                }
+
+        // Função para alternar entre mapas
+                const btnAlternarMapa = document.getElementById('btnAlternarMapa');
+                if (btnAlternarMapa) {
+                    console.log('Botão alternar mapa encontrado');
+                    btnAlternarMapa.addEventListener('click', function() {
+                        if (window.MapRoutes.isGoogleMapActive) {
+                // Voltar para mapa Canvas
+                document.getElementById('mapCanvas').style.display = 'block';
+                document.getElementById('googleMap').style.display = 'none';
+                            this.innerHTML = '<i class="fas fa-map-marked-alt"></i> Google Maps';
+                this.style.background = '#1976d2';
+                            window.MapRoutes.isGoogleMapActive = false;
+                isGoogleMapActive = false;
+            } else {
+                // Usar Google Maps
+                document.getElementById('mapCanvas').style.display = 'none';
+                document.getElementById('googleMap').style.display = 'block';
+                            this.innerHTML = '<i class="fas fa-map"></i> Mapa Canvas';
+                this.style.background = '#4caf50';
+                            window.MapRoutes.isGoogleMapActive = true;
+                isGoogleMapActive = true;
+                
+                // Inicializar Google Maps se ainda não foi inicializado
+                            if (!window.MapRoutes.googleMap) {
+                    initGoogleMapsForRoutes();
+                } else {
+                    // Atualizar dados se já foi inicializado
+                    updateGoogleMapsWithRoutes();
+                }
+            }
+        });
+                }
+
+                // Função para limpar o mapa
+                const btnLimparMapa = document.getElementById('btnLimparMapa');
+                if (btnLimparMapa) {
+                    btnLimparMapa.addEventListener('click', function() {
+                        if (window.MapRoutes.isGoogleMapActive) {
+                            // Limpar Google Maps
+                            if (window.googleMapsManager) {
+                                window.googleMapsManager.clearMarkers();
+                            }
+                            if (window.MapRoutes.routeManager) {
+                                window.MapRoutes.routeManager.clearRoute();
+                            }
+                        } else {
+                            // Limpar Canvas
+                            const canvas = document.getElementById('mapCanvas');
+                            const ctx = canvas.getContext('2d');
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            
+                            // Redesenhar apenas o mapa base
+                            const img = new Image();
+                            img.src = '/sistema-frotas/uploads/mapa/mapa-brasil.png';
+                            img.onload = () => {
+                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                            };
+                        }
+                    });
+                }
+
+                // Modo coordenadas
+                const btnModoCoordenadas = document.getElementById('btnModoCoordenadas');
+                if (btnModoCoordenadas) {
+                    btnModoCoordenadas.addEventListener('click', function() {
+                        modoCoordenadas = !modoCoordenadas;
+                        this.style.background = modoCoordenadas ? '#1976d2' : '';
+                        this.style.color = modoCoordenadas ? '#fff' : '';
+                        document.getElementById('coordenadaInfo').textContent = modoCoordenadas ? 'Clique no mapa para capturar X/Y' : '';
+                    });
+                }
+
+                // Configurar botão de simular rota
+                const btnSimularRota = document.getElementById('simulateRouteBtn');
+                if (btnSimularRota) {
+                    console.log('Botão simular rota encontrado');
+                    btnSimularRota.addEventListener('click', function() {
+                        console.log('Abrindo simulador de rotas...');
+                        const modal = document.getElementById('routeSimulationModal');
+                        if (modal) {
+                            modal.style.display = 'block';
+                            console.log('Modal aberto');
+                            initRouteSimulator();
+                        } else {
+                            console.error('Modal não encontrado');
+                        }
+                    });
+                } else {
+                    console.error('Botão simular rota não encontrado');
+                }
+            }, 100); // Fim do setTimeout
+        }); // Fim do DOMContentLoaded
+
+        // Função para inicializar Google Maps
+        async function initGoogleMapsForRoutes() {
+            try {
+                // Obter chave da API
+                const response = await fetch('../google-maps/api.php?action=get_config', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (!data.success || !data.data.google_maps_api_key) {
+                    alert('Chave da API do Google Maps não configurada. Configure em Configurações > Google Maps');
+                    return;
+                }
+
+                // Inicializar Google Maps
+                await window.googleMapsManager.init(data.data.google_maps_api_key);
+                
+                // Aguardar um pouco mais para garantir que a API está totalmente carregada
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Verificar se o Google Maps está realmente disponível
+                if (!window.google || !window.google.maps || !window.google.maps.Map) {
+                    throw new Error('Google Maps API não carregou completamente');
+                }
+                
+                window.MapRoutes.googleMap = await window.googleMapsManager.createMap('googleMap', {
+                    zoom: 5,
+                    center: { lat: -14.2350, lng: -51.9253 }, // Centro do Brasil
+                    mapTypeId: 'roadmap' // Usar string em vez de google.maps.MapTypeId
+                });
+                googleMap = window.MapRoutes.googleMap;
+
+                // Inicializar gerenciador de rotas
+                window.MapRoutes.routeManager = new RouteManager();
+                window.MapRoutes.routeManager.init(googleMap);
+                routeManager = window.MapRoutes.routeManager;
+
+                // Carregar dados das rotas
+                await loadRoutesData();
+                updateGoogleMapsWithRoutes();
+
+            } catch (error) {
+                console.error('Erro ao inicializar Google Maps:', error);
+                alert('Erro ao carregar Google Maps: ' + error.message);
+            }
+        }
+
+        // Função para carregar dados das rotas
+        async function loadRoutesData() {
+            try {
+                // Pega o mês/ano do filtro, ou usa o atual
+                let mes, ano;
+                const filtro = document.getElementById('filtroMesMapa');
+                if (filtro && filtro.value) {
+                    [ano, mes] = filtro.value.split('-');
+                } else {
+                    const data = new Date();
+                    mes = data.getMonth() + 1;
+                    ano = data.getFullYear();
+                }
+
+                const response = await fetch(`../api/rotas_google_maps.php?mes=${mes}&ano=${ano}`, {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    window.MapRoutes.routesData = data.data;
+                    routesData = window.MapRoutes.routesData;
+                } else {
+                    console.error('Erro ao carregar dados das rotas:', data.error);
+                    window.MapRoutes.routesData = [];
+                    routesData = window.MapRoutes.routesData;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar dados das rotas:', error);
+                routesData = [];
+            }
+        }
+
+        // Função para atualizar Google Maps com as rotas
+        function updateGoogleMapsWithRoutes() {
+            if (!window.MapRoutes.googleMap || !window.MapRoutes.routesData.length) {
+                console.log('Google Maps não inicializado ou sem dados de rotas');
+                return;
+            }
+
+            // Limpar marcadores existentes
+            window.googleMapsManager.clearMarkers();
+
+            // Adicionar marcadores para cada rota
+            console.log('Dados das rotas:', window.MapRoutes.routesData);
+            window.MapRoutes.routesData.forEach((route, index) => {
+                const color = getColor(index);
+                console.log(`Processando rota ${index + 1}:`, route);
+                
+                // Marcador de origem
+                if (route.origem.latitude && route.origem.longitude) {
+                    const originMarker = window.googleMapsManager.addMarker(
+                        { lat: route.origem.latitude, lng: route.origem.longitude },
+                        {
+                            title: `Origem: ${route.origem.cidade}, ${route.origem.estado}`,
+                            icon: {
+                                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                                    <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="16" cy="16" r="12" fill="${color}" stroke="#fff" stroke-width="2"/>
+                                        <text x="16" y="20" text-anchor="middle" fill="white" font-family="Arial" font-size="12" font-weight="bold">O</text>
+                                    </svg>
+                                `),
+                                scaledSize: new google.maps.Size(32, 32),
+                                anchor: new google.maps.Point(16, 16)
+                            }
+                        }
+                    );
+
+                    // Info window para origem
+                    const originInfoWindow = new google.maps.InfoWindow({
+                        content: `
+                            <div style="padding: 12px; min-width: 250px; background: #f8f9fa; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                                <h4 style="margin: 0 0 12px 0; color: ${color}; font-size: 16px; font-weight: bold; border-bottom: 2px solid ${color}; padding-bottom: 8px;">📍 Origem</h4>
+                                <div style="color: #333; line-height: 1.6;">
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Cidade:</strong> ${route.origem.cidade || 'N/A'}, ${route.origem.estado || 'N/A'}</p>
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Motorista:</strong> ${route.motorista.nome || 'N/A'}</p>
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Veículo:</strong> ${route.veiculo.placa || 'N/A'}</p>
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Data:</strong> ${route.data_rota ? new Date(route.data_rota).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Distância:</strong> ${route.distancia_km || 0} km</p>
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Frete:</strong> R$ ${route.frete ? route.frete.toFixed(2) : '0.00'}</p>
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Status:</strong> <span style="color: ${route.no_prazo ? '#28a745' : '#dc3545'}; font-weight: bold;">${route.no_prazo ? 'No Prazo' : 'Atrasado'}</span></p>
+                                </div>
+                            </div>
+                        `
+                    });
+
+                    originMarker.addListener('click', () => {
+                        originInfoWindow.open(window.MapRoutes.googleMap, originMarker);
+                    });
+                }
+
+                // Marcador de destino
+                if (route.destino.latitude && route.destino.longitude) {
+                    const destinationMarker = window.googleMapsManager.addMarker(
+                        { lat: route.destino.latitude, lng: route.destino.longitude },
+                        {
+                            title: `Destino: ${route.destino.cidade}, ${route.destino.estado}`,
+                            icon: {
+                                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+                                    <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                                        <circle cx="16" cy="16" r="12" fill="${color}" stroke="#fff" stroke-width="2"/>
+                                        <text x="16" y="20" text-anchor="middle" fill="white" font-family="Arial" font-size="12" font-weight="bold">D</text>
+                                    </svg>
+                                `),
+                                scaledSize: new google.maps.Size(32, 32),
+                                anchor: new google.maps.Point(16, 16)
+                            }
+                        }
+                    );
+
+                    // Info window para destino
+                    const destinationInfoWindow = new google.maps.InfoWindow({
+                        content: `
+                            <div style="padding: 12px; min-width: 250px; background: #f8f9fa; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
+                                <h4 style="margin: 0 0 12px 0; color: ${color}; font-size: 16px; font-weight: bold; border-bottom: 2px solid ${color}; padding-bottom: 8px;">🎯 Destino</h4>
+                                <div style="color: #333; line-height: 1.6;">
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Cidade:</strong> ${route.destino.cidade || 'N/A'}, ${route.destino.estado || 'N/A'}</p>
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Motorista:</strong> ${route.motorista.nome || 'N/A'}</p>
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Veículo:</strong> ${route.veiculo.placa || 'N/A'}</p>
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Data:</strong> ${route.data_rota ? new Date(route.data_rota).toLocaleDateString('pt-BR') : 'N/A'}</p>
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Distância:</strong> ${route.distancia_km || 0} km</p>
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Frete:</strong> R$ ${route.frete ? route.frete.toFixed(2) : '0.00'}</p>
+                                    <p style="margin: 6px 0; font-size: 14px;"><strong style="color: #555;">Status:</strong> <span style="color: ${route.no_prazo ? '#28a745' : '#dc3545'}; font-weight: bold;">${route.no_prazo ? 'No Prazo' : 'Atrasado'}</span></p>
+                                </div>
+                            </div>
+                        `
+                    });
+
+                    destinationMarker.addListener('click', () => {
+                        destinationInfoWindow.open(window.MapRoutes.googleMap, destinationMarker);
+                    });
+                }
+
+                // Desenhar rota se ambos os pontos existirem
+                if (route.origem.latitude && route.origem.longitude && route.destino.latitude && route.destino.longitude) {
+                    const origin = `${route.origem.latitude},${route.origem.longitude}`;
+                    const destination = `${route.destino.latitude},${route.destino.longitude}`;
+                    
+                    // Usar o RouteManager para desenhar a rota
+                    if (window.MapRoutes.routeManager) {
+                        window.MapRoutes.routeManager.calculateRoute(origin, destination, {
+                            polylineOptions: {
+                                strokeColor: color,
+                                strokeWeight: 4,
+                                strokeOpacity: 0.8
+                            }
+                        })
+                        .then(result => {
+                            if (result) {
+                            console.log('Rota calculada:', result);
+                                // Desenhar polilinha customizada
+                                window.MapRoutes.routeManager.drawRoutePolyline(result, color);
+                            } else {
+                                console.warn(`Nenhuma rota encontrada entre ${origin} e ${destination}`);
+                            }
+                        })
+                        .catch(error => {
+                            console.warn('Erro ao calcular rota:', error.message);
+                        });
+                    }
+                }
+            });
+
+            // Ajustar zoom para mostrar todas as rotas
+            if (window.MapRoutes.routesData.length > 0) {
+                const bounds = new google.maps.LatLngBounds();
+                window.MapRoutes.routesData.forEach(route => {
+                    if (route.origem.latitude && route.origem.longitude) {
+                        bounds.extend(new google.maps.LatLng(route.origem.latitude, route.origem.longitude));
+                    }
+                    if (route.destino.latitude && route.destino.longitude) {
+                        bounds.extend(new google.maps.LatLng(route.destino.latitude, route.destino.longitude));
+                    }
+                });
+                window.MapRoutes.googleMap.fitBounds(bounds);
+            }
+        }
+
+        // Função para atualizar estatísticas do mapa
+        function updateMapStats() {
+            if (!window.MapRoutes.routesData || window.MapRoutes.routesData.length === 0) {
+                document.getElementById('totalRotasMapa').textContent = '0';
+                document.getElementById('totalKmMapa').textContent = '0';
+                document.getElementById('totalFreteMapa').textContent = 'R$ 0,00';
+                return;
+            }
+
+            const totalRotas = window.MapRoutes.routesData.length;
+            const totalKm = window.MapRoutes.routesData.reduce((sum, route) => sum + (route.distancia_km || 0), 0);
+            const totalFrete = window.MapRoutes.routesData.reduce((sum, route) => sum + (route.frete || 0), 0);
+
+            document.getElementById('totalRotasMapa').textContent = totalRotas;
+            document.getElementById('totalKmMapa').textContent = totalKm.toFixed(0);
+            document.getElementById('totalFreteMapa').textContent = `R$ ${totalFrete.toFixed(2)}`;
+        }
+
+        // Modificar a função de filtrar para funcionar com ambos os mapas
+        const originalDesenhaMapaComRotas = desenhaMapaComRotas;
+        desenhaMapaComRotas = function() {
+            if (window.MapRoutes.isGoogleMapActive) {
+                // Se estiver usando Google Maps, recarregar dados
+                loadRoutesData().then(() => {
+                    updateGoogleMapsWithRoutes();
+                    updateMapStats();
+                });
+            } else {
+                // Usar função original do Canvas
+                originalDesenhaMapaComRotas();
+                // Atualizar estatísticas para o mapa Canvas também
+                loadRoutesData().then(() => {
+                    updateMapStats();
+                });
+            }
+        };
+
+        // ===== VALIDAÇÃO DE QUILOMETRAGEM =====
+        
+        // Função para validar KM Saída da rota
+        async function validarKmSaidaRota(veiculoId, kmSaida) {
+            if (!veiculoId || !kmSaida) {
+                return { valido: false, mensagem: 'Dados insuficientes para validação' };
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('action', 'validar_km_saida_rota');
+                formData.append('veiculo_id', veiculoId);
+                formData.append('km_saida', kmSaida);
+                
+                const response = await fetch('../api/validar_quilometragem.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Erro na validação de quilometragem:', error);
+                return { valido: false, mensagem: 'Erro na validação' };
+            }
+        }
+        
+        // Função para obter quilometragem atual do veículo
+        async function obterKmAtualVeiculo(veiculoId) {
+            if (!veiculoId) return null;
+            
+            try {
+                const response = await fetch(`../api/validar_quilometragem.php?action=obter_km_atual_veiculo&veiculo_id=${veiculoId}`);
+                const data = await response.json();
+                return data.success ? data.km_atual : null;
+            } catch (error) {
+                console.error('Erro ao obter quilometragem do veículo:', error);
+                return null;
+            }
+        }
+        
+        // Configurar validação quando veículo for selecionado
+        function configurarValidacaoKmSaida() {
+            const veiculoSelect = document.getElementById('veiculo_id');
+            const kmSaidaInput = document.getElementById('km_saida');
+            const kmSaidaHelp = document.getElementById('km_saida_help');
+            const kmSaidaValidation = document.getElementById('km_saida_validation');
+            
+            if (!veiculoSelect || !kmSaidaInput) return;
+            
+            // Quando veículo for selecionado
+            veiculoSelect.addEventListener('change', async function() {
+                const veiculoId = this.value;
+                
+                if (veiculoId) {
+                    const kmAtual = await obterKmAtualVeiculo(veiculoId);
+                    if (kmAtual !== null) {
+                        kmSaidaHelp.innerHTML = `<i class="fas fa-info-circle"></i> Quilometragem atual do veículo: ${kmAtual.toLocaleString('pt-BR')} km`;
+                        kmSaidaInput.placeholder = `Mín: ${kmAtual.toLocaleString('pt-BR')}`;
+                        kmSaidaInput.min = kmAtual;
+                    }
+                } else {
+                    kmSaidaHelp.innerHTML = '<i class="fas fa-info-circle"></i> Selecione um veículo para validar a quilometragem';
+                    kmSaidaInput.placeholder = 'Ex: 150000';
+                    kmSaidaInput.min = '';
+                }
+                
+                // Limpar validação anterior
+                kmSaidaValidation.innerHTML = '';
+            });
+            
+            // Quando KM Saída for digitado
+            kmSaidaInput.addEventListener('blur', async function() {
+                const veiculoId = veiculoSelect.value;
+                const kmSaida = this.value;
+                
+                if (veiculoId && kmSaida) {
+                    const validacao = await validarKmSaidaRota(veiculoId, kmSaida);
+                    
+                    if (validacao.valido) {
+                        kmSaidaValidation.innerHTML = `<div style="color: #28a745;"><i class="fas fa-check-circle"></i> ${validacao.mensagem}</div>`;
+                        kmSaidaInput.style.borderColor = '#28a745';
+                    } else {
+                        kmSaidaValidation.innerHTML = `<div style="color: #dc3545;"><i class="fas fa-exclamation-triangle"></i> ${validacao.mensagem}</div>`;
+                        kmSaidaInput.style.borderColor = '#dc3545';
+                    }
+                } else {
+                    kmSaidaValidation.innerHTML = '';
+                    kmSaidaInput.style.borderColor = '';
+                }
+            });
+        }
+        
+        // Inicializar validação quando DOM estiver carregado
+        document.addEventListener('DOMContentLoaded', function() {
+            // Aguardar um pouco para garantir que todos os elementos estejam carregados
+            setTimeout(() => {
+                configurarValidacaoKmSaida();
+            }, 500);
+        });
+        
     </script>
 </body>
 </html>

@@ -29,11 +29,19 @@ try {
                                AND lida = 0 
                                AND data_criacao >= DATE_SUB(NOW(), INTERVAL 7 DAY)
                                ORDER BY data_criacao DESC 
-                               LIMIT 50");
+                               LIMIT 200");
         $stmt->execute([$empresa_id]);
     }
     
     $notificacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Obter total real de notificações não lidas dos últimos 7 dias
+    $stmt_total = $conn->prepare("SELECT COUNT(*) as total FROM notificacoes 
+                                 WHERE empresa_id = ? 
+                                 AND lida = 0 
+                                 AND data_criacao >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+    $stmt_total->execute([$empresa_id]);
+    $total_real = $stmt_total->fetch(PDO::FETCH_ASSOC)['total'];
     
     // Filtrar notificações duplicadas baseado em tipo, título e data
     $notificacoes_filtradas = [];
@@ -54,7 +62,8 @@ try {
         'success' => true, 
         'notificacoes' => $notificacoes_filtradas,
         'total_original' => count($notificacoes),
-        'total_filtrado' => count($notificacoes_filtradas)
+        'total_filtrado' => count($notificacoes_filtradas),
+        'total_real_nao_lidas' => (int)$total_real
     ]);
     
 } catch (Exception $e) {

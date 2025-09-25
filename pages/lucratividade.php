@@ -18,6 +18,7 @@ foreach ($required_files as $file) {
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
+require_once '../includes/permissions.php';
 
 // Configure session before starting it
 configure_session();
@@ -27,6 +28,9 @@ session_start();
 
 // Check authentication - usar o padrão correto do sistema
 require_authentication();
+
+// Verificar permissões para acessar lucratividade (apenas admin)
+require_permission('access_lucratividade');
 
 // Set page title
 $page_title = "Lucratividade - Dashboard Inteligente";
@@ -1755,6 +1759,20 @@ try {
         fetch(profitPerKmUrl)
             .then(response => response.json())
             .then(data => {
+                // Mostrar aviso se há dados de exemplo
+                if (data.warning) {
+                    const warningDiv = document.createElement('div');
+                    warningDiv.className = 'alert alert-warning';
+                    warningDiv.innerHTML = `
+                        <h5><i class="fas fa-exclamation-triangle"></i> ${data.warning}</h5>
+                        <p><strong>Sugestões:</strong></p>
+                        <ul>
+                            ${data.suggestions.map(s => `<li>${s}</li>`).join('')}
+                        </ul>
+                    `;
+                    document.getElementById('profitPerKmGauge').parentNode.parentNode.insertBefore(warningDiv, document.getElementById('profitPerKmGauge').parentNode);
+                }
+                
                 // Configurar gráfico gauge (usando doughnut como base)
                 const gaugeCtx = document.getElementById('profitPerKmGauge').getContext('2d');
                 new Chart(gaugeCtx, {
@@ -1870,6 +1888,26 @@ try {
         fetch('../api/profit_forecast_analytics.php')
             .then(response => response.json())
             .then(data => {
+                // Mostrar aviso se há dados de exemplo
+                if (data.warning) {
+                    const warningDiv = document.createElement('div');
+                    warningDiv.className = 'alert alert-warning';
+                    let suggestionsHtml = '';
+                    if (data.suggestions && data.suggestions.length > 0) {
+                        suggestionsHtml = `
+                            <p><strong>Sugestões:</strong></p>
+                            <ul>
+                                ${data.suggestions.map(s => `<li>${s}</li>`).join('')}
+                            </ul>
+                        `;
+                    }
+                    warningDiv.innerHTML = `
+                        <h5><i class="fas fa-exclamation-triangle"></i> ${data.warning}</h5>
+                        ${suggestionsHtml}
+                    `;
+                    document.getElementById('profitForecastChart').parentNode.parentNode.insertBefore(warningDiv, document.getElementById('profitForecastChart').parentNode);
+                }
+                
                 const ctx = document.getElementById('profitForecastChart').getContext('2d');
                 new Chart(ctx, {
                     type: 'line',
@@ -2110,7 +2148,7 @@ try {
                     new Chart(margemCtx, {
                         type: 'bar',
                         data: {
-                            labels: data.labels || ['Frete Local', 'Frete Interestadual', 'Frete Internacional'],
+                            labels: data.labels || ['Frete Local', 'Frete Regional', 'Frete Interestadual'],
                             datasets: [{
                                 label: 'Margem de Lucro (%)',
                                 data: data.margens || [0, 0, 0],
@@ -2159,7 +2197,7 @@ try {
                     new Chart(margemCtx, {
                         type: 'bar',
                         data: {
-                            labels: ['Frete Local', 'Frete Interestadual', 'Frete Internacional'],
+                            labels: ['Frete Local', 'Frete Regional', 'Frete Interestadual'],
                             datasets: [{
                                 label: 'Margem de Lucro (%)',
                                 data: [0, 0, 0],
@@ -2401,7 +2439,7 @@ try {
             new Chart(marginByFreightCtx, {
                 type: 'bar',
                 data: {
-                    labels: ['Frete Local', 'Frete Interestadual', 'Frete Internacional'],
+                    labels: ['Frete Local', 'Frete Regional', 'Frete Interestadual'],
                     datasets: [{
                         label: 'Margem de Lucro (%)',
                         data: [25, 35, 45],

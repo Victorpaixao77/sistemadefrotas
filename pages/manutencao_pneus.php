@@ -96,6 +96,9 @@ $total_pages = ceil($total / $limit);
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="stylesheet" href="../css/maintenance.css">
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../logo.png">
+    
     <!-- Chart.js for analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 

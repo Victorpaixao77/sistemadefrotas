@@ -282,7 +282,7 @@ $kpis = getKPIMetrics($conn);
     <title>Sistema de Gestão de Frotas - <?php echo $page_title; ?></title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="../assets/favicon.ico">
+    <link rel="icon" type="image/png" href="../logo.png">
     
     <!-- CSS Files -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">

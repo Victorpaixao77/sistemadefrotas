@@ -25,6 +25,13 @@ if (ini_get("session.use_cookies")) {
     );
 }
 
+// Limpar o cookie "Lembre-me" se existir (apenas o de login automático)
+if (isset($_COOKIE['remember_user'])) {
+    setcookie("remember_user", "", time() - 3600, "/", "", false, true);
+}
+
+// NÃO limpar o cookie 'saved_login' - ele deve permanecer para restaurar o formulário
+
 // Destruir a sessão
 session_destroy();
 
@@ -40,7 +47,7 @@ header("Cache-Control: no-store, no-cache, must-revalidate");
 header("Cache-Control: post-check=0, pre-check=0", false);
 header("Pragma: no-cache");
 
-// Redirecionar para a página de login
-header("Location: /sistema-frotas/login.php");
+// Redirecionar para a página de login com parâmetro de logout
+header("Location: /sistema-frotas/login.php?logout=1");
 exit();
 ?>

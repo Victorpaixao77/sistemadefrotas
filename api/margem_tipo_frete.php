@@ -28,33 +28,54 @@ $ano = isset($_GET['ano']) ? intval($_GET['ano']) : intval(date('Y'));
 try {
     $conn = getConnection();
     
-    // Query simplificada para margem por tipo de frete
+    // Query melhorada para margem por tipo de frete baseada na empresa cliente
     $sql = "
     SELECT 
         CASE 
-            WHEN distancia_km <= 100 THEN 'Frete Local'
-            WHEN distancia_km <= 500 THEN 'Frete Regional'
+            -- Frete Local: destino no mesmo estado da empresa cliente e distância <= 200km
+            WHEN ec.estado = r.estado_destino AND r.distancia_km <= 200 THEN 'Frete Local'
+            -- Frete Interestadual: destino em estado diferente da empresa cliente
+            WHEN ec.estado != r.estado_destino THEN 'Frete Interestadual'
+            -- Frete Regional: destino no mesmo estado da empresa cliente mas distância > 200km
+            WHEN ec.estado = r.estado_destino AND r.distancia_km > 200 THEN 'Frete Regional'
+            -- Fallback por distância (caso não tenha empresa cliente)
+            WHEN r.distancia_km <= 100 THEN 'Frete Local'
+            WHEN r.distancia_km <= 500 THEN 'Frete Regional'
             ELSE 'Frete Interestadual'
         END as tipo_frete,
-        COALESCE(SUM(frete), 0) as total_frete,
-        COALESCE(SUM(comissao), 0) as total_comissao,
+        COALESCE(SUM(r.frete), 0) as total_frete,
+        COALESCE(SUM(r.comissao), 0) as total_comissao,
         (
-            COALESCE(SUM(frete), 0) - COALESCE(SUM(comissao), 0)
-        ) as lucro_liquido
-    FROM rotas 
-    WHERE empresa_id = :empresa_id
-      AND MONTH(data_rota) = :mes
-      AND YEAR(data_rota) = :ano
+            COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0)
+        ) as lucro_liquido,
+        COUNT(*) as total_rotas,
+        AVG(r.distancia_km) as distancia_media,
+        ec.estado as estado_empresa_cliente,
+        r.estado_destino as estado_destino_rota
+    FROM rotas r
+    LEFT JOIN empresa_clientes ec ON r.empresa_id = ec.empresa_adm_id
+    WHERE r.empresa_id = :empresa_id
+      AND MONTH(r.data_rota) = :mes
+      AND YEAR(r.data_rota) = :ano
+      AND r.estado_destino IS NOT NULL
     GROUP BY 
         CASE 
-            WHEN distancia_km <= 100 THEN 'Frete Local'
-            WHEN distancia_km <= 500 THEN 'Frete Regional'
+            WHEN ec.estado = r.estado_destino AND r.distancia_km <= 200 THEN 'Frete Local'
+            WHEN ec.estado != r.estado_destino THEN 'Frete Interestadual'
+            WHEN ec.estado = r.estado_destino AND r.distancia_km > 200 THEN 'Frete Regional'
+            WHEN r.distancia_km <= 100 THEN 'Frete Local'
+            WHEN r.distancia_km <= 500 THEN 'Frete Regional'
             ELSE 'Frete Interestadual'
-        END
+        END,
+        ec.estado,
+        r.estado_destino
     ORDER BY 
         CASE 
-            WHEN distancia_km <= 100 THEN 1
-            WHEN distancia_km <= 500 THEN 2
+            WHEN ec.estado = r.estado_destino AND r.distancia_km <= 200 THEN 1
+            WHEN ec.estado != r.estado_destino THEN 3
+            WHEN ec.estado = r.estado_destino AND r.distancia_km > 200 THEN 2
+            WHEN r.distancia_km <= 100 THEN 1
+            WHEN r.distancia_km <= 500 THEN 2
             ELSE 3
         END
     ";
@@ -98,7 +119,8 @@ try {
             'empresa_id' => $empresa_id,
             'mes' => $mes,
             'ano' => $ano,
-            'resultados_count' => count($resultados)
+            'resultados_count' => count($resultados),
+            'resultados_detalhados' => $resultados
         ]
     ]);
     

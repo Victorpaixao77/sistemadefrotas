@@ -7,8 +7,8 @@ header('Content-Type: application/json');
 try {
     $conn = getConnection();
     
-    // Marcar todas as notificações como lidas
-    $stmt = $conn->prepare('UPDATE notificacoes SET lida = 1 WHERE empresa_id = ?');
+    // Marcar apenas notificações regulares (não IA) como lidas
+    $stmt = $conn->prepare('UPDATE notificacoes SET lida = 1 WHERE empresa_id = ? AND tipo NOT IN ("manutencao", "alerta", "pneu", "documento", "financeiro", "rota", "abastecimento", "consumo", "custo", "seguranca", "insights", "recomendacao")');
     $stmt->execute([$empresa_id]);
     
     // LIMPEZA AUTOMÁTICA: Remover notificações antigas (mais de 30 dias)

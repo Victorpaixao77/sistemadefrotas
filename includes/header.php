@@ -12,6 +12,9 @@ $email_usuario = isset($_SESSION['email']) ? $_SESSION['email'] : '';
 $foto_perfil = isset($_SESSION['foto_perfil']) && $_SESSION['foto_perfil'] ? $_SESSION['foto_perfil'] : null;
 $letra = $nome_usuario ? mb_substr($nome_usuario, 0, 1, 'UTF-8') : 'U';
 
+// Carregar sistema de notificações
+require_once 'notifications.php';
+
 // You can override this in specific pages by setting $page_title before including header.php
 ?>
 <header class="top-header">
@@ -137,6 +140,24 @@ $letra = $nome_usuario ? mb_substr($nome_usuario, 0, 1, 'UTF-8') : 'U';
                         <div class="color-option">
                             <label for="sidebarColor">Menu Lateral:</label>
                             <input type="color" id="sidebarColor" value="#121a29" data-color-var="--bg-sidebar">
+                        </div>
+                        
+                        <!-- Cor do Fundo das Dashboards -->
+                        <div class="color-option">
+                            <label for="dashboardBgColor">Fundo das Dashboards:</label>
+                            <input type="color" id="dashboardBgColor" value="#1e293b" data-color-var="--card-bg">
+                        </div>
+                        
+                        <!-- Cor do Fundo Secundário -->
+                        <div class="color-option">
+                            <label for="secondaryBgColor">Fundo Secundário:</label>
+                            <input type="color" id="secondaryBgColor" value="#1a2332" data-color-var="--bg-secondary">
+                        </div>
+                        
+                        <!-- Cor do Fundo Terciário (Colunas de Histórico) -->
+                        <div class="color-option">
+                            <label for="tertiaryBgColor">Colunas de Histórico:</label>
+                            <input type="color" id="tertiaryBgColor" value="#243041" data-color-var="--bg-tertiary">
                         </div>
                         
                         <!-- Botão para Restaurar Cores Padrão -->

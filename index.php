@@ -46,6 +46,10 @@ $empresa = getCompanyData();
 // Set page title
 $page_title = "Dashboard";
 
+// Verificar permissões do usuário
+require_once 'includes/permissions.php';
+$can_view_financial_data = can_view_financial_data();
+
 // ====== INDICADORES ACUMULADOS ======
 try {
     // Conexão já criada: $conn
@@ -391,15 +395,25 @@ try {
                     </div>
                     <div class="dashboard-card">
                         <div class="card-header">
-                            <h3>Faturamento (Fretes)</h3>
+                            <h3><?php echo $can_view_financial_data ? 'Faturamento (Fretes)' : 'Fretes Realizados'; ?></h3>
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">R$ <?php echo number_format($total_fretes, 2, ',', '.'); ?></span>
-                                <span class="metric-subtitle">Receita bruta</span>
+                                <?php if ($can_view_financial_data): ?>
+                                    <span class="metric-value">R$ <?php echo number_format($total_fretes, 2, ',', '.'); ?></span>
+                                    <span class="metric-subtitle">Receita bruta</span>
+                                <?php else: ?>
+                                    <?php
+                                    // Para gestores, mostrar apenas o número de fretes
+                                    $num_fretes = $conn->query("SELECT COUNT(*) FROM rotas WHERE empresa_id = $empresa_id")->fetchColumn();
+                                    ?>
+                                    <span class="metric-value"><?php echo number_format($num_fretes, 0, ',', '.'); ?></span>
+                                    <span class="metric-subtitle">Fretes realizados</span>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
+                    <?php if ($can_view_financial_data): ?>
                     <div class="dashboard-card">
                         <div class="card-header">
                             <h3>Comissões</h3>
@@ -411,6 +425,24 @@ try {
                             </div>
                         </div>
                     </div>
+                    <?php else: ?>
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <h3>Comissões</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="metric">
+                                <?php
+                                // Para gestores, mostrar apenas percentual médio de comissão
+                                $percentual_comissao = $total_fretes > 0 ? ($total_comissoes / $total_fretes) * 100 : 0;
+                                ?>
+                                <span class="metric-value"><?php echo number_format($percentual_comissao, 1, ',', '.'); ?>%</span>
+                                <span class="metric-subtitle">Percentual médio</span>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($can_view_financial_data): ?>
                     <div class="dashboard-card" style="background: #e6f9ed; border: 2px solid #2ecc40;">
                         <div class="card-header">
                             <h3 style="color: #218838;">Lucro Líquido Geral</h3>
@@ -422,9 +454,11 @@ try {
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
                 
                 <!-- Gráfico Financeiro -->
+                <?php if ($can_view_financial_data): ?>
                 <div class="analytics-section">
                     <div class="section-header">
                         <h2>Análise Financeira</h2>
@@ -579,6 +613,7 @@ try {
                         <?php endif; ?>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- Insights Inteligentes -->
                     <div class="card">

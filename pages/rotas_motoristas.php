@@ -81,6 +81,9 @@ $counts = getDashboardCounts();
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../logo.png">
 </head>
 <body>
     <div class="app-container">

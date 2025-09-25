@@ -1,108 +1,72 @@
-[24-Aug-2025 19:56:00 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Sep-2025 00:58:19 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => victor 123
-    [email] => victor@rbxsoft.com
+    [id] => 21
+    [usuario_id] => 21
+    [nome] => victor
+    [email] => victor@rbxsofts.com
     [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [foto_perfil] => 
     [tipo_usuario] => gestor
 )
 
-[24-Aug-2025 19:56:00 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Sep-2025 00:58:19 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => victor 123
-    [email] => victor@rbxsoft.com
+    [id] => 21
+    [usuario_id] => 21
+    [nome] => victor
+    [email] => victor@rbxsofts.com
     [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [foto_perfil] => 
     [tipo_usuario] => gestor
 )
 
-[30-Aug-2025 03:10:16 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Sep-2025 01:08:49 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
     [loggedin] => 1
     [id] => 16
     [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão
+    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
     [email] => victor@rbxsoft.com
     [empresa_id] => 1
     [foto_perfil] => perfil_16_1747893599.png
+    [tipo_usuario] => admin
+)
+
+[22-Sep-2025 01:08:50 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [loggedin] => 1
+    [id] => 16
+    [usuario_id] => 16
+    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
+    [email] => victor@rbxsoft.com
+    [empresa_id] => 1
+    [foto_perfil] => perfil_16_1747893599.png
+    [tipo_usuario] => admin
+)
+
+[22-Sep-2025 01:09:04 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [loggedin] => 1
+    [id] => 21
+    [usuario_id] => 21
+    [nome] => victor
+    [email] => victor@rbxsofts.com
+    [empresa_id] => 1
+    [foto_perfil] => 
     [tipo_usuario] => gestor
 )
 
-[30-Aug-2025 03:10:16 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Sep-2025 01:09:05 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão
-    [email] => victor@rbxsoft.com
+    [id] => 21
+    [usuario_id] => 21
+    [nome] => victor
+    [email] => victor@rbxsofts.com
     [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => gestor
-)
-
-[30-Aug-2025 03:10:30 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => gestor
-)
-
-[30-Aug-2025 03:10:30 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => gestor
-)
-
-[30-Aug-2025 03:10:36 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => gestor
-)
-
-[30-Aug-2025 03:14:09 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => gestor
-)
-
-[30-Aug-2025 03:14:09 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [foto_perfil] => 
     [tipo_usuario] => gestor
 )
 

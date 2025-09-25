@@ -163,7 +163,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const clearBtn = panel.querySelector('.notification-clear-btn');
   clearBtn.addEventListener('click', function(e) {
     e.stopPropagation();
-    fetch('/sistema-frotas/notificacoes/limpar_notificacoes.php', { method: 'POST' })
+    fetch('/sistema-frotas/notificacoes/limpar_notificacoes_ia.php', { method: 'POST' })
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -172,6 +172,13 @@ document.addEventListener('DOMContentLoaded', function() {
           // Atualiza o badge
           badge.textContent = '0';
           badge.style.display = 'none';
+          
+          // Atualiza também o badge das notificações regulares se existir
+          const regularBadge = document.getElementById('notificationBadge');
+          if (regularBadge && data.total_restantes !== undefined) {
+            regularBadge.textContent = data.total_restantes;
+            regularBadge.style.display = data.total_restantes > 0 ? 'flex' : 'none';
+          }
         }
       });
   });
@@ -193,4 +200,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Carrega as notificações inicialmente
   carregarIANotificacoes();
+  
+  // Torna a função global para ser chamada de outros scripts
+  window.carregarIANotificacoes = carregarIANotificacoes;
 }); 

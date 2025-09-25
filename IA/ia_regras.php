@@ -50,65 +50,197 @@ function inserirNotificacao($empresa_id, $tipo, $titulo, $mensagem, $ia_mensagem
     }
 }
 
-// Adicionar análise de consumo por desempenho
-$consumoEsperado = [
-    'Fiorino' => 10, // km por litro
-    'Sprinter' => 8,
-    'HR' => 9,
-    'Volvo FH 54' => 2.5,
-    'Scania 770' => 2.5,
-    'DAF XF 480' => 2.5,
-    'teste' => 2.5
-];
-
-$sql = "SELECT a.*, r.distancia_km, v.modelo, v.placa, r.id as rota_id, co.nome as cidade_origem_nome, cd.nome as cidade_destino_nome, r.data_rota FROM abastecimentos a
+// VALIDAÇÃO MELHORADA DE CONSUMO ABAIXO DO ESPERADO
+$sql = "SELECT a.*, r.distancia_km, v.modelo, v.placa, v.id as veiculo_id, r.id as rota_id, 
+        co.nome as cidade_origem_nome, cd.nome as cidade_destino_nome, r.data_rota,
+        (r.distancia_km / a.litros) as consumo_atual
+        FROM abastecimentos a
         JOIN rotas r ON a.rota_id = r.id
         JOIN veiculos v ON r.veiculo_id = v.id
         LEFT JOIN cidades co ON r.cidade_origem_id = co.id
         LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
         WHERE v.empresa_id = :empresa_id";
+
 $stmt = $conn->prepare($sql);
 $stmt->execute(['empresa_id' => $empresa_id]);
+
 foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     $modelo = $row['modelo'];
     $placa = $row['placa'];
     $rota_nome = ($row['data_rota'] ? date('Y-m-d', strtotime($row['data_rota'])) : '') .
         ' - ' . ($row['cidade_origem_nome'] ?? '-') . ' → ' . ($row['cidade_destino_nome'] ?? '-');
-    $consumo = $row['distancia_km'] / $row['litros'];
-    if (isset($consumoEsperado[$modelo]) && $consumo < $consumoEsperado[$modelo] * 0.8) {
-        inserirNotificacao(
-            $empresa_id,
-            'alerta',
-            'Consumo abaixo do esperado',
-            "O consumo do veículo {$placa} na Rota* {$rota_nome} está abaixo do esperado.",
-            "Verifique se há problemas mecânicos ou uso inadequado. O consumo foi de " . round($consumo, 2) . " km/l, enquanto o esperado é cerca de {$consumoEsperado[$modelo]} km/l."
-        );
+    
+    // Obter histórico de consumo do veículo
+    $historico_sql = "SELECT a.*, r.distancia_km, 
+            (r.distancia_km / a.litros) as consumo_km_l
+            FROM abastecimentos a
+            JOIN rotas r ON a.rota_id = r.id
+            WHERE r.veiculo_id = :veiculo_id
+            ORDER BY a.data_abastecimento DESC
+            LIMIT 10";
+    
+    $hist_stmt = $conn->prepare($historico_sql);
+    $hist_stmt->execute(['veiculo_id' => $row['veiculo_id']]);
+    $historico = $hist_stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    if (count($historico) >= 3) {
+        // Calcular média e desvio padrão do consumo
+        $consumos = array_column($historico, 'consumo_km_l');
+        $consumos = array_filter($consumos, function($c) { return $c > 0; });
+        
+        if (count($consumos) >= 3) {
+            $media_consumo = array_sum($consumos) / count($consumos);
+            $variancia = array_sum(array_map(function($x) use ($media_consumo) { return pow($x - $media_consumo, 2); }, $consumos)) / (count($consumos) - 1);
+            $desvio_consumo = sqrt($variancia);
+            
+            // Limite inferior: média - 2 desvios padrão
+            $limite_consumo_baixo = $media_consumo - (2 * $desvio_consumo);
+            
+            if ($row['consumo_atual'] < $limite_consumo_baixo) {
+                $titulo = 'Consumo abaixo do esperado (IA Melhorada)';
+                $mensagem = "O consumo do veículo {$placa} na Rota* {$rota_nome} está abaixo do esperado.";
+                $ia_mensagem = "Análise IA: Consumo atual: " . round($row['consumo_atual'], 2) . " km/l. ";
+                $ia_mensagem .= "Média histórica: " . round($media_consumo, 2) . " km/l. ";
+                $ia_mensagem .= "Limite inferior: " . round($limite_consumo_baixo, 2) . " km/l. ";
+                $ia_mensagem .= "Verifique se há problemas mecânicos ou uso inadequado.";
+                
+                inserirNotificacao($empresa_id, 'alerta', $titulo, $mensagem, $ia_mensagem);
+            }
+        }
+    } else {
+        // Se não há histórico suficiente, usar critérios conservadores baseados no tipo de veículo
+        $consumo_esperado = 5.0; // Padrão conservador
+        if ($row['tipo'] === 'Caminhão') $consumo_esperado = 2.5;
+        elseif ($row['tipo'] === 'Carro') $consumo_esperado = 8.0;
+        elseif ($row['tipo'] === 'Van') $consumo_esperado = 6.0;
+        elseif ($row['tipo'] === 'Moto') $consumo_esperado = 15.0;
+        
+        if ($row['consumo_atual'] < ($consumo_esperado * 0.7)) {
+            inserirNotificacao(
+                $empresa_id,
+                'alerta',
+                'Consumo abaixo do esperado (Pouco Histórico)',
+                "O consumo do veículo {$placa} na Rota* {$rota_nome} está abaixo do esperado.",
+                "Pouco histórico disponível. Consumo: " . round($row['consumo_atual'], 2) . " km/l. Esperado para {$row['tipo']}: ~{$consumo_esperado} km/l."
+            );
+        }
     }
 }
 
 // Adicionar tratamento de erro para evitar que o script interrompa a execução
 try {
     // error_log('DEBUG IA: Entrou no bloco try da IA');
-    // 1. Alerta de abastecimento acima do esperado
-    $sql = "SELECT a.*, r.distancia_km, v.placa, r.id as rota_id, co.nome as cidade_origem_nome, cd.nome as cidade_destino_nome, r.data_rota FROM abastecimentos a
+    // 1. VALIDAÇÃO MELHORADA DE ABASTECIMENTO SUSPEITO
+    $sql = "SELECT a.*, r.distancia_km, v.placa, v.modelo, v.tipo, v.tipo_combustivel, r.id as rota_id, 
+            co.nome as cidade_origem_nome, cd.nome as cidade_destino_nome, r.data_rota, r.com_carga,
+            (a.valor_total / r.distancia_km) as valor_por_km,
+            (a.litros / r.distancia_km) as litros_por_km
+            FROM abastecimentos a
             JOIN rotas r ON a.rota_id = r.id
             JOIN veiculos v ON r.veiculo_id = v.id
             LEFT JOIN cidades co ON r.cidade_origem_id = co.id
             LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-            WHERE v.empresa_id = :empresa_id AND (a.valor_total > (r.distancia_km * 2) OR a.litros > (r.distancia_km * 0.5))";
+            WHERE v.empresa_id = :empresa_id
+            ORDER BY a.data_abastecimento DESC";
+    
     $stmt = $conn->prepare($sql);
     $stmt->execute(['empresa_id' => $empresa_id]);
+    
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $placa = $row['placa'];
         $rota_nome = ($row['data_rota'] ? date('Y-m-d', strtotime($row['data_rota'])) : '') .
             ' - ' . ($row['cidade_origem_nome'] ?? '-') . ' → ' . ($row['cidade_destino_nome'] ?? '-');
-        inserirNotificacao(
-            $empresa_id,
-            'alerta',
-            'Abastecimento suspeito',
-            'Abastecimento do veículo ' . $placa . ' na Rota* ' . $rota_nome . ' está acima do esperado.',
-            'Verifique se houve erro de digitação ou possível fraude. Compare com abastecimentos anteriores.'
-        );
+        
+        // Análise inteligente baseada no histórico
+        $historico_sql = "SELECT a.*, r.distancia_km, 
+                (a.valor_total / r.distancia_km) as valor_por_km,
+                (a.litros / r.distancia_km) as litros_por_km
+                FROM abastecimentos a
+                JOIN rotas r ON a.rota_id = r.id
+                WHERE r.veiculo_id = :veiculo_id
+                ORDER BY a.data_abastecimento DESC
+                LIMIT 10";
+        
+        $hist_stmt = $conn->prepare($historico_sql);
+        $hist_stmt->execute(['veiculo_id' => $row['veiculo_id']]);
+        $historico = $hist_stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (count($historico) >= 3) {
+            // Calcular média e desvio padrão
+            $valores_km = array_column($historico, 'valor_por_km');
+            $litros_km = array_column($historico, 'litros_por_km');
+            
+            $media_valor = array_sum($valores_km) / count($valores_km);
+            $media_litros = array_sum($litros_km) / count($litros_km);
+            
+            $desvio_valor = 0;
+            $desvio_litros = 0;
+            if (count($valores_km) > 1) {
+                $variancia_valor = array_sum(array_map(function($x) use ($media_valor) { return pow($x - $media_valor, 2); }, $valores_km)) / (count($valores_km) - 1);
+                $variancia_litros = array_sum(array_map(function($x) use ($media_litros) { return pow($x - $media_litros, 2); }, $litros_km)) / (count($litros_km) - 1);
+                $desvio_valor = sqrt($variancia_valor);
+                $desvio_litros = sqrt($variancia_litros);
+            }
+            
+            // Aplicar limites por tipo de veículo
+            $limite_veiculo = 1.0;
+            if ($row['tipo'] === 'Caminhão') $limite_veiculo = 1.2;
+            elseif ($row['tipo'] === 'Carro') $limite_veiculo = 0.8;
+            elseif ($row['tipo'] === 'Moto') $limite_veiculo = 0.6;
+            
+            // Aplicar limites por tipo de combustível
+            $limite_combustivel = 1.0;
+            if ($row['tipo_combustivel'] === 'Diesel') $limite_combustivel = 1.1;
+            elseif ($row['tipo_combustivel'] === 'Etanol') $limite_combustivel = 0.9;
+            elseif ($row['tipo_combustivel'] === 'GNV') $limite_combustivel = 0.8;
+            
+            // Calcular limite dinâmico (média + 2 desvios)
+            $limite_valor = ($media_valor + (2 * $desvio_valor)) * $limite_veiculo * $limite_combustivel;
+            $limite_litros = ($media_litros + (2 * $desvio_litros)) * $limite_veiculo * $limite_combustivel;
+            
+            // Ajustar por condições da rota
+            if ($row['com_carga']) {
+                $limite_valor *= 1.2;
+                $limite_litros *= 1.2;
+            }
+            
+            // Verificar se está acima do limite
+            $valor_suspeito = $row['valor_por_km'] > $limite_valor;
+            $litros_suspeitos = $row['litros_por_km'] > $limite_litros;
+            
+            if ($valor_suspeito || $litros_suspeitos) {
+                $motivos = [];
+                if ($valor_suspeito) {
+                    $excesso_valor = round((($row['valor_por_km'] / $limite_valor) - 1) * 100, 1);
+                    $motivos[] = "valor por km ({$excesso_valor}% acima do limite)";
+                }
+                if ($litros_suspeitos) {
+                    $excesso_litros = round((($row['litros_por_km'] / $limite_litros) - 1) * 100, 1);
+                    $motivos[] = "litros por km ({$excesso_litros}% acima do limite)";
+                }
+                
+                $titulo = 'Abastecimento suspeito (IA Melhorada)';
+                $mensagem = 'Abastecimento do veículo ' . $placa . ' na Rota* ' . $rota_nome . ' está acima do esperado.';
+                $ia_mensagem = 'Análise IA: ' . implode(', ', $motivos) . '. ';
+                $ia_mensagem .= 'Limite dinâmico: R$ ' . number_format($limite_valor, 2, ',', '.') . '/km, ';
+                $ia_mensagem .= number_format($limite_litros, 2, ',', '.') . ' L/km. ';
+                $ia_mensagem .= 'Média histórica: R$ ' . number_format($media_valor, 2, ',', '.') . '/km, ';
+                $ia_mensagem .= number_format($media_litros, 2, ',', '.') . ' L/km.';
+                
+                inserirNotificacao($empresa_id, 'alerta', $titulo, $mensagem, $ia_mensagem);
+            }
+        } else {
+            // Se não há histórico suficiente, usar critérios conservadores
+            if ($row['valor_por_km'] > 3.0 || $row['litros_por_km'] > 0.8) {
+                inserirNotificacao(
+                    $empresa_id,
+                    'alerta',
+                    'Abastecimento suspeito (Pouco Histórico)',
+                    'Abastecimento do veículo ' . $placa . ' na Rota* ' . $rota_nome . ' está acima do esperado.',
+                    'Pouco histórico disponível. Valor: R$ ' . number_format($row['valor_por_km'], 2, ',', '.') . '/km, Litros: ' . number_format($row['litros_por_km'], 2, ',', '.') . ' L/km.'
+                );
+            }
+        }
     }
 
     // 2. Manutenção atrasada
@@ -128,26 +260,58 @@ try {
         );
     }
 
-    // 3. Despesas de viagem acima do limite
-    $sql = "SELECT d.*, r.id as rota_id, v.placa, co.nome as cidade_origem_nome, cd.nome as cidade_destino_nome, r.data_rota FROM despesas_viagem d
+    // 3. VALIDAÇÃO MELHORADA DE DESPESA DE VIAGEM ALTA
+    $sql = "SELECT d.*, r.id as rota_id, v.placa, v.tipo, co.nome as cidade_origem_nome, 
+            cd.nome as cidade_destino_nome, r.data_rota, r.distancia_km, r.com_carga
+            FROM despesas_viagem d
             JOIN rotas r ON d.rota_id = r.id
             JOIN veiculos v ON r.veiculo_id = v.id
             LEFT JOIN cidades co ON r.cidade_origem_id = co.id
             LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-            WHERE v.empresa_id = :empresa_id AND d.total_despviagem > 1000";
+            WHERE v.empresa_id = :empresa_id";
+    
     $stmt = $conn->prepare($sql);
     $stmt->execute(['empresa_id' => $empresa_id]);
+    
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $placa = $row['placa'];
         $rota_nome = ($row['data_rota'] ? date('Y-m-d', strtotime($row['data_rota'])) : '') .
             ' - ' . ($row['cidade_origem_nome'] ?? '-') . ' → ' . ($row['cidade_destino_nome'] ?? '-');
-        inserirNotificacao(
-            $empresa_id,
-            'alerta',
-            'Despesa de viagem alta',
-            'Despesa de viagem na Rota* ' . $rota_nome . ' do veículo ' . $placa . ' ultrapassou o limite.',
-            'Analise os comprovantes e justifique o valor excedente. Considere revisar políticas de reembolso.'
-        );
+        
+        // Calcular limite dinâmico baseado no tipo de veículo e distância
+        $limite_base = 500; // R$ 500 base
+        $limite_por_km = 2.0; // R$ 2 por km
+        
+        if ($row['tipo'] === 'Caminhão') {
+            $limite_base = 800;
+            $limite_por_km = 3.0;
+        } elseif ($row['tipo'] === 'Carro') {
+            $limite_base = 300;
+            $limite_por_km = 1.5;
+        } elseif ($row['tipo'] === 'Van') {
+            $limite_base = 400;
+            $limite_por_km = 2.2;
+        } elseif ($row['tipo'] === 'Moto') {
+            $limite_base = 200;
+            $limite_por_km = 1.0;
+        }
+        
+        if ($row['com_carga']) {
+            $limite_base *= 1.3; // 30% mais tolerante para cargas
+        }
+        
+        $limite_dinamico = $limite_base + ($row['distancia_km'] * $limite_por_km);
+        
+        if ($row['total_despviagem'] > $limite_dinamico) {
+            $excesso = round((($row['total_despviagem'] / $limite_dinamico) - 1) * 100, 1);
+            $titulo = 'Despesa de viagem alta (IA Melhorada)';
+            $mensagem = 'Despesa de viagem na Rota* ' . $rota_nome . ' do veículo ' . $placa . ' ultrapassou o limite.';
+            $ia_mensagem = "Análise IA: Despesa: R$ " . number_format($row['total_despviagem'], 2, ',', '.') . ". ";
+            $ia_mensagem .= "Limite dinâmico: R$ " . number_format($limite_dinamico, 2, ',', '.') . " ({$excesso}% acima). ";
+            $ia_mensagem .= "Tipo: {$row['tipo']}, Distância: {$row['distancia_km']} km, Carga: " . ($row['com_carga'] ? 'Sim' : 'Não') . ".";
+            
+            inserirNotificacao($empresa_id, 'alerta', $titulo, $mensagem, $ia_mensagem);
+        }
     }
 
     // 4. Rota demorando muito para ser concluída

@@ -128,6 +128,19 @@ switch ($method) {
             $stmt->execute();
             $id = $conn->lastInsertId();
             
+            // Atualizar data da última manutenção no veículo
+            $update_veiculo_sql = "UPDATE veiculos SET 
+                                    ultima_manutencao = :data_manutencao,
+                                    km_ultima_manutencao = :km_atual
+                                   WHERE id = :veiculo_id AND empresa_id = :empresa_id";
+            
+            $update_stmt = $conn->prepare($update_veiculo_sql);
+            $update_stmt->bindParam(':data_manutencao', $data['data_manutencao']);
+            $update_stmt->bindParam(':km_atual', $data['km_atual'], PDO::PARAM_INT);
+            $update_stmt->bindParam(':veiculo_id', $data['veiculo_id'], PDO::PARAM_INT);
+            $update_stmt->bindParam(':empresa_id', $_SESSION['empresa_id'], PDO::PARAM_INT);
+            $update_stmt->execute();
+            
             echo json_encode(['success' => true, 'message' => 'Manutenção cadastrada com sucesso', 'id' => $id]);
             
         } catch (Exception $e) {

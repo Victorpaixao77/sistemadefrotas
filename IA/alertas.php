@@ -207,23 +207,88 @@ class Alertas {
 
     public function obterTodosAlertas() {
         try {
-            $alertas = array_merge(
+            // Primeiro, gerar novos alertas baseados nas verificações
+            $novos_alertas = array_merge(
                 $this->verificarManutencao(),
                 $this->verificarDocumentos(),
                 $this->verificarConsumo(),
                 $this->verificarRotas()
             );
-
-            // Ordenar por prioridade (alta, media, baixa)
-            usort($alertas, function($a, $b) {
-                $prioridades = ['alta' => 3, 'media' => 2, 'baixa' => 1];
-                return $prioridades[$b['prioridade']] - $prioridades[$a['prioridade']];
-            });
-
+            
+            // Salvar novos alertas na tabela
+            $this->salvarAlertas($novos_alertas);
+            
+            // Buscar alertas ativos da tabela
+            $sql = "SELECT * FROM alertas_sistema 
+                    WHERE empresa_id = :empresa_id 
+                    AND status = 'ativo'
+                    ORDER BY prioridade DESC, data_criacao DESC";
+            
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->bindParam(':empresa_id', $this->empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            $alertas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Converter dados JSON de volta para array
+            foreach ($alertas as &$alerta) {
+                if (!empty($alerta['dados'])) {
+                    $alerta['dados'] = json_decode($alerta['dados'], true);
+                }
+            }
+            
             return $alertas;
         } catch (Exception $e) {
             error_log("Erro ao obter todos os alertas: " . $e->getMessage());
             return [];
+        }
+    }
+    
+    private function salvarAlertas($alertas) {
+        try {
+            foreach ($alertas as $alerta) {
+                // Verificar se já existe um alerta similar ativo
+                $sql_check = "SELECT id FROM alertas_sistema 
+                             WHERE empresa_id = :empresa_id 
+                             AND tipo = :tipo 
+                             AND titulo = :titulo 
+                             AND status = 'ativo'";
+                
+                $stmt_check = $this->pdo->prepare($sql_check);
+                $stmt_check->bindParam(':empresa_id', $this->empresa_id, PDO::PARAM_INT);
+                $stmt_check->bindParam(':tipo', $alerta['tipo']);
+                $stmt_check->bindParam(':titulo', $alerta['mensagem']);
+                $stmt_check->execute();
+                
+                if (!$stmt_check->fetch()) {
+                    // Inserir novo alerta
+                    $sql_insert = "INSERT INTO alertas_sistema (
+                                    empresa_id, tipo, prioridade, titulo, mensagem, dados,
+                                    veiculo_id, motorista_id, rota_id, status
+                                  ) VALUES (
+                                    :empresa_id, :tipo, :prioridade, :titulo, :mensagem, :dados,
+                                    :veiculo_id, :motorista_id, :rota_id, 'ativo'
+                                  )";
+                    
+                    $stmt_insert = $this->pdo->prepare($sql_insert);
+                    $stmt_insert->bindParam(':empresa_id', $this->empresa_id, PDO::PARAM_INT);
+                    $stmt_insert->bindParam(':tipo', $alerta['tipo']);
+                    $stmt_insert->bindParam(':prioridade', $alerta['prioridade']);
+                    $stmt_insert->bindParam(':titulo', $alerta['mensagem']);
+                    $stmt_insert->bindParam(':mensagem', $alerta['mensagem']);
+                    $stmt_insert->bindParam(':dados', json_encode($alerta['dados'] ?? []));
+                    $veiculo_id = $alerta['veiculo_id'] ?? null;
+                    $motorista_id = $alerta['motorista_id'] ?? null;
+                    $rota_id = $alerta['rota_id'] ?? null;
+                    
+                    $stmt_insert->bindParam(':veiculo_id', $veiculo_id, PDO::PARAM_INT);
+                    $stmt_insert->bindParam(':motorista_id', $motorista_id, PDO::PARAM_INT);
+                    $stmt_insert->bindParam(':rota_id', $rota_id, PDO::PARAM_INT);
+                    $stmt_insert->execute();
+                }
+            }
+        } catch (Exception $e) {
+            error_log("Erro ao salvar alertas: " . $e->getMessage());
         }
     }
 } 

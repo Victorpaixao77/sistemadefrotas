@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/permissions.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 $empresa_id = $_SESSION['empresa_id'] ?? null;
@@ -141,6 +142,7 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                         <span class="sidebar-link-text">Manutenções</span>
                     </a>
                 </li>
+                <?php if (can_access_fiscal_system()): ?>
                 <li class="sidebar-nav-item">
                     <a href="#" class="sidebar-link sidebar-dropdown-toggle">
                         <div class="sidebar-link-icon">
@@ -172,6 +174,9 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                         </li>
                     </ul>
                 </li>
+                <?php endif; ?>
+                
+                <!-- Menu Financeiro - sempre visível -->
                 <li class="sidebar-nav-item">
                     <a href="#" class="sidebar-link sidebar-dropdown-toggle">
                         <div class="sidebar-link-icon">
@@ -191,7 +196,6 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                                 <i class="fas fa-receipt"></i> Despesas Fixas
                             </a>
                         </li>
-
                         <li>
                             <a href="/sistema-frotas/pages/financiamento.php">
                                 <i class="fas fa-hand-holding-usd"></i> Financiamento
@@ -204,6 +208,8 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                         </li>
                     </ul>
                 </li>
+                
+                <?php if (can_access_tire_management()): ?>
                 <li class="sidebar-nav-item">
                     <a href="#" class="sidebar-link sidebar-dropdown-toggle">
                         <div class="sidebar-link-icon">
@@ -235,6 +241,8 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                         </li>
                     </ul>
                 </li>
+                <?php endif; ?>
+                <?php if (can_approve_refuels()): ?>
                 <li class="sidebar-nav-item">
                     <a href="#" class="sidebar-link sidebar-dropdown-toggle">
                         <div class="sidebar-link-icon">
@@ -266,6 +274,8 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                         </li>
                     </ul>
                 </li>
+                <?php endif; ?>
+                <?php if (can_access_lucratividade()): ?>
                 <li class="sidebar-nav-item">
                     <a href="/sistema-frotas/pages/lucratividade.php" class="sidebar-link">
                         <div class="sidebar-link-icon">
@@ -274,14 +284,20 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                         <span class="sidebar-link-text">Lucratividade</span>
                     </a>
                 </li>
+                <?php endif; ?>
+                
+                <?php if (can_access_advanced_reports()): ?>
                 <li class="sidebar-nav-item">
                     <a href="/sistema-frotas/pages/relatorios.php" class="sidebar-link">
                         <div class="sidebar-link-icon">
-                            <i class="fas fa-chart-line"></i>
+                            <i class="fas fa-file-alt"></i>
                         </div>
                         <span class="sidebar-link-text">Relatórios</span>
                     </a>
                 </li>
+                <?php endif; ?>
+                
+                <?php if (can_manage_system_settings()): ?>
                 <li class="sidebar-nav-item">
                     <a href="/sistema-frotas/pages/configuracoes.php" class="sidebar-link">
                         <div class="sidebar-link-icon">
@@ -290,6 +306,7 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                         <span class="sidebar-link-text">Configuração</span>
                     </a>
                 </li>
+                <?php endif; ?>
             </ul>
         </nav>
     </div>

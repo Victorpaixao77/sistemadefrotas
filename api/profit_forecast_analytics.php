@@ -124,6 +124,42 @@ try {
             $x_values[] = 5 - $i;
             $y_values[] = $historical_values[count($historical_values) - 1];
         }
+        
+        // Adicionar projeção
+        for ($i = 1; $i <= 3; $i++) {
+            $next_month = date('Y-m', strtotime("+$i months"));
+            $month = intval(date('m', strtotime($next_month)));
+            $year = date('Y', strtotime($next_month));
+            
+            $labels[] = $meses[$month] . '/' . substr($year, -2);
+        }
+        
+        // Retornar dados de exemplo com aviso
+        echo json_encode([
+            'labels' => $labels,
+            'datasets' => [
+                [
+                    'label' => 'Lucro Real (Dados de Exemplo)',
+                    'data' => array_merge($historical_values, array_fill(0, 3, null)),
+                    'borderColor' => '#ffc107',
+                    'backgroundColor' => 'rgba(255, 193, 7, 0.1)',
+                    'fill' => true,
+                    'tension' => 0.4
+                ],
+                [
+                    'label' => 'Projeção (Dados de Exemplo)',
+                    'data' => array_merge(array_fill(0, count($historical_values), null), 
+                        array_map(function($val) { return $val * 1.1; }, array_slice($historical_values, -3))),
+                    'borderColor' => '#fd7e14',
+                    'backgroundColor' => 'rgba(253, 126, 20, 0.1)',
+                    'borderDash' => [5, 5],
+                    'fill' => true,
+                    'tension' => 0.4
+                ]
+            ],
+            'warning' => 'Dados insuficientes para análise real.'
+        ]);
+        exit;
     }
     
     // Calcular regressão linear

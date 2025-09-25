@@ -35,6 +35,9 @@ try {
         case 'list':
             listMotorists($conn);
             break;
+        case 'get_all':
+            getAllMotorists($conn);
+            break;
         default:
             echo json_encode(['success' => false, 'message' => 'Ação não especificada']);
             break;
@@ -309,6 +312,32 @@ function listMotorists($conn) {
         'page' => $page,
         'limit' => $limit,
         'total_pages' => ceil($total / $limit)
+    ]);
+}
+
+function getAllMotorists($conn) {
+    $empresa_id = $_SESSION['empresa_id'];
+    
+    // Get all motorists without pagination
+    $sql = "SELECT m.id, m.nome, m.cpf, m.telefone, m.email, m.cnh,
+            d.nome as disponibilidade_nome,
+            c.nome as categoria_cnh_nome
+            FROM motoristas m
+            LEFT JOIN disponibilidades d ON m.disponibilidade_id = d.id
+            LEFT JOIN categorias_cnh c ON m.categoria_cnh_id = c.id
+            WHERE m.empresa_id = :empresa_id
+            ORDER BY m.nome ASC";
+    
+    $stmt = $conn->prepare($sql);
+    $stmt->bindParam(':empresa_id', $empresa_id);
+    $stmt->execute();
+    
+    $motorists = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    echo json_encode([
+        'success' => true,
+        'data' => $motorists,
+        'total' => count($motorists)
     ]);
 }
 ?> 

@@ -1,14 +1,22 @@
 <?php
-require_once '../config.php';
-require_once '../functions.php';
-require_once '../db.php';
+require_once '../includes/config.php';
+require_once '../includes/functions.php';
+require_once '../includes/db_connect.php';
 
-// Verificar se o motorista está logado
-validar_sessao_motorista();
+configure_session();
+session_start();
 
-// Obter dados do motorista
-$motorista_id = $_SESSION['motorista_id'];
-$empresa_id = $_SESSION['empresa_id'];
+// Verificar se o usuário está autenticado ou se empresa_id foi fornecido
+$empresa_id = null;
+if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true && isset($_SESSION['empresa_id'])) {
+    $empresa_id = $_SESSION['empresa_id'];
+} elseif (isset($_GET['empresa_id']) && is_numeric($_GET['empresa_id'])) {
+    $empresa_id = (int)$_GET['empresa_id'];
+} else {
+    http_response_code(401);
+    echo json_encode(['error' => 'Não autorizado']);
+    exit;
+}
 
 // Verificar se é uma requisição GET
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
