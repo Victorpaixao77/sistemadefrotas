@@ -1,6 +1,18 @@
 <?php
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/functions.php';
+
+// Configurar sessão
+configure_session();
+session_start();
+
+// Verificar se o usuário está autenticado
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Não autorizado']);
+    exit;
+}
+
 header('Content-Type: application/json');
 
 try {

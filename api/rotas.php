@@ -6,17 +6,14 @@ require_once '../includes/db_connect.php';
 configure_session();
 session_start();
 
-// Verificar se o usuário está autenticado ou se empresa_id foi fornecido
-$empresa_id = null;
-if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true && isset($_SESSION['empresa_id'])) {
-    $empresa_id = $_SESSION['empresa_id'];
-} elseif (isset($_GET['empresa_id']) && is_numeric($_GET['empresa_id'])) {
-    $empresa_id = (int)$_GET['empresa_id'];
-} else {
+// Verificar se o usuário está autenticado
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
     http_response_code(401);
     echo json_encode(['error' => 'Não autorizado']);
     exit;
 }
+
+$empresa_id = $_SESSION['empresa_id'];
 
 // Verificar se é uma requisição GET
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {

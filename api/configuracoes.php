@@ -6,12 +6,15 @@ require_once '../includes/functions.php';
 configure_session();
 if (session_status() === PHP_SESSION_NONE) session_start();
 header('Content-Type: application/json');
-// Temporariamente desabilitando autenticação para desenvolvimento
-// require_authentication();
-$empresa_id = $_SESSION['empresa_id'] ?? 1; // Usar empresa_id 1 como padrão se não houver sessão
-if (!$empresa_id) {
-    $empresa_id = 1; // Fallback para empresa_id 1
+
+// Verificar se o usuário está autenticado
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Não autorizado']);
+    exit;
 }
+
+$empresa_id = $_SESSION['empresa_id'];
 
 
 $method = $_SERVER['REQUEST_METHOD'];

@@ -25,7 +25,7 @@ try {
 
         case 'veiculos':
             // Buscar veículos da empresa atual
-            $empresa_id = $_SESSION['empresa_id'] ?? 0;
+            $empresa_id = $_SESSION['empresa_id'];
             $stmt = $pdo->prepare("SELECT id, placa as nome FROM veiculos WHERE empresa_id = ? ORDER BY placa");
             $stmt->execute([$empresa_id]);
             $data = $stmt->fetchAll(PDO::FETCH_ASSOC);

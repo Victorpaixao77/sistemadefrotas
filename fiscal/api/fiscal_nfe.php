@@ -46,7 +46,7 @@ try {
     
     // Obter dados do POST
     $input = json_decode(file_get_contents('php://input'), true);
-    $empresa_id = $input['empresa_id'] ?? 1; // Usar empresa_id padrão se não fornecido
+    $empresa_id = $_SESSION['empresa_id'];
     $action = $input['action'] ?? 'list';
     
     switch ($action) {

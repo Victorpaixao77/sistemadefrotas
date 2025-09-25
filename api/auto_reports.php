@@ -9,7 +9,14 @@ session_start();
 
 header('Content-Type: application/json');
 
-$empresa_id = $_SESSION['empresa_id'] ?? 1;
+// Verificar se o usuário está autenticado
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Não autorizado']);
+    exit;
+}
+
+$empresa_id = $_SESSION['empresa_id'];
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
 try {

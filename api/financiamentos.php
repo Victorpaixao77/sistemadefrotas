@@ -197,7 +197,7 @@ try {
                         'forma_pagamento_id' => $_POST['forma_pagamento_id'],
                         'comprovante_pagamento' => $comprovante_path,
                         'observacoes' => !empty($_POST['observacoes']) ? $_POST['observacoes'] : null,
-                        'empresa_id' => $_POST['empresa_id']
+                        'empresa_id' => $_SESSION['empresa_id']
                     ];
                     
                     $stmt = $conn->prepare($sql);
@@ -240,7 +240,7 @@ try {
                     $data = [
                         'financiamento_id' => $_POST['financiamento_id'],
                         'numero_parcela' => $_POST['numero_parcela'],
-                        'empresa_id' => $_POST['empresa_id']
+                        'empresa_id' => $_SESSION['empresa_id']
                     ];
                     
                     $stmt = $conn->prepare($sql);
@@ -280,7 +280,7 @@ try {
                             'data_proxima_parcela' => !empty($_POST['data_proxima_parcela']) ? $_POST['data_proxima_parcela'] : null,
                             'contrato' => !empty($_POST['contrato']) ? $_POST['contrato'] : null,
                             'observacoes' => !empty($_POST['observacoes']) ? $_POST['observacoes'] : null,
-                            'empresa_id' => $_POST['empresa_id']
+                            'empresa_id' => $_SESSION['empresa_id']
                         ];
                         
                         // Verifica se é uma atualização ou inserção
@@ -314,7 +314,7 @@ try {
                             $stmt_check = $conn->prepare($sql_check);
                             $stmt_check->execute([
                                 'id' => $_POST['financiamentoId'],
-                                'empresa_id' => $_POST['empresa_id']
+                                'empresa_id' => $_SESSION['empresa_id']
                             ]);
                             
                             if ($stmt_check->fetchColumn() == 0) {
@@ -363,7 +363,7 @@ try {
                                             'numero_parcela' => $i,
                                             'valor' => $valor_parcela,
                                             'data_vencimento' => $data_vencimento->format('Y-m-d'),
-                                            'empresa_id' => $_POST['empresa_id']
+                                            'empresa_id' => $_SESSION['empresa_id']
                                         ]);
                                         
                                         if (!$result) {
@@ -448,7 +448,7 @@ try {
                                     'valor' => $valor_parcela,
                                     'data_vencimento' => $data_vencimento->format('Y-m-d'),
                                     'status_id' => $status_id,
-                                    'empresa_id' => $_POST['empresa_id'],
+                                    'empresa_id' => $_SESSION['empresa_id'],
                                     'data_pagamento' => $data_pagamento
                                 ];
                                 

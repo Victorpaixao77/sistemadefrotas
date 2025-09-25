@@ -1,7 +1,7 @@
 <?php
 require_once '../includes/db_connect.php';
 session_start();
-$empresa_id = $_SESSION['empresa_id'] ?? 1;
+$empresa_id = $_SESSION['empresa_id'];
 header('Content-Type: application/json');
 
 try {

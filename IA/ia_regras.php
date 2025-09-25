@@ -3,26 +3,14 @@
 require_once __DIR__ . '/../includes/db_connect.php';
 session_start();
 
-// Permitir empresa_id via GET, CLI ou variável de ambiente
-if (php_sapi_name() === 'cli') {
-    // Executado via terminal
-    global $argv;
-    $empresa_id = 1;
-    foreach ($argv as $arg) {
-        if (strpos($arg, 'empresa_id=') === 0) {
-            $empresa_id = (int)str_replace('empresa_id=', '', $arg);
-        }
-    }
-    if (!$empresa_id) $empresa_id = 1;
-} elseif (isset($_GET['empresa_id'])) {
-    $empresa_id = (int)$_GET['empresa_id'];
-} elseif (isset($_SESSION['empresa_id'])) {
-    $empresa_id = $_SESSION['empresa_id'];
-} elseif (getenv('EMPRESA_ID')) {
-    $empresa_id = (int)getenv('EMPRESA_ID');
-} else {
-    $empresa_id = 1;
+// Verificar se o usuário está autenticado
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Não autorizado']);
+    exit;
 }
+
+$empresa_id = $_SESSION['empresa_id'];
 
 $conn = getConnection();
 

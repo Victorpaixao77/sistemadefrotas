@@ -2,11 +2,20 @@
 require_once 'config.php';
 require_once 'functions.php';
 
+// Configurar sessão
+configure_session();
 session_start();
+
+// Verificar se o usuário está autenticado
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Não autorizado']);
+    exit;
+}
 
 try {
     $pdo = getConnection();
-    $empresa_id = $_SESSION['empresa_id'] ?? 0;
+    $empresa_id = $_SESSION['empresa_id'];
     
     // Se foi solicitado um pneu específico
     if (isset($_GET['id'])) {

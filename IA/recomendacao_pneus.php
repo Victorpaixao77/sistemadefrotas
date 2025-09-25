@@ -296,7 +296,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new Exception('Parâmetros obrigatórios não fornecidos');
         }
         
-        $empresa_id = $_SESSION['empresa_id'] ?? 1;
+        $empresa_id = $_SESSION['empresa_id'];
         $recomendador = new RecomendacaoPneus($empresa_id);
         
         $recomendacoes = $recomendador->recomendarPneu(

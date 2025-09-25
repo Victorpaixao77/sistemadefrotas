@@ -9,7 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 // Obter dados da empresa do usuário logado
-$empresa_id = $_SESSION['empresa_id'] ?? 1;
+$empresa_id = $_SESSION['empresa_id'];
 $user_id = $_SESSION['user_id'];
 
 // Dados simulados para demonstração (até as tabelas serem criadas)

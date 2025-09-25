@@ -7,7 +7,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$empresa_id = $_SESSION['empresa_id'] ?? 1; // Ajuste conforme sua lógica de sessão
+$empresa_id = $_SESSION['empresa_id'];
 header('Content-Type: application/json');
 $conn = getConnection();
 

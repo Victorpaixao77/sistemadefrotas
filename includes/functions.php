@@ -213,7 +213,7 @@ function getCompanyData() {
         $conn = getConnection();
         $sql = "SELECT * FROM empresa_clientes WHERE id = :empresa_id";
         $stmt = $conn->prepare($sql);
-        $stmt->bindValue(':empresa_id', $_SESSION['empresa_id'] ?? 1);
+        $stmt->bindValue(':empresa_id', $_SESSION['empresa_id']);
         $stmt->execute();
         
         if ($stmt->rowCount() > 0) {

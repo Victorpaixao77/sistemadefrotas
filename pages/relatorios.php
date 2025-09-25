@@ -755,7 +755,7 @@ function getReportData($reportType, $month, $year) {
         
         // Adicionar empresa_id para relatórios que precisam
         if (in_array($reportType, ['vida_util_pneus', 'custos_veiculo', 'eficiencia_frota', 'historico_manutencoes', 'analise_preditiva', 'otimizacao_pneus', 'produtividade_motoristas', 'consumo_combustivel', 'custo_por_km', 'rentabilidade_rotas', 'multas_motorista_veiculo', 'ocupacao_frota', 'veiculos_ociosos', 'custos_manutencao_veiculo'])) {
-            $empresa_id = $_SESSION['empresa_id'] ?? 1;
+            $empresa_id = $_SESSION['empresa_id'];
             $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
             error_log("Parâmetro empresa_id para $reportType: $empresa_id");
         }

@@ -10,7 +10,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Verificar se o usuário está logado (mas não redirecionar)
 $usuario_logado = isLoggedIn();
-$empresa_id = $_SESSION['empresa_id'] ?? 1;
+$empresa_id = $_SESSION['empresa_id'];
 
 // Se não estiver logado, mostrar aviso mas permitir acesso
 if (!$usuario_logado) {

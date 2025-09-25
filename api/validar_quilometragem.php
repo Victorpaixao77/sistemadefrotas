@@ -12,9 +12,10 @@ session_start();
 
 header('Content-Type: application/json');
 
-// Verificar autenticação
-if (!isset($_SESSION['empresa_id'])) {
-    echo json_encode(['success' => false, 'error' => 'Não autenticado']);
+// Verificar se o usuário está autenticado
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Não autorizado']);
     exit;
 }
 

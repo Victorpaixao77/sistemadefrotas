@@ -8,7 +8,7 @@ try {
     $pdo = getConnection();
     
     $id = $_GET['id'] ?? null;
-    $empresa_id = $_SESSION['empresa_id'] ?? 0;
+    $empresa_id = $_SESSION['empresa_id'];
     
     if (!$id) {
         throw new Exception('ID do pneu não fornecido');

@@ -9,8 +9,15 @@ session_start();
 
 header('Content-Type: application/json');
 
-$empresa_id = $_SESSION['empresa_id'] ?? 1;
-$user_id = $_SESSION['user_id'] ?? 16; // Fallback para admin
+// Verificar se o usuário está autenticado
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Não autorizado']);
+    exit;
+}
+
+$empresa_id = $_SESSION['empresa_id'];
+$user_id = $_SESSION['user_id'] ?? null;
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
 
 try {

@@ -34,7 +34,7 @@ try {
     }
     
     // Obter empresa_id
-    $empresa_id = $_SESSION['empresa_id'] ?? 1;
+    $empresa_id = $_SESSION['empresa_id'];
     
     // Conectar ao banco
     $conn = getConnection();

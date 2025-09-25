@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                     // Obter o ID da empresa_clientes correspondente
                     $stmt = $pdo->prepare("SELECT id FROM empresa_clientes WHERE empresa_adm_id = ?");
-                    $stmt->execute([$_POST['empresa_id']]);
+                    $stmt->execute([$_SESSION['empresa_id']]);
                     $empresa_cliente = $stmt->fetch();
                     
                     if (!$empresa_cliente) {
@@ -151,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                     // Obter o ID da empresa_clientes correspondente
                     $stmt = $pdo->prepare("SELECT id FROM empresa_clientes WHERE empresa_adm_id = ?");
-                    $stmt->execute([$_POST['empresa_id']]);
+                    $stmt->execute([$_SESSION['empresa_id']]);
                     $empresa_cliente = $stmt->fetch();
                     
                     if (!$empresa_cliente) {

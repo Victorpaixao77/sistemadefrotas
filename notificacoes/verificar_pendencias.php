@@ -13,7 +13,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Obter empresa_id da sessão
-$empresa_id = $_SESSION['empresa_id'] ?? 1;
+$empresa_id = $_SESSION['empresa_id'];
 
 try {
     $conn = getConnection();

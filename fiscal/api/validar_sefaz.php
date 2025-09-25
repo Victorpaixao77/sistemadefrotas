@@ -20,7 +20,7 @@ try {
         // Se não estiver logado, usar empresa_id padrão
         $empresa_id = 1;
     } else {
-        $empresa_id = $_SESSION['empresa_id'] ?? 1;
+        $empresa_id = $_SESSION['empresa_id'];
     }
 
     $conn = getConnection();

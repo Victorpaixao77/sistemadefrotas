@@ -14,7 +14,7 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$empresa_id = $_SESSION['empresa_id'] ?? 1;
+$empresa_id = $_SESSION['empresa_id'];
 $conn = getConnection();
 
 $method = $_SERVER['REQUEST_METHOD'];

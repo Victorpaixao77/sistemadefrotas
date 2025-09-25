@@ -5,9 +5,10 @@ require_once '../includes/functions.php';
 configure_session();
 session_start();
 
-// Verifica se é uma requisição AJAX
-if (!isset($_SERVER['HTTP_X_REQUESTED_WITH']) || strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) != 'xmlhttprequest') {
-    echo json_encode(['success' => false, 'error' => 'Requisição inválida']);
+// Verificar se o usuário está autenticado
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Não autorizado']);
     exit;
 }
 
