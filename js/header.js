@@ -31,41 +31,59 @@ function initNotifications() {
     // Função para carregar notificações (padrão: só não lidas, todas se true)
     function carregarNotificacoesIA(verTodas = false) {
         const url = verTodas ? '/sistema-frotas/notificacoes/notificacoes.php?todas=1' : '/sistema-frotas/notificacoes/notificacoes.php';
-        fetch(url)
-            .then(res => res.json())
-            .then(data => {
-                notificationList.innerHTML = '';
-                let unreadCount = 0;
-                if (data.success && data.notificacoes.length) {
-                    data.notificacoes.forEach(n => {
-                        let iconClass = 'info';
-                        if (n.tipo === 'manutencao') iconClass = 'warning';
-                        if (n.tipo === 'alerta') iconClass = 'warning';
-                        if (n.tipo === 'pneu') iconClass = 'success';
-                        const unread = n.lida == 0 ? 'unread' : 'lida';
-                        if (unread === 'unread') unreadCount++;
-                        notificationList.innerHTML += `
-                            <div class="notification-item ${unread}">
-                                <div class="notification-icon ${iconClass}">
-                                    <i class="fas fa-bell"></i>
-                                </div>
-                                <div class="notification-content">
-                                    <div class="notification-title">${n.titulo}</div>
-                                    <div class="notification-text">${n.mensagem}</div>
-                                    <div class="notification-time">${new Date(n.data_criacao).toLocaleString('pt-BR')}</div>
-                                </div>
+        fetch(url, {
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(res => {
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            return res.json();
+        })
+        .then(data => {
+            notificationList.innerHTML = '';
+            let unreadCount = 0;
+            
+            if (data.success && data.notificacoes && data.notificacoes.length) {
+                data.notificacoes.forEach(n => {
+                    let iconClass = 'info';
+                    if (n.tipo === 'manutencao') iconClass = 'warning';
+                    if (n.tipo === 'alerta') iconClass = 'warning';
+                    if (n.tipo === 'pneu') iconClass = 'success';
+                    const unread = n.lida == 0 ? 'unread' : 'lida';
+                    if (unread === 'unread') unreadCount++;
+                    notificationList.innerHTML += `
+                        <div class="notification-item ${unread}">
+                            <div class="notification-icon ${iconClass}">
+                                <i class="fas fa-bell"></i>
                             </div>
-                        `;
-                    });
-                } else {
-                    notificationList.innerHTML = '<div style="padding:16px;color:#b8c2d0">Nenhuma notificação encontrada.</div>';
-                }
-                
-                // Usar o total real de notificações não lidas se disponível
-                const totalReal = data.total_real_nao_lidas || unreadCount;
-                badge.textContent = totalReal;
-                badge.style.display = totalReal > 0 ? 'flex' : 'none';
-            });
+                            <div class="notification-content">
+                                <div class="notification-title">${n.titulo}</div>
+                                <div class="notification-text">${n.mensagem}</div>
+                                <div class="notification-time">${new Date(n.data_criacao).toLocaleString('pt-BR')}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                notificationList.innerHTML = '<div style="padding:16px;color:#b8c2d0">Nenhuma notificação encontrada.</div>';
+            }
+            
+            // Usar o total real de notificações não lidas se disponível
+            const totalReal = data.total_real_nao_lidas || unreadCount;
+            badge.textContent = totalReal;
+            badge.style.display = totalReal > 0 ? 'flex' : 'none';
+        })
+        .catch(error => {
+            console.error('Erro ao carregar notificações:', error);
+            notificationList.innerHTML = '<div style="padding:16px;color:#dc3545">Erro ao carregar notificações. Tente novamente.</div>';
+            badge.textContent = '!';
+            badge.style.display = 'flex';
+            badge.style.backgroundColor = '#dc3545';
+        });
     }
 
     // Toggle do dropdown de notificações

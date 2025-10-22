@@ -1,19 +1,46 @@
 <?php
-require_once '../includes/db_connect.php';
-require_once '../IA/ia_regras.php';
+// Incluir arquivos na ordem correta usando caminhos absolutos
+require_once dirname(__DIR__) . '/includes/config.php';
+require_once dirname(__DIR__) . '/includes/db_connect.php';
+require_once dirname(__DIR__) . '/includes/functions.php';
+
+// NOTA: ia_regras.php foi removido porque executa análises pesadas automaticamente
+// O arquivo de notificações apenas busca e retorna dados, não precisa executar análises
+// require_once dirname(__DIR__) . '/IA/ia_regras.php';
+
+// Prevenir qualquer saída antes do JSON
+ob_start();
+
+// Configurar sessão
+configure_session();
 
 // Verificar se a sessão já está ativa antes de iniciá-la
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$empresa_id = $_SESSION['empresa_id'];
+// Definir header antes de qualquer saída
 header('Content-Type: application/json');
+
+// Verificar se o usuário está autenticado
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
+    ob_clean();
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Usuário não autenticado']);
+    exit;
+}
+
+$empresa_id = $_SESSION['empresa_id'];
 $conn = getConnection();
 
 $todas = isset($_GET['todas']) && $_GET['todas'] == '1';
 
 try {
+    // Verificar se a conexão com o banco está funcionando
+    if (!$conn) {
+        throw new Exception("Falha na conexão com o banco de dados");
+    }
+    
     if ($todas) {
         // Para "Ver todas": mostrar apenas notificações dos últimos 30 dias
         $stmt = $conn->prepare("SELECT * FROM notificacoes 
@@ -58,6 +85,9 @@ try {
         }
     }
     
+    // Limpar buffer antes de enviar resposta
+    ob_clean();
+    
     echo json_encode([
         'success' => true, 
         'notificacoes' => $notificacoes_filtradas,
@@ -67,6 +97,12 @@ try {
     ]);
     
 } catch (Exception $e) {
+    ob_clean();
     error_log("Erro ao buscar notificações: " . $e->getMessage());
-    echo json_encode(['success' => false, 'error' => 'Erro ao buscar notificações']);
+    http_response_code(500);
+    echo json_encode([
+        'success' => false, 
+        'error' => 'Erro ao buscar notificações',
+        'details' => $e->getMessage()
+    ]);
 } 

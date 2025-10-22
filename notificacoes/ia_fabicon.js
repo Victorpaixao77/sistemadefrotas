@@ -55,14 +55,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function carregarIANotificacoes(verTodas = false) {
     const url = verTodas ? '/sistema-frotas/notificacoes/notificacoes.php?todas=1' : '/sistema-frotas/notificacoes/notificacoes.php';
-    fetch(url)
-      .then(res => res.json())
+    fetch(url, {
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        return res.json();
+      })
       .then(data => {
         const list = panel.querySelector('.ia-notification-list');
         list.innerHTML = '';
         let unreadCount = 0;
         
-        if (data.success && data.notificacoes.length) {
+        if (data.success && data.notificacoes && data.notificacoes.length) {
           data.notificacoes.forEach(n => {
             const item = document.createElement('div');
             item.className = 'ia-notification-item';
@@ -132,13 +142,20 @@ document.addEventListener('DOMContentLoaded', function() {
           list.innerHTML = '<div style="color:#b8c2d0; text-align: center; padding: 20px;">Nenhuma notificação IA encontrada.</div>';
         }
         
-        badge.textContent = unreadCount;
-        badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+        // Usar o total real de notificações não lidas se disponível
+        const totalReal = data.total_real_nao_lidas || unreadCount;
+        badge.textContent = totalReal;
+        badge.style.display = totalReal > 0 ? 'flex' : 'none';
       })
       .catch(error => {
         console.error('Erro ao carregar notificações IA:', error);
         const list = panel.querySelector('.ia-notification-list');
         list.innerHTML = '<div style="color:#ef4444; text-align: center; padding: 20px;">Erro ao carregar notificações</div>';
+        
+        // Mostrar erro no badge
+        badge.textContent = '!';
+        badge.style.display = 'flex';
+        badge.style.backgroundColor = '#ef4444';
       });
   }
 

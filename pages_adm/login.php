@@ -27,6 +27,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $_SESSION['admin_nome'] = $usuario['nome'];
                 $_SESSION['admin_email'] = $usuario['email'];
                 
+                // Definir empresa_id padrão para administrador geral (ID 1)
+                // Em um sistema multi-tenant, isso seria dinâmico baseado no usuário
+                $_SESSION['empresa_id'] = 1; // Empresa administrativa padrão
+                
                 // Registrar login no log
                 $log_file = '../logs/admin_login.log';
                 $log_message = date('Y-m-d H:i:s') . " - Admin ID: {$usuario['id']} - Email: {$usuario['email']} - IP: {$_SERVER['REMOTE_ADDR']}\n";

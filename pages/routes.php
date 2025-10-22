@@ -300,6 +300,34 @@ $total_paginas = $resultado['total_paginas'];
             position: relative;
             overflow: hidden;
         }
+        
+        /* Estilos responsivos para mobile */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            transition: margin-left var(--transition-speed) ease;
+            width: calc(100% - var(--sidebar-width));
+            min-height: 100vh;
+            background: var(--bg-primary);
+        }
+        
+        .sidebar-collapsed .main-content {
+            margin-left: var(--sidebar-collapsed-width);
+            width: calc(100% - var(--sidebar-collapsed-width));
+        }
+        
+        .dashboard-content {
+            padding: 20px;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                margin-left: 0 !important;
+                width: 100% !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1250,11 +1278,14 @@ $total_paginas = $resultado['total_paginas'];
           </div>
         </div>
         
+        <!-- Container responsivo para os mapas -->
+        <div class="map-container" style="width: 100%; max-width: 800px; margin: 0 auto; padding: 10px;">
         <!-- Mapa Canvas (atual) -->
-        <canvas id="mapCanvas" width="800" height="700" style="display: block; margin: 0 auto;"></canvas>
+        <canvas id="mapCanvas" width="800" height="700" style="display: block; margin: 0 auto; max-width: 100%; height: auto;"></canvas>
         
         <!-- Google Maps -->
-        <div id="googleMap" style="width: 800px; height: 700px; margin: 0 auto; display: none;"></div>
+        <div id="googleMap" style="width: 100%; max-width: 800px; height: 700px; margin: 0 auto; display: none;"></div>
+        </div>
       </div>
     </div>
 
@@ -1285,6 +1316,39 @@ $total_paginas = $resultado['total_paginas'];
     
     <!-- Script do Mapa - Carregado por último -->
     <script>
+        // Função para redimensionar o canvas responsivamente
+        function resizeCanvas() {
+            const canvas = document.getElementById('mapCanvas');
+            const container = canvas.parentElement;
+            const containerWidth = container.clientWidth;
+            
+            // Manter proporção 800x700
+            const aspectRatio = 800 / 700;
+            let newWidth = Math.min(containerWidth - 20, 800); // 20px de margem
+            let newHeight = newWidth / aspectRatio;
+            
+            // Limitar altura máxima
+            if (newHeight > 700) {
+                newHeight = 700;
+                newWidth = newHeight * aspectRatio;
+            }
+            
+            // Aplicar novos tamanhos
+            canvas.style.width = newWidth + 'px';
+            canvas.style.height = newHeight + 'px';
+            
+            // Redesenhar o mapa se necessário
+            if (typeof desenhaMapaComRotas === 'function') {
+                desenhaMapaComRotas();
+            }
+        }
+        
+        // Redimensionar quando a janela mudar de tamanho
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Redimensionar quando a página carregar
+        window.addEventListener('load', resizeCanvas);
+        
         // Namespace para evitar conflitos
         window.MapRoutes = window.MapRoutes || {};
         

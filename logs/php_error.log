@@ -118,3 +118,27 @@
     [tipo_usuario] => admin
 )
 
+[26-Sep-2025 04:39:48 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [loggedin] => 1
+    [id] => 16
+    [usuario_id] => 16
+    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
+    [email] => victor@rbxsoft.com
+    [empresa_id] => 1
+    [foto_perfil] => perfil_16_1747893599.png
+    [tipo_usuario] => admin
+)
+
+[26-Sep-2025 04:39:48 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [loggedin] => 1
+    [id] => 16
+    [usuario_id] => 16
+    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
+    [email] => victor@rbxsoft.com
+    [empresa_id] => 1
+    [foto_perfil] => perfil_16_1747893599.png
+    [tipo_usuario] => admin
+)
+

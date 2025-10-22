@@ -3,14 +3,12 @@
 ob_start();
 header('Content-Type: application/json');
 
-// Definir constantes se não existirem
-if (!defined('DB_SERVER')) define('DB_SERVER', 'localhost:3307');
-if (!defined('DB_USERNAME')) define('DB_USERNAME', 'root');
-if (!defined('DB_PASSWORD')) define('DB_PASSWORD', '');
-if (!defined('DB_NAME')) define('DB_NAME', 'sistema_frotas');
+// Incluir configurações principais
+require_once dirname(__DIR__, 2) . '/includes/config.php';
+require_once dirname(__DIR__, 2) . '/includes/functions.php';
 
-// Incluir conexão
-require_once dirname(__DIR__, 2) . '/includes/db_connect.php';
+// Configurar sessão
+configure_session();
 
 // Iniciar sessão
 if (session_status() === PHP_SESSION_NONE) {
@@ -22,10 +20,10 @@ error_log("API Eixos - Session ID: " . session_id());
 error_log("API Eixos - Session data: " . print_r($_SESSION, true));
 
 // Verificar autenticação e empresa_id
-if (!isset($_SESSION['empresa_id']) || empty($_SESSION['empresa_id'])) {
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
     ob_clean();
     http_response_code(401);
-    echo json_encode(['success' => false, 'error' => 'Usuário não autenticado ou empresa não identificada', 'debug' => ['session_id' => session_id(), 'session_data' => $_SESSION]]);
+    echo json_encode(['success' => false, 'error' => 'Usuário não autenticado']);
     exit;
 }
 

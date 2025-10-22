@@ -297,6 +297,36 @@ $kpis = getKPIMetrics($conn);
     <!-- Sortable.js for drag-and-drop -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     
+    <!-- Estilos responsivos para mobile -->
+    <style>
+        .main-content {
+            margin-left: var(--sidebar-width);
+            transition: margin-left var(--transition-speed) ease;
+            width: calc(100% - var(--sidebar-width));
+            min-height: 100vh;
+            background: var(--bg-primary);
+        }
+        
+        .sidebar-collapsed .main-content {
+            margin-left: var(--sidebar-collapsed-width);
+            width: calc(100% - var(--sidebar-collapsed-width));
+        }
+        
+        .dashboard-content {
+            padding: 20px;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                margin-left: 0 !important;
+                width: 100% !important;
+            }
+        }
+    </style>
+    
     <!-- Custom scripts -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>

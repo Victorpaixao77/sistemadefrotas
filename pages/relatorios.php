@@ -28,7 +28,14 @@ function generatePDF($html, $filename) {
         error_log("Iniciando geração do PDF: $filename");
         error_log("HTML a ser convertido: " . substr($html, 0, 500) . "...");
         
+        // Criar diretório temporário se não existir
+        $tempDir = dirname(__DIR__) . '/tmp';
+        if (!file_exists($tempDir)) {
+            mkdir($tempDir, 0755, true);
+        }
+        
         $mpdf = new \Mpdf\Mpdf([
+            'tempDir' => $tempDir,
             'mode' => 'utf-8',
             'format' => 'A4',
             'margin_left' => 15,

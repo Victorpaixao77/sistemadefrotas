@@ -1663,6 +1663,33 @@ $total_paginas = $resultado['total_paginas'];
         .analytics-card .card-body {
             height: 300px;
         }
+        
+        /* Estilos responsivos para mobile */
+        .main-content {
+            margin-left: 0 !important;
+            width: 100% !important;
+        }
+    }
+    
+    /* Estilos responsivos para mobile */
+    .main-content {
+        margin-left: var(--sidebar-width);
+        transition: margin-left var(--transition-speed) ease;
+        width: calc(100% - var(--sidebar-width));
+        min-height: 100vh;
+        background: var(--bg-primary);
+    }
+    
+    .sidebar-collapsed .main-content {
+        margin-left: var(--sidebar-collapsed-width);
+        width: calc(100% - var(--sidebar-collapsed-width));
+    }
+    
+    .dashboard-content {
+        padding: 20px;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
     }
 
     /* Estilos para o modal de ajuda */

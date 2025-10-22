@@ -1,13 +1,17 @@
 <?php
 // IA simples para análise de dados e geração de notificações
 require_once __DIR__ . '/../includes/db_connect.php';
-session_start();
+
+// Iniciar sessão apenas se não estiver ativa
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Verificar se o usuário está autenticado
-if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Não autorizado']);
-    exit;
+// Se não houver empresa_id na sessão, não executar as regras de IA
+if (!isset($_SESSION['empresa_id'])) {
+    // Arquivo incluído sem contexto de sessão válida, retornar silenciosamente
+    return;
 }
 
 $empresa_id = $_SESSION['empresa_id'];
@@ -39,7 +43,7 @@ function inserirNotificacao($empresa_id, $tipo, $titulo, $mensagem, $ia_mensagem
 }
 
 // VALIDAÇÃO MELHORADA DE CONSUMO ABAIXO DO ESPERADO
-$sql = "SELECT a.*, r.distancia_km, v.modelo, v.placa, v.id as veiculo_id, r.id as rota_id, 
+$sql = "SELECT a.*, r.distancia_km, v.modelo, v.placa, v.tipo, v.id as veiculo_id, r.id as rota_id, 
         co.nome as cidade_origem_nome, cd.nome as cidade_destino_nome, r.data_rota,
         (r.distancia_km / a.litros) as consumo_atual
         FROM abastecimentos a
@@ -98,10 +102,11 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
     } else {
         // Se não há histórico suficiente, usar critérios conservadores baseados no tipo de veículo
         $consumo_esperado = 5.0; // Padrão conservador
-        if ($row['tipo'] === 'Caminhão') $consumo_esperado = 2.5;
-        elseif ($row['tipo'] === 'Carro') $consumo_esperado = 8.0;
-        elseif ($row['tipo'] === 'Van') $consumo_esperado = 6.0;
-        elseif ($row['tipo'] === 'Moto') $consumo_esperado = 15.0;
+        $tipo_veiculo = isset($row['tipo']) ? $row['tipo'] : 'Padrão';
+        if ($tipo_veiculo === 'Caminhão') $consumo_esperado = 2.5;
+        elseif ($tipo_veiculo === 'Carro') $consumo_esperado = 8.0;
+        elseif ($tipo_veiculo === 'Van') $consumo_esperado = 6.0;
+        elseif ($tipo_veiculo === 'Moto') $consumo_esperado = 15.0;
         
         if ($row['consumo_atual'] < ($consumo_esperado * 0.7)) {
             inserirNotificacao(
@@ -109,7 +114,7 @@ foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
                 'alerta',
                 'Consumo abaixo do esperado (Pouco Histórico)',
                 "O consumo do veículo {$placa} na Rota* {$rota_nome} está abaixo do esperado.",
-                "Pouco histórico disponível. Consumo: " . round($row['consumo_atual'], 2) . " km/l. Esperado para {$row['tipo']}: ~{$consumo_esperado} km/l."
+                "Pouco histórico disponível. Consumo: " . round($row['consumo_atual'], 2) . " km/l. Esperado para {$tipo_veiculo}: ~{$consumo_esperado} km/l."
             );
         }
     }
@@ -172,9 +177,10 @@ try {
             
             // Aplicar limites por tipo de veículo
             $limite_veiculo = 1.0;
-            if ($row['tipo'] === 'Caminhão') $limite_veiculo = 1.2;
-            elseif ($row['tipo'] === 'Carro') $limite_veiculo = 0.8;
-            elseif ($row['tipo'] === 'Moto') $limite_veiculo = 0.6;
+            $tipo_veiculo = isset($row['tipo']) ? $row['tipo'] : 'Padrão';
+            if ($tipo_veiculo === 'Caminhão') $limite_veiculo = 1.2;
+            elseif ($tipo_veiculo === 'Carro') $limite_veiculo = 0.8;
+            elseif ($tipo_veiculo === 'Moto') $limite_veiculo = 0.6;
             
             // Aplicar limites por tipo de combustível
             $limite_combustivel = 1.0;
@@ -269,17 +275,18 @@ try {
         // Calcular limite dinâmico baseado no tipo de veículo e distância
         $limite_base = 500; // R$ 500 base
         $limite_por_km = 2.0; // R$ 2 por km
+        $tipo_veiculo = isset($row['tipo']) ? $row['tipo'] : 'Padrão';
         
-        if ($row['tipo'] === 'Caminhão') {
+        if ($tipo_veiculo === 'Caminhão') {
             $limite_base = 800;
             $limite_por_km = 3.0;
-        } elseif ($row['tipo'] === 'Carro') {
+        } elseif ($tipo_veiculo === 'Carro') {
             $limite_base = 300;
             $limite_por_km = 1.5;
-        } elseif ($row['tipo'] === 'Van') {
+        } elseif ($tipo_veiculo === 'Van') {
             $limite_base = 400;
             $limite_por_km = 2.2;
-        } elseif ($row['tipo'] === 'Moto') {
+        } elseif ($tipo_veiculo === 'Moto') {
             $limite_base = 200;
             $limite_por_km = 1.0;
         }
@@ -296,7 +303,7 @@ try {
             $mensagem = 'Despesa de viagem na Rota* ' . $rota_nome . ' do veículo ' . $placa . ' ultrapassou o limite.';
             $ia_mensagem = "Análise IA: Despesa: R$ " . number_format($row['total_despviagem'], 2, ',', '.') . ". ";
             $ia_mensagem .= "Limite dinâmico: R$ " . number_format($limite_dinamico, 2, ',', '.') . " ({$excesso}% acima). ";
-            $ia_mensagem .= "Tipo: {$row['tipo']}, Distância: {$row['distancia_km']} km, Carga: " . ($row['com_carga'] ? 'Sim' : 'Não') . ".";
+            $ia_mensagem .= "Tipo: {$tipo_veiculo}, Distância: {$row['distancia_km']} km, Carga: " . ($row['com_carga'] ? 'Sim' : 'Não') . ".";
             
             inserirNotificacao($empresa_id, 'alerta', $titulo, $mensagem, $ia_mensagem);
         }

@@ -356,7 +356,14 @@ function gerarDadosRelatorio($tipo, $data_inicio, $data_fim, $empresa_id) {
 function gerarRelatorioPDF($dados, $tipo) {
     require_once '../../vendor/autoload.php';
     
+    // Criar diretório temporário se não existir
+    $tempDir = dirname(__DIR__, 2) . '/tmp';
+    if (!file_exists($tempDir)) {
+        mkdir($tempDir, 0755, true);
+    }
+    
     $mpdf = new \Mpdf\Mpdf([
+        'tempDir' => $tempDir,
         'mode' => 'utf-8',
         'format' => 'A4-L', // Paisagem para mais colunas
         'margin_left' => 15,

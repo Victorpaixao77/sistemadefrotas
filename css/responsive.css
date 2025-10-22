@@ -11,6 +11,19 @@
     .analytics-grid {
         grid-template-columns: 1fr;
     }
+    
+    /* Map Responsiveness */
+    #mapCanvas {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+    }
+    
+    #googleMap {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 500px !important;
+    }
 }
 
 /* Mobile Devices (< 768px) */
@@ -81,6 +94,73 @@
     .form-grid {
         grid-template-columns: 1fr;
     }
+    
+    /* Map Responsiveness for Mobile */
+    #mapCanvas {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+    }
+    
+    #googleMap {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 400px !important;
+    }
+    
+    /* Map Container */
+    .map-container {
+        padding: 0.5rem;
+        overflow-x: auto;
+    }
+    
+    /* User Profile Menu Responsiveness */
+    .profile-dropdown {
+        width: 100% !important;
+        max-width: calc(100vw - 20px) !important;
+        right: 10px !important;
+        left: 10px !important;
+        max-height: 80vh !important;
+        overflow-y: auto !important;
+    }
+    
+    .color-palette-section {
+        padding: 8px 12px !important;
+    }
+    
+    .color-option {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 8px !important;
+        margin-bottom: 16px !important;
+    }
+    
+    .color-option label {
+        font-size: 0.8rem !important;
+        margin-bottom: 4px !important;
+    }
+    
+    .color-option input[type="color"] {
+        width: 100% !important;
+        height: 40px !important;
+        border-radius: 8px !important;
+    }
+    
+    .btn-restore-colors {
+        padding: 12px 0 !important;
+        font-size: 0.9rem !important;
+        margin-top: 16px !important;
+    }
+    
+    .profile-dropdown-item {
+        padding: 12px 15px !important;
+        font-size: 0.9rem !important;
+    }
+    
+    .profile-dropdown-item i {
+        width: 24px !important;
+        font-size: 1rem !important;
+    }
 }
 
 /* Small Mobile Devices (< 576px) */
@@ -102,5 +182,53 @@
     .modal-content {
         width: 95%;
         max-height: 90vh;
+    }
+    
+    /* Map Responsiveness for Small Mobile */
+    #mapCanvas {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+    }
+    
+    #googleMap {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 350px !important;
+    }
+    
+    /* User Profile Menu for Small Mobile */
+    .profile-dropdown {
+        width: 100% !important;
+        max-width: calc(100vw - 10px) !important;
+        right: 5px !important;
+        left: 5px !important;
+        max-height: 85vh !important;
+    }
+    
+    .color-palette-section {
+        padding: 6px 10px !important;
+    }
+    
+    .color-option {
+        margin-bottom: 12px !important;
+    }
+    
+    .color-option label {
+        font-size: 0.75rem !important;
+    }
+    
+    .color-option input[type="color"] {
+        height: 35px !important;
+    }
+    
+    .btn-restore-colors {
+        padding: 10px 0 !important;
+        font-size: 0.85rem !important;
+    }
+    
+    .profile-dropdown-item {
+        padding: 10px 12px !important;
+        font-size: 0.85rem !important;
     }
 }

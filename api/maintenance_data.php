@@ -177,18 +177,18 @@ function getMaintenanceData($empresa_id, $limit, $offset, $vehicle, $type, $date
         $summaryStmt->execute();
         $summary = $summaryStmt->fetch(PDO::FETCH_ASSOC);
         
-        return [
+    return [
             'data' => $formattedData,
-            'pagination' => [
+        'pagination' => [
                 'page' => ceil($offset / $limit) + 1,
-                'limit' => $limit,
-                'total' => $totalRecords,
-                'totalPages' => ceil($totalRecords / $limit)
-            ],
-            'summary' => [
+            'limit' => $limit,
+            'total' => $totalRecords,
+            'totalPages' => ceil($totalRecords / $limit)
+        ],
+        'summary' => [
                 'totalMaintenance' => intval($summary['totalMaintenance']),
                 'totalCost' => floatval($summary['totalCost']),
-                'typeBreakdown' => [
+            'typeBreakdown' => [
                     'corretiva' => intval($summary['corretiva']),
                     'preventiva' => intval($summary['preventiva'])
                 ]

@@ -1,0 +1,5 @@
+# Ignorar todos os arquivos temporários
+*
+
+# Manter o diretório
+!.gitignore

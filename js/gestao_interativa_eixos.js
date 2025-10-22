@@ -234,18 +234,55 @@ async function alocarPneuFlexivel(slotId, pneuId) {
     // Carregar posições disponíveis
     let posicoes = [];
     try {
+        console.log('Carregando posições disponíveis...');
         const response = await fetch('../gestao_interativa/api/posicoes_pneus.php', {
             credentials: 'same-origin'
         });
-        const data = await response.json();
-        if (data.success) {
+        
+        console.log('Response status posições:', response.status);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const text = await response.text();
+        console.log('Response text:', text);
+        
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (parseError) {
+            console.error('Erro ao fazer parse do JSON:', parseError);
+            throw new Error('Resposta inválida do servidor: ' + text.substring(0, 100));
+        }
+        
+        console.log('Dados de posições recebidos:', data);
+        
+        if (data.success && data.posicoes) {
             posicoes = data.posicoes;
+            console.log('Posições carregadas:', posicoes.length);
+        } else {
+            console.error('API retornou erro:', data);
+            throw new Error(data.error || 'Erro desconhecido ao carregar posições');
         }
     } catch (error) {
         console.error('Erro ao carregar posições:', error);
+        alert('ERRO: Não foi possível carregar as posições de pneus.\n\n' + 
+              'Detalhes: ' + error.message + '\n\n' +
+              'Verifique o console do navegador (F12) para mais informações.');
+        return;
     }
 
-    // Se não há posições, usar posição padrão
+    // Se não há posições, mostrar erro
+    if (!posicoes || posicoes.length === 0) {
+        alert('ATENÇÃO: Não há posições de pneus cadastradas no sistema!\n\n' +
+              'Para usar este sistema, você precisa cadastrar as posições de pneus primeiro.\n' +
+              'Por favor, cadastre as posições antes de alocar pneus.');
+        return;
+    }
+    
+    // DEBUG: Remover este bloco que aloca sem posição
+    /*
     if (posicoes.length === 0) {
         // Alocar sem posição específica
         const [tipo, idxEixo, posicao] = slotId.split('-');
@@ -290,6 +327,7 @@ async function alocarPneuFlexivel(slotId, pneuId) {
         }
         return;
     }
+    */
 
     // Criar prompt simples para seleção de posição
     let opcoes = 'Selecione a posição do pneu:\n\n';
@@ -297,7 +335,15 @@ async function alocarPneuFlexivel(slotId, pneuId) {
         opcoes += `${index + 1}. ${pos.nome}\n`;
     });
     
+    console.log('Exibindo prompt de seleção de posição...');
     const escolha = prompt(opcoes + '\nDigite o número da posição:');
+    
+    // Se o usuário cancelar o prompt, não continuar
+    if (escolha === null || escolha === '') {
+        console.log('Usuário cancelou a seleção da posição');
+        return;
+    }
+    
     const index = parseInt(escolha) - 1;
     
     if (isNaN(index) || index < 0 || index >= posicoes.length) {

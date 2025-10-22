@@ -13,8 +13,16 @@ if (!isset($_SESSION['empresa_id'])) {
 $empresa_id = $_SESSION['empresa_id'];
 $conn = getConnection();
 
-// Processar requisições
-$action = $_POST['action'] ?? $_GET['action'] ?? '';
+// Processar requisições - suportar JSON e POST
+$input = file_get_contents('php://input');
+$jsonData = json_decode($input, true);
+
+// Determinar a action de diferentes fontes
+$action = $_POST['action'] ?? $_GET['action'] ?? ($jsonData['action'] ?? '');
+
+// Log para debug
+error_log('API usuarios_motoristas.php - Action: ' . $action);
+error_log('API usuarios_motoristas.php - Input: ' . $input);
 
 switch ($action) {
     case 'create':
@@ -155,7 +163,17 @@ switch ($action) {
         break;
 
     case 'delete':
-        $data = json_decode(file_get_contents('php://input'), true);
+        // Usar dados do JSON já decodificado no início
+        $data = $jsonData;
+        
+        // Se não conseguiu via JSON, tentar via POST
+        if (empty($data['id']) && !empty($_POST['id'])) {
+            $data = $_POST;
+        }
+        
+        // Log para debug
+        error_log('Delete usuario motorista - ID recebido: ' . ($data['id'] ?? 'VAZIO'));
+        
         if (empty($data['id'])) {
             echo json_encode(['success' => false, 'error' => 'ID não fornecido']);
             exit;

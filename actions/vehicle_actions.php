@@ -73,7 +73,6 @@ function handleSaveVehicle() {
             'chassi' => $_POST['chassi'] ?? null,
             'renavam' => $_POST['renavam'] ?? null,
             'km_atual' => $_POST['km_atual'] ?? 0,
-            'documento' => $_POST['documento'] ?? null,
             'observacoes' => $_POST['observacoes'] ?? null,
             'id_cavalo' => $_POST['id_cavalo'] ?: null,
             'id_carreta' => $_POST['id_carreta'] ?: null,
@@ -88,34 +87,86 @@ function handleSaveVehicle() {
             'status_id' => $_POST['status_id'] ?: null
         ];
 
+        // Log para debug em produção
+        error_log("vehicle_actions.php - Processando veículo ID: " . ($id ?? 'novo'));
+        error_log("vehicle_actions.php - FILES recebidos: " . print_r(array_keys($_FILES), true));
+
         // Handle file upload for foto_veiculo if present
-        if (isset($_FILES['foto_veiculo']) && $_FILES['foto_veiculo']['error'] == 0) {
+        if (isset($_FILES['foto_veiculo']) && $_FILES['foto_veiculo']['error'] == UPLOAD_ERR_OK) {
             $uploadDir = '../uploads/veiculos/';
             if (!file_exists($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
+                if (!mkdir($uploadDir, 0777, true)) {
+                    error_log("vehicle_actions.php - ERRO: Não foi possível criar diretório $uploadDir");
+                    throw new Exception("Erro ao criar diretório de uploads");
+                }
             }
             
-            $fileExtension = pathinfo($_FILES['foto_veiculo']['name'], PATHINFO_EXTENSION);
-            $newFileName = uniqid() . '.' . $fileExtension;
+            // Verificar permissões do diretório
+            if (!is_writable($uploadDir)) {
+                error_log("vehicle_actions.php - ERRO: Diretório $uploadDir não tem permissão de escrita");
+                throw new Exception("Diretório de uploads sem permissão de escrita");
+            }
+            
+            $fileExtension = strtolower(pathinfo($_FILES['foto_veiculo']['name'], PATHINFO_EXTENSION));
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+            
+            if (!in_array($fileExtension, $allowedExtensions)) {
+                throw new Exception("Formato de imagem não permitido. Use JPG, JPEG, PNG ou GIF.");
+            }
+            
+            $newFileName = 'veiculo_' . uniqid() . '.' . $fileExtension;
             $uploadFile = $uploadDir . $newFileName;
+            
+            error_log("vehicle_actions.php - Tentando fazer upload da foto para: $uploadFile");
             
             if (move_uploaded_file($_FILES['foto_veiculo']['tmp_name'], $uploadFile)) {
                 $data['foto_veiculo'] = 'uploads/veiculos/' . $newFileName;
+                error_log("vehicle_actions.php - Foto salva com sucesso: " . $data['foto_veiculo']);
+            } else {
+                error_log("vehicle_actions.php - ERRO ao mover arquivo de foto");
+                throw new Exception("Erro ao fazer upload da foto do veículo");
             }
+        } else if (isset($_FILES['foto_veiculo'])) {
+            error_log("vehicle_actions.php - Erro no upload da foto: " . $_FILES['foto_veiculo']['error']);
         }
 
         // Handle file upload for documento if present
-        if (isset($_FILES['documento']) && $_FILES['documento']['error'] == 0) {
+        if (isset($_FILES['documento']) && $_FILES['documento']['error'] == UPLOAD_ERR_OK) {
             $uploadDir = '../uploads/veiculos/';
             if (!file_exists($uploadDir)) {
-                mkdir($uploadDir, 0777, true);
+                if (!mkdir($uploadDir, 0777, true)) {
+                    error_log("vehicle_actions.php - ERRO: Não foi possível criar diretório $uploadDir");
+                    throw new Exception("Erro ao criar diretório de uploads");
+                }
             }
-            $fileExtension = pathinfo($_FILES['documento']['name'], PATHINFO_EXTENSION);
-            $newFileName = uniqid() . '.' . $fileExtension;
+            
+            // Verificar permissões do diretório
+            if (!is_writable($uploadDir)) {
+                error_log("vehicle_actions.php - ERRO: Diretório $uploadDir não tem permissão de escrita");
+                throw new Exception("Diretório de uploads sem permissão de escrita");
+            }
+            
+            $fileExtension = strtolower(pathinfo($_FILES['documento']['name'], PATHINFO_EXTENSION));
+            $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
+            
+            if (!in_array($fileExtension, $allowedExtensions)) {
+                throw new Exception("Formato de documento não permitido. Use PDF, JPG, JPEG, PNG, DOC ou DOCX.");
+            }
+            
+            $newFileName = 'doc_' . uniqid() . '.' . $fileExtension;
             $uploadFile = $uploadDir . $newFileName;
+            
+            error_log("vehicle_actions.php - Tentando fazer upload do documento para: $uploadFile");
+            
             if (move_uploaded_file($_FILES['documento']['tmp_name'], $uploadFile)) {
                 $data['documento'] = 'uploads/veiculos/' . $newFileName;
+                error_log("vehicle_actions.php - Documento salvo com sucesso: " . $data['documento']);
+            } else {
+                error_log("vehicle_actions.php - ERRO ao mover arquivo de documento");
+                throw new Exception("Erro ao fazer upload do documento do veículo");
             }
+        } else if (isset($_FILES['documento'])) {
+            error_log("vehicle_actions.php - Erro no upload do documento: " . $_FILES['documento']['error']);
         }
         
         if ($id) {
@@ -129,7 +180,6 @@ function handleSaveVehicle() {
                     chassi = :chassi,
                     renavam = :renavam,
                     km_atual = :km_atual,
-                    documento = :documento,
                     observacoes = :observacoes,
                     id_cavalo = :id_cavalo,
                     id_carreta = :id_carreta,
@@ -147,19 +197,27 @@ function handleSaveVehicle() {
                 $sql .= ", foto_veiculo = :foto_veiculo";
             }
             
+            if (isset($data['documento'])) {
+                $sql .= ", documento = :documento";
+            }
+            
             $sql .= " WHERE id = :id AND empresa_id = :empresa_id";
             $data['id'] = $id;
             
         } else {
             // Insert new vehicle
             $fields = ['empresa_id', 'placa', 'modelo', 'marca', 'ano', 'cor', 'chassi', 
-                      'renavam', 'km_atual', 'documento', 'observacoes', 'id_cavalo', 
+                      'renavam', 'km_atual', 'observacoes', 'id_cavalo', 
                       'id_carreta', 'capacidade_carga', 'capacidade_passageiros', 
                       'numero_motor', 'proprietario', 'tipo_combustivel_id', 
                       'potencia_motor', 'numero_eixos', 'carroceria_id', 'status_id'];
             
             if (isset($data['foto_veiculo'])) {
                 $fields[] = 'foto_veiculo';
+            }
+            
+            if (isset($data['documento'])) {
+                $fields[] = 'documento';
             }
             
             $sql = "INSERT INTO veiculos (" . implode(', ', $fields) . ") 
@@ -169,16 +227,35 @@ function handleSaveVehicle() {
         $stmt = $conn->prepare($sql);
         $stmt->execute($data);
         
+        $vehicle_id = $id ?: $conn->lastInsertId();
+        
+        error_log("vehicle_actions.php - Veículo salvo com sucesso. ID: $vehicle_id");
+        error_log("vehicle_actions.php - Foto salva: " . ($data['foto_veiculo'] ?? 'não'));
+        error_log("vehicle_actions.php - Documento salvo: " . ($data['documento'] ?? 'não'));
+        
         $response = [
             'success' => true,
             'message' => $id ? 'Veículo atualizado com sucesso!' : 'Veículo cadastrado com sucesso!',
-            'id' => $id ?: $conn->lastInsertId()
+            'id' => $vehicle_id,
+            'debug' => [
+                'foto_uploaded' => isset($data['foto_veiculo']),
+                'documento_uploaded' => isset($data['documento']),
+                'foto_path' => $data['foto_veiculo'] ?? null,
+                'documento_path' => $data['documento'] ?? null
+            ]
         ];
         
     } catch(PDOException $e) {
+        error_log("vehicle_actions.php - ERRO PDO: " . $e->getMessage());
         $response = [
             'success' => false,
             'message' => 'Erro ao salvar veículo: ' . $e->getMessage()
+        ];
+    } catch(Exception $e) {
+        error_log("vehicle_actions.php - ERRO: " . $e->getMessage());
+        $response = [
+            'success' => false,
+            'message' => $e->getMessage()
         ];
     }
     

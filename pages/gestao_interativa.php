@@ -1575,6 +1575,13 @@ try {
             });
             
             const escolha = prompt(opcoes + '\nDigite o número do pneu que deseja alocar:');
+            
+            // Se o usuário cancelar o prompt, não continuar
+            if (escolha === null || escolha === '') {
+                console.log('Usuário cancelou a seleção do pneu');
+                return;
+            }
+            
             const index = parseInt(escolha) - 1;
             
             if (isNaN(index) || index < 0 || index >= pneusDisponiveis.length) {
@@ -1588,12 +1595,31 @@ try {
             // Seleção da posição identificada
             const posicoesDisponiveis = <?php echo json_encode($posicoes); ?>;
             
+            console.log('Posições disponíveis no sistema:', posicoesDisponiveis);
+            
+            // Verificar se existem posições cadastradas
+            if (!posicoesDisponiveis || posicoesDisponiveis.length === 0) {
+                alert('ATENÇÃO: Não há posições de pneus cadastradas no sistema!\n\n' +
+                      'Para usar este sistema, você precisa cadastrar as posições de pneus primeiro.\n' +
+                      'Exemplos de posições: Dianteiro Esquerdo, Dianteiro Direito, Traseiro Esquerdo Externo, etc.\n\n' +
+                      'Por favor, cadastre as posições antes de alocar pneus.');
+                return;
+            }
+            
             let opcoesPosicao = 'Escolha a posição identificada:\n\n';
             posicoesDisponiveis.forEach((pos, idx) => {
                 opcoesPosicao += `${idx + 1}. ${pos.nome}\n`;
             });
             
+            console.log('Exibindo prompt de posição...');
             const escolhaPosicao = prompt(opcoesPosicao + '\nDigite o número da posição:');
+            
+            // Se o usuário cancelar o prompt, não continuar
+            if (escolhaPosicao === null || escolhaPosicao === '') {
+                console.log('Usuário cancelou a seleção da posição');
+                return;
+            }
+            
             const indexPosicao = parseInt(escolhaPosicao) - 1;
             
             if (isNaN(indexPosicao) || indexPosicao < 0 || indexPosicao >= posicoesDisponiveis.length) {
