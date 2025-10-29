@@ -1,0 +1,360 @@
+[26-Oct-2025 09:13:57 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[26-Oct-2025 09:13:57 Europe/Berlin] Hora: 2025-10-26 09:13:57
+[26-Oct-2025 09:13:57 Europe/Berlin] Carregando includes...
+[26-Oct-2025 09:13:57 Europe/Berlin] ✓ database.php carregado
+[26-Oct-2025 09:13:57 Europe/Berlin] ✓ auth.php carregado
+[26-Oct-2025 09:13:57 Europe/Berlin] ✓ Headers definidos
+[26-Oct-2025 09:13:57 Europe/Berlin] Verificando login...
+[26-Oct-2025 09:13:57 Europe/Berlin] ✓ Login verificado
+[26-Oct-2025 09:13:57 Europe/Berlin] Obtendo empresa_id...
+[26-Oct-2025 09:13:57 Europe/Berlin] ✓ Empresa ID: 1
+[26-Oct-2025 09:13:57 Europe/Berlin] Conectando ao banco...
+[26-Oct-2025 09:13:57 Europe/Berlin] ✓ Conexão estabelecida
+[26-Oct-2025 09:13:57 Europe/Berlin] Lendo JSON de entrada...
+[26-Oct-2025 09:13:57 Europe/Berlin] JSON recebido: 1099 bytes
+[26-Oct-2025 09:13:57 Europe/Berlin] JSON decodificado: OK
+[26-Oct-2025 09:13:57 Europe/Berlin] Total de documentos recebidos: 3
+[26-Oct-2025 09:13:57 Europe/Berlin] Cliente encontrado: ID 2
+[26-Oct-2025 09:13:57 Europe/Berlin] Erro ao importar documento 439: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'cliente_id' in 'where clause'
+[26-Oct-2025 09:13:57 Europe/Berlin] Cliente encontrado: ID 5
+[26-Oct-2025 09:13:57 Europe/Berlin] Erro ao importar documento 713: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'cliente_id' in 'where clause'
+[26-Oct-2025 09:13:57 Europe/Berlin] Erro ao importar documento 3898: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'razao_social' in 'where clause'
+[26-Oct-2025 09:13:57 Europe/Berlin] PHP Fatal error:  Uncaught ArgumentCountError: Too few arguments to function registrarLog(), 2 passed in C:\xampp\htdocs\sistema-frotas\SISTEMA-SEGURO\api\importar_documentos.php on line 215 and at least 4 expected in C:\xampp\htdocs\sistema-frotas\SISTEMA-SEGURO\config\auth.php:200
+Stack trace:
+#0 C:\xampp\htdocs\sistema-frotas\SISTEMA-SEGURO\api\importar_documentos.php(215): registrarLog('importacao_docu...', 'Importados: 0, ...')
+#1 {main}
+  thrown in C:\xampp\htdocs\sistema-frotas\SISTEMA-SEGURO\config\auth.php on line 200
+[26-Oct-2025 09:18:43 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[26-Oct-2025 09:18:43 Europe/Berlin] Hora: 2025-10-26 09:18:43
+[26-Oct-2025 09:18:43 Europe/Berlin] Carregando includes...
+[26-Oct-2025 09:18:43 Europe/Berlin] ✓ database.php carregado
+[26-Oct-2025 09:18:43 Europe/Berlin] ✓ auth.php carregado
+[26-Oct-2025 09:18:43 Europe/Berlin] ✓ Headers definidos
+[26-Oct-2025 09:18:43 Europe/Berlin] Verificando login...
+[26-Oct-2025 09:18:43 Europe/Berlin] ✓ Login verificado
+[26-Oct-2025 09:18:43 Europe/Berlin] Obtendo empresa_id...
+[26-Oct-2025 09:18:43 Europe/Berlin] ✓ Empresa ID: 1
+[26-Oct-2025 09:18:43 Europe/Berlin] Conectando ao banco...
+[26-Oct-2025 09:18:43 Europe/Berlin] ✓ Conexão estabelecida
+[26-Oct-2025 09:18:43 Europe/Berlin] Lendo JSON de entrada...
+[26-Oct-2025 09:18:43 Europe/Berlin] JSON recebido: 1284 bytes
+[26-Oct-2025 09:18:43 Europe/Berlin] JSON decodificado: OK
+[26-Oct-2025 09:18:43 Europe/Berlin] Total de documentos recebidos: 3
+[26-Oct-2025 09:18:43 Europe/Berlin] Cliente encontrado: ID 2
+[26-Oct-2025 09:18:43 Europe/Berlin] Erro ao importar documento 439: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'cliente_id' in 'where clause'
+[26-Oct-2025 09:18:43 Europe/Berlin] Cliente encontrado: ID 5
+[26-Oct-2025 09:18:43 Europe/Berlin] Erro ao importar documento 713: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'cliente_id' in 'where clause'
+[26-Oct-2025 09:18:43 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[26-Oct-2025 09:18:43 Europe/Berlin] Erro ao importar documento 3898: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'cliente_id' in 'where clause'
+[26-Oct-2025 09:18:43 Europe/Berlin] PHP Fatal error:  Uncaught ArgumentCountError: Too few arguments to function registrarLog(), 2 passed in C:\xampp\htdocs\sistema-frotas\SISTEMA-SEGURO\api\importar_documentos.php on line 215 and at least 4 expected in C:\xampp\htdocs\sistema-frotas\SISTEMA-SEGURO\config\auth.php:200
+Stack trace:
+#0 C:\xampp\htdocs\sistema-frotas\SISTEMA-SEGURO\api\importar_documentos.php(215): registrarLog('importacao_docu...', 'Importados: 0, ...')
+#1 {main}
+  thrown in C:\xampp\htdocs\sistema-frotas\SISTEMA-SEGURO\config\auth.php on line 200
+[26-Oct-2025 09:23:53 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[26-Oct-2025 09:23:53 Europe/Berlin] Hora: 2025-10-26 09:23:53
+[26-Oct-2025 09:23:53 Europe/Berlin] Carregando includes...
+[26-Oct-2025 09:23:53 Europe/Berlin] ✓ database.php carregado
+[26-Oct-2025 09:23:53 Europe/Berlin] ✓ auth.php carregado
+[26-Oct-2025 09:23:53 Europe/Berlin] ✓ Headers definidos
+[26-Oct-2025 09:23:53 Europe/Berlin] Verificando login...
+[26-Oct-2025 09:23:53 Europe/Berlin] ✓ Login verificado
+[26-Oct-2025 09:23:53 Europe/Berlin] Obtendo empresa_id...
+[26-Oct-2025 09:23:53 Europe/Berlin] ✓ Empresa ID: 1
+[26-Oct-2025 09:23:53 Europe/Berlin] Conectando ao banco...
+[26-Oct-2025 09:23:53 Europe/Berlin] ✓ Conexão estabelecida
+[26-Oct-2025 09:23:53 Europe/Berlin] Lendo JSON de entrada...
+[26-Oct-2025 09:23:53 Europe/Berlin] JSON recebido: 1284 bytes
+[26-Oct-2025 09:23:53 Europe/Berlin] JSON decodificado: OK
+[26-Oct-2025 09:23:53 Europe/Berlin] Total de documentos recebidos: 3
+[26-Oct-2025 09:23:53 Europe/Berlin] Cliente encontrado: ID 2
+[26-Oct-2025 09:23:53 Europe/Berlin] Cliente encontrado: ID 5
+[26-Oct-2025 09:23:53 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[26-Oct-2025 09:23:53 Europe/Berlin] PHP Fatal error:  Uncaught ArgumentCountError: Too few arguments to function registrarLog(), 2 passed in C:\xampp\htdocs\sistema-frotas\SISTEMA-SEGURO\api\importar_documentos.php on line 215 and at least 4 expected in C:\xampp\htdocs\sistema-frotas\SISTEMA-SEGURO\config\auth.php:200
+Stack trace:
+#0 C:\xampp\htdocs\sistema-frotas\SISTEMA-SEGURO\api\importar_documentos.php(215): registrarLog('importacao_docu...', 'Importados: 3, ...')
+#1 {main}
+  thrown in C:\xampp\htdocs\sistema-frotas\SISTEMA-SEGURO\config\auth.php on line 200
+[26-Oct-2025 09:26:16 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[26-Oct-2025 09:26:16 Europe/Berlin] Hora: 2025-10-26 09:26:16
+[26-Oct-2025 09:26:16 Europe/Berlin] Carregando includes...
+[26-Oct-2025 09:26:16 Europe/Berlin] ✓ database.php carregado
+[26-Oct-2025 09:26:16 Europe/Berlin] ✓ auth.php carregado
+[26-Oct-2025 09:26:16 Europe/Berlin] ✓ Headers definidos
+[26-Oct-2025 09:26:16 Europe/Berlin] Verificando login...
+[26-Oct-2025 09:26:16 Europe/Berlin] ✓ Login verificado
+[26-Oct-2025 09:26:16 Europe/Berlin] Obtendo empresa_id...
+[26-Oct-2025 09:26:16 Europe/Berlin] ✓ Empresa ID: 1
+[26-Oct-2025 09:26:16 Europe/Berlin] Conectando ao banco...
+[26-Oct-2025 09:26:16 Europe/Berlin] ✓ Conexão estabelecida
+[26-Oct-2025 09:26:16 Europe/Berlin] Lendo JSON de entrada...
+[26-Oct-2025 09:26:16 Europe/Berlin] JSON recebido: 1284 bytes
+[26-Oct-2025 09:26:16 Europe/Berlin] JSON decodificado: OK
+[26-Oct-2025 09:26:16 Europe/Berlin] Total de documentos recebidos: 3
+[26-Oct-2025 09:26:16 Europe/Berlin] Cliente encontrado: ID 2
+[26-Oct-2025 09:26:16 Europe/Berlin] Cliente encontrado: ID 5
+[26-Oct-2025 09:26:16 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[26-Oct-2025 09:26:16 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+
+[27-Oct-2025 07:15:17 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[27-Oct-2025 07:15:17 Europe/Berlin] Hora: 2025-10-27 07:15:17
+[27-Oct-2025 07:15:17 Europe/Berlin] Carregando includes...
+[27-Oct-2025 07:15:17 Europe/Berlin] ✓ database.php carregado
+[27-Oct-2025 07:15:17 Europe/Berlin] ✓ auth.php carregado
+[27-Oct-2025 07:15:17 Europe/Berlin] ✓ Headers definidos
+[27-Oct-2025 07:15:17 Europe/Berlin] Verificando login...
+[27-Oct-2025 07:15:17 Europe/Berlin] ✓ Login verificado
+[27-Oct-2025 07:15:17 Europe/Berlin] Obtendo empresa_id...
+[27-Oct-2025 07:15:17 Europe/Berlin] ✓ Empresa ID: 1
+[27-Oct-2025 07:15:17 Europe/Berlin] Conectando ao banco...
+[27-Oct-2025 07:15:17 Europe/Berlin] ✓ Conexão estabelecida
+[27-Oct-2025 07:15:17 Europe/Berlin] Lendo JSON de entrada...
+[27-Oct-2025 07:15:17 Europe/Berlin] JSON recebido: 1284 bytes
+[27-Oct-2025 07:15:17 Europe/Berlin] JSON decodificado: OK
+[27-Oct-2025 07:15:17 Europe/Berlin] Total de documentos recebidos: 3
+[27-Oct-2025 07:15:17 Europe/Berlin] Cliente encontrado: ID 2
+[27-Oct-2025 07:15:17 Europe/Berlin] Cliente encontrado: ID 5
+[27-Oct-2025 07:15:17 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[27-Oct-2025 07:15:17 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+
+[29-Oct-2025 05:56:49 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[29-Oct-2025 05:56:49 Europe/Berlin] Hora: 2025-10-29 05:56:49
+[29-Oct-2025 05:56:49 Europe/Berlin] Carregando includes...
+[29-Oct-2025 05:56:49 Europe/Berlin] ✓ database.php carregado
+[29-Oct-2025 05:56:49 Europe/Berlin] ✓ auth.php carregado
+[29-Oct-2025 05:56:49 Europe/Berlin] ✓ Headers definidos
+[29-Oct-2025 05:56:49 Europe/Berlin] Verificando login...
+[29-Oct-2025 05:56:49 Europe/Berlin] ✓ Login verificado
+[29-Oct-2025 05:56:49 Europe/Berlin] Obtendo empresa_id...
+[29-Oct-2025 05:56:49 Europe/Berlin] ✓ Empresa ID: 1
+[29-Oct-2025 05:56:49 Europe/Berlin] Conectando ao banco...
+[29-Oct-2025 05:56:49 Europe/Berlin] ✓ Conexão estabelecida
+[29-Oct-2025 05:56:49 Europe/Berlin] Lendo JSON de entrada...
+[29-Oct-2025 05:56:49 Europe/Berlin] JSON recebido: 1284 bytes
+[29-Oct-2025 05:56:49 Europe/Berlin] JSON decodificado: OK
+[29-Oct-2025 05:56:49 Europe/Berlin] Total de documentos recebidos: 3
+[29-Oct-2025 05:56:49 Europe/Berlin] Cliente encontrado: ID 2
+[29-Oct-2025 05:56:49 Europe/Berlin] Cliente encontrado: ID 5
+[29-Oct-2025 05:56:49 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[29-Oct-2025 05:56:49 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+
+[29-Oct-2025 05:56:55 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[29-Oct-2025 05:56:55 Europe/Berlin] Hora: 2025-10-29 05:56:55
+[29-Oct-2025 05:56:55 Europe/Berlin] Carregando includes...
+[29-Oct-2025 05:56:55 Europe/Berlin] ✓ database.php carregado
+[29-Oct-2025 05:56:55 Europe/Berlin] ✓ auth.php carregado
+[29-Oct-2025 05:56:55 Europe/Berlin] ✓ Headers definidos
+[29-Oct-2025 05:56:55 Europe/Berlin] Verificando login...
+[29-Oct-2025 05:56:55 Europe/Berlin] ✓ Login verificado
+[29-Oct-2025 05:56:55 Europe/Berlin] Obtendo empresa_id...
+[29-Oct-2025 05:56:55 Europe/Berlin] ✓ Empresa ID: 1
+[29-Oct-2025 05:56:55 Europe/Berlin] Conectando ao banco...
+[29-Oct-2025 05:56:55 Europe/Berlin] ✓ Conexão estabelecida
+[29-Oct-2025 05:56:55 Europe/Berlin] Lendo JSON de entrada...
+[29-Oct-2025 05:56:55 Europe/Berlin] JSON recebido: 1284 bytes
+[29-Oct-2025 05:56:55 Europe/Berlin] JSON decodificado: OK
+[29-Oct-2025 05:56:55 Europe/Berlin] Total de documentos recebidos: 3
+[29-Oct-2025 05:56:55 Europe/Berlin] Cliente encontrado: ID 2
+[29-Oct-2025 05:56:55 Europe/Berlin] Cliente encontrado: ID 5
+[29-Oct-2025 05:56:55 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[29-Oct-2025 05:56:55 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+
+[29-Oct-2025 05:58:05 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[29-Oct-2025 05:58:05 Europe/Berlin] Hora: 2025-10-29 05:58:05
+[29-Oct-2025 05:58:05 Europe/Berlin] Carregando includes...
+[29-Oct-2025 05:58:05 Europe/Berlin] ✓ database.php carregado
+[29-Oct-2025 05:58:05 Europe/Berlin] ✓ auth.php carregado
+[29-Oct-2025 05:58:05 Europe/Berlin] ✓ Headers definidos
+[29-Oct-2025 05:58:05 Europe/Berlin] Verificando login...
+[29-Oct-2025 05:58:05 Europe/Berlin] ✓ Login verificado
+[29-Oct-2025 05:58:05 Europe/Berlin] Obtendo empresa_id...
+[29-Oct-2025 05:58:05 Europe/Berlin] ✓ Empresa ID: 1
+[29-Oct-2025 05:58:05 Europe/Berlin] Conectando ao banco...
+[29-Oct-2025 05:58:05 Europe/Berlin] ✓ Conexão estabelecida
+[29-Oct-2025 05:58:05 Europe/Berlin] Lendo JSON de entrada...
+[29-Oct-2025 05:58:05 Europe/Berlin] JSON recebido: 1284 bytes
+[29-Oct-2025 05:58:05 Europe/Berlin] JSON decodificado: OK
+[29-Oct-2025 05:58:05 Europe/Berlin] Total de documentos recebidos: 3
+[29-Oct-2025 05:58:05 Europe/Berlin] Cliente encontrado: ID 2
+[29-Oct-2025 05:58:05 Europe/Berlin] Cliente encontrado: ID 5
+[29-Oct-2025 05:58:05 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[29-Oct-2025 05:58:05 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+
+[29-Oct-2025 05:58:09 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[29-Oct-2025 05:58:09 Europe/Berlin] Hora: 2025-10-29 05:58:09
+[29-Oct-2025 05:58:09 Europe/Berlin] Carregando includes...
+[29-Oct-2025 05:58:09 Europe/Berlin] ✓ database.php carregado
+[29-Oct-2025 05:58:09 Europe/Berlin] ✓ auth.php carregado
+[29-Oct-2025 05:58:09 Europe/Berlin] ✓ Headers definidos
+[29-Oct-2025 05:58:09 Europe/Berlin] Verificando login...
+[29-Oct-2025 05:58:09 Europe/Berlin] ✓ Login verificado
+[29-Oct-2025 05:58:09 Europe/Berlin] Obtendo empresa_id...
+[29-Oct-2025 05:58:09 Europe/Berlin] ✓ Empresa ID: 1
+[29-Oct-2025 05:58:09 Europe/Berlin] Conectando ao banco...
+[29-Oct-2025 05:58:09 Europe/Berlin] ✓ Conexão estabelecida
+[29-Oct-2025 05:58:09 Europe/Berlin] Lendo JSON de entrada...
+[29-Oct-2025 05:58:09 Europe/Berlin] JSON recebido: 1284 bytes
+[29-Oct-2025 05:58:09 Europe/Berlin] JSON decodificado: OK
+[29-Oct-2025 05:58:09 Europe/Berlin] Total de documentos recebidos: 3
+[29-Oct-2025 05:58:09 Europe/Berlin] Cliente encontrado: ID 2
+[29-Oct-2025 05:58:09 Europe/Berlin] Cliente encontrado: ID 5
+[29-Oct-2025 05:58:09 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[29-Oct-2025 05:58:09 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+
+[29-Oct-2025 05:58:57 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[29-Oct-2025 05:58:57 Europe/Berlin] Hora: 2025-10-29 05:58:57
+[29-Oct-2025 05:58:57 Europe/Berlin] Carregando includes...
+[29-Oct-2025 05:58:57 Europe/Berlin] ✓ database.php carregado
+[29-Oct-2025 05:58:57 Europe/Berlin] ✓ auth.php carregado
+[29-Oct-2025 05:58:57 Europe/Berlin] ✓ Headers definidos
+[29-Oct-2025 05:58:57 Europe/Berlin] Verificando login...
+[29-Oct-2025 05:58:57 Europe/Berlin] ✓ Login verificado
+[29-Oct-2025 05:58:57 Europe/Berlin] Obtendo empresa_id...
+[29-Oct-2025 05:58:57 Europe/Berlin] ✓ Empresa ID: 1
+[29-Oct-2025 05:58:57 Europe/Berlin] Conectando ao banco...
+[29-Oct-2025 05:58:57 Europe/Berlin] ✓ Conexão estabelecida
+[29-Oct-2025 05:58:57 Europe/Berlin] Lendo JSON de entrada...
+[29-Oct-2025 05:58:57 Europe/Berlin] JSON recebido: 1287 bytes
+[29-Oct-2025 05:58:57 Europe/Berlin] JSON decodificado: OK
+[29-Oct-2025 05:58:57 Europe/Berlin] Total de documentos recebidos: 3
+[29-Oct-2025 05:58:57 Europe/Berlin] Cliente encontrado: ID 2
+[29-Oct-2025 05:58:57 Europe/Berlin] Cliente encontrado: ID 5
+[29-Oct-2025 05:58:57 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[29-Oct-2025 05:58:57 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+
+[29-Oct-2025 06:03:59 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[29-Oct-2025 06:03:59 Europe/Berlin] Hora: 2025-10-29 06:03:59
+[29-Oct-2025 06:03:59 Europe/Berlin] Carregando includes...
+[29-Oct-2025 06:03:59 Europe/Berlin] ✓ database.php carregado
+[29-Oct-2025 06:03:59 Europe/Berlin] ✓ auth.php carregado
+[29-Oct-2025 06:03:59 Europe/Berlin] ✓ Headers definidos
+[29-Oct-2025 06:03:59 Europe/Berlin] Verificando login...
+[29-Oct-2025 06:03:59 Europe/Berlin] ✓ Login verificado
+[29-Oct-2025 06:03:59 Europe/Berlin] Obtendo empresa_id...
+[29-Oct-2025 06:03:59 Europe/Berlin] ✓ Empresa ID: 1
+[29-Oct-2025 06:03:59 Europe/Berlin] Conectando ao banco...
+[29-Oct-2025 06:03:59 Europe/Berlin] ✓ Conexão estabelecida
+[29-Oct-2025 06:03:59 Europe/Berlin] Lendo JSON de entrada...
+[29-Oct-2025 06:03:59 Europe/Berlin] JSON recebido: 1287 bytes
+[29-Oct-2025 06:03:59 Europe/Berlin] JSON decodificado: OK
+[29-Oct-2025 06:03:59 Europe/Berlin] Total de documentos recebidos: 3
+[29-Oct-2025 06:03:59 Europe/Berlin] Cliente encontrado: ID 2
+[29-Oct-2025 06:03:59 Europe/Berlin] Cliente encontrado: ID 5
+[29-Oct-2025 06:03:59 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[29-Oct-2025 06:03:59 Europe/Berlin] ✅ Importação registrada no histórico
+[29-Oct-2025 06:03:59 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+
+[29-Oct-2025 06:04:01 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[29-Oct-2025 06:04:01 Europe/Berlin] Hora: 2025-10-29 06:04:01
+[29-Oct-2025 06:04:01 Europe/Berlin] Carregando includes...
+[29-Oct-2025 06:04:01 Europe/Berlin] ✓ database.php carregado
+[29-Oct-2025 06:04:01 Europe/Berlin] ✓ auth.php carregado
+[29-Oct-2025 06:04:01 Europe/Berlin] ✓ Headers definidos
+[29-Oct-2025 06:04:01 Europe/Berlin] Verificando login...
+[29-Oct-2025 06:04:01 Europe/Berlin] ✓ Login verificado
+[29-Oct-2025 06:04:01 Europe/Berlin] Obtendo empresa_id...
+[29-Oct-2025 06:04:01 Europe/Berlin] ✓ Empresa ID: 1
+[29-Oct-2025 06:04:01 Europe/Berlin] Conectando ao banco...
+[29-Oct-2025 06:04:01 Europe/Berlin] ✓ Conexão estabelecida
+[29-Oct-2025 06:04:01 Europe/Berlin] Lendo JSON de entrada...
+[29-Oct-2025 06:04:01 Europe/Berlin] JSON recebido: 1287 bytes
+[29-Oct-2025 06:04:01 Europe/Berlin] JSON decodificado: OK
+[29-Oct-2025 06:04:01 Europe/Berlin] Total de documentos recebidos: 3
+[29-Oct-2025 06:04:01 Europe/Berlin] Cliente encontrado: ID 2
+[29-Oct-2025 06:04:01 Europe/Berlin] Cliente encontrado: ID 5
+[29-Oct-2025 06:04:01 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[29-Oct-2025 06:04:01 Europe/Berlin] ✅ Importação registrada no histórico
+[29-Oct-2025 06:04:01 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+
+[29-Oct-2025 06:09:42 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[29-Oct-2025 06:09:42 Europe/Berlin] Hora: 2025-10-29 06:09:42
+[29-Oct-2025 06:09:42 Europe/Berlin] Carregando includes...
+[29-Oct-2025 06:09:42 Europe/Berlin] ✓ database.php carregado
+[29-Oct-2025 06:09:42 Europe/Berlin] ✓ auth.php carregado
+[29-Oct-2025 06:09:42 Europe/Berlin] ✓ Headers definidos
+[29-Oct-2025 06:09:42 Europe/Berlin] Verificando login...
+[29-Oct-2025 06:09:42 Europe/Berlin] ✓ Login verificado
+[29-Oct-2025 06:09:42 Europe/Berlin] Obtendo empresa_id...
+[29-Oct-2025 06:09:42 Europe/Berlin] ✓ Empresa ID: 1
+[29-Oct-2025 06:09:42 Europe/Berlin] Conectando ao banco...
+[29-Oct-2025 06:09:42 Europe/Berlin] ✓ Conexão estabelecida
+[29-Oct-2025 06:09:42 Europe/Berlin] Lendo JSON de entrada...
+[29-Oct-2025 06:09:42 Europe/Berlin] JSON recebido: 1390 bytes
+[29-Oct-2025 06:09:42 Europe/Berlin] JSON decodificado: OK
+[29-Oct-2025 06:09:42 Europe/Berlin] Nome do arquivo: teste12312323.xlsx
+[29-Oct-2025 06:09:42 Europe/Berlin] Total de documentos recebidos: 3
+[29-Oct-2025 06:09:42 Europe/Berlin] Cliente encontrado: ID 2
+[29-Oct-2025 06:09:42 Europe/Berlin] Cliente encontrado: ID 5
+[29-Oct-2025 06:09:42 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[29-Oct-2025 06:09:42 Europe/Berlin] ✅ Importação registrada no histórico: teste12312323.xlsx
+[29-Oct-2025 06:09:42 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+
+[29-Oct-2025 06:09:44 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[29-Oct-2025 06:09:44 Europe/Berlin] Hora: 2025-10-29 06:09:44
+[29-Oct-2025 06:09:44 Europe/Berlin] Carregando includes...
+[29-Oct-2025 06:09:44 Europe/Berlin] ✓ database.php carregado
+[29-Oct-2025 06:09:44 Europe/Berlin] ✓ auth.php carregado
+[29-Oct-2025 06:09:44 Europe/Berlin] ✓ Headers definidos
+[29-Oct-2025 06:09:44 Europe/Berlin] Verificando login...
+[29-Oct-2025 06:09:44 Europe/Berlin] ✓ Login verificado
+[29-Oct-2025 06:09:44 Europe/Berlin] Obtendo empresa_id...
+[29-Oct-2025 06:09:44 Europe/Berlin] ✓ Empresa ID: 1
+[29-Oct-2025 06:09:44 Europe/Berlin] Conectando ao banco...
+[29-Oct-2025 06:09:44 Europe/Berlin] ✓ Conexão estabelecida
+[29-Oct-2025 06:09:44 Europe/Berlin] Lendo JSON de entrada...
+[29-Oct-2025 06:09:44 Europe/Berlin] JSON recebido: 1390 bytes
+[29-Oct-2025 06:09:44 Europe/Berlin] JSON decodificado: OK
+[29-Oct-2025 06:09:44 Europe/Berlin] Nome do arquivo: teste12312323.xlsx
+[29-Oct-2025 06:09:44 Europe/Berlin] Total de documentos recebidos: 3
+[29-Oct-2025 06:09:44 Europe/Berlin] Cliente encontrado: ID 2
+[29-Oct-2025 06:09:44 Europe/Berlin] Cliente encontrado: ID 5
+[29-Oct-2025 06:09:44 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[29-Oct-2025 06:09:44 Europe/Berlin] ✅ Importação registrada no histórico: teste12312323.xlsx
+[29-Oct-2025 06:09:44 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+
+[29-Oct-2025 06:14:15 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[29-Oct-2025 06:14:15 Europe/Berlin] Hora: 2025-10-29 06:14:15
+[29-Oct-2025 06:14:15 Europe/Berlin] Carregando includes...
+[29-Oct-2025 06:14:15 Europe/Berlin] ✓ database.php carregado
+[29-Oct-2025 06:14:15 Europe/Berlin] ✓ auth.php carregado
+[29-Oct-2025 06:14:15 Europe/Berlin] ✓ Headers definidos
+[29-Oct-2025 06:14:15 Europe/Berlin] Verificando login...
+[29-Oct-2025 06:14:15 Europe/Berlin] ✓ Login verificado
+[29-Oct-2025 06:14:15 Europe/Berlin] Obtendo empresa_id...
+[29-Oct-2025 06:14:15 Europe/Berlin] ✓ Empresa ID: 1
+[29-Oct-2025 06:14:15 Europe/Berlin] Conectando ao banco...
+[29-Oct-2025 06:14:15 Europe/Berlin] ✓ Conexão estabelecida
+[29-Oct-2025 06:14:15 Europe/Berlin] Lendo JSON de entrada...
+[29-Oct-2025 06:14:15 Europe/Berlin] JSON recebido: 1390 bytes
+[29-Oct-2025 06:14:15 Europe/Berlin] JSON decodificado: OK
+[29-Oct-2025 06:14:15 Europe/Berlin] Nome do arquivo: teste12312323.xlsx
+[29-Oct-2025 06:14:15 Europe/Berlin] Total de documentos recebidos: 3
+[29-Oct-2025 06:14:15 Europe/Berlin] Cliente encontrado: ID 2
+[29-Oct-2025 06:14:15 Europe/Berlin] Cliente encontrado: ID 5
+[29-Oct-2025 06:14:15 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[29-Oct-2025 06:14:15 Europe/Berlin] ⚠️ Nenhum documento importado - histórico NÃO registrado
+[29-Oct-2025 06:14:15 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+
+[29-Oct-2025 06:14:25 Europe/Berlin] ========== INÍCIO DA IMPORTAÇÃO ==========
+[29-Oct-2025 06:14:25 Europe/Berlin] Hora: 2025-10-29 06:14:25
+[29-Oct-2025 06:14:25 Europe/Berlin] Carregando includes...
+[29-Oct-2025 06:14:25 Europe/Berlin] ✓ database.php carregado
+[29-Oct-2025 06:14:25 Europe/Berlin] ✓ auth.php carregado
+[29-Oct-2025 06:14:25 Europe/Berlin] ✓ Headers definidos
+[29-Oct-2025 06:14:25 Europe/Berlin] Verificando login...
+[29-Oct-2025 06:14:25 Europe/Berlin] ✓ Login verificado
+[29-Oct-2025 06:14:25 Europe/Berlin] Obtendo empresa_id...
+[29-Oct-2025 06:14:25 Europe/Berlin] ✓ Empresa ID: 1
+[29-Oct-2025 06:14:25 Europe/Berlin] Conectando ao banco...
+[29-Oct-2025 06:14:25 Europe/Berlin] ✓ Conexão estabelecida
+[29-Oct-2025 06:14:25 Europe/Berlin] Lendo JSON de entrada...
+[29-Oct-2025 06:14:25 Europe/Berlin] JSON recebido: 1390 bytes
+[29-Oct-2025 06:14:25 Europe/Berlin] JSON decodificado: OK
+[29-Oct-2025 06:14:25 Europe/Berlin] Nome do arquivo: teste12312323.xlsx
+[29-Oct-2025 06:14:25 Europe/Berlin] Total de documentos recebidos: 3
+[29-Oct-2025 06:14:25 Europe/Berlin] Cliente encontrado: ID 2
+[29-Oct-2025 06:14:25 Europe/Berlin] Cliente encontrado: ID 5
+[29-Oct-2025 06:14:25 Europe/Berlin] Cliente não encontrado para identificador: 2575625
+[29-Oct-2025 06:14:25 Europe/Berlin] ⚠️ Nenhum documento importado - histórico NÃO registrado
+[29-Oct-2025 06:14:25 Europe/Berlin] ========== FIM DA IMPORTAÇÃO ==========
+

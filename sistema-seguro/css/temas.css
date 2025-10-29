@@ -1,0 +1,759 @@
+/* ============================================
+   SISTEMA SEGURO - TEMAS CLARO E ESCURO
+   ============================================ */
+
+/* ===== TEMA CLARO (Padrão) ===== */
+:root[data-theme="claro"],
+:root {
+    /* Cores principais (agora são variáveis CSS globais carregadas via JS) */
+    --cor-primaria-custom: #667eea;
+    --cor-secundaria-custom: #764ba2;
+    --cor-destaque-custom: #28a745;
+    
+    /* Manter nomes antigos para compatibilidade */
+    --cor-primaria: var(--cor-primaria-custom);
+    --cor-secundaria: var(--cor-secundaria-custom);
+    --cor-destaque: var(--cor-destaque-custom);
+    
+    /* Backgrounds */
+    --bg-body: #f8f9fa;
+    --bg-card: #ffffff;
+    --bg-header: #ffffff;
+    --bg-sidebar: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    
+    /* Textos */
+    --text-primary: #212529;
+    --text-secondary: #6c757d;
+    --text-muted: #adb5bd;
+    --text-light: #ffffff;
+    
+    /* Bordas */
+    --border-color: #dee2e6;
+    --border-light: #e9ecef;
+    
+    /* Sombras */
+    --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 5px 15px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.15);
+    
+    /* Estados */
+    --hover-bg: #f8f9fa;
+    --active-bg: #e9ecef;
+}
+
+/* ===== TEMA ESCURO ===== */
+:root[data-theme="escuro"] {
+    /* Cores principais (ajustadas para escuro - mas usa as customizadas) */
+    --cor-primaria-custom: var(--cor-primaria-custom, #8b9cff);
+    --cor-secundaria-custom: var(--cor-secundaria-custom, #9a69c7);
+    --cor-destaque-custom: var(--cor-destaque-custom, #4caf50);
+    
+    /* Manter nomes antigos para compatibilidade */
+    --cor-primaria: var(--cor-primaria-custom);
+    --cor-secundaria: var(--cor-secundaria-custom);
+    --cor-destaque: var(--cor-destaque-custom);
+    
+    /* Backgrounds */
+    --bg-body: #1a1d23;
+    --bg-card: #242830;
+    --bg-header: #2c3038;
+    --bg-sidebar: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    
+    /* Textos */
+    --text-primary: #e4e6eb;
+    --text-secondary: #b0b3b8;
+    --text-muted: #8a8d91;
+    --text-light: #ffffff;
+    
+    /* Bordas */
+    --border-color: #3a3d44;
+    --border-light: #2f3238;
+    
+    /* Sombras */
+    --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 5px 15px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+    
+    /* Estados */
+    --hover-bg: #2f3238;
+    --active-bg: #3a3d44;
+}
+
+/* ===== APLICAÇÃO DOS TEMAS ===== */
+
+/* Body */
+body {
+    background-color: var(--bg-body) !important;
+    color: var(--text-primary) !important;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Main Content - Área principal que envolve tudo */
+.main-content,
+div.main-content,
+.container,
+.container-fluid {
+    background-color: transparent !important;
+    color: var(--text-primary) !important;
+}
+
+/* Cards - TODOS os tipos */
+.card,
+.card-white,
+div.card {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+.card-header,
+.card-header.bg-white {
+    background-color: var(--bg-card) !important;
+    border-bottom-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+.card-body {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Cards com classes específicas do Bootstrap */
+.bg-white,
+.card.bg-white {
+    background-color: var(--bg-card) !important;
+}
+
+/* Header */
+.header {
+    background-color: var(--bg-header) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Sidebar com fundo escurecido via filter */
+.sidebar {
+    background: var(--bg-sidebar) !important;
+    filter: brightness(0.7) saturate(1.2);
+}
+
+/* Texto do sidebar sempre branco e legível - MÁXIMA PRIORIDADE */
+.sidebar,
+.sidebar *,
+.sidebar a,
+.sidebar a *,
+.sidebar .nav-link,
+.sidebar .nav-link *,
+.sidebar .menu-item,
+.sidebar .menu-item *,
+.sidebar h1, .sidebar h2, .sidebar h3, .sidebar h4, .sidebar h5, .sidebar h6,
+.sidebar p,
+.sidebar span,
+.sidebar div,
+.sidebar .brand-text,
+.sidebar .brand-text *,
+.sidebar li,
+.sidebar ul,
+html .sidebar,
+html .sidebar *,
+body .sidebar,
+body .sidebar * {
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Links do sidebar com hover mais visível */
+.sidebar a:hover,
+.sidebar a:hover *,
+.sidebar .nav-link:hover,
+.sidebar .nav-link:hover * {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Ícones do sidebar */
+.sidebar i,
+.sidebar .fas,
+.sidebar .fa,
+.sidebar .fab,
+.sidebar svg {
+    color: #ffffff !important;
+    fill: #ffffff !important;
+    opacity: 1 !important;
+}
+
+/* Tables */
+.table {
+    color: var(--text-primary) !important;
+}
+
+.table-hover tbody tr:hover {
+    background-color: var(--hover-bg) !important;
+}
+
+.table thead th {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+.table tbody td {
+    border-color: var(--border-light) !important;
+}
+
+/* Forms */
+.form-control,
+.form-select,
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="number"],
+input[type="date"],
+input[type="month"],
+input[type="color"],
+textarea,
+select {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+.form-control:focus,
+.form-select:focus,
+input:focus,
+textarea:focus,
+select:focus {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--cor-primaria) !important;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+}
+
+.form-label,
+label {
+    color: var(--text-primary) !important;
+}
+
+/* Placeholders no tema escuro */
+:root[data-theme="escuro"] .form-control::placeholder,
+:root[data-theme="escuro"] input::placeholder,
+:root[data-theme="escuro"] textarea::placeholder {
+    color: var(--text-muted) !important;
+    opacity: 0.7;
+}
+
+/* Input group text */
+.input-group-text {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Modal */
+.modal-content {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+.modal-header {
+    border-bottom-color: var(--border-color) !important;
+}
+
+.modal-footer {
+    border-top-color: var(--border-color) !important;
+}
+
+/* Buttons mantêm suas cores originais */
+.btn-close {
+    filter: var(--bs-btn-close-bg);
+}
+
+:root[data-theme="escuro"] .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* Dropdown */
+.dropdown-menu {
+    background-color: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+
+.dropdown-item {
+    color: var(--text-primary) !important;
+}
+
+.dropdown-item:hover {
+    background-color: var(--hover-bg) !important;
+}
+
+.dropdown-divider {
+    border-top-color: var(--border-color) !important;
+}
+
+/* Text colors */
+.text-muted,
+small.text-muted {
+    color: var(--text-muted) !important;
+}
+
+/* Small text */
+small {
+    color: var(--text-secondary) !important;
+}
+
+/* Alerts */
+.alert {
+    border-color: var(--border-color) !important;
+}
+
+:root[data-theme="escuro"] .alert {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+/* List group */
+.list-group-item {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+.list-group-item:hover {
+    background-color: var(--hover-bg) !important;
+}
+
+/* Badge mantém suas cores originais */
+
+/* Progress bar mantém suas cores originais */
+
+/* Charts - mantém fundo claro para legibilidade */
+canvas {
+    background-color: transparent !important;
+}
+
+/* Form sections - página de empresa */
+.form-section {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+/* Scrollbar personalizada para tema escuro */
+:root[data-theme="escuro"] ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+:root[data-theme="escuro"] ::-webkit-scrollbar-track {
+    background: var(--bg-body);
+}
+
+:root[data-theme="escuro"] ::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 6px;
+}
+
+:root[data-theme="escuro"] ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-secondary);
+}
+
+/* Transições suaves */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Toggle de tema */
+.theme-toggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1050;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--cor-primaria);
+    color: white;
+    border: none;
+    box-shadow: var(--shadow-lg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.theme-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Ajustes específicos para componentes Bootstrap no tema escuro */
+:root[data-theme="escuro"] .table-light {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+:root[data-theme="escuro"] .table-dark {
+    background-color: #1a1d23 !important;
+}
+
+:root[data-theme="escuro"] .bg-white {
+    background-color: var(--bg-card) !important;
+}
+
+:root[data-theme="escuro"] .text-dark {
+    color: var(--text-primary) !important;
+}
+
+/* Forçar background escuro em TODOS os elementos brancos no modo escuro */
+:root[data-theme="escuro"] .card,
+:root[data-theme="escuro"] .card-header,
+:root[data-theme="escuro"] .card-body,
+:root[data-theme="escuro"] .header,
+:root[data-theme="escuro"] .form-section,
+:root[data-theme="escuro"] div[class*="card"],
+:root[data-theme="escuro"] .table-responsive,
+:root[data-theme="escuro"] .modal-content,
+:root[data-theme="escuro"] .modal-header,
+:root[data-theme="escuro"] .modal-body,
+:root[data-theme="escuro"] .modal-footer {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Headers específicos que devem ser escuros */
+:root[data-theme="escuro"] .card-header.bg-white,
+:root[data-theme="escuro"] .card-header[style*="background"],
+:root[data-theme="escuro"] h1, 
+:root[data-theme="escuro"] h2, 
+:root[data-theme="escuro"] h3, 
+:root[data-theme="escuro"] h4, 
+:root[data-theme="escuro"] h5, 
+:root[data-theme="escuro"] h6 {
+    color: var(--text-primary) !important;
+}
+
+/* Filtros, listas e outros elementos */
+:root[data-theme="escuro"] .list-group-item,
+:root[data-theme="escuro"] .accordion-item,
+:root[data-theme="escuro"] .accordion-button {
+    background-color: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Containers e rows */
+:root[data-theme="escuro"] .container-fluid,
+:root[data-theme="escuro"] .row > div > .card {
+    background-color: transparent !important;
+}
+
+/* Tabelas dentro de cards */
+:root[data-theme="escuro"] .card .table-responsive {
+    background-color: transparent !important;
+}
+
+/* Inputs dentro de cards */
+:root[data-theme="escuro"] .card input,
+:root[data-theme="escuro"] .card select,
+:root[data-theme="escuro"] .card textarea {
+    background-color: var(--bg-body) !important;
+    color: var(--text-primary) !important;
+}
+
+/* ===== REGRAS SUPER ESPECÍFICAS PARA MODO ESCURO ===== */
+/* Estas regras têm alta especificidade para sobrescrever qualquer outra */
+
+/* FORÇAR todos os cards a ficarem ESCUROS */
+:root[data-theme="escuro"] body .card,
+:root[data-theme="escuro"] body div.card,
+:root[data-theme="escuro"] .main-content .card,
+:root[data-theme="escuro"] .container .card,
+:root[data-theme="escuro"] .container-fluid .card {
+    background-color: #242830 !important;
+    background: #242830 !important;
+    color: #e4e6eb !important;
+    border-color: #3a3d44 !important;
+}
+
+/* FORÇAR card-header a ficar ESCURO */
+:root[data-theme="escuro"] body .card-header,
+:root[data-theme="escuro"] body .card .card-header,
+:root[data-theme="escuro"] .card-header.bg-white,
+:root[data-theme="escuro"] .card-header[style],
+:root[data-theme="escuro"] .main-content .card-header {
+    background-color: #242830 !important;
+    background: #242830 !important;
+    color: #e4e6eb !important;
+    border-bottom-color: #3a3d44 !important;
+}
+
+/* FORÇAR card-body a ficar ESCURO */
+:root[data-theme="escuro"] body .card-body,
+:root[data-theme="escuro"] body .card .card-body,
+:root[data-theme="escuro"] .main-content .card-body {
+    background-color: #242830 !important;
+    background: #242830 !important;
+    color: #e4e6eb !important;
+}
+
+/* FORÇAR header principal a ficar ESCURO */
+:root[data-theme="escuro"] body .header,
+:root[data-theme="escuro"] .main-content .header,
+:root[data-theme="escuro"] div.header {
+    background-color: #2c3038 !important;
+    background: #2c3038 !important;
+    color: #e4e6eb !important;
+}
+
+/* FORÇAR todos os h1, h2, h3, h4, h5, h6 a ficarem CLAROS */
+:root[data-theme="escuro"] h1,
+:root[data-theme="escuro"] h2,
+:root[data-theme="escuro"] h3,
+:root[data-theme="escuro"] h4,
+:root[data-theme="escuro"] h5,
+:root[data-theme="escuro"] h6,
+:root[data-theme="escuro"] .card h1,
+:root[data-theme="escuro"] .card h2,
+:root[data-theme="escuro"] .card h3,
+:root[data-theme="escuro"] .card h4,
+:root[data-theme="escuro"] .card h5,
+:root[data-theme="escuro"] .card h6 {
+    color: #e4e6eb !important;
+}
+
+/* FORÇAR parágrafos a ficarem CLAROS */
+:root[data-theme="escuro"] p,
+:root[data-theme="escuro"] .card p,
+:root[data-theme="escuro"] .card-body p {
+    color: #e4e6eb !important;
+}
+
+/* FORÇAR tabelas a ficarem ESCURAS */
+:root[data-theme="escuro"] .table,
+:root[data-theme="escuro"] .card .table,
+:root[data-theme="escuro"] .table-responsive table {
+    background-color: transparent !important;
+    color: #e4e6eb !important;
+}
+
+:root[data-theme="escuro"] .table thead,
+:root[data-theme="escuro"] .table thead th {
+    background-color: #1a1d23 !important;
+    color: #e4e6eb !important;
+    border-color: #3a3d44 !important;
+}
+
+:root[data-theme="escuro"] .table tbody td,
+:root[data-theme="escuro"] .table tbody tr {
+    background-color: transparent !important;
+    color: #e4e6eb !important;
+    border-color: #2f3238 !important;
+}
+
+:root[data-theme="escuro"] .table-hover tbody tr:hover {
+    background-color: #2f3238 !important;
+}
+
+/* FORÇAR modais a ficarem ESCUROS */
+:root[data-theme="escuro"] .modal-content,
+:root[data-theme="escuro"] .modal-header,
+:root[data-theme="escuro"] .modal-body,
+:root[data-theme="escuro"] .modal-footer {
+    background-color: #242830 !important;
+    background: #242830 !important;
+    color: #e4e6eb !important;
+    border-color: #3a3d44 !important;
+}
+
+/* FORÇAR forms a ficarem visíveis */
+:root[data-theme="escuro"] input,
+:root[data-theme="escuro"] select,
+:root[data-theme="escuro"] textarea,
+:root[data-theme="escuro"] .form-control,
+:root[data-theme="escuro"] .form-select {
+    background-color: #1a1d23 !important;
+    background: #1a1d23 !important;
+    color: #e4e6eb !important;
+    border-color: #3a3d44 !important;
+}
+
+:root[data-theme="escuro"] .input-group-text {
+    background-color: #2c3038 !important;
+    color: #e4e6eb !important;
+    border-color: #3a3d44 !important;
+}
+
+:root[data-theme="escuro"] label,
+:root[data-theme="escuro"] .form-label {
+    color: #e4e6eb !important;
+}
+
+/* FORÇAR dropdowns a ficarem ESCUROS */
+:root[data-theme="escuro"] .dropdown-menu {
+    background-color: #242830 !important;
+    border-color: #3a3d44 !important;
+}
+
+:root[data-theme="escuro"] .dropdown-item {
+    color: #e4e6eb !important;
+}
+
+:root[data-theme="escuro"] .dropdown-item:hover {
+    background-color: #2f3238 !important;
+    color: #ffffff !important;
+}
+
+/* FORÇAR TODOS os backgrounds brancos a ficarem ESCUROS */
+:root[data-theme="escuro"] [style*="background: white"],
+:root[data-theme="escuro"] [style*="background-color: white"],
+:root[data-theme="escuro"] [style*="background: #fff"],
+:root[data-theme="escuro"] [style*="background-color: #fff"],
+:root[data-theme="escuro"] [style*="background-color: #ffffff"],
+:root[data-theme="escuro"] .bg-white,
+:root[data-theme="escuro"] .bg-light {
+    background-color: #242830 !important;
+    background: #242830 !important;
+    color: #e4e6eb !important;
+}
+
+/* FORÇAR main-content e containers a ficarem ESCUROS */
+:root[data-theme="escuro"] body .main-content,
+:root[data-theme="escuro"] body div.main-content,
+:root[data-theme="escuro"] .main-content {
+    background-color: #1a1d23 !important;
+    background: #1a1d23 !important;
+}
+
+/* FORÇAR rows e columns a serem transparentes (herdam do body) */
+:root[data-theme="escuro"] .row,
+:root[data-theme="escuro"] .col,
+:root[data-theme="escuro"] [class*="col-"] {
+    background-color: transparent !important;
+}
+
+/* FORÇAR área de controles (botões, filtros) a ficar ESCURA */
+:root[data-theme="escuro"] .controls,
+:root[data-theme="escuro"] .filters,
+:root[data-theme="escuro"] .actions,
+:root[data-theme="escuro"] .toolbar {
+    background-color: transparent !important;
+    color: #e4e6eb !important;
+}
+
+/* ===== APLICAÇÃO DE CORES PERSONALIZADAS ===== */
+
+/* Botões com cor primária */
+.btn-primary,
+.btn-primary-custom,
+.btn-gradient,
+button.btn-primary,
+input[type="submit"],
+button[type="submit"] {
+    background: linear-gradient(135deg, var(--cor-primaria-custom) 0%, var(--cor-secundaria-custom) 100%) !important;
+    background-color: var(--cor-primaria-custom) !important;
+    border-color: var(--cor-primaria-custom) !important;
+}
+
+.btn-primary:hover,
+.btn-primary-custom:hover,
+.btn-gradient:hover,
+button.btn-primary:hover,
+input[type="submit"]:hover,
+button[type="submit"]:hover {
+    background: linear-gradient(135deg, var(--cor-secundaria-custom) 0%, var(--cor-primaria-custom) 100%) !important;
+    background-color: var(--cor-secundaria-custom) !important;
+    border-color: var(--cor-secundaria-custom) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Botões de destaque (sucesso) */
+.btn-success,
+.btn-success-custom {
+    background-color: var(--cor-destaque-custom) !important;
+    border-color: var(--cor-destaque-custom) !important;
+}
+
+.btn-success:hover,
+.btn-success-custom:hover {
+    background-color: var(--cor-destaque-custom) !important;
+    filter: brightness(1.1);
+}
+
+/* Links */
+a,
+a.text-primary {
+    color: var(--cor-primaria-custom) !important;
+}
+
+a:hover,
+a.text-primary:hover {
+    color: var(--cor-secundaria-custom) !important;
+}
+
+/* Badges */
+.badge.bg-primary,
+.badge.primary {
+    background-color: var(--cor-primaria-custom) !important;
+}
+
+.badge.bg-secondary,
+.badge.secondary {
+    background-color: var(--cor-secundaria-custom) !important;
+}
+
+.badge.bg-success,
+.badge.success {
+    background-color: var(--cor-destaque-custom) !important;
+}
+
+/* Cards de estatísticas com gradiente */
+.stat-card,
+.card-gradient {
+    background: linear-gradient(135deg, var(--cor-primaria-custom) 0%, var(--cor-secundaria-custom) 100%) !important;
+}
+
+/* Bordas coloridas */
+.border-primary {
+    border-color: var(--cor-primaria-custom) !important;
+}
+
+/* Texto colorido */
+.text-primary-custom {
+    color: var(--cor-primaria-custom) !important;
+}
+
+.text-secondary-custom {
+    color: var(--cor-secundaria-custom) !important;
+}
+
+.text-destaque {
+    color: var(--cor-destaque-custom) !important;
+}
+
+/* Focus em inputs */
+.form-control:focus,
+.form-select:focus,
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: var(--cor-primaria-custom) !important;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+}
+
+/* Toggle de tema */
+.theme-toggle {
+    background: var(--cor-primaria-custom) !important;
+}
+
+.theme-toggle:hover {
+    background: var(--cor-secundaria-custom) !important;
+}
+
+/* Sidebar já tem o gradiente aplicado via JS */
+
+/* ===== FIM DOS TEMAS ===== */
+

@@ -1,0 +1,225 @@
+/* ===================================================
+   TEMA ESCURO FORÇADO - MÁXIMA PRIORIDADE
+   Este arquivo DEVE ser carregado DEPOIS de temas.css
+   ================================================== */
+
+/* FORÇAR TUDO a ficar ESCURO - Especificidade MÁXIMA */
+
+/* 1. BODY e HTML */
+html[data-theme="escuro"],
+html[data-theme="escuro"] body {
+    background-color: #1a1d23 !important;
+    background: #1a1d23 !important;
+    color: #e4e6eb !important;
+}
+
+/* 2. MAIN-CONTENT (Área do dashboard que está branca) */
+html[data-theme="escuro"] body .main-content,
+html[data-theme="escuro"] body > .main-content,
+html[data-theme="escuro"] div.main-content,
+html[data-theme="escuro"] .main-content,
+html[data-theme="escuro"] #main-content {
+    background-color: #1a1d23 !important;
+    background: #1a1d23 !important;
+    color: #e4e6eb !important;
+}
+
+/* 3. CONTAINERS */
+html[data-theme="escuro"] .container,
+html[data-theme="escuro"] .container-fluid,
+html[data-theme="escuro"] body .container,
+html[data-theme="escuro"] body .container-fluid {
+    background-color: transparent !important;
+    background: transparent !important;
+}
+
+/* 4. ROWS e COLUMNS */
+html[data-theme="escuro"] .row,
+html[data-theme="escuro"] [class*="col-"],
+html[data-theme="escuro"] .col {
+    background-color: transparent !important;
+    background: transparent !important;
+}
+
+/* 5. CARDS (menus, filtros, tabelas) */
+html[data-theme="escuro"] .card,
+html[data-theme="escuro"] body .card,
+html[data-theme="escuro"] div.card,
+html[data-theme="escuro"] .card-header,
+html[data-theme="escuro"] .card-body,
+html[data-theme="escuro"] .card-footer {
+    background-color: #242830 !important;
+    background: #242830 !important;
+    color: #e4e6eb !important;
+    border-color: #3a3d44 !important;
+}
+
+/* 6. HEADER PRINCIPAL */
+html[data-theme="escuro"] .header,
+html[data-theme="escuro"] body .header,
+html[data-theme="escuro"] div.header {
+    background-color: #2c3038 !important;
+    background: #2c3038 !important;
+    color: #e4e6eb !important;
+}
+
+/* 7. QUALQUER DIV que tenha fundo branco */
+html[data-theme="escuro"] div[style*="background: white"],
+html[data-theme="escuro"] div[style*="background-color: white"],
+html[data-theme="escuro"] div[style*="background: #fff"],
+html[data-theme="escuro"] div[style*="background-color: #fff"],
+html[data-theme="escuro"] div[style*="background-color: #ffffff"],
+html[data-theme="escuro"] div[style*="background-color:#fff"],
+html[data-theme="escuro"] div[style*="background-color:#ffffff"] {
+    background-color: #1a1d23 !important;
+    background: #1a1d23 !important;
+}
+
+/* 8. CLASSES .bg-white do Bootstrap */
+html[data-theme="escuro"] .bg-white,
+html[data-theme="escuro"] .bg-light,
+html[data-theme="escuro"] body .bg-white,
+html[data-theme="escuro"] body .bg-light {
+    background-color: #242830 !important;
+    background: #242830 !important;
+    color: #e4e6eb !important;
+}
+
+/* 9. FORMS e INPUTS */
+html[data-theme="escuro"] input,
+html[data-theme="escuro"] select,
+html[data-theme="escuro"] textarea,
+html[data-theme="escuro"] .form-control,
+html[data-theme="escuro"] .form-select {
+    background-color: #1a1d23 !important;
+    background: #1a1d23 !important;
+    color: #e4e6eb !important;
+    border-color: #3a3d44 !important;
+}
+
+html[data-theme="escuro"] input::placeholder,
+html[data-theme="escuro"] textarea::placeholder {
+    color: #8a8d91 !important;
+}
+
+/* 10. LABELS */
+html[data-theme="escuro"] label,
+html[data-theme="escuro"] .form-label {
+    color: #e4e6eb !important;
+}
+
+/* 11. TABELAS */
+html[data-theme="escuro"] .table {
+    color: #e4e6eb !important;
+}
+
+html[data-theme="escuro"] .table thead,
+html[data-theme="escuro"] .table thead th {
+    background-color: #1a1d23 !important;
+    color: #e4e6eb !important;
+    border-color: #3a3d44 !important;
+}
+
+html[data-theme="escuro"] .table tbody td {
+    color: #e4e6eb !important;
+    border-color: #2f3238 !important;
+}
+
+html[data-theme="escuro"] .table-hover tbody tr:hover {
+    background-color: #2f3238 !important;
+}
+
+/* 12. TEXTOS */
+html[data-theme="escuro"] h1,
+html[data-theme="escuro"] h2,
+html[data-theme="escuro"] h3,
+html[data-theme="escuro"] h4,
+html[data-theme="escuro"] h5,
+html[data-theme="escuro"] h6,
+html[data-theme="escuro"] p,
+html[data-theme="escuro"] span:not(.badge) {
+    color: #e4e6eb !important;
+}
+
+html[data-theme="escuro"] small,
+html[data-theme="escuro"] .text-muted {
+    color: #b0b3b8 !important;
+}
+
+/* 13. SIDEBAR - SEMPRE colorida (roxo/azul) */
+html[data-theme="escuro"] .sidebar,
+html[data-theme="escuro"] body .sidebar,
+html[data-theme="escuro"] nav.sidebar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+html[data-theme="escuro"] .sidebar .nav-link {
+    color: #ffffff !important;
+}
+
+/* 14. MODAIS */
+html[data-theme="escuro"] .modal-content,
+html[data-theme="escuro"] .modal-header,
+html[data-theme="escuro"] .modal-body,
+html[data-theme="escuro"] .modal-footer {
+    background-color: #242830 !important;
+    background: #242830 !important;
+    color: #e4e6eb !important;
+    border-color: #3a3d44 !important;
+}
+
+/* 15. DROPDOWNS */
+html[data-theme="escuro"] .dropdown-menu {
+    background-color: #242830 !important;
+    border-color: #3a3d44 !important;
+}
+
+html[data-theme="escuro"] .dropdown-item {
+    color: #e4e6eb !important;
+}
+
+html[data-theme="escuro"] .dropdown-item:hover {
+    background-color: #2f3238 !important;
+}
+
+/* 16. CONTAINERS ESPECÍFICOS (search-container, table-container, etc) */
+html[data-theme="escuro"] .search-container,
+html[data-theme="escuro"] .table-container,
+html[data-theme="escuro"] .filter-container,
+html[data-theme="escuro"] .actions-container,
+html[data-theme="escuro"] .ticket-item,
+html[data-theme="escuro"] body .search-container,
+html[data-theme="escuro"] body .table-container,
+html[data-theme="escuro"] body .ticket-item {
+    background-color: #242830 !important;
+    background: #242830 !important;
+    color: #e4e6eb !important;
+}
+
+/* 17. PAGINAÇÃO */
+html[data-theme="escuro"] .pagination {
+    background-color: transparent !important;
+}
+
+html[data-theme="escuro"] .page-link {
+    background-color: #1a1d23 !important;
+    color: #e4e6eb !important;
+    border-color: #3a3d44 !important;
+}
+
+html[data-theme="escuro"] .page-item.active .page-link {
+    background-color: #667eea !important;
+    border-color: #667eea !important;
+    color: #ffffff !important;
+}
+
+html[data-theme="escuro"] .page-link:hover {
+    background-color: #2f3238 !important;
+    color: #ffffff !important;
+}
+
+/* ===== BADGES mantêm cores originais ===== */
+/* ===== BUTTONS mantêm cores originais ===== */
+
+/* FIM */
+

@@ -34,15 +34,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     // Iniciar transação
                     $pdo->beginTransaction();
 
+                    // Verificar se tem acesso ao Sistema Seguro
+                    $tem_acesso_seguro = 'nao';
+                    if (($_POST['plano'] === 'premium' || $_POST['plano'] === 'enterprise') && 
+                        isset($_POST['tem_acesso_seguro']) && $_POST['tem_acesso_seguro'] === 'sim') {
+                        $tem_acesso_seguro = 'sim';
+                    }
+
                     // Inserir na tabela empresa_adm
-                    $stmt = $pdo->prepare("INSERT INTO empresa_adm (razao_social, cnpj, telefone, email, valor_por_veiculo, plano) VALUES (?, ?, ?, ?, ?, ?)");
+                    $stmt = $pdo->prepare("INSERT INTO empresa_adm (razao_social, cnpj, telefone, email, valor_por_veiculo, plano, tem_acesso_seguro) VALUES (?, ?, ?, ?, ?, ?, ?)");
                     $stmt->execute([
                         $_POST['razao_social'],
                         $_POST['cnpj'],
                         $_POST['telefone'],
                         $_POST['email'],
                         $_POST['valor_por_veiculo'],
-                        $_POST['plano']
+                        $_POST['plano'],
+                        $tem_acesso_seguro
                     ]);
 
                     // Obter o ID da empresa_adm inserida
@@ -58,10 +66,46 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $_POST['email']
                     ]);
 
+                    // Se tem acesso ao Sistema Seguro, criar registros nas tabelas seguro_*
+                    if ($tem_acesso_seguro === 'sim') {
+                        // Inserir na tabela seguro_empresa_clientes
+                        $stmt = $pdo->prepare("
+                            INSERT INTO seguro_empresa_clientes 
+                            (empresa_adm_id, razao_social, cnpj, email, telefone, porcentagem_fixa, unidade, status)
+                            VALUES (?, ?, ?, ?, ?, 5.00, 'Matriz', 'ativo')
+                        ");
+                        $stmt->execute([
+                            $empresa_adm_id,
+                            $_POST['razao_social'],
+                            $_POST['cnpj'],
+                            $_POST['email'],
+                            $_POST['telefone']
+                        ]);
+
+                        $seguro_empresa_id = $pdo->lastInsertId();
+
+                        // Criar usuário admin para o Sistema Seguro
+                        $senha_padrao = password_hash('123456', PASSWORD_DEFAULT);
+                        $nome_admin = explode('@', $_POST['email'])[0]; // Usar parte do email como nome
+
+                        $stmt = $pdo->prepare("
+                            INSERT INTO seguro_usuarios 
+                            (seguro_empresa_id, nome, email, senha, nivel_acesso, status)
+                            VALUES (?, ?, ?, ?, 'admin', 'ativo')
+                        ");
+                        $stmt->execute([
+                            $seguro_empresa_id,
+                            $nome_admin,
+                            $_POST['email'],
+                            $senha_padrao
+                        ]);
+                    }
+
                     // Confirmar transação
                     $pdo->commit();
 
-                    $mensagem = "Empresa cadastrada com sucesso!";
+                    $mensagem_extra = $tem_acesso_seguro === 'sim' ? ' Sistema Seguro habilitado! Login: ' . $_POST['email'] . ' | Senha: 123456' : '';
+                    $mensagem = "Empresa cadastrada com sucesso!" . $mensagem_extra;
                     $tipo_mensagem = "success";
                 } catch (Exception $e) {
                     // Reverter transação em caso de erro
@@ -92,8 +136,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     // Iniciar transação
                     $pdo->beginTransaction();
 
-                    // Atualizar na tabela empresa_adm
-                    $stmt = $pdo->prepare("UPDATE empresa_adm SET razao_social = ?, cnpj = ?, telefone = ?, email = ?, valor_por_veiculo = ?, plano = ? WHERE id = ?");
+                    // Determinar se tem acesso ao Sistema Seguro baseado no plano
+                    $tem_acesso_seguro = 'nao';
+                    if ($_POST['plano'] === 'premium' || $_POST['plano'] === 'enterprise') {
+                        $tem_acesso_seguro = 'sim';
+                    }
+
+                    // Atualizar na tabela empresa_adm (incluindo tem_acesso_seguro)
+                    $stmt = $pdo->prepare("UPDATE empresa_adm SET razao_social = ?, cnpj = ?, telefone = ?, email = ?, valor_por_veiculo = ?, plano = ?, tem_acesso_seguro = ? WHERE id = ?");
                     $stmt->execute([
                         $_POST['razao_social'],
                         $_POST['cnpj'],
@@ -101,6 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $_POST['email'],
                         $_POST['valor_por_veiculo'],
                         $_POST['plano'],
+                        $tem_acesso_seguro,
                         $_POST['id']
                     ]);
 
@@ -114,10 +165,93 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $_POST['id']
                     ]);
 
+                    $mensagem_extra = '';
+
+                    // Se mudou para plano Premium/Enterprise, verificar se precisa criar acesso ao Sistema Seguro
+                    if ($tem_acesso_seguro === 'sim') {
+                        // Verificar se já existe registro no Sistema Seguro
+                        $stmt = $pdo->prepare("SELECT id FROM seguro_empresa_clientes WHERE empresa_adm_id = ?");
+                        $stmt->execute([$_POST['id']]);
+                        $seguro_existe = $stmt->fetch();
+
+                        if (!$seguro_existe) {
+                            // Criar registro no Sistema Seguro
+                            $stmt = $pdo->prepare("
+                                INSERT INTO seguro_empresa_clientes 
+                                (empresa_adm_id, razao_social, cnpj, email, telefone, porcentagem_fixa, unidade, status)
+                                VALUES (?, ?, ?, ?, ?, 5.00, 'Matriz', 'ativo')
+                            ");
+                            $stmt->execute([
+                                $_POST['id'],
+                                $_POST['razao_social'],
+                                $_POST['cnpj'],
+                                $_POST['email'],
+                                $_POST['telefone']
+                            ]);
+
+                            $seguro_empresa_id = $pdo->lastInsertId();
+
+                            // Verificar se já existe usuário com este email
+                            $stmt = $pdo->prepare("SELECT id FROM seguro_usuarios WHERE email = ?");
+                            $stmt->execute([$_POST['email']]);
+                            $usuario_existe = $stmt->fetch();
+
+                            if (!$usuario_existe) {
+                                // Criar usuário admin para o Sistema Seguro
+                                $senha_padrao = password_hash('123456', PASSWORD_DEFAULT);
+                                $nome_admin = explode('@', $_POST['email'])[0];
+
+                                $stmt = $pdo->prepare("
+                                    INSERT INTO seguro_usuarios 
+                                    (seguro_empresa_id, nome, email, senha, nivel_acesso, status)
+                                    VALUES (?, ?, ?, ?, 'admin', 'ativo')
+                                ");
+                                $stmt->execute([
+                                    $seguro_empresa_id,
+                                    $nome_admin,
+                                    $_POST['email'],
+                                    $senha_padrao
+                                ]);
+
+                                $mensagem_extra = ' | Sistema Seguro HABILITADO! Login: ' . $_POST['email'] . ' | Senha: 123456';
+                            } else {
+                                // Apenas reativar o usuário existente
+                                $stmt = $pdo->prepare("UPDATE seguro_usuarios SET status = 'ativo', seguro_empresa_id = ? WHERE email = ?");
+                                $stmt->execute([$seguro_empresa_id, $_POST['email']]);
+                                $mensagem_extra = ' | Sistema Seguro REATIVADO!';
+                            }
+                        } else {
+                            // Atualizar dados na tabela seguro_empresa_clientes
+                            $stmt = $pdo->prepare("
+                                UPDATE seguro_empresa_clientes 
+                                SET razao_social = ?, cnpj = ?, email = ?, telefone = ?, status = 'ativo'
+                                WHERE empresa_adm_id = ?
+                            ");
+                            $stmt->execute([
+                                $_POST['razao_social'],
+                                $_POST['cnpj'],
+                                $_POST['email'],
+                                $_POST['telefone'],
+                                $_POST['id']
+                            ]);
+
+                            // Reativar usuários
+                            $stmt = $pdo->prepare("UPDATE seguro_usuarios SET status = 'ativo' WHERE seguro_empresa_id = (SELECT id FROM seguro_empresa_clientes WHERE empresa_adm_id = ?)");
+                            $stmt->execute([$_POST['id']]);
+                        }
+                    } else {
+                        // Se mudou para plano Básico, desativar acesso ao Sistema Seguro
+                        $stmt = $pdo->prepare("UPDATE seguro_empresa_clientes SET status = 'inativo' WHERE empresa_adm_id = ?");
+                        $stmt->execute([$_POST['id']]);
+
+                        $stmt = $pdo->prepare("UPDATE seguro_usuarios SET status = 'inativo' WHERE seguro_empresa_id IN (SELECT id FROM seguro_empresa_clientes WHERE empresa_adm_id = ?)");
+                        $stmt->execute([$_POST['id']]);
+                    }
+
                     // Confirmar transação
                     $pdo->commit();
 
-                    $mensagem = "Empresa atualizada com sucesso!";
+                    $mensagem = "Empresa atualizada com sucesso!" . $mensagem_extra;
                     $tipo_mensagem = "success";
                 } catch (Exception $e) {
                     // Reverter transação em caso de erro
@@ -303,6 +437,13 @@ try {
             background: #f8d7da;
             color: #721c24;
         }
+        .alert-info-seguro {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            margin-top: 10px;
+        }
         .badge {
             padding: 4px 8px;
             border-radius: 4px;
@@ -355,6 +496,7 @@ try {
                         <th>Telefone</th>
                         <th>Valor por Veículo</th>
                         <th>Plano</th>
+                        <th>Sistema Seguro</th>
                         <th>Data de Cadastro</th>
                         <th>Ações</th>
                     </tr>
@@ -371,6 +513,20 @@ try {
                                 <span class="badge badge-<?php echo strtolower($empresa['plano']); ?>">
                                     <?php echo ucfirst($empresa['plano']); ?>
                                 </span>
+                            </td>
+                            <td>
+                                <?php 
+                                $tem_acesso = isset($empresa['tem_acesso_seguro']) && $empresa['tem_acesso_seguro'] === 'sim';
+                                if ($tem_acesso): 
+                                ?>
+                                    <span class="badge" style="background: #28a745; color: white;">
+                                        <i class="fas fa-check-circle"></i> Ativo
+                                    </span>
+                                <?php else: ?>
+                                    <span class="badge" style="background: #6c757d; color: white;">
+                                        <i class="fas fa-times-circle"></i> Não
+                                    </span>
+                                <?php endif; ?>
                             </td>
                             <td><?php echo date('d/m/Y', strtotime($empresa['data_cadastro'])); ?></td>
                             <td class="actions">
@@ -417,13 +573,28 @@ try {
                 </div>
                 <div class="form-group">
                     <label for="plano">Plano:</label>
-                    <select id="plano" name="plano">
+                    <select id="plano" name="plano" required>
                         <option value="">Selecione um plano</option>
-                        <option value="basic">Basic</option>
-                        <option value="premium">Premium</option>
-                        <option value="enterprise">Enterprise</option>
+                        <option value="basic">Básico</option>
+                        <option value="premium">Premium (+ Sistema Seguro)</option>
+                        <option value="enterprise">Enterprise (+ Sistema Seguro)</option>
                     </select>
                 </div>
+                
+                <div class="form-group" id="divAcessoSeguro" style="display:none; background: #e7f3ff; padding: 15px; border-radius: 8px; border-left: 4px solid #007bff;">
+                    <div style="color: #004085;">
+                        <strong><i class="fas fa-shield-alt"></i> Sistema Seguro Habilitado!</strong><br>
+                        <small>Esta empresa terá acesso ao módulo premium de gestão de clientes comissionados.</small>
+                        <br><br>
+                        <label style="font-weight: normal; cursor: pointer;">
+                            <input type="checkbox" name="tem_acesso_seguro" value="sim" checked>
+                            Confirmar acesso ao Sistema Seguro
+                        </label>
+                        <br>
+                        <small style="color: #666;"><strong>Credenciais de acesso:</strong> E-mail cadastrado | Senha: 123456</small>
+                    </div>
+                </div>
+                
                 <button type="submit" class="btn">Salvar</button>
             </form>
         </div>
@@ -459,13 +630,14 @@ try {
                 </div>
                 <div class="form-group">
                     <label for="edit_plano">Plano:</label>
-                    <select id="edit_plano" name="plano">
+                    <select id="edit_plano" name="plano" required>
                         <option value="">Selecione um plano</option>
-                        <option value="basic">Basic</option>
-                        <option value="premium">Premium</option>
-                        <option value="enterprise">Enterprise</option>
+                        <option value="basic">Básico</option>
+                        <option value="premium">Premium (+ Sistema Seguro)</option>
+                        <option value="enterprise">Enterprise (+ Sistema Seguro)</option>
                     </select>
                 </div>
+                
                 <button type="submit" class="btn">Atualizar</button>
             </form>
         </div>
@@ -550,6 +722,18 @@ try {
                 value = value.replace(/^(\d{2})(\d)/g, '($1) $2');
                 value = value.replace(/(\d)(\d{4})$/, '$1-$2');
                 e.target.value = value;
+            }
+        });
+
+        // ===== CONTROLE DO SISTEMA SEGURO =====
+        
+        // Mostrar/ocultar div do Sistema Seguro no modal de adicionar
+        document.getElementById('plano').addEventListener('change', function() {
+            const divAcessoSeguro = document.getElementById('divAcessoSeguro');
+            if (this.value === 'premium' || this.value === 'enterprise') {
+                divAcessoSeguro.style.display = 'block';
+            } else {
+                divAcessoSeguro.style.display = 'none';
             }
         });
     </script>
