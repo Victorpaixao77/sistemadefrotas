@@ -1,39 +1,36 @@
--- ============================================
--- ADICIONAR CAMPOS NA TABELA seguro_financeiro
--- ============================================
--- Campos: PLACA, CONJUNTO, MATRÍCULA
--- ============================================
+-- =====================================================
+-- Adicionar campos 'ponteiro' e 'proposals' na tabela seguro_financeiro
+-- Remover campo 'identificador' obsoleto
+-- =====================================================
 
--- Adicionar coluna PLACA
+-- 1. Adicionar campo 'ponteiro' (se não existir)
 ALTER TABLE seguro_financeiro 
-ADD COLUMN IF NOT EXISTS placa VARCHAR(100) DEFAULT NULL COMMENT 'Placa do veículo' 
-AFTER valor;
+ADD COLUMN IF NOT EXISTS ponteiro VARCHAR(50) NULL 
+AFTER unidade;
 
--- Adicionar coluna CONJUNTO
+-- 2. Adicionar campo 'proposals' (se não existir)
 ALTER TABLE seguro_financeiro 
-ADD COLUMN IF NOT EXISTS conjunto VARCHAR(100) DEFAULT NULL COMMENT 'Conjunto/Grupo' 
-AFTER placa;
+ADD COLUMN IF NOT EXISTS proposals VARCHAR(100) NULL 
+AFTER data_baixa;
 
--- Adicionar coluna MATRÍCULA
+-- 3. Remover campo 'identificador' obsoleto (se existir)
 ALTER TABLE seguro_financeiro 
-ADD COLUMN IF NOT EXISTS matricula VARCHAR(100) DEFAULT NULL COMMENT 'Matrícula' 
-AFTER conjunto;
+DROP COLUMN IF EXISTS identificador;
 
--- Adicionar coluna DATA_EMISSAO (separada do vencimento)
+-- 4. Remover campo 'identificador_original' obsoleto (se existir)
 ALTER TABLE seguro_financeiro 
-ADD COLUMN IF NOT EXISTS data_emissao DATE DEFAULT NULL COMMENT 'Data de emissão do documento' 
-AFTER categoria;
+DROP COLUMN IF EXISTS identificador_original;
 
--- Verificar se foram criados
 SELECT 
-    COLUMN_NAME as 'Campo',
-    COLUMN_TYPE as 'Tipo',
-    COLUMN_COMMENT as 'Comentário'
-FROM INFORMATION_SCHEMA.COLUMNS 
-WHERE TABLE_NAME = 'seguro_financeiro' 
-AND TABLE_SCHEMA = 'sistema_frotas'
-AND COLUMN_NAME IN ('placa', 'conjunto', 'matricula', 'data_emissao')
+    '✅ Campos atualizados com sucesso!' as status,
+    'Tabela seguro_financeiro preparada para nova lógica de importação' as informacao;
+
+-- Listar estrutura final
+SELECT 
+    COLUMN_NAME as campo,
+    COLUMN_TYPE as tipo,
+    IS_NULLABLE as permite_nulo
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = 'seguro_financeiro'
 ORDER BY ORDINAL_POSITION;
-
-SELECT '✅ CAMPOS ADICIONADOS COM SUCESSO!' as 'RESULTADO';
-

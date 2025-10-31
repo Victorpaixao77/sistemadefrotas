@@ -142,3 +142,29 @@
     [tipo_usuario] => admin
 )
 
+[31-Oct-2025 05:23:45 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [redirect_url] => /sistema-frotas/pages/lucratividade.php
+    [loggedin] => 1
+    [id] => 20
+    [usuario_id] => 20
+    [nome] => teste3
+    [email] => victorpaixao77@hotmail.com
+    [empresa_id] => 3
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+)
+
+[31-Oct-2025 05:23:45 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [redirect_url] => /sistema-frotas/pages/lucratividade.php
+    [loggedin] => 1
+    [id] => 20
+    [usuario_id] => 20
+    [nome] => teste3
+    [email] => victorpaixao77@hotmail.com
+    [empresa_id] => 3
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+)
+

@@ -38,12 +38,21 @@ if (!$dados) {
 }
 
 // Validar campos obrigatórios
-$camposObrigatorios = ['tipoPessoa', 'cpfCnpj', 'nomeRazao', 'situacao'];
+$camposObrigatorios = ['tipoPessoa', 'cpfCnpj', 'nomeRazao', 'situacao', 'matricula'];
+$nomesAmigaveis = [
+    'tipoPessoa' => 'Tipo de Pessoa',
+    'cpfCnpj' => 'CPF/CNPJ',
+    'nomeRazao' => 'Nome/Razão Social',
+    'situacao' => 'Situação',
+    'matricula' => 'MATRÍCULA (Código do Cliente)'
+];
+
 foreach ($camposObrigatorios as $campo) {
     if (empty($dados[$campo])) {
+        $nomeAmigavel = $nomesAmigaveis[$campo] ?? $campo;
         echo json_encode([
             'sucesso' => false,
-            'mensagem' => "Campo obrigatório não informado: $campo"
+            'mensagem' => "Campo obrigatório não informado: $nomeAmigavel"
         ]);
         exit;
     }
@@ -86,6 +95,8 @@ try {
     }
     
     // Inserir cliente
+    // Nota: campos removidos: identificador, placa, conjunto, unidade (gerenciados por contratos ou empresa)
+    // porcentagem_recorrencia será calculada pela soma dos contratos
     $stmt = $db->prepare("
         INSERT INTO seguro_clientes (
             seguro_empresa_id,
@@ -101,19 +112,14 @@ try {
             bairro,
             cidade,
             uf,
-            identificador,
-            placa,
-            conjunto,
             matricula,
             telefone,
             celular,
             email,
-            unidade,
-            porcentagem_recorrencia,
             observacoes,
             situacao
         ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
     ");
     
@@ -131,15 +137,10 @@ try {
         $dados['bairro'] ?? null,
         $dados['cidade'] ?? null,
         $dados['uf'] ?? null,
-        $dados['identificador'] ?? null,
-        $dados['placa'] ?? null,
-        $dados['conjunto'] ?? null,
-        $dados['matricula'] ?? null,
+        $dados['matricula'],
         $dados['telefone'] ?? null,
         $dados['celular'] ?? null,
         $dados['email'] ?? null,
-        $dados['unidade'] ?? null,
-        $dados['porcentagemRecorrencia'] ?? 0.00,
         $dados['observacoes'] ?? null,
         $dados['situacao']
     ]);

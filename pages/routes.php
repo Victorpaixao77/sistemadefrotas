@@ -98,6 +98,9 @@ $total_paginas = $resultado['total_paginas'];
     
     <!-- Chart.js for analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Route Profitability Analysis -->
+    <script src="../js/route-profitability.js"></script>
     <style>
         .pagination {
             display: flex;
@@ -823,122 +826,194 @@ $total_paginas = $resultado['total_paginas'];
     </div>
     
     <!-- View Route Details Modal -->
-    <div class="modal" id="viewRouteModal">
-        <div class="modal-content large-modal">
+    <div class="modal" id="viewRouteModal" data-route-id="">
+        <div class="modal-content modal-lg">
             <div class="modal-header">
                 <h2 id="viewModalTitle">Detalhes da Rota</h2>
                 <span class="close-modal close-view-modal">&times;</span>
             </div>
             <div class="modal-body">
                 <div class="details-container">
-                    <div class="route-header">
-                        <div class="route-primary-info">
-                            <h3 id="routeOriginDestination">São Paulo, SP → Rio de Janeiro, RJ</h3>
-                            <div class="route-status" id="routeStatus">Concluída</div>
-                        </div>
-                        <div class="route-date" id="routeDate">07/05/2025</div>
-                    </div>
-                    
-                    <div class="info-grid">
-                        <div class="info-group">
-                            <label>Motorista</label>
-                            <div id="detailDriver"></div>
-                        </div>
-                        <div class="info-group">
-                            <label>Veículo</label>
-                            <div id="detailVehicle"></div>
-                        </div>
-                        <div class="info-group">
-                            <label>Distância</label>
-                            <div id="detailDistance"></div>
-                        </div>
-                        <div class="info-group">
-                            <label>Status</label>
-                            <div id="detailStatus"></div>
-                        </div>
-                        <div class="info-group">
-                            <label>Horário de Saída</label>
-                            <div id="detailStartTime"></div>
-                        </div>
-                        <div class="info-group">
-                            <label>Horário de Chegada</label>
-                            <div id="detailEndTime"></div>
-                        </div>
-                        <div class="info-group">
-                            <label>Duração</label>
-                            <div id="detailDuration"></div>
-                        </div>
-                        <div class="info-group">
-                            <label>Consumo de Combustível</label>
-                            <div id="detailFuelConsumption"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="address-info">
-                        <div class="address-card">
-                            <h4>Endereço de Origem</h4>
-                            <p id="detailOriginAddress"></p>
-                        </div>
-                        <div class="address-card">
-                            <h4>Endereço de Destino</h4>
-                            <p id="detailDestinationAddress"></p>
-                        </div>
-                    </div>
-                    
-                    <div class="cargo-info">
-                        <h4>Informações da Carga</h4>
-                        <div class="info-grid">
-                            <div class="info-group">
-                                <label>Descrição</label>
-                                <div id="detailCargoDescription"></div>
+                    <!-- Cabeçalho Principal -->
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; margin-bottom: 25px; color: white; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h3 style="margin: 0 0 8px 0; font-size: 1.6rem; text-shadow: 0 2px 4px rgba(0,0,0,0.2);" id="routeOriginDestination">São Paulo, SP → Rio de Janeiro, RJ</h3>
+                                <div style="display: inline-block; background: rgba(255,255,255,0.25); padding: 4px 12px; border-radius: 15px; font-size: 0.9rem; font-weight: 500;" id="routeStatus">Concluída</div>
                             </div>
-                            <div class="info-group">
-                                <label>Peso</label>
-                                <div id="detailCargoWeight"></div>
-                            </div>
-                            <div class="info-group">
-                                <label>Cliente</label>
-                                <div id="detailCustomer"></div>
-                            </div>
-                            <div class="info-group">
-                                <label>Contato</label>
-                                <div id="detailCustomerContact"></div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 0.85rem; opacity: 0.9; margin-bottom: 4px;">Data da Rota</div>
+                                <div style="font-size: 1.3rem; font-weight: 700;" id="routeDate">07/05/2025</div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="cost-summary">
-                        <h4>Resumo de Custos</h4>
-                        <div class="cost-cards">
-                            <div class="cost-card">
-                                <h5>Custo Estimado</h5>
-                                <div class="cost-value" id="estimatedCostValue">R$ 0,00</div>
-                            </div>
-                            <div class="cost-card">
-                                <h5>Custo Real</h5>
-                                <div class="cost-value" id="actualCostValue">R$ 0,00</div>
-                            </div>
-                            <div class="cost-card">
-                                <h5>Diferença</h5>
-                                <div class="cost-value" id="costDifference">R$ 0,00</div>
+                    <!-- Grid de Informações Principais -->
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 25px;">
+                        <!-- Card Viagem -->
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #007bff;">
+                            <h4 style="color: #007bff; margin: 0 0 15px 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-route"></i> Informações da Viagem
+                            </h4>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                <div>
+                                    <label style="font-size: 0.75rem; color: #6c757d; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">Motorista</label>
+                                    <div style="font-size: 1rem; font-weight: 500; color: #333;" id="detailDriver">-</div>
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.75rem; color: #6c757d; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">Veículo</label>
+                                    <div style="font-size: 1rem; font-weight: 500; color: #333;" id="detailVehicle">-</div>
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.75rem; color: #6c757d; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">Distância</label>
+                                    <div style="font-size: 1rem; font-weight: 500; color: #333;" id="detailDistance">-</div>
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.75rem; color: #6c757d; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">Consumo</label>
+                                    <div style="font-size: 1rem; font-weight: 500; color: #333;" id="detailFuelConsumption">-</div>
+                                </div>
                             </div>
                         </div>
                         
-                        <div class="cost-breakdown">
-                            <h4>Detalhamento de Custos</h4>
+                        <!-- Card Horários -->
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; border-left: 4px solid #28a745;">
+                            <h4 style="color: #28a745; margin: 0 0 15px 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-clock"></i> Horários e Duração
+                            </h4>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                <div>
+                                    <label style="font-size: 0.75rem; color: #6c757d; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">Saída</label>
+                                    <div style="font-size: 1rem; font-weight: 500; color: #333;" id="detailStartTime">-</div>
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.75rem; color: #6c757d; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">Chegada</label>
+                                    <div style="font-size: 1rem; font-weight: 500; color: #333;" id="detailEndTime">-</div>
+                                </div>
+                                <div style="grid-column: 1 / -1;">
+                                    <label style="font-size: 0.75rem; color: #6c757d; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">Duração Total</label>
+                                    <div style="font-size: 1.2rem; font-weight: 700; color: #28a745;" id="detailDuration">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Grid de Endereços e Carga -->
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 25px;">
+                        <!-- Endereços -->
+                        <div style="background: #fff3cd; padding: 20px; border-radius: 10px; border-left: 4px solid #ffc107;">
+                            <h4 style="color: #856404; margin: 0 0 15px 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-map-marker-alt"></i> Origem e Destino
+                            </h4>
+                            <div style="margin-bottom: 15px;">
+                                <label style="font-size: 0.75rem; color: #856404; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">📍 Origem</label>
+                                <div style="font-size: 0.95rem; font-weight: 500; color: #333;" id="detailOriginAddress">-</div>
+                            </div>
+                            <div>
+                                <label style="font-size: 0.75rem; color: #856404; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">🏁 Destino</label>
+                                <div style="font-size: 0.95rem; font-weight: 500; color: #333;" id="detailDestinationAddress">-</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Informações da Carga -->
+                        <div style="background: #e7f3ff; padding: 20px; border-radius: 10px; border-left: 4px solid #17a2b8;">
+                            <h4 style="color: #117a8b; margin: 0 0 15px 0; font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+                                <i class="fas fa-box"></i> Informações da Carga
+                            </h4>
+                            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                <div style="grid-column: 1 / -1;">
+                                    <label style="font-size: 0.75rem; color: #117a8b; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">Descrição</label>
+                                    <div style="font-size: 0.95rem; font-weight: 500; color: #333;" id="detailCargoDescription">-</div>
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.75rem; color: #117a8b; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">Peso</label>
+                                    <div style="font-size: 0.95rem; font-weight: 500; color: #333;" id="detailCargoWeight">-</div>
+                                </div>
+                                <div>
+                                    <label style="font-size: 0.75rem; color: #117a8b; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">Cliente</label>
+                                    <div style="font-size: 0.95rem; font-weight: 500; color: #333;" id="detailCustomer">-</div>
+                                </div>
+                                <div style="grid-column: 1 / -1;">
+                                    <label style="font-size: 0.75rem; color: #117a8b; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 4px;">Contato</label>
+                                    <div style="font-size: 0.95rem; font-weight: 500; color: #333;" id="detailCustomerContact">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Análise de Lucratividade -->
+                    <div class="cost-summary" style="margin-top: 25px;">
+                        <h4><i class="fas fa-chart-line"></i> Análise de Lucratividade da Rota</h4>
+                        
+                        <div class="cost-cards" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
+                            <!-- Receita Bruta -->
+                            <div class="cost-card" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-left: 4px solid #2196f3;">
+                                <h5 style="color: #1976d2; display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                                    <i class="fas fa-dollar-sign"></i> Receita Bruta
+                                </h5>
+                                <div class="cost-value" style="font-size: 1.8rem; color: #1565c0; font-weight: 700;" id="profitReceitaBruta">R$ 0,00</div>
+                                <p style="font-size: 0.85rem; color: #666; margin: 5px 0 0;">Valor do Frete</p>
+                            </div>
+                            
+                            <!-- Despesas Totais -->
+                            <div class="cost-card" style="background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%); border-left: 4px solid #f44336;">
+                                <h5 style="color: #c62828; display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                                    <i class="fas fa-receipt"></i> Despesas Totais
+                                </h5>
+                                <div class="cost-value" style="font-size: 1.8rem; color: #b71c1c; font-weight: 700;" id="profitDespesasTotais">R$ 0,00</div>
+                                <p style="font-size: 0.85rem; color: #666; margin: 5px 0 0;">Comissão + Despesas + Combustível</p>
+                            </div>
+                            
+                            <!-- Lucro Líquido -->
+                            <div class="cost-card" style="background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%); border-left: 4px solid #4caf50;">
+                                <h5 style="color: #388e3c; display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                                    <i class="fas fa-chart-pie"></i> Lucro Líquido
+                                </h5>
+                                <div class="cost-value" style="font-size: 2.2rem; color: #2e7d32; font-weight: 700;" id="profitLucroLiquido">R$ 0,00</div>
+                                <p style="font-size: 0.85rem; color: #666; margin: 5px 0 0;">Resultado Final da Rota</p>
+                            </div>
+                            
+                            <!-- Margem -->
+                            <div class="cost-card" style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); border-left: 4px solid #9c27b0;">
+                                <h5 style="color: #7b1fa2; display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                                    <i class="fas fa-chart-area"></i> Margem Líquida
+                                </h5>
+                                <div class="cost-value" style="font-size: 2.2rem; color: #6a1b9a; font-weight: 700;" id="profitMargem">0%</div>
+                                <p style="font-size: 0.85rem; color: #666; margin: 5px 0 0;">% sobre Receita</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Tabela Detalhada -->
+                        <div class="cost-breakdown" style="margin-top: 20px;">
+                            <h4><i class="fas fa-list-alt"></i> Composição Detalhada do Resultado</h4>
                             <div class="cost-breakdown-table">
                                 <table class="info-table">
                                     <thead>
                                         <tr>
-                                            <th>Categoria</th>
-                                            <th>Valor (R$)</th>
-                                            <th>Percentual</th>
+                                            <th style="text-align: left;">Item</th>
+                                            <th style="text-align: right;">Valor</th>
+                                            <th style="text-align: right;">% Receita</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="costBreakdownBody">
-                                        <!-- Populated by JavaScript -->
+                                    <tbody id="profitabilityTableBody">
+                                        <!-- Preenchido via JavaScript -->
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Indicador Visual de Lucro -->
+                        <div style="margin-top: 20px; padding: 20px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; border: 1px solid #dee2e6;">
+                            <h5 style="color: #495057; margin-bottom: 12px; font-weight: 600;">
+                                <i class="fas fa-tachometer-alt"></i> Indicador de Rentabilidade
+                            </h5>
+                            <div style="position: relative; height: 35px; background: #fff; border: 2px solid #dee2e6; border-radius: 8px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);">
+                                <div id="profitabilityIndicator" style="height: 100%; background: linear-gradient(90deg, #dc3545 0%, #ffc107 40%, #17a2b8 70%, #28a745 100%); width: 0%; transition: all 0.5s ease;"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.8rem; color: #6c757d; font-weight: 500;">
+                                <span style="color: #dc3545;">❌ Prejuízo</span>
+                                <span style="color: #ffc107;">⚠️ Baixa</span>
+                                <span style="color: #17a2b8;">✅ Boa</span>
+                                <span style="color: #28a745;">🎯 Excelente</span>
                             </div>
                         </div>
                     </div>
@@ -951,10 +1026,54 @@ $total_paginas = $resultado['total_paginas'];
             </div>
             <div class="modal-footer">
                 <button id="closeRouteDetailsBtn" class="btn-secondary">Fechar</button>
-                <button id="editFromDetailsBtn" class="btn-primary">Editar</button>
             </div>
         </div>
     </div>
+    
+    <script>
+    // Observer para calcular lucratividade quando o modal for aberto
+    (function() {
+        const modal = document.getElementById('viewRouteModal');
+        if (modal) {
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.attributeName === 'style') {
+                        const displayStyle = window.getComputedStyle(modal).display;
+                        if (displayStyle === 'block' || displayStyle === 'flex') {
+                            const rotaId = modal.getAttribute('data-route-id');
+                            if (rotaId && window.calcularLucratividade) {
+                                console.log('Calculando lucratividade para rota:', rotaId);
+                                window.calcularLucratividade(rotaId);
+                            }
+                        }
+                    }
+                });
+            });
+            
+            observer.observe(modal, {
+                attributes: true,
+                attributeFilter: ['style', 'data-route-id']
+            });
+            
+            // Também observar quando o atributo data-route-id mudar
+            const titleObserver = new MutationObserver(function() {
+                const rotaId = modal.getAttribute('data-route-id');
+                if (rotaId && modal.style.display === 'block') {
+                    setTimeout(function() {
+                        if (window.calcularLucratividade) {
+                            window.calcularLucratividade(rotaId);
+                        }
+                    }, 500);
+                }
+            });
+            
+            titleObserver.observe(modal, {
+                attributes: true,
+                attributeFilter: ['data-route-id']
+            });
+        }
+    })();
+    </script>
     
     <!-- Delete Confirmation Modal -->
     <div class="modal" id="deleteRouteModal">

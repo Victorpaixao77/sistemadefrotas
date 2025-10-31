@@ -52,30 +52,63 @@ try {
     $empresaData = $stmtUnidade->fetch();
     $unidadeEmpresa = $empresaData['unidade'] ?? '-';
     
-    // Buscar documentos financeiros (sempre usa unidade da empresa)
-    $stmt = $db->prepare("
+    // Verificar se colunas 'ponteiro' e 'proposals' existem
+    $stmt = $db->query("SHOW COLUMNS FROM seguro_financeiro LIKE 'ponteiro'");
+    $temPonteiro = $stmt->fetch() ? true : false;
+    
+    $stmt = $db->query("SHOW COLUMNS FROM seguro_financeiro LIKE 'proposals'");
+    $temProposals = $stmt->fetch() ? true : false;
+    
+    // Montar SQL dinamicamente conforme campos existentes
+    $sqlPonteiro = $temPonteiro ? "sf.ponteiro," : "'' as ponteiro,";
+    $sqlProposals = $temProposals ? "COALESCE(sf.proposals, '') as proposals," : "'' as proposals,";
+    
+    // Buscar documentos financeiros com verificação de contrato
+    $sql = "
         SELECT 
-            identificador_original as identificador,
-            numero_documento as numero_documento,
-            associado as associado,
-            classe as classe,
-            DATE_FORMAT(data_emissao, '%d/%m/%Y') as data_emissao,
-            DATE_FORMAT(data_vencimento, '%d/%m/%Y') as data_vencimento,
-            COALESCE(valor, 0) as valor,
-            COALESCE(placa, '') as placa,
-            COALESCE(conjunto, '') as conjunto,
-            COALESCE(matricula, '') as matricula,
-            COALESCE(status, 'pendente') as status,
-            COALESCE(valor_pago, 0) as valor_pago,
-            DATE_FORMAT(data_baixa, '%d/%m/%Y') as data_baixa,
-            ? as unidade
-        FROM seguro_financeiro 
-        WHERE cliente_id = ? 
-        AND seguro_empresa_id = ?
-        ORDER BY data_vencimento DESC, data_emissao DESC
-    ");
-    $stmt->execute([$unidadeEmpresa, $cliente_id, $empresa_id]);
+            $sqlPonteiro
+            sf.numero_documento,
+            sf.associado,
+            sf.classe,
+            DATE_FORMAT(sf.data_emissao, '%d/%m/%Y') as data_emissao,
+            DATE_FORMAT(sf.data_vencimento, '%d/%m/%Y') as data_vencimento,
+            COALESCE(sf.valor, 0) as valor,
+            COALESCE(sf.placa, '') as placa,
+            COALESCE(sf.conjunto, '') as conjunto,
+            COALESCE(sf.matricula, '') as matricula,
+            COALESCE(sf.status, 'pendente') as status,
+            COALESCE(sf.valor_pago, 0) as valor_pago,
+            DATE_FORMAT(sf.data_baixa, '%d/%m/%Y') as data_baixa,
+            COALESCE(sf.unidade, ?) as unidade,
+            $sqlProposals
+            -- Verificar se o CONJUNTO existe nos contratos do cliente
+            (SELECT cc.id 
+             FROM seguro_contratos_clientes cc 
+             WHERE cc.cliente_id = COALESCE(sf.cliente_id, sf.seguro_cliente_id)
+             AND cc.matricula COLLATE utf8mb4_general_ci = sf.conjunto COLLATE utf8mb4_general_ci
+             AND cc.ativo = 'sim'
+             LIMIT 1) as contrato_id,
+            -- Buscar porcentagem do contrato (se existir)
+            (SELECT cc.porcentagem_recorrencia 
+             FROM seguro_contratos_clientes cc 
+             WHERE cc.cliente_id = COALESCE(sf.cliente_id, sf.seguro_cliente_id)
+             AND cc.matricula COLLATE utf8mb4_general_ci = sf.conjunto COLLATE utf8mb4_general_ci
+             AND cc.ativo = 'sim'
+             LIMIT 1) as porcentagem_contrato
+        FROM seguro_financeiro sf
+        WHERE (sf.cliente_id = ? OR sf.seguro_cliente_id = ?)
+        AND sf.seguro_empresa_id = ?
+        ORDER BY sf.data_vencimento DESC, sf.data_emissao DESC
+    ";
+    
+    error_log("SQL gerado: " . $sql);
+    error_log("Parâmetros: unidade={$unidadeEmpresa}, cliente_id={$cliente_id}, empresa_id={$empresa_id}");
+    
+    $stmt = $db->prepare($sql);
+    $stmt->execute([$unidadeEmpresa, $cliente_id, $cliente_id, $empresa_id]);
     $documentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    error_log("Documentos encontrados: " . count($documentos));
     
     echo json_encode([
         'sucesso' => true,
@@ -84,10 +117,19 @@ try {
     ]);
     
 } catch(PDOException $e) {
-    error_log("Erro ao obter documentos financeiros: " . $e->getMessage());
+    error_log("ERRO PDO ao obter documentos financeiros: " . $e->getMessage());
+    error_log("SQL: " . $sql);
     echo json_encode([
         'sucesso' => false,
-        'mensagem' => 'Erro ao buscar documentos financeiros'
+        'mensagem' => 'Erro ao buscar documentos financeiros',
+        'erro_detalhado' => $e->getMessage()
+    ]);
+} catch(Exception $e) {
+    error_log("ERRO GERAL ao obter documentos financeiros: " . $e->getMessage());
+    echo json_encode([
+        'sucesso' => false,
+        'mensagem' => 'Erro ao buscar documentos financeiros',
+        'erro_detalhado' => $e->getMessage()
     ]);
 }
 ?>

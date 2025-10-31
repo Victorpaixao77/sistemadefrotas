@@ -66,71 +66,86 @@ if ($ano < 2020 || $ano > 2030) {
 // Função otimizada para buscar KPIs (nova função do improved)
 function getKPIsOptimized($conn, $empresa_id, $mes, $ano) {
     try {
-        // Query otimizada usando JOINs em vez de subconsultas
+        // Query otimizada usando subconsultas para evitar duplicação de valores
+        // O problema estava nos JOINs que multiplicavam linhas, causando soma duplicada
         $sql = "
         SELECT 
             DATE_FORMAT(r.data_rota, '%Y-%m') AS mes_ano,
             
-            -- Receitas
+            -- Receitas (soma direta das rotas, sem JOIN que causa duplicação)
             COALESCE(SUM(r.frete), 0) AS total_frete,
             COALESCE(SUM(r.comissao), 0) AS total_comissao,
             
-            -- Despesas de viagem
-            COALESCE(SUM(dv.total_despviagem), 0) AS total_despesas_viagem,
-            
-            -- Abastecimentos
-            COALESCE(SUM(a.valor_total), 0) AS total_abastecimentos,
-            
-            -- Despesas fixas
-            COALESCE(SUM(df.valor), 0) AS total_despesas_fixas,
-            
-            -- Parcelas de financiamento
-            COALESCE(SUM(pf.valor), 0) AS total_parcelas_financiamento,
-            
-            -- Contas pagas
-            COALESCE(SUM(cp.valor), 0) AS total_contas_pagas,
-            
-            -- Manutenções de veículos
-            COALESCE(SUM(m.valor), 0) AS total_manutencoes,
-            
-            -- Manutenção de pneus
-            COALESCE(SUM(pm.custo), 0) AS total_pneu_manutencao,
-            
-            -- Cálculo do lucro otimizado
+            -- Despesas de viagem (usando subconsulta para não multiplicar linhas)
             (
-                COALESCE(SUM(r.frete), 0)
-                - COALESCE(SUM(r.comissao), 0)
-                - COALESCE(SUM(dv.total_despviagem), 0)
-                - COALESCE(SUM(a.valor_total), 0)
-                - COALESCE(SUM(df.valor), 0)
-                - COALESCE(SUM(pf.valor), 0)
-                - COALESCE(SUM(cp.valor), 0)
-                - COALESCE(SUM(m.valor), 0)
-                - COALESCE(SUM(pm.custo), 0)
-            ) AS lucro_liquido
+                SELECT COALESCE(SUM(total_despviagem), 0)
+                FROM despesas_viagem dv
+                WHERE dv.rota_id IN (
+                    SELECT id FROM rotas r2 
+                    WHERE r2.empresa_id = :empresa_id
+                      AND MONTH(r2.data_rota) = :mes
+                      AND YEAR(r2.data_rota) = :ano
+                )
+            ) AS total_despesas_viagem,
+            
+            -- Abastecimentos (subconsulta)
+            (
+                SELECT COALESCE(SUM(valor_total), 0)
+                FROM abastecimentos a
+                WHERE a.empresa_id = :empresa_id
+                  AND MONTH(a.data_abastecimento) = :mes
+                  AND YEAR(a.data_abastecimento) = :ano
+            ) AS total_abastecimentos,
+            
+            -- Despesas fixas (subconsulta)
+            (
+                SELECT COALESCE(SUM(df.valor), 0)
+                FROM despesas_fixas df
+                WHERE df.empresa_id = :empresa_id
+                  AND df.status_pagamento_id = 2
+                  AND MONTH(df.data_pagamento) = :mes
+                  AND YEAR(df.data_pagamento) = :ano
+            ) AS total_despesas_fixas,
+            
+            -- Parcelas de financiamento (subconsulta)
+            (
+                SELECT COALESCE(SUM(pf.valor), 0)
+                FROM parcelas_financiamento pf
+                WHERE pf.empresa_id = :empresa_id
+                  AND pf.status_id = 2
+                  AND MONTH(pf.data_pagamento) = :mes
+                  AND YEAR(pf.data_pagamento) = :ano
+            ) AS total_parcelas_financiamento,
+            
+            -- Contas pagas (subconsulta)
+            (
+                SELECT COALESCE(SUM(cp.valor), 0)
+                FROM contas_pagar cp
+                WHERE cp.empresa_id = :empresa_id
+                  AND cp.status_id = 2
+                  AND MONTH(cp.data_pagamento) = :mes
+                  AND YEAR(cp.data_pagamento) = :ano
+            ) AS total_contas_pagas,
+            
+            -- Manutenções de veículos (subconsulta)
+            (
+                SELECT COALESCE(SUM(m.valor), 0)
+                FROM manutencoes m
+                WHERE m.empresa_id = :empresa_id
+                  AND MONTH(m.data_manutencao) = :mes
+                  AND YEAR(m.data_manutencao) = :ano
+            ) AS total_manutencoes,
+            
+            -- Manutenção de pneus (subconsulta)
+            (
+                SELECT COALESCE(SUM(pm.custo), 0)
+                FROM pneu_manutencao pm
+                WHERE pm.empresa_id = :empresa_id
+                  AND MONTH(pm.data_manutencao) = :mes
+                  AND YEAR(pm.data_manutencao) = :ano
+            ) AS total_pneu_manutencao
+            
         FROM rotas r
-        LEFT JOIN despesas_viagem dv ON dv.rota_id = r.id
-        LEFT JOIN abastecimentos a ON a.veiculo_id = r.veiculo_id 
-            AND YEAR(a.data_abastecimento) = YEAR(r.data_rota)
-            AND MONTH(a.data_abastecimento) = MONTH(r.data_rota)
-        LEFT JOIN despesas_fixas df ON df.empresa_id = r.empresa_id 
-            AND df.status_pagamento_id = 2
-            AND YEAR(df.data_pagamento) = YEAR(r.data_rota)
-            AND MONTH(df.data_pagamento) = MONTH(r.data_rota)
-        LEFT JOIN parcelas_financiamento pf ON pf.empresa_id = r.empresa_id 
-            AND pf.status_id = 2
-            AND YEAR(pf.data_pagamento) = YEAR(r.data_rota)
-            AND MONTH(pf.data_pagamento) = MONTH(r.data_rota)
-        LEFT JOIN contas_pagar cp ON cp.empresa_id = r.empresa_id 
-            AND cp.status_id = 2
-            AND YEAR(cp.data_pagamento) = YEAR(r.data_rota)
-            AND MONTH(cp.data_pagamento) = MONTH(r.data_rota)
-        LEFT JOIN manutencoes m ON m.empresa_id = r.empresa_id 
-            AND YEAR(m.data_manutencao) = YEAR(r.data_rota)
-            AND MONTH(m.data_manutencao) = MONTH(r.data_rota)
-        LEFT JOIN pneu_manutencao pm ON pm.empresa_id = r.empresa_id 
-            AND YEAR(pm.data_manutencao) = YEAR(r.data_rota)
-            AND MONTH(pm.data_manutencao) = MONTH(r.data_rota)
         WHERE r.empresa_id = :empresa_id
           AND MONTH(r.data_rota) = :mes
           AND YEAR(r.data_rota) = :ano
@@ -312,6 +327,7 @@ try {
 }
 
 // Buscar dados para os KPIs (manter a query original como backup)
+// CORREÇÃO: Removido JOIN com despesas_viagem que causava duplicação
 $sql_kpis = "
 SELECT 
     DATE_FORMAT(r.data_rota, '%Y-%m') AS mes_ano,
@@ -320,8 +336,16 @@ SELECT
     COALESCE(SUM(r.frete), 0) AS total_frete,
     COALESCE(SUM(r.comissao), 0) AS total_comissao,
     
-    -- Despesas de viagem
-    COALESCE(SUM(dv.total_despviagem), 0) AS total_despesas_viagem,
+    -- Despesas de viagem (subconsulta para evitar duplicação)
+    (
+        SELECT COALESCE(SUM(dv.total_despviagem), 0)
+        FROM despesas_viagem dv
+        WHERE dv.rota_id IN (
+            SELECT id FROM rotas WHERE empresa_id = " . intval($empresa_id) . "
+            AND MONTH(data_rota) = " . intval($mes) . "
+            AND YEAR(data_rota) = " . intval($ano) . "
+        )
+    ) AS total_despesas_viagem,
     
     -- Total de abastecimentos
     (
@@ -390,7 +414,15 @@ SELECT
     (
         COALESCE(SUM(r.frete), 0)
         - COALESCE(SUM(r.comissao), 0)
-        - COALESCE(SUM(dv.total_despviagem), 0)
+        - (
+            SELECT COALESCE(SUM(dv.total_despviagem), 0)
+            FROM despesas_viagem dv
+            WHERE dv.rota_id IN (
+                SELECT id FROM rotas WHERE empresa_id = " . intval($empresa_id) . "
+                AND MONTH(data_rota) = " . intval($mes) . "
+                AND YEAR(data_rota) = " . intval($ano) . "
+            )
+        )
         - (
             SELECT COALESCE(SUM(valor_total), 0)
             FROM abastecimentos
@@ -444,10 +476,10 @@ SELECT
         )
     ) AS lucro_liquido
 FROM rotas r
-LEFT JOIN despesas_viagem dv ON dv.rota_id = r.id
 WHERE r.empresa_id = " . intval($empresa_id) . "
   AND MONTH(r.data_rota) = " . intval($mes) . "
   AND YEAR(r.data_rota) = " . intval($ano) . "
+GROUP BY DATE_FORMAT(r.data_rota, '%Y-%m')
 ";
 
 // Executar a query original como backup

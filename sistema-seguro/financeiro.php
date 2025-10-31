@@ -344,6 +344,11 @@ try {
                     <div class="card-body">
                         <div class="chart-container">
                             <canvas id="cashFlowChart"></canvas>
+                            <div id="semDadosFluxo" style="display:none; text-align:center; padding:50px;">
+                                <i class="fas fa-chart-area" style="font-size:48px; color:#ddd;"></i>
+                                <p style="color:#999; margin-top:10px;">Sem dados disponíveis</p>
+                                <small style="color:#999;">Importe documentos para visualizar o gráfico</small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -359,6 +364,11 @@ try {
                     <div class="card-body">
                         <div class="chart-container">
                             <canvas id="revenueChart"></canvas>
+                            <div id="semDadosReceita" style="display:none; text-align:center; padding:50px;">
+                                <i class="fas fa-chart-pie" style="font-size:48px; color:#ddd;"></i>
+                                <p style="color:#999; margin-top:10px;">Sem dados disponíveis</p>
+                                <small style="color:#999;">Importe documentos para visualizar o gráfico</small>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -539,7 +549,8 @@ try {
                             <thead class="table-warning">
                                 <tr>
                                     <th>Unidade</th>
-                                    <th>Identificador</th>
+                                    <th>MATRÍCULA</th>
+                                    <th>CONJUNTO</th>
                                     <th>N° Doc</th>
                                     <th>Associado</th>
                                     <th>Classe</th>
@@ -547,8 +558,6 @@ try {
                                     <th>Vencimento</th>
                                     <th>Valor</th>
                                     <th>Placa</th>
-                                    <th>Conjunto</th>
-                                    <th>Matrícula</th>
                                     <th>Status</th>
                                     <th>Importado em</th>
                                     <th>Ações</th>
@@ -556,7 +565,7 @@ try {
                             </thead>
                             <tbody id="tabelaQuarentena">
                                 <tr>
-                                    <td colspan="14" class="text-center">
+                                    <td colspan="13" class="text-center">
                                         <i class="fas fa-spinner fa-spin"></i> Carregando...
                                     </td>
                                 </tr>
@@ -692,7 +701,8 @@ try {
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
                         <strong>Instruções:</strong> Selecione um arquivo Excel (.xlsx, .xls) ou CSV (.csv) com os documentos financeiros.
-                        O arquivo deve conter as colunas: Identificador, N° DOC, ASSOCIADO, CLASSE, EMISSÃO, VENCIMENTO, VALOR, PLACA, CONJUNTO, MATRÍCULA, SITUAÇÃO, VALOR PAGO, DATA DA BAIXA.
+                        <br><strong>Formato aceito:</strong> INGLÊS (do banco) ou PORTUGUÊS
+                        <br><strong>Campos obrigatórios:</strong> N° DOC (DocNumber), MATRÍCULA (IdRegistration), CONJUNTO (IdSet), EMISSÃO (DateEmissao), VENCIMENTO (ExpirationDate)
                     </div>
 
                     <!-- Área de Upload -->
@@ -711,7 +721,8 @@ try {
                             <table class="table table-sm table-bordered" id="tabelaPreview">
                                 <thead class="table-light sticky-top">
                                     <tr>
-                                        <th>Identificador</th>
+                                        <th>MATRÍCULA</th>
+                                        <th>CONJUNTO</th>
                                         <th>N° DOC</th>
                                         <th>ASSOCIADO</th>
                                         <th>CLASSE</th>
@@ -719,8 +730,6 @@ try {
                                         <th>VENCIMENTO</th>
                                         <th>VALOR</th>
                                         <th>PLACA</th>
-                                        <th>CONJUNTO</th>
-                                        <th>MATRÍCULA</th>
                                         <th>SITUAÇÃO</th>
                                         <th>VALOR PAGO</th>
                                         <th>DATA BAIXA</th>
@@ -856,68 +865,6 @@ try {
         let graficoFluxoCaixa;
         let graficoCategorias;
         
-        // Carregar dados reais ao iniciar a página
-        document.addEventListener('DOMContentLoaded', function() {
-            carregarDadosReais();
-        });
-        
-        // Função para carregar dados reais do banco
-        async function carregarDadosReais() {
-            try {
-                const response = await fetch('api/obter_estatisticas_financeiro.php');
-                const resultado = await response.json();
-                
-                if (resultado.success) {
-                    const stats = resultado.estatisticas;
-                    
-                    // Atualizar cards do dashboard
-                    // (Os cards já estão com PHP, mas podemos adicionar refresh aqui se necessário)
-                    
-                    // Atualizar gráficos com dados reais
-                    atualizarGraficos(resultado.grafico_mensal);
-                    
-                    // Atualizar tabela com últimas transações
-                    atualizarTabelaTransacoes(resultado.ultimas_transacoes);
-                    
-                    console.log('✅ Dados reais carregados com sucesso!');
-                } else {
-                    console.error('Erro ao carregar dados:', resultado.error);
-                }
-            } catch (error) {
-                console.error('Erro ao buscar dados reais:', error);
-            }
-        }
-        
-        // Atualizar gráficos com dados reais
-        function atualizarGraficos(dadosMensais) {
-            if (!dadosMensais || dadosMensais.length === 0) {
-                console.log('Sem dados para gráficos ainda');
-                return;
-            }
-            
-            const meses = dadosMensais.map(d => {
-                const [ano, mes] = d.mes.split('-');
-                const nomeMes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                return nomeMes[parseInt(mes) - 1] + '/' + ano.substring(2);
-            });
-            
-            const recebidos = dadosMensais.map(d => parseFloat(d.recebido));
-            const pendentes = dadosMensais.map(d => parseFloat(d.pendente));
-            
-            // Atualizar gráfico de fluxo de caixa
-            if (graficoFluxoCaixa) {
-                graficoFluxoCaixa.data.labels = meses;
-                graficoFluxoCaixa.data.datasets[0].data = recebidos;
-                graficoFluxoCaixa.data.datasets[1].data = pendentes;
-                graficoFluxoCaixa.update();
-            }
-        }
-        
-        // Atualizar tabela de transações (não usado mais pois já vem do PHP)
-        function atualizarTabelaTransacoes(transacoes) {
-            console.log('Tabela já carregada via PHP');
-        }
-        
         // Aplicar filtros e atualizar comissão mensal
         async function aplicarFiltros() {
             const search = document.getElementById('transactionSearch').value.toLowerCase();
@@ -1013,69 +960,130 @@ try {
             // TODO: Criar modal com detalhes completos do documento
         }
         
-        // Gráfico de Fluxo de Caixa
-        const cashFlowCtx = document.getElementById('cashFlowChart').getContext('2d');
-        graficoFluxoCaixa = new Chart(cashFlowCtx, {
-            type: 'line',
-            data: {
-                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-                datasets: [{
-                    label: 'Receitas',
-                    data: [2000000, 2200000, 1800000, 2500000, 2300000, 2800000, 2600000, 2400000, 2700000, 2900000, 2500000, 3000000],
-                    borderColor: '#28a745',
-                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }, {
-                    label: 'Despesas',
-                    data: [1500000, 1600000, 1400000, 1800000, 1700000, 1900000, 1850000, 1750000, 1800000, 2000000, 1800000, 2100000],
-                    borderColor: '#dc3545',
-                    backgroundColor: 'rgba(220, 53, 69, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + (value / 1000000).toFixed(1) + 'M';
+        // Gráfico de Fluxo de Caixa - Carregar dados reais
+        async function carregarGraficoFluxoCaixa() {
+            try {
+                const response = await fetch('api/dashboard_comissoes_6_meses.php');
+                const data = await response.json();
+                
+                if (data.sucesso && data.dados && data.dados.length > 0) {
+                    // Verificar se há pelo menos um valor > 0
+                    const temDados = data.dados.some(d => parseFloat(d.total_comissao) > 0);
+                    
+                    if (temDados) {
+                        const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                        const labels = data.dados.map(d => {
+                            const [ano, mes] = d.mes.split('-');
+                            return meses[parseInt(mes) - 1] + '/' + ano.substring(2);
+                        });
+                        const valores = data.dados.map(d => parseFloat(d.total_comissao));
+                        
+                        const cashFlowCtx = document.getElementById('cashFlowChart').getContext('2d');
+                        graficoFluxoCaixa = new Chart(cashFlowCtx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    label: 'Comissões',
+                                    data: valores,
+                                    borderColor: '#28a745',
+                                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                                    tension: 0.4,
+                                    fill: true,
+                                    pointBackgroundColor: '#28a745',
+                                    pointRadius: 4
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        ticks: {
+                                            callback: function(value) {
+                                                return 'R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                        }
+                        });
+                    } else {
+                        // Sem dados, mostrar mensagem
+                        mostrarSemDados('cashFlowChart', 'semDadosFluxo');
                     }
+                } else {
+                    // Sem dados, mostrar mensagem
+                    mostrarSemDados('cashFlowChart', 'semDadosFluxo');
                 }
+            } catch (error) {
+                console.error('Erro ao carregar fluxo de caixa:', error);
+                mostrarSemDados('cashFlowChart', 'semDadosFluxo');
             }
-        });
+        }
 
-        // Gráfico de Distribuição de Receitas
-        const revenueCtx = document.getElementById('revenueChart').getContext('2d');
-        new Chart(revenueCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Seguros Auto', 'Seguros Vida', 'Seguros Residencial', 'Outros'],
-                datasets: [{
-                    data: [45, 30, 20, 5],
-                    backgroundColor: [
-                        '#667eea',
-                        '#764ba2',
-                        '#28a745',
-                        '#ffc107'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
+        // Gráfico de Distribuição de Receitas - Apenas se houver dados
+        async function carregarGraficoDistribuicao() {
+            try {
+                // Verificar se há documentos
+                const response = await fetch('api/obter_estatisticas_financeiro.php');
+                const data = await response.json();
+                
+                if (data.sucesso && data.total_documentos > 0) {
+                    // Tem dados, renderizar gráfico (distribuição por classe)
+                    const responseClasses = await fetch('api/obter_distribuicao_classes.php');
+                    const dataClasses = await responseClasses.json();
+                    
+                    if (dataClasses.sucesso && dataClasses.classes && dataClasses.classes.length > 0) {
+                        const labels = dataClasses.classes.map(c => c.classe || 'Sem Classe');
+                        const valores = dataClasses.classes.map(c => parseFloat(c.total));
+                        const cores = ['#667eea', '#764ba2', '#28a745', '#ffc107', '#dc3545'];
+                        
+                        const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+                        new Chart(revenueCtx, {
+                            type: 'doughnut',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                    data: valores,
+                                    backgroundColor: cores.slice(0, labels.length)
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        position: 'bottom'
+                                    }
+                                }
+                            }
+                        });
+                    } else {
+                        mostrarSemDados('revenueChart', 'semDadosReceita');
                     }
+                } else {
+                    // Sem dados, mostrar mensagem
+                    mostrarSemDados('revenueChart', 'semDadosReceita');
                 }
+            } catch (error) {
+                console.error('Erro ao carregar distribuição:', error);
+                mostrarSemDados('revenueChart', 'semDadosReceita');
             }
+        }
+        
+        // Função auxiliar para mostrar "sem dados"
+        function mostrarSemDados(canvasId, divId) {
+            document.getElementById(canvasId).style.display = 'none';
+            document.getElementById(divId).style.display = 'block';
+        }
+        
+        // Carregar gráficos após o DOM estar pronto
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🎨 Inicializando gráficos do financeiro...');
+            carregarGraficoFluxoCaixa();
+            carregarGraficoDistribuicao();
         });
 
         // Funcionalidade de busca
@@ -1126,7 +1134,7 @@ try {
                     // Preencher tabela
                     const tbody = document.getElementById('tabelaQuarentena');
                     if (dadosQuarentena.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="14" class="text-center text-success"><i class="fas fa-check-circle me-2"></i>Nenhum documento em quarentena! 🎉</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="13" class="text-center text-success"><i class="fas fa-check-circle me-2"></i>Nenhum documento em quarentena! 🎉</td></tr>';
                     } else {
                         let html = '';
                         dadosQuarentena.forEach(doc => {
@@ -1140,7 +1148,8 @@ try {
                             html += `
                                 <tr style="background-color: #fff3cd;">
                                     <td>${doc.unidade || '-'}</td>
-                                    <td><strong>${doc.identificador}</strong></td>
+                                    <td><strong>${doc.matricula || '-'}</strong></td>
+                                    <td><strong>${doc.conjunto || '-'}</strong></td>
                                     <td>${doc.numero_documento}</td>
                                     <td>${doc.associado}</td>
                                     <td>${doc.classe || '-'}</td>
@@ -1148,8 +1157,6 @@ try {
                                     <td>${doc.data_vencimento || '-'}</td>
                                     <td><strong>R$ ${parseFloat(doc.valor).toFixed(2).replace('.', ',')}</strong></td>
                                     <td>${doc.placa || '-'}</td>
-                                    <td>${doc.conjunto || '-'}</td>
-                                    <td>${doc.matricula || '-'}</td>
                                     <td><span class="badge ${badgeStatus[doc.status] || 'bg-secondary'}">${doc.status}</span></td>
                                     <td><small>${doc.data_importacao}</small></td>
                                     <td>
@@ -1168,14 +1175,53 @@ try {
             } catch (error) {
                 console.error('Erro:', error);
                 document.getElementById('tabelaQuarentena').innerHTML = 
-                    '<tr><td colspan="14" class="text-center text-danger"><i class="fas fa-exclamation-circle me-2"></i>Erro ao carregar dados</td></tr>';
+                    '<tr><td colspan="13" class="text-center text-danger"><i class="fas fa-exclamation-circle me-2"></i>Erro ao carregar dados</td></tr>';
             }
         }
         
         // Vincular documento a um cliente
-        function vincularCliente(docId) {
-            alert('Funcionalidade de vinculação será implementada em breve!');
-            // TODO: Implementar seleção de cliente e vincular
+        async function vincularCliente(docId) {
+            if (!confirm('Tentar vincular este documento ao cliente correspondente?\n\nO sistema buscará automaticamente o cliente pela MATRÍCULA e CONJUNTO.')) {
+                return;
+            }
+            
+            try {
+                // Mostrar loading
+                const btnVincular = event.target.closest('button');
+                btnVincular.disabled = true;
+                btnVincular.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                const formData = new FormData();
+                formData.append('documento_id', docId);
+                
+                const response = await fetch('api/vincular_documento_cliente.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const resultado = await response.json();
+                
+                if (resultado.sucesso) {
+                    // Sucesso!
+                    let mensagem = resultado.mensagem;
+                    
+                    if (!resultado.tem_contrato) {
+                        mensagem += '\n\n⚠️ ATENÇÃO: Não foi encontrado um contrato ativo com o CONJUNTO informado.\nCadastre o contrato para que a comissão seja calculada corretamente.';
+                    }
+                    
+                    alert(mensagem);
+                    
+                    // Recarregar quarentena
+                    await carregarQuarentena();
+                } else {
+                    alert('❌ Erro ao vincular documento:\n\n' + resultado.mensagem);
+                    btnVincular.disabled = false;
+                    btnVincular.innerHTML = '<i class="fas fa-link"></i>';
+                }
+            } catch (error) {
+                console.error('Erro ao vincular:', error);
+                alert('❌ Erro ao vincular documento: ' + error.message);
+            }
         }
         
         // Exportar quarentena para Excel
@@ -1424,64 +1470,169 @@ try {
             const cabecalho = dados[0];
             const linhasDados = dados.slice(1);
             
+            console.log('📋 DEBUG - Cabeçalho recebido:', cabecalho);
+            console.log('📋 DEBUG - Total de linhas de dados:', linhasDados.length);
+            
             dadosImportacao = [];
             let clientesNaoEncontrados = [];
 
-            // Mapear índices das colunas (aceita TODAS as variações do Excel)
+            // Mapear índices das colunas (aceita TODAS as variações incluindo INGLÊS)
             const colunas = {
-                identificador: encontrarIndiceColuna(cabecalho, ['identificador', 'id', 'ident']),
-                ndoc: encontrarIndiceColuna(cabecalho, [
-                    'n doc', 'ndoc', 'n° doc', 'n?doc', 'n  doc', 'numero documento', 
-                    'numero doc', 'num doc', 'nro doc', 'nr doc', 'documento'
+                unidade: encontrarIndiceColuna(cabecalho, [
+                    'unity', 'unidade', 'unidad', 'unit'
                 ]),
-                associado: encontrarIndiceColuna(cabecalho, ['associado', 'cliente', 'nome', 'razao social']),
-                classe: encontrarIndiceColuna(cabecalho, ['classe', 'tipo', 'categoria']),
+                ponteiro: encontrarIndiceColuna(cabecalho, [
+                    'ponteiro', 'pointer', 'pont'
+                ]),
+                identificador: encontrarIndiceColuna(cabecalho, [
+                    'identificador', 'id', 'ident', 'codigo', 'code'
+                ]),
+                ndoc: encontrarIndiceColuna(cabecalho, [
+                    // INGLÊS (vem do banco):
+                    'docnumber', 'doc number',
+                    // PORTUGUÊS:
+                    'n doc', 'ndoc', 'n° doc', 'n?doc', 'n  doc', 'numero documento', 
+                    'numero doc', 'num doc', 'nro doc', 'nr doc', 'documento', 'n documento'
+                ]),
+                associado: encontrarIndiceColuna(cabecalho, [
+                    // INGLÊS (vem do banco):
+                    'customer', 'client',
+                    // PORTUGUÊS:
+                    'associado', 'cliente', 'clientes', 'nome', 'razao social'
+                ]),
+                classe: encontrarIndiceColuna(cabecalho, [
+                    // INGLÊS (vem do banco):
+                    'financialclass', 'financial class', 'class',
+                    // PORTUGUÊS:
+                    'classe', 'tipo', 'categoria'
+                ]),
                 emissao: encontrarIndiceColuna(cabecalho, [
+                    // INGLÊS (vem do banco):
+                    'dateemissao', 'date emissao', 'emission date', 'issue date',
+                    // PORTUGUÊS:
                     'emiss', 'emissao', 'emissão', 'emiss o', 'emiss?o', 
                     'data emissao', 'data emissão', 'dt emissao', 'dt emissão'
                 ]),
                 vencimento: encontrarIndiceColuna(cabecalho, [
+                    // INGLÊS (vem do banco):
+                    'expirationdate', 'expiration date', 'due date', 'duedate',
+                    // PORTUGUÊS:
                     'vencimento', 'venc', 'vencimen', 'vencim', 
                     'data vencimento', 'dt vencimento', 'dt venc'
                 ]),
-                valor: encontrarIndiceColuna(cabecalho, ['valor', 'vlr', 'val', 'total']),
-                placa: encontrarIndiceColuna(cabecalho, ['placa', 'placas', 'veiculo', 'veículo']),
+                valor: encontrarIndiceColuna(cabecalho, [
+                    // INGLÊS (vem do banco):
+                    'valuetitle', 'value title', 'value', 'amount',
+                    // PORTUGUÊS:
+                    'valor', 'vlr', 'val', 'total'
+                ]),
+                placa: encontrarIndiceColuna(cabecalho, [
+                    // INGLÊS (vem do banco):
+                    'boardschassis', 'boards chassis', 'board', 'plate',
+                    // PORTUGUÊS:
+                    'placa', 'placas', 'veiculo', 'veículo'
+                ]),
                 conjunto: encontrarIndiceColuna(cabecalho, [
-                    'conjunto', 'conj', 'conjunt', 'set', 'grupo'
+                    // INGLÊS (vem do banco):
+                    'idset', 'id set', 'set',
+                    // PORTUGUÊS:
+                    'conjunto', 'conj', 'conjunt', 'grupo'
                 ]),
                 matricula: encontrarIndiceColuna(cabecalho, [
+                    // INGLÊS (vem do banco):
+                    'idregistration', 'id registration', 'registration',
+                    // PORTUGUÊS:
                     'matr', 'matricula', 'matrícula', 'matr cula', 'matr?cula', 
                     'registro', 'reg'
                 ]),
                 situacao: encontrarIndiceColuna(cabecalho, [
+                    // INGLÊS (vem do banco):
+                    'situation', 'status',
+                    // PORTUGUÊS:
                     'situa', 'situacao', 'situação', 'situa o', 'situa?o', 
-                    'status', 'estado', 'sit'
+                    'estado', 'sit'
                 ]),
                 valorPago: encontrarIndiceColuna(cabecalho, [
+                    // INGLÊS (vem do banco):
+                    'lowervalue', 'lower value', 'paid value', 'paid',
+                    // PORTUGUÊS:
                     'valor pago', 'vlr pago', 'pago', 'valor pa', 'vlr pa', 
                     'valor recebido', 'recebido', 'pgt', 'pagamento'
                 ]),
                 dataBaixa: encontrarIndiceColuna(cabecalho, [
+                    // INGLÊS (vem do banco):
+                    'lowerdate', 'lower date', 'payment date', 'paid date',
+                    // PORTUGUÊS:
                     'data da baixa', 'data baixa', 'baixa', 'dt baixa', 
                     'data pagamento', 'dt pagamento', 'dt pgt'
+                ]),
+                proposals: encontrarIndiceColuna(cabecalho, [
+                    'proposals', 'proposta', 'propostas'
                 ])
             };
 
-            // Verificar se encontrou as colunas essenciais
-            if (colunas.identificador === -1 || colunas.ndoc === -1) {
-                alert('Erro: Colunas "Identificador" e "N° DOC" são obrigatórias!');
+            // Verificar se encontrou as colunas OBRIGATÓRIAS
+            const camposFaltando = [];
+            
+            if (colunas.ndoc === -1) {
+                camposFaltando.push('N° Documento (DocNumber)');
+            }
+            if (colunas.matricula === -1) {
+                camposFaltando.push('MATRÍCULA (IdRegistration)');
+            }
+            if (colunas.conjunto === -1) {
+                camposFaltando.push('CONJUNTO (IdSet)');
+            }
+            if (colunas.emissao === -1) {
+                camposFaltando.push('Data de Emissão (DateEmissao)');
+            }
+            if (colunas.vencimento === -1) {
+                camposFaltando.push('Data de Vencimento (ExpirationDate)');
+            }
+            
+            // Debug: Mostrar quais colunas foram encontradas
+            console.log('🔍 DEBUG - Colunas mapeadas:', {
+                ndoc: colunas.ndoc,
+                matricula: colunas.matricula,
+                conjunto: colunas.conjunto,
+                emissao: colunas.emissao,
+                vencimento: colunas.vencimento
+            });
+            
+            if (camposFaltando.length > 0) {
+                console.error('❌ Campos faltando:', camposFaltando);
+                console.error('📋 Cabeçalho normalizado:', cabecalho.map(c => normalizarNomeColuna(c)));
+                
+                alert('❌ Erro: Campos obrigatórios não encontrados:\n\n' + 
+                      camposFaltando.join('\n') + 
+                      '\n\nVerifique se o arquivo está no formato correto.\n\n' +
+                      'Cabeçalho encontrado: ' + cabecalho.join(', '));
                 return;
             }
 
+            console.log('✅ Todos os campos obrigatórios foram encontrados!');
+            
             // Processar cada linha
             for (let i = 0; i < linhasDados.length; i++) {
                 const linha = linhasDados[i];
                 
+                console.log(`📄 Processando linha ${i + 1}:`, linha);
+                
                 // Pular linhas vazias
-                if (!linha || linha.length < 2 || !linha[colunas.identificador]) continue;
+                if (!linha || linha.length < 2) {
+                    console.log(`⏭️ Linha ${i + 1} pulada (vazia ou com poucos dados)`);
+                    continue;
+                }
+                
+                // Verificar se tem número do documento (obrigatório)
+                if (!linha[colunas.ndoc]) {
+                    console.log(`⏭️ Linha ${i + 1} pulada (sem número de documento)`);
+                    continue;
+                }
 
                 const documento = {
-                    identificador: limparTexto(linha[colunas.identificador]),
+                    unidade: limparTexto(linha[colunas.unidade]),
+                    ponteiro: limparTexto(linha[colunas.ponteiro]),
                     numero_documento: limparTexto(linha[colunas.ndoc]),
                     associado: limparTexto(linha[colunas.associado]),
                     classe: limparTexto(linha[colunas.classe]),
@@ -1494,13 +1645,24 @@ try {
                     status: normalizarStatus(linha[colunas.situacao]),
                     valor_pago: limparValor(linha[colunas.valorPago]),
                     data_baixa: formatarData(linha[colunas.dataBaixa]),
+                    proposals: limparTexto(linha[colunas.proposals]),
                     linha: i + 2, // +2 porque linha 1 é cabeçalho e arrays começam em 0
-                    clienteExiste: null // Será verificado depois
+                    clienteExiste: null, // Será verificado depois
+                    contratoExiste: null,
+                    documentoDuplicado: false
                 };
 
+                console.log(`✅ Documento ${i + 1} adicionado:`, {
+                    numero: documento.numero_documento,
+                    matricula: documento.matricula,
+                    conjunto: documento.conjunto
+                });
+                
                 dadosImportacao.push(documento);
             }
 
+            console.log(`📊 Total de documentos processados: ${dadosImportacao.length}`);
+            
             // Verificar quais clientes existem
             verificarClientesExistentes();
         }
@@ -1616,25 +1778,43 @@ try {
         // Verificar quais clientes existem no banco
         async function verificarClientesExistentes() {
             try {
-                // Extrair identificadores únicos
-                const identificadores = [...new Set(dadosImportacao.map(doc => doc.identificador))];
+                console.log('🔍 Verificando existência de clientes/contratos...');
+                
+                // Extrair MATRÍCULA e CONJUNTO únicos (NOVA LÓGICA)
+                const documentosParaVerificar = dadosImportacao.map(doc => ({
+                    matricula: doc.matricula,
+                    conjunto: doc.conjunto,
+                    numero_documento: doc.numero_documento,
+                    data_emissao: doc.data_emissao,
+                    data_vencimento: doc.data_vencimento
+                }));
+                
+                console.log('📋 Documentos para verificar:', documentosParaVerificar);
                 
                 // Fazer requisição para verificar
-                const response = await fetch('api/verificar_clientes.php', {
+                const response = await fetch('api/verificar_clientes_contratos.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json; charset=utf-8'
                     },
-                    body: JSON.stringify({ identificadores: identificadores })
+                    body: JSON.stringify({ documentos: documentosParaVerificar })
                 });
                 
                 const resultado = await response.json();
+                console.log('✅ Resultado da verificação:', resultado);
                 
                 if (resultado.success) {
-                    // Atualizar dados com status do cliente
+                    // Atualizar dados com status do cliente/contrato
                     dadosImportacao.forEach(doc => {
-                        doc.clienteExiste = resultado.clientes[doc.identificador]?.existe || false;
-                        doc.dadosCliente = resultado.clientes[doc.identificador]?.dados || null;
+                        const chave = `${doc.matricula}_${doc.conjunto}`;
+                        const verificacao = resultado.clientes[chave];
+                        
+                        doc.clienteExiste = verificacao?.existe || false;
+                        doc.dadosCliente = verificacao?.dados || null;
+                        doc.contratoExiste = verificacao?.contrato_existe || false;
+                        doc.documentoDuplicado = verificacao?.documento_duplicado || false;
+                        
+                        console.log(`Cliente MATRÍCULA ${doc.matricula} + CONJUNTO ${doc.conjunto}: ${doc.clienteExiste ? 'ENCONTRADO' : 'NÃO ENCONTRADO'}`);
                     });
                 }
                 
@@ -1659,19 +1839,33 @@ try {
             linhasPreview.forEach(doc => {
                 const tr = document.createElement('tr');
                 
-                // Se cliente não existe, destacar linha
-                if (doc.clienteExiste === false) {
-                    tr.style.backgroundColor = '#fff3cd';
-                    tr.title = 'Cliente não encontrado - irá para Quarentena Financeira';
+                // Destacar linha conforme situação
+                let statusValidacao = '';
+                let corFundo = '';
+                let titulo = '';
+                
+                if (doc.documentoDuplicado) {
+                    corFundo = '#e2e3e5'; // Cinza - duplicado
+                    titulo = '⏭️ Documento duplicado - será pulado';
+                    statusValidacao = '<i class="fas fa-copy text-secondary" title="Duplicado"></i>';
+                } else if (doc.clienteExiste === false) {
+                    corFundo = '#fff3cd'; // Amarelo - quarentena
+                    titulo = '⚠️ Cliente não encontrado - irá para Quarentena';
+                    statusValidacao = '<i class="fas fa-exclamation-triangle text-warning" title="Cliente não encontrado"></i>';
+                } else {
+                    corFundo = '#d4edda'; // Verde - OK
+                    titulo = '✅ Cliente encontrado - será importado';
+                    statusValidacao = '<i class="fas fa-check-circle text-success" title="Cliente encontrado"></i>';
                 }
                 
+                tr.style.backgroundColor = corFundo;
+                tr.title = titulo;
+                
                 const statusClass = doc.status === 'pago' ? 'success' : doc.status === 'pendente' ? 'warning' : 'danger';
-                const statusValidacao = doc.clienteExiste === false ? 
-                    '<i class="fas fa-exclamation-triangle text-warning" title="Cliente não encontrado"></i>' :
-                    '<i class="fas fa-check-circle text-success" title="Cliente encontrado"></i>';
                 
                 tr.innerHTML = `
-                    <td>${doc.identificador}${doc.clienteExiste === false ? ' <i class="fas fa-exclamation-triangle text-warning"></i>' : ''}</td>
+                    <td><strong>${doc.matricula || '-'}</strong>${doc.clienteExiste === false ? ' <i class="fas fa-exclamation-triangle text-warning"></i>' : ''}</td>
+                    <td><strong>${doc.conjunto || '-'}</strong></td>
                     <td>${doc.numero_documento}</td>
                     <td>${doc.associado}</td>
                     <td>${doc.classe}</td>
@@ -1679,8 +1873,6 @@ try {
                     <td>${doc.data_vencimento || '-'}</td>
                     <td>R$ ${parseFloat(doc.valor).toFixed(2)}</td>
                     <td>${doc.placa}</td>
-                    <td>${doc.conjunto}</td>
-                    <td>${doc.matricula}</td>
                     <td><span class="badge bg-${statusClass}">${doc.status}</span></td>
                     <td>R$ ${parseFloat(doc.valor_pago).toFixed(2)}</td>
                     <td>${doc.data_baixa || '-'}</td>
@@ -1697,19 +1889,37 @@ try {
             const totalValor = dadosImportacao.reduce((sum, doc) => sum + parseFloat(doc.valor), 0);
             const totalPago = dadosImportacao.reduce((sum, doc) => sum + parseFloat(doc.valor_pago), 0);
             
+            // Contar documentos por situação
+            const documentosDuplicados = dadosImportacao.filter(doc => doc.documentoDuplicado).length;
+            const documentosQuarentena = dadosImportacao.filter(doc => doc.clienteExiste === false && !doc.documentoDuplicado).length;
+            const documentosOK = dadosImportacao.filter(doc => doc.clienteExiste === true && !doc.documentoDuplicado).length;
+            
             let resumoHTML = `
                 <strong><i class="fas fa-chart-line me-2"></i>Resumo da Importação:</strong><br>
                 📋 Total de documentos: <strong>${dadosImportacao.length}</strong><br>
+                ✅ Serão importados: <strong>${documentosOK}</strong> (cliente encontrado)<br>
+                ⏭️ Duplicados (pulados): <strong>${documentosDuplicados}</strong><br>
+                ⚠️ Quarentena: <strong>${documentosQuarentena}</strong> (cliente não encontrado)<br>
+                <hr>
                 💰 Valor total: <strong>R$ ${totalValor.toFixed(2).replace('.', ',')}</strong><br>
                 ✅ Valor pago: <strong>R$ ${totalPago.toFixed(2).replace('.', ',')}</strong><br>
                 ⏳ Valor pendente: <strong>R$ ${(totalValor - totalPago).toFixed(2).replace('.', ',')}</strong>
             `;
             
-            if (clientesNaoEncontrados > 0) {
+            if (documentosQuarentena > 0) {
                 resumoHTML += `<br><hr><div class="text-warning">
                     <strong><i class="fas fa-exclamation-triangle me-2"></i>Atenção:</strong><br>
-                    ⚠️ <strong>${clientesNaoEncontrados}</strong> documento(s) com cliente não encontrado<br>
-                    <small>Estes irão para <strong>"Quarentena Financeira"</strong> para futura correção</small>
+                    ⚠️ <strong>${documentosQuarentena}</strong> documento(s) com cliente/contrato não encontrado<br>
+                    <small>Estes irão para <strong>"Quarentena Financeira"</strong> para futura correção</small><br>
+                    <small class="text-muted">Certifique-se de que os clientes possuem MATRÍCULA e CONTRATOS com CONJUNTO cadastrados</small>
+                </div>`;
+            }
+            
+            if (documentosDuplicados > 0) {
+                resumoHTML += `<br><div class="text-secondary">
+                    <strong><i class="fas fa-copy me-2"></i>Duplicados:</strong><br>
+                    ⏭️ <strong>${documentosDuplicados}</strong> documento(s) já existem no sistema<br>
+                    <small>Estes serão pulados automaticamente (mesmo N° DOC + Emissão + Vencimento)</small>
                 </div>`;
             }
             

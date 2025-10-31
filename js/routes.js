@@ -722,7 +722,10 @@ function showRouteDetails(routeId) {
         .then(data => {
             if (data.success) {
                 fillRouteDetails(data.data);
-                document.getElementById('viewRouteModal').style.display = 'block';
+                const modal = document.getElementById('viewRouteModal');
+                // Definir o ID da rota no modal para calcular lucratividade
+                modal.setAttribute('data-route-id', routeId);
+                modal.style.display = 'block';
             } else {
                 throw new Error(data.error || 'Erro ao carregar detalhes da rota');
             }
@@ -749,7 +752,19 @@ function fillRouteDetails(data) {
         `${data.veiculo_placa} (${data.veiculo_modelo})` : data.veiculo_placa || '-';
     document.getElementById('detailDistance').textContent = data.distancia_km ? 
         `${parseFloat(data.distancia_km).toFixed(2)} km` : '-';
-    document.getElementById('detailStatus').textContent = statusText;
+    
+    // Consumo de Combustível
+    const fuelElement = document.getElementById('detailFuelConsumption');
+    if (fuelElement) {
+        fuelElement.textContent = data.consumo_medio ? 
+            `${parseFloat(data.consumo_medio).toFixed(2)} km/l` : '-';
+    }
+    
+    // Status (opcional - só se existir no layout)
+    const statusElement = document.getElementById('detailStatus');
+    if (statusElement) {
+        statusElement.textContent = statusText;
+    }
     
     // Formatação de datas
     document.getElementById('detailStartTime').textContent = data.data_saida ? 
@@ -787,22 +802,10 @@ function fillRouteDetails(data) {
     document.getElementById('detailCargoDescription').textContent = data.descricao_carga || '-';
     document.getElementById('detailCargoWeight').textContent = data.peso_carga ? 
         `${parseFloat(data.peso_carga).toFixed(2)} kg` : '-';
+    document.getElementById('detailCustomer').textContent = data.cliente || '-';
+    document.getElementById('detailCustomerContact').textContent = data.cliente_contato || '-';
     
-    // Informações Financeiras
-    if (document.getElementById('estimatedCostValue')) {
-        document.getElementById('estimatedCostValue').textContent = data.frete ? 
-            `R$ ${parseFloat(data.frete).toFixed(2)}` : 'R$ 0,00';
-    }
-    
-    if (document.getElementById('actualCostValue')) {
-        const custoReal = data.frete ? parseFloat(data.frete) : 0;
-        document.getElementById('actualCostValue').textContent = 
-            `R$ ${custoReal.toFixed(2)}`;
-    }
-    
-    if (document.getElementById('costDifference')) {
-        document.getElementById('costDifference').textContent = 'R$ 0,00';
-    }
+    // Informações Financeiras (cards antigos removidos - agora usa Análise de Lucratividade)
     
     // Eficiência
     if (document.getElementById('detailEfficiency')) {

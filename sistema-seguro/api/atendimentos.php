@@ -41,6 +41,7 @@ try {
                 ORDER BY a.data_abertura DESC
             ");
             $stmt->execute([$cliente_id, $empresa_id]);
+            $atendimentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
         } else {
             // Todos os atendimentos da empresa com paginação

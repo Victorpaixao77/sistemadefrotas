@@ -376,34 +376,33 @@ $empresa_id = obterEmpresaId();
                     <thead class="table-light">
                         <tr>
                             <th width="5%"></th>
-                            <th width="8%">Identificador</th>
                             <th width="15%">CPF/CNPJ</th>
-                            <th width="25%">Nome/Razão Social</th>
+                            <th width="28%">Nome/Razão Social</th>
                             <th width="12%">MATRÍCULA</th>
-                            <th width="12%">Cidade</th>
+                            <th width="15%">Cidade</th>
                             <th width="5%">UF</th>
                             <th width="13%">% do Cliente</th>
-                            <th width="5%">Situação</th>
+                            <th width="7%">Situação</th>
                         </tr>
                     </thead>
                     <tbody id="clientesTableBody">
                         <!-- Os clientes serão carregados dinamicamente via JavaScript -->
                     </tbody>
                 </table>
-            </div>
+                                    </div>
             
             <!-- Paginação e Info -->
             <div class="d-flex justify-content-between align-items-center mt-3">
                 <div id="infoRegistros" class="text-muted">
                     Mostrando <strong id="infoInicio">0</strong> a <strong id="infoFim">0</strong> de <strong id="infoTotal">0</strong> registros
-                </div>
+                                    </div>
                 <nav aria-label="Navegação de página">
                     <ul class="pagination pagination-sm mb-0" id="paginationContainer">
                         <!-- Paginação será gerada dinamicamente -->
                     </ul>
                 </nav>
-            </div>
-        </div>
+                                    </div>
+                                    </div>
 
     <!-- Modal de Cadastro de Cliente -->
     <div class="modal fade" id="modalNovoCliente" tabindex="-1" aria-labelledby="modalNovoClienteLabel" aria-hidden="true">
@@ -418,6 +417,9 @@ $empresa_id = obterEmpresaId();
                                 </div>
                 <div class="modal-body">
                     <form id="formNovoCliente">
+                        <!-- Campo hidden para ID do cliente -->
+                        <input type="hidden" id="clienteId" value="">
+                        
                         <!-- Informações Básicas -->
                         <div class="card mb-3">
                             <div class="card-header bg-light">
@@ -440,8 +442,9 @@ $empresa_id = obterEmpresaId();
                                     <div class="col-md-4 mb-3">
                                         <label for="situacao" class="form-label">Situação <span class="text-danger">*</span></label>
                                         <select class="form-select" id="situacao" required>
-                                            <option value="ativo">Ativo</option>
-                                            <option value="inativo">Inativo</option>
+                                            <option value="aguardando_ativacao">🕐 Aguardando Ativação</option>
+                                            <option value="ativo">✅ Ativo</option>
+                                            <option value="inativo">❌ Inativo</option>
                                         </select>
                                     </div>
                                     </div>
@@ -558,44 +561,55 @@ $empresa_id = obterEmpresaId();
                             </div>
                             <div class="card-body">
                                 <div class="row">
-                                    <div class="col-md-3 mb-3">
-                                        <label for="identificador" class="form-label">Identificador</label>
-                                        <input type="text" class="form-control" id="identificador" placeholder="ID do cliente">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="matricula" class="form-label">MATRÍCULA (Código do Cliente) <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="matricula" placeholder="Ex: 370" required>
+                                        <small class="text-muted">Código único de identificação do cliente</small>
                                     </div>
-                                    <div class="col-md-3 mb-3">
-                                        <label for="placa" class="form-label">PLACA</label>
-                                        <input type="text" class="form-control" id="placa" placeholder="ABC1D23" maxlength="100">
-                                        <small class="text-muted">Pode ter múltiplas placas separadas por vírgula</small>
-                                    </div>
-                                    <div class="col-md-3 mb-3">
-                                        <label for="conjunto" class="form-label">CONJUNTO</label>
-                                        <input type="text" class="form-control" id="conjunto" placeholder="Ex: 382">
-                                    </div>
-                                    <div class="col-md-3 mb-3">
-                                        <label for="matricula" class="form-label">MATRÍCULA</label>
-                                        <input type="text" class="form-control" id="matricula" placeholder="Ex: 370">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="unidade" class="form-label">Unidade</label>
+                                        <input type="text" class="form-control" id="unidade" placeholder="Nome da unidade" readonly>
+                                        <small class="text-muted">Unidade da empresa</small>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Configuração Sistema Financeiro -->
+                        <!-- Contratos -->
                         <div class="card mb-3">
-                            <div class="card-header bg-light">
-                                <h6 class="mb-0"><i class="fas fa-dollar-sign me-2"></i>Configuração Sistema Financeiro</h6>
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="fas fa-file-contract me-2"></i>Contratos</h6>
+                                <button type="button" class="btn btn-sm btn-primary" id="btnAdicionarContrato">
+                                    <i class="fas fa-plus me-1"></i>Adicionar Contrato
+                                </button>
                             </div>
                             <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <label for="unidade" class="form-label">Unidade</label>
-                                        <input type="text" class="form-control" id="unidade" readonly style="background-color: #e9ecef;">
-                                        <small class="text-muted">Unidade cadastrada na empresa (somente leitura)</small>
+                                <div class="alert alert-info mb-3">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Importante:</strong> Cada contrato possui um CONJUNTO único, 
+                                    placa(s) vinculada(s) e sua própria porcentagem de recorrência.
                                     </div>
-                                    <div class="col-md-6 mb-3">
-                                        <label for="porcentagemRecorrencia" class="form-label">Porcentagem RECORRENCIA (%)</label>
-                                        <input type="number" class="form-control" id="porcentagemRecorrencia" placeholder="0.00" min="0" max="100" step="0.01">
-                                        <small class="text-muted">Defina a porcentagem de recorrência para este cliente</small>
-                                    </div>
+                                
+                                <!-- Tabela de contratos -->
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-hover" id="tabelaContratos">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th width="25%">CONJUNTO</th>
+                                                <th width="35%">Placa(s)</th>
+                                                <th width="20%">% Recorrência</th>
+                                                <th width="20%">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="listaContratos">
+                                            <tr id="semContratos">
+                                                <td colspan="4" class="text-center text-muted">
+                                                    <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                                                    Nenhum contrato cadastrado. Clique em "Adicionar Contrato" para começar.
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
@@ -658,12 +672,24 @@ $empresa_id = obterEmpresaId();
                 </div>
                 <div class="modal-body">
                     <div id="infoClienteFinanceiro" style="margin-bottom: 20px;"></div>
+                    
+                    <!-- Legenda de cores -->
+                    <div class="alert alert-light border mb-3">
+                        <strong><i class="fas fa-info-circle me-2"></i>Legenda:</strong><br>
+                        <small>
+                            🟢 <strong>Fundo branco:</strong> Documento vinculado a contrato (comissão: % empresa + % contrato)<br>
+                            🟡 <strong>Fundo amarelo:</strong> CONJUNTO não vinculado (comissão: apenas % empresa)
+                            <i class="fas fa-info-circle text-warning ms-1"></i>
+                        </small>
+                    </div>
+                    
                     <div class="table-responsive">
                         <table class="table table-hover table-sm" style="font-size: 13px;">
                             <thead class="table-light">
                                 <tr>
                                     <th>Unidade</th>
-                                    <th>Identificador</th>
+                                    <th>MATRÍCULA</th>
+                                    <th>CONJUNTO</th>
                                     <th>N° DOC</th>
                                     <th>ASSOCIADO</th>
                                     <th>CLASSE</th>
@@ -671,8 +697,6 @@ $empresa_id = obterEmpresaId();
                                     <th>VENCIMENTO</th>
                                     <th>VALOR</th>
                                     <th>PLACA</th>
-                                    <th>CONJUNTO</th>
-                                    <th>MATRÍCULA</th>
                                     <th>SITUAÇÃO</th>
                                     <th>VALOR PAGO</th>
                                     <th>DATA DA BAIXA</th>
@@ -1156,6 +1180,69 @@ $empresa_id = obterEmpresaId();
         </div>
     </div>
 
+    <!-- Modal Adicionar/Editar Contrato -->
+    <div class="modal fade" id="modalContrato" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="tituloModalContrato">
+                        <i class="fas fa-file-contract me-2"></i>Adicionar Contrato
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formContrato">
+                        <input type="hidden" id="contratoId">
+                        <input type="hidden" id="contratoClienteId">
+                        
+                        <div class="mb-3">
+                            <label for="contratoMatricula" class="form-label">
+                                CONJUNTO <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="contratoMatricula" required
+                                   placeholder="Ex: 382">
+                            <small class="text-muted">Identificador único do contrato (CONJUNTO)</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="contratoPlaca" class="form-label">
+                                Placa(s) <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="contratoPlaca" required
+                                   placeholder="ABC1D23 ou ABC1D23, DEF4G56">
+                            <small class="text-muted">Digite uma ou mais placas separadas por vírgula</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="contratoPorcentagem" class="form-label">
+                                % Recorrência <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="contratoPorcentagem" required
+                                       min="0" max="100" step="0.01" placeholder="0.00">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small class="text-muted">Porcentagem de comissão para este contrato</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="contratoObservacoes" class="form-label">Observações</label>
+                            <textarea class="form-control" id="contratoObservacoes" rows="3"
+                                      placeholder="Informações adicionais sobre o contrato..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarContrato()">
+                        <i class="fas fa-save me-1"></i>
+                        Salvar Contrato
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/menu-responsivo.js"></script>
     <script src="js/temas.js"></script>
@@ -1188,7 +1275,7 @@ $empresa_id = obterEmpresaId();
                         bairro: c.bairro || '-',
                         cidade: c.cidade || '-',
                         uf: c.uf || '-',
-                        porcentagem: c.porcentagem_recorrencia || '0.00',
+                        porcentagem: c.porcentagem_total_contratos || '0.00',
                         situacao: c.situacao
                     }));
                     carregando = false;
@@ -1214,7 +1301,15 @@ $empresa_id = obterEmpresaId();
         
         // Função para obter clientes filtrados
         function obterClientesFiltrados() {
-            let clientes = mostrarTodos ? todosClientes : todosClientes.filter(c => c.situacao === 'ativo');
+            // Por padrão, mostrar apenas 'ativo' e 'aguardando_ativacao'
+            // Ao clicar em "Ver Todos", mostrar também 'inativo'
+            let clientes;
+            if (mostrarTodos) {
+                clientes = todosClientes; // Mostra todos (ativo, inativo, aguardando_ativacao)
+            } else {
+                // Mostra apenas ativo e aguardando_ativacao
+                clientes = todosClientes.filter(c => c.situacao === 'ativo' || c.situacao === 'aguardando_ativacao');
+            }
             
             if (termoBusca) {
                 clientes = clientes.filter(cliente => {
@@ -1258,13 +1353,22 @@ $empresa_id = obterEmpresaId();
             tbody.innerHTML = '';
             
             if (carregando) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center"><i class="fas fa-spinner fa-spin"></i> Carregando clientes...</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center"><i class="fas fa-spinner fa-spin"></i> Carregando clientes...</td></tr>';
             } else if (clientesPagina.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" class="text-center">Nenhum cliente encontrado</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center">Nenhum cliente encontrado</td></tr>';
             } else {
                 clientesPagina.forEach(cliente => {
-                    const badgeClass = cliente.situacao === 'ativo' ? 'bg-success' : 'bg-danger';
-                    const badgeText = cliente.situacao === 'ativo' ? 'Ativo' : 'Inativo';
+                    let badgeClass, badgeText;
+                    if (cliente.situacao === 'ativo') {
+                        badgeClass = 'bg-success';
+                        badgeText = 'Ativo';
+                    } else if (cliente.situacao === 'inativo') {
+                        badgeClass = 'bg-danger';
+                        badgeText = 'Inativo';
+                    } else {
+                        badgeClass = 'bg-warning';
+                        badgeText = 'Aguardando Ativação';
+                    }
                     
                     const row = `
                         <tr>
@@ -1287,7 +1391,6 @@ $empresa_id = obterEmpresaId();
                                     </div>
                                 </div>
                             </td>
-                            <td>${cliente.identificador}</td>
                             <td>${cliente.cpfCnpj}</td>
                             <td>${cliente.nome}</td>
                             <td>${cliente.matricula}</td>
@@ -1309,9 +1412,9 @@ $empresa_id = obterEmpresaId();
             // Atualizar título do header
             const headerSubtitle = document.querySelector('.header p.text-muted');
             if (mostrarTodos) {
-                headerSubtitle.textContent = `Mostrando Todos os Clientes (Ativos e Inativos)`;
+                headerSubtitle.textContent = 'Mostrando Todos os Clientes (Ativos, Inativos e Aguardando Ativação)';
             } else {
-                headerSubtitle.textContent = `Mostrando Apenas Clientes Ativos`;
+                headerSubtitle.textContent = 'Mostrando Clientes Ativos e Aguardando Ativação';
             }
             
             // Renderizar paginação
@@ -1417,49 +1520,95 @@ $empresa_id = obterEmpresaId();
         }
         
         async function abrirFinanceiro(id) {
+            console.log('🔍 Abrindo posição financeira para cliente ID:', id);
+            
             try {
                 // Buscar dados completos do cliente (incluindo percentuais)
+                console.log('📡 Buscando dados do cliente...');
                 const responseCliente = await fetch('api/obter_cliente.php?id=' + id);
+                console.log('📊 Response cliente status:', responseCliente.status);
+                
                 const dataCliente = await responseCliente.json();
+                console.log('📋 Dados do cliente:', dataCliente);
                 
                 if (!dataCliente.sucesso) {
+                    console.error('❌ Erro ao carregar cliente:', dataCliente);
                     alert('Erro ao carregar dados do cliente');
                     return;
                 }
                 
                 const clienteCompleto = dataCliente.cliente;
-                
+                console.log('✅ Cliente carregado:', clienteCompleto);
+            
                 // Buscar documentos financeiros
+                console.log('📡 Buscando documentos financeiros...');
                 const responseDoc = await fetch('api/obter_documentos_financeiros.php?cliente_id=' + id);
-                const dataDoc = await responseDoc.json();
+                console.log('📊 Response documentos status:', responseDoc.status);
+                
+                const textDoc = await responseDoc.text();
+                console.log('📄 Response text (primeiros 300 chars):', textDoc.substring(0, 300));
+                
+                let dataDoc;
+                try {
+                    dataDoc = JSON.parse(textDoc);
+                    console.log('📋 Documentos parsed:', dataDoc);
+                } catch (e) {
+                    console.error('❌ Erro ao fazer parse do JSON:', e);
+                    console.error('📄 Texto completo:', textDoc);
+                    alert('Erro ao carregar documentos financeiros: resposta inválida da API\n\nVerifique o console (F12) para detalhes.');
+                    return;
+                }
                 
                 if (dataDoc.sucesso) {
+                    console.log('✅ Abrindo modal com', dataDoc.documentos.length, 'documentos');
                     mostrarModalFinanceiro(clienteCompleto, dataDoc.documentos);
                 } else {
-                    alert('Erro ao carregar documentos financeiros');
+                    console.error('❌ API retornou erro:', dataDoc.mensagem);
+                    if (dataDoc.erro_detalhado) {
+                        console.error('🔴 Erro SQL detalhado:', dataDoc.erro_detalhado);
+                    }
+                    alert('Erro ao carregar documentos financeiros: ' + dataDoc.mensagem + (dataDoc.erro_detalhado ? '\n\nDetalhes: ' + dataDoc.erro_detalhado : ''));
+                    return;
                 }
             } catch (error) {
-                console.error('Erro:', error);
-                alert('Erro ao buscar dados financeiros');
+                console.error('❌ Erro geral:', error);
+                alert('Erro ao buscar dados financeiros: ' + error.message);
             }
         }
         
         async function abrirAtendimento(id) {
             const cliente = todosClientes.find(c => c.id === id);
             
+            console.log('Abrindo atendimentos para cliente:', id);
+            
             // Abrir modal de atendimentos do cliente
             try {
                 const response = await fetch(`api/atendimentos.php?cliente_id=${id}`);
-                const resultado = await response.json();
+                console.log('Response status:', response.status);
                 
-                if (resultado.success) {
-                    mostrarModalAtendimentos(cliente, resultado.atendimentos);
+                const text = await response.text();
+                console.log('Response text:', text.substring(0, 200));
+                
+                let resultado;
+                try {
+                    resultado = JSON.parse(text);
+                    console.log('Resultado parsed:', resultado);
+                } catch (e) {
+                    console.error('Erro ao fazer parse do JSON:', e);
+                    alert('Erro ao carregar atendimentos: resposta inválida da API');
+                    return;
+                }
+                
+                // Verificar ambos os formatos: success (inglês) e sucesso (português)
+                if (resultado.success || resultado.sucesso) {
+                    mostrarModalAtendimentos(cliente, resultado.atendimentos || []);
                 } else {
-                    alert('Erro ao carregar atendimentos');
+                    console.error('Erro na API:', resultado);
+                    alert('Erro ao carregar atendimentos: ' + (resultado.error || resultado.erro || resultado.mensagem || 'Erro desconhecido'));
                 }
             } catch (error) {
                 console.error('Erro:', error);
-                alert('Erro ao carregar atendimentos');
+                alert('Erro ao carregar atendimentos: ' + error.message);
             }
         }
         
@@ -1929,6 +2078,9 @@ $empresa_id = obterEmpresaId();
             // Modo cadastro (não edição)
             clienteEditandoId = null;
             
+            // Limpar campo hidden do ID
+            document.getElementById('clienteId').value = '';
+            
             // Alterar título do modal
             document.getElementById('modalNovoClienteLabel').innerHTML = '<i class="fas fa-user-plus me-2"></i>Cadastro de Cliente';
             
@@ -1938,6 +2090,17 @@ $empresa_id = obterEmpresaId();
             // Preencher unidade automaticamente
             document.getElementById('unidade').value = unidadeEmpresa || 'Matriz';
             
+            // Limpar lista de contratos
+            const tbody = document.getElementById('listaContratos');
+            tbody.innerHTML = `
+                <tr id="semContratos">
+                    <td colspan="4" class="text-center text-muted">
+                        <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                        Salve o cliente primeiro e depois adicione contratos.
+                    </td>
+                </tr>
+            `;
+            
             // Abrir o modal
             modalNovoCliente.show();
         });
@@ -1946,8 +2109,12 @@ $empresa_id = obterEmpresaId();
         async function preencherModalEdicao(cliente) {
             clienteEditandoId = cliente.id;
             
+            // Preencher campo hidden do ID
+            document.getElementById('clienteId').value = cliente.id;
+            
             // Alterar título do modal
-            document.getElementById('modalNovoClienteLabel').innerHTML = '<i class="fas fa-user-edit me-2"></i>Editar Cliente - Código: ' + cliente.codigo;
+            const nomeCliente = cliente.nome_razao_social || cliente.nome || 'Cliente';
+            document.getElementById('modalNovoClienteLabel').innerHTML = '<i class="fas fa-user-edit me-2"></i>Editar Cliente - ' + nomeCliente;
             
             // Preencher todos os campos
             document.getElementById('tipoPessoa').value = cliente.tipo_pessoa;
@@ -1964,17 +2131,19 @@ $empresa_id = obterEmpresaId();
             document.getElementById('telefone').value = cliente.telefone || '';
             document.getElementById('celular').value = cliente.celular || '';
             document.getElementById('email').value = cliente.email || '';
-            document.getElementById('identificador').value = cliente.identificador || '';
-            document.getElementById('placa').value = cliente.placa || '';
-            document.getElementById('conjunto').value = cliente.conjunto || '';
+            
+            // Dados Adicionais
             document.getElementById('matricula').value = cliente.matricula || '';
-            
-            // SEMPRE buscar a unidade atual da empresa (não usar a antiga do cliente)
             document.getElementById('unidade').value = unidadeEmpresa || 'Carregando...';
-            
-            document.getElementById('porcentagemRecorrencia').value = cliente.porcentagem_recorrencia || '0.00';
             document.getElementById('observacoes').value = cliente.observacoes || '';
-            document.getElementById('situacao').value = cliente.situacao;
+            
+            // Situação - garantir que tenha um valor válido
+            const situacaoCliente = cliente.situacao || 'ativo';
+            console.log('Situação do cliente:', situacaoCliente);
+            document.getElementById('situacao').value = situacaoCliente;
+            
+            // Carregar contratos do cliente
+            await carregarContratos(cliente.id);
             
             // Abrir modal
             modalNovoCliente.show();
@@ -2007,12 +2176,13 @@ $empresa_id = obterEmpresaId();
                 telefone: document.getElementById('telefone').value,
                 celular: document.getElementById('celular').value,
                 email: document.getElementById('email').value,
-                identificador: document.getElementById('identificador').value,
-                placa: document.getElementById('placa').value,
-                conjunto: document.getElementById('conjunto').value,
+                // Campos que não existem mais foram removidos:
+                // - identificador (removido)
+                // - placa (gerenciado por contratos)
+                // - conjunto (gerenciado por contratos)
                 matricula: document.getElementById('matricula').value,
-                unidade: document.getElementById('unidade').value,
-                porcentagemRecorrencia: document.getElementById('porcentagemRecorrencia').value,
+                // Porcentagem agora é gerenciada pelos contratos individuais
+                porcentagemRecorrencia: 0,
                 observacoes: document.getElementById('observacoes').value
             };
             
@@ -2166,7 +2336,13 @@ $empresa_id = obterEmpresaId();
                             <tr><th>CPF/CNPJ:</th><td>${cliente.cpf_cnpj}</td></tr>
                             <tr><th>Nome/Razão Social:</th><td><strong>${cliente.nome_razao_social}</strong></td></tr>
                             <tr><th>Sigla/Fantasia:</th><td>${cliente.sigla_fantasia || '-'}</td></tr>
-                            <tr><th>Situação:</th><td><span class="badge bg-${cliente.situacao === 'ativo' ? 'success' : 'danger'}">${cliente.situacao === 'ativo' ? 'Ativo' : 'Inativo'}</span></td></tr>
+                            <tr><th>Situação:</th><td><span class="badge bg-${
+                                cliente.situacao === 'ativo' ? 'success' : 
+                                cliente.situacao === 'inativo' ? 'danger' : 'warning'
+                            }">${
+                                cliente.situacao === 'ativo' ? '✅ Ativo' : 
+                                cliente.situacao === 'inativo' ? '❌ Inativo' : '🕐 Aguardando Ativação'
+                            }</span></td></tr>
                         </table>
                     </div>
                     
@@ -2193,10 +2369,7 @@ $empresa_id = obterEmpresaId();
                         
                         <h5 class="text-primary mt-3"><i class="fas fa-id-card me-2"></i>Dados Adicionais</h5>
                         <table class="table table-bordered">
-                            <tr><th width="30%">Identificador:</th><td>${cliente.identificador || '-'}</td></tr>
-                            <tr><th>PLACA:</th><td>${cliente.placa || '-'}</td></tr>
-                            <tr><th>CONJUNTO:</th><td>${cliente.conjunto || '-'}</td></tr>
-                            <tr><th>MATRÍCULA:</th><td>${cliente.matricula || '-'}</td></tr>
+                            <tr><th width="30%">MATRÍCULA:</th><td>${cliente.matricula || '-'}</td></tr>
                         </table>
                         
                         <h5 class="text-primary mt-3"><i class="fas fa-dollar-sign me-2"></i>Financeiro</h5>
@@ -2253,8 +2426,27 @@ $empresa_id = obterEmpresaId();
                     const valorDoc = parseFloat(doc.valor || 0);
                     const valorPago = parseFloat(doc.valor_pago || 0);
                     
-                    // Calcular comissão: valor pago * (% empresa + % cliente)
-                    const comissao = valorPago * (percentualTotal / 100);
+                    // Verificar se documento tem contrato vinculado
+                    const temContrato = doc.contrato_id !== null && doc.contrato_id !== undefined;
+                    const porcentagemContrato = parseFloat(doc.porcentagem_contrato || 0);
+                    
+                    // Calcular comissão conforme vinculação:
+                    // COM CONTRATO: valor pago * (% empresa + % contrato)
+                    // SEM CONTRATO: valor pago * (% empresa apenas)
+                    let comissao;
+                    let percentualUsado;
+                    let avisoSemContrato = '';
+                    
+                    if (temContrato) {
+                        // Documento vinculado a contrato
+                        percentualUsado = percentualEmpresa + porcentagemContrato;
+                        comissao = valorPago * (percentualUsado / 100);
+                    } else {
+                        // Documento SEM contrato vinculado (apenas % empresa)
+                        percentualUsado = percentualEmpresa;
+                        comissao = valorPago * (percentualUsado / 100);
+                        avisoSemContrato = ' <i class="fas fa-info-circle text-warning" title="CONJUNTO não vinculado a contrato. Comissão calculada apenas com % da empresa (' + percentualEmpresa.toFixed(2) + '%)"></i>';
+                    }
                     
                     totalValor += valorDoc;
                     totalPago += valorPago;
@@ -2268,9 +2460,10 @@ $empresa_id = obterEmpresaId();
                     };
                     
                     html += `
-                        <tr>
+                        <tr ${!temContrato ? 'style="background-color: #fff3cd;"' : ''}>
                             <td>${doc.unidade || '-'}</td>
-                            <td>${doc.identificador || '-'}</td>
+                            <td><strong>${doc.matricula || '-'}</strong></td>
+                            <td><strong>${doc.conjunto || '-'}</strong>${avisoSemContrato}</td>
                             <td>${doc.numero_documento || '-'}</td>
                             <td>${doc.associado || '-'}</td>
                             <td>${doc.classe || '-'}</td>
@@ -2278,12 +2471,15 @@ $empresa_id = obterEmpresaId();
                             <td>${doc.data_vencimento || '-'}</td>
                             <td>R$ ${valorDoc.toFixed(2).replace('.', ',')}</td>
                             <td>${doc.placa || '-'}</td>
-                            <td>${doc.conjunto || '-'}</td>
-                            <td>${doc.matricula || '-'}</td>
                             <td><span class="badge ${badgeStatus[doc.status] || 'bg-secondary'}">${doc.status || '-'}</span></td>
                             <td>R$ ${valorPago.toFixed(2).replace('.', ',')}</td>
                             <td>${doc.data_baixa || '-'}</td>
-                            <td><strong style="color: #28a745;">R$ ${comissao.toFixed(2).replace('.', ',')}</strong></td>
+                            <td>
+                                <strong style="color: ${temContrato ? '#28a745' : '#ffc107'};">
+                                    R$ ${comissao.toFixed(2).replace('.', ',')}
+                                </strong>
+                                ${!temContrato ? '<br><small class="text-muted">(' + percentualUsado.toFixed(2) + '% empresa)</small>' : '<br><small class="text-muted">(' + percentualUsado.toFixed(2) + '%)</small>'}
+                            </td>
                         </tr>
                     `;
                 });
@@ -2741,6 +2937,349 @@ $empresa_id = obterEmpresaId();
                 alert('Erro ao criar atendimento');
             }
         }
+        
+        // ===== GESTÃO DE CONTRATOS =====
+        
+        let clienteAtualId = null;
+        let contratoEmEdicaoId = null;
+        
+        // Abrir modal para adicionar contrato
+        document.getElementById('btnAdicionarContrato').addEventListener('click', function() {
+            // Pegar o ID do cliente do modal
+            const clienteId = document.getElementById('clienteId').value;
+            
+            if (!clienteId) {
+                alert('Salve o cliente antes de adicionar contratos');
+                return;
+            }
+            
+            clienteAtualId = clienteId;
+            contratoEmEdicaoId = null;
+            
+            // Limpar formulário
+            document.getElementById('formContrato').reset();
+            document.getElementById('contratoId').value = '';
+            document.getElementById('contratoClienteId').value = clienteId;
+            document.getElementById('tituloModalContrato').innerHTML = '<i class="fas fa-file-contract me-2"><\/i>Adicionar Contrato';
+            
+            // Abrir modal de contrato (mantendo o modal do cliente aberto em background)
+            const modalContrato = new bootstrap.Modal(document.getElementById('modalContrato'), {
+                backdrop: 'static',
+                keyboard: false
+            });
+            modalContrato.show();
+        });
+        
+        // Carregar contratos de um cliente
+        async function carregarContratos(clienteId) {
+            try {
+                const response = await fetch('api/contratos_clientes.php?cliente_id=' + clienteId);
+                const data = await response.json();
+                
+                // Verificar se há aviso sobre tabela não existir
+                if (data.aviso) {
+                    console.warn('⚠️ Aviso:', data.aviso);
+                }
+                
+                const tbody = document.getElementById('listaContratos');
+                tbody.innerHTML = '';
+                
+                if (data.sucesso && data.contratos && data.contratos.length > 0) {
+                    const semContratos = document.getElementById('semContratos');
+                    if (semContratos) {
+                        semContratos.style.display = 'none';
+                    }
+                    
+                    data.contratos.forEach(contrato => {
+                        const tr = document.createElement('tr');
+                        tr.id = 'contrato-' + contrato.id;
+                        tr.setAttribute('data-contrato-id', contrato.id);
+                        tr.innerHTML = '<td class="contrato-matricula"><strong>' + contrato.matricula + '</strong><\/td>' +
+                            '<td class="contrato-placa">' + (contrato.placa || '-') + '<\/td>' +
+                            '<td class="contrato-porcentagem"><span class="badge bg-info">' + parseFloat(contrato.porcentagem_recorrencia).toFixed(2) + '%<\/span><\/td>' +
+                            '<td>' +
+                                '<button type="button" class="btn btn-sm btn-warning me-1" onclick="event.stopPropagation(); editarContratoInline(' + contrato.id + '); return false;" title="Editar">' +
+                                    '<i class="fas fa-edit"><\/i>' +
+                                '<\/button> ' +
+                                '<button type="button" class="btn btn-sm btn-danger" onclick="event.stopPropagation(); excluirContrato(' + contrato.id + '); return false;" title="Excluir">' +
+                                    '<i class="fas fa-trash"><\/i>' +
+                                '<\/button>' +
+                            '<\/td>';
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    tbody.innerHTML = '<tr id="semContratos">' +
+                        '<td colspan="4" class="text-center text-muted">' +
+                            '<i class="fas fa-inbox fa-2x mb-2"><\/i><br>' +
+                            'Nenhum contrato cadastrado. Clique em "Adicionar Contrato" para começar.' +
+                        '<\/td>' +
+                    '<\/tr>';
+                }
+            } catch (error) {
+                console.error('Erro ao carregar contratos:', error);
+                
+                // Se erro de JSON, mostrar aviso sobre tabela
+                if (error.message && error.message.includes('JSON')) {
+                    const tbody = document.getElementById('listaContratos');
+                    tbody.innerHTML = '<tr>' +
+                        '<td colspan="4" class="text-center text-warning">' +
+                            '<i class="fas fa-exclamation-triangle fa-2x mb-2"><\/i><br>' +
+                            '<strong>Tabela de contratos não foi criada ainda<\/strong><br>' +
+                            '<small>Execute: <a href="criar_tabela_contratos.php" target="_blank">criar_tabela_contratos.php<\/a><\/small>' +
+                        '<\/td>' +
+                    '<\/tr>';
+                }
+            }
+        }
+        
+        // Salvar contrato (criar ou atualizar)
+        async function salvarContrato() {
+            const form = document.getElementById('formContrato');
+            
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+            
+            const contratoId = document.getElementById('contratoId').value;
+            const clienteId = document.getElementById('contratoClienteId').value;
+            const matricula = document.getElementById('contratoMatricula').value.trim();
+            const placa = document.getElementById('contratoPlaca').value.trim();
+            const porcentagem = document.getElementById('contratoPorcentagem').value;
+            const observacoes = document.getElementById('contratoObservacoes').value.trim();
+            
+            if (!matricula || !placa || !porcentagem) {
+                alert('Preencha todos os campos obrigatórios');
+                return;
+            }
+            
+            try {
+                const metodo = contratoId ? 'PUT' : 'POST';
+                const dados = {
+                    cliente_id: clienteId,
+                    matricula: matricula,
+                    placa: placa,
+                    porcentagem_recorrencia: porcentagem,
+                    observacoes: observacoes
+                };
+                
+                if (contratoId) {
+                    dados.id = contratoId;
+                }
+                
+                const response = await fetch('api/contratos_clientes.php', {
+                    method: metodo,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dados)
+                });
+                
+                const resultado = await response.json();
+                
+                if (resultado.sucesso) {
+                    alert(contratoId ? 'Contrato atualizado com sucesso!' : 'Contrato cadastrado com sucesso!');
+                    
+                    // Fechar apenas o modal de contrato
+                    const modalContratoInstance = bootstrap.Modal.getInstance(document.getElementById('modalContrato'));
+                    if (modalContratoInstance) {
+                        modalContratoInstance.hide();
+                    }
+                    
+                    // Recarregar lista de contratos
+                    await carregarContratos(clienteId);
+                    
+                    // Garantir que o modal do cliente permanece aberto
+                    const modalCliente = document.getElementById('modalNovoCliente');
+                    if (modalCliente && !modalCliente.classList.contains('show')) {
+                        new bootstrap.Modal(modalCliente).show();
+                    }
+                } else {
+                    alert('Erro: ' + (resultado.erro || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro ao salvar contrato:', error);
+                alert('Erro ao salvar contrato');
+            }
+        }
+        
+        // Editar contrato inline (diretamente na tabela)
+        async function editarContratoInline(contratoId) {
+            console.log('🔧 Iniciando edição inline do contrato ID:', contratoId);
+            
+            try {
+                const url = 'api/contratos_clientes.php?id=' + contratoId;
+                console.log('📡 Fazendo fetch para:', url);
+                
+                const response = await fetch(url);
+                console.log('📊 Response status:', response.status);
+                
+                // Verificar se a resposta é JSON válida
+                const text = await response.text();
+                console.log('📄 Response text (primeiros 200 chars):', text.substring(0, 200));
+                
+                let data;
+                
+                try {
+                    data = JSON.parse(text);
+                    console.log('✅ JSON parsed:', data);
+                } catch (e) {
+                    console.error('❌ Erro ao fazer parse do JSON:', text.substring(0, 500));
+                    alert('Erro ao carregar contrato.\n\nA API retornou HTML em vez de JSON.\n\nVerifique o console para detalhes.');
+                    return;
+                }
+                
+                if (data.sucesso && data.contrato) {
+                    const contrato = data.contrato;
+                    console.log('📋 Contrato carregado:', contrato);
+                    
+                    const tr = document.getElementById('contrato-' + contratoId);
+                    
+                    // Salvar valores originais
+                    tr.setAttribute('data-original-matricula', contrato.matricula);
+                    tr.setAttribute('data-original-placa', contrato.placa || '');
+                    tr.setAttribute('data-original-porcentagem', contrato.porcentagem_recorrencia);
+                    
+                    // Substituir células por inputs editáveis
+                    tr.innerHTML = '<td>' +
+                            '<input type="text" class="form-control form-control-sm" id="edit-matricula-' + contratoId + '" value="' + contrato.matricula + '" required>' +
+                        '<\/td>' +
+                        '<td>' +
+                            '<input type="text" class="form-control form-control-sm" id="edit-placa-' + contratoId + '" value="' + (contrato.placa || '') + '" placeholder="ABC1D23" required>' +
+                        '<\/td>' +
+                        '<td>' +
+                            '<div class="input-group input-group-sm">' +
+                                '<input type="number" class="form-control" id="edit-porcentagem-' + contratoId + '" value="' + parseFloat(contrato.porcentagem_recorrencia).toFixed(2) + '" min="0" max="100" step="0.01" required>' +
+                                '<span class="input-group-text">%<\/span>' +
+                            '<\/div>' +
+                        '<\/td>' +
+                        '<td>' +
+                            '<button type="button" class="btn btn-sm btn-success me-1" onclick="event.stopPropagation(); salvarContratoInline(' + contratoId + '); return false;" title="Salvar">' +
+                                '<i class="fas fa-check"><\/i>' +
+                            '<\/button> ' +
+                            '<button type="button" class="btn btn-sm btn-secondary" onclick="event.stopPropagation(); cancelarEdicaoInline(' + contratoId + '); return false;" title="Cancelar">' +
+                                '<i class="fas fa-times"><\/i>' +
+                            '<\/button>' +
+                        '<\/td>';
+                } else {
+                    alert('Erro ao carregar contrato');
+                }
+            } catch (error) {
+                console.error('❌ Erro ao editar contrato:', error);
+                
+                if (error.message === 'Failed to fetch') {
+                    alert('⚠️ Erro de conexão com a API.\n\n' +
+                          'Possíveis causas:\n' +
+                          '- Servidor não está respondendo\n' +
+                          '- Arquivo api/contratos_clientes.php não existe\n' +
+                          '- Erro de permissões\n\n' +
+                          'Verifique o console (F12) para mais detalhes.');
+                } else {
+                    alert('Erro ao carregar dados do contrato: ' + error.message);
+                }
+                
+                // NÃO fechar o modal do cliente
+                return;
+            }
+        }
+        
+        // Salvar edição inline
+        async function salvarContratoInline(contratoId) {
+            const matricula = document.getElementById('edit-matricula-' + contratoId).value.trim();
+            const placa = document.getElementById('edit-placa-' + contratoId).value.trim();
+            const porcentagem = document.getElementById('edit-porcentagem-' + contratoId).value;
+            
+            if (!matricula || !placa || !porcentagem) {
+                alert('Preencha todos os campos obrigatórios');
+                return;
+            }
+            
+            try {
+                const response = await fetch('api/contratos_clientes.php', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        id: contratoId,
+                        matricula: matricula,
+                        placa: placa,
+                        porcentagem_recorrencia: porcentagem,
+                        observacoes: ''
+                    })
+                });
+                
+                const resultado = await response.json();
+                
+                if (resultado.sucesso) {
+                    alert('Contrato atualizado com sucesso!');
+                    
+                    // Recarregar lista de contratos
+                    const clienteId = document.getElementById('clienteId').value;
+                    await carregarContratos(clienteId);
+                } else {
+                    alert('Erro: ' + (resultado.erro || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro ao salvar contrato:', error);
+                alert('Erro ao salvar contrato');
+            }
+        }
+        
+        // Cancelar edição inline
+        async function cancelarEdicaoInline(contratoId) {
+            // Recarregar lista de contratos para restaurar visualização
+            const clienteId = document.getElementById('clienteId').value;
+            await carregarContratos(clienteId);
+        }
+        
+        // Excluir contrato
+        async function excluirContrato(contratoId) {
+            if (!confirm('Tem certeza que deseja excluir este contrato?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('api/contratos_clientes.php', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: contratoId })
+                });
+                
+                const resultado = await response.json();
+                
+                if (resultado.sucesso) {
+                    alert('Contrato removido com sucesso!');
+                    
+                    // Recarregar lista de contratos
+                    const clienteId = document.getElementById('clienteId').value;
+                    if (clienteId) {
+                        await carregarContratos(clienteId);
+                    }
+                } else {
+                    alert('Erro: ' + (resultado.erro || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro ao excluir contrato:', error);
+                alert('Erro ao excluir contrato');
+            }
+        }
+        
+        // Prevenir que o modal do cliente seja fechado quando o modal de contrato for fechado
+        document.getElementById('modalContrato').addEventListener('hidden.bs.modal', function(e) {
+            // Reabrir o modal do cliente se ele foi fechado acidentalmente
+            const modalCliente = document.getElementById('modalNovoCliente');
+            const clienteId = document.getElementById('clienteId').value;
+            
+            if (clienteId && modalCliente && !modalCliente.classList.contains('show')) {
+                console.log('🔄 Reabrindo modal do cliente após fechar contrato');
+                new bootstrap.Modal(modalCliente).show();
+            }
+        });
+        
+        // Expor funções globalmente
+        window.salvarContrato = salvarContrato;
+        window.editarContratoInline = editarContratoInline;
+        window.salvarContratoInline = salvarContratoInline;
+        window.cancelarEdicaoInline = cancelarEdicaoInline;
+        window.excluirContrato = excluirContrato;
+        window.carregarContratos = carregarContratos;
     </script>
 </body>
 </html>

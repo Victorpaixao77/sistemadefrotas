@@ -64,6 +64,9 @@ try {
 
     // 4. Total de Abastecimentos
     $total_abastecimentos = $conn->query("SELECT COUNT(*) FROM abastecimentos WHERE empresa_id = $empresa_id")->fetchColumn();
+    
+    // 4.1 Valor Total de Abastecimentos
+    $valor_total_abastecimentos = $conn->query("SELECT COALESCE(SUM(valor_total),0) FROM abastecimentos WHERE empresa_id = $empresa_id")->fetchColumn();
 
     // 5. Despesas de Viagem
     $total_desp_viagem = $conn->query("SELECT COALESCE(SUM(
@@ -97,6 +100,7 @@ try {
     $lucro_liquido = $total_fretes
         - $total_comissoes
         - $total_desp_viagem
+        - $valor_total_abastecimentos  // ⚠️ CORRIGIDO: estava faltando!
         - $total_desp_fixas
         - $total_parcelas_financiamento
         - $total_contas_pagas
@@ -105,6 +109,7 @@ try {
 
 } catch (Exception $e) {
     $total_veiculos = $total_motoristas = $total_rotas = $total_abastecimentos = 0;
+    $valor_total_abastecimentos = 0;
     $total_desp_viagem = $total_desp_fixas = $total_contas_pagas = 0;
     $total_manutencoes = $total_pneu_manutencao = $total_parcelas_financiamento = 0;
     $total_fretes = $total_comissoes = $lucro_liquido = 0;
@@ -323,7 +328,11 @@ try {
                         <div class="card-body">
                             <div class="metric">
                                 <span class="metric-value"><?php echo $total_abastecimentos; ?></span>
-                                <span class="metric-subtitle">Total de abastecimentos</span>
+                                <span class="metric-subtitle">Quantidade total</span>
+                            </div>
+                            <div class="metric" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                                <span class="metric-value" style="font-size: 1.5rem;">R$ <?php echo number_format($valor_total_abastecimentos, 2, ',', '.'); ?></span>
+                                <span class="metric-subtitle">Valor total gasto</span>
                             </div>
                         </div>
                     </div>

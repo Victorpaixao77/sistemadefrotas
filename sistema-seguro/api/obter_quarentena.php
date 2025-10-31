@@ -21,11 +21,22 @@ try {
     $empresaData = $stmtUnidade->fetch();
     $unidade = $empresaData['unidade'] ?? '-';
     
+    // Verificar se colunas 'ponteiro' e 'proposals' existem
+    $stmt = $db->query("SHOW COLUMNS FROM seguro_financeiro LIKE 'ponteiro'");
+    $temPonteiro = $stmt->fetch() ? true : false;
+    
+    $stmt = $db->query("SHOW COLUMNS FROM seguro_financeiro LIKE 'proposals'");
+    $temProposals = $stmt->fetch() ? true : false;
+    
+    // Montar SQL dinamicamente
+    $sqlPonteiro = $temPonteiro ? "ponteiro," : "'' as ponteiro,";
+    $sqlProposals = $temProposals ? "COALESCE(proposals, '') as proposals," : "'' as proposals,";
+    
     // Buscar documentos em quarentena (cliente_id = NULL)
-    $stmt = $db->prepare("
+    $sql = "
         SELECT 
             id,
-            identificador_original as identificador,
+            $sqlPonteiro
             numero_documento,
             associado,
             classe,
@@ -39,12 +50,15 @@ try {
             COALESCE(valor_pago, 0) as valor_pago,
             DATE_FORMAT(data_baixa, '%d/%m/%Y') as data_baixa,
             COALESCE(unidade, ?) as unidade,
+            $sqlProposals
             DATE_FORMAT(data_cadastro, '%d/%m/%Y %H:%i') as data_importacao
         FROM seguro_financeiro 
         WHERE cliente_nao_encontrado = 'sim'
         AND seguro_empresa_id = ?
         ORDER BY data_cadastro DESC
-    ");
+    ";
+    
+    $stmt = $db->prepare($sql);
     $stmt->execute([$unidade, $empresa_id]);
     $documentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     

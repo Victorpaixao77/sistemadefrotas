@@ -78,7 +78,7 @@ try {
     $totalRegistros = $stmtCount->fetch()['total'];
     $totalPaginas = $todas === 'true' ? 1 : ceil($totalRegistros / $porPagina);
     
-    // Buscar clientes com unidade da empresa
+    // Buscar clientes com unidade da empresa e soma das porcentagens dos contratos
     $sql = "
         SELECT 
             c.id,
@@ -95,7 +95,15 @@ try {
             c.matricula,
             c.porcentagem_recorrencia,
             c.situacao,
-            DATE_FORMAT(c.data_cadastro, '%d/%m/%Y %H:%i') as data_cadastro_formatada
+            DATE_FORMAT(c.data_cadastro, '%d/%m/%Y %H:%i') as data_cadastro_formatada,
+            COALESCE(
+                (SELECT SUM(cc.porcentagem_recorrencia) 
+                 FROM seguro_contratos_clientes cc 
+                 WHERE cc.cliente_id = c.id 
+                   AND cc.empresa_id = c.seguro_empresa_id
+                   AND cc.ativo = 'sim'),
+                0
+            ) as porcentagem_total_contratos
         FROM seguro_clientes c
         INNER JOIN seguro_empresa_clientes e ON c.seguro_empresa_id = e.id
         WHERE $whereClause

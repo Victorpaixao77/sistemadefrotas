@@ -37,6 +37,27 @@ if (!$dados || !isset($dados['id'])) {
     exit;
 }
 
+// Validar campos obrigatórios
+$camposObrigatorios = ['tipoPessoa', 'cpfCnpj', 'nomeRazao', 'situacao', 'matricula'];
+$nomesAmigaveis = [
+    'tipoPessoa' => 'Tipo de Pessoa',
+    'cpfCnpj' => 'CPF/CNPJ',
+    'nomeRazao' => 'Nome/Razão Social',
+    'situacao' => 'Situação',
+    'matricula' => 'MATRÍCULA (Código do Cliente)'
+];
+
+foreach ($camposObrigatorios as $campo) {
+    if (empty($dados[$campo])) {
+        $nomeAmigavel = $nomesAmigaveis[$campo] ?? $campo;
+        echo json_encode([
+            'sucesso' => false,
+            'mensagem' => "Campo obrigatório não informado: $nomeAmigavel"
+        ]);
+        exit;
+    }
+}
+
 try {
     $db = getDB();
     $empresa_id = obterEmpresaId();
@@ -60,6 +81,8 @@ try {
     }
     
     // Atualizar cliente
+    // Nota: campos removidos: identificador, placa, conjunto (gerenciados por contratos)
+    // unidade e porcentagem_recorrencia são read-only ou gerenciados por contratos
     $stmt = $db->prepare("
         UPDATE seguro_clientes 
         SET 
@@ -74,15 +97,10 @@ try {
             bairro = ?,
             cidade = ?,
             uf = ?,
-            identificador = ?,
-            placa = ?,
-            conjunto = ?,
             matricula = ?,
             telefone = ?,
             celular = ?,
             email = ?,
-            unidade = ?,
-            porcentagem_recorrencia = ?,
             observacoes = ?,
             situacao = ?
         WHERE id = ? AND seguro_empresa_id = ?
@@ -100,15 +118,10 @@ try {
         $dados['bairro'] ?? null,
         $dados['cidade'] ?? null,
         $dados['uf'] ?? null,
-        $dados['identificador'] ?? null,
-        $dados['placa'] ?? null,
-        $dados['conjunto'] ?? null,
-        $dados['matricula'] ?? null,
+        $dados['matricula'],
         $dados['telefone'] ?? null,
         $dados['celular'] ?? null,
         $dados['email'] ?? null,
-        $dados['unidade'] ?? null,
-        $dados['porcentagemRecorrencia'] ?? 0.00,
         $dados['observacoes'] ?? null,
         $dados['situacao'],
         $cliente_id,

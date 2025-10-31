@@ -73,48 +73,88 @@ try {
         try {
             // Iniciar transação para este documento
             $pdo->beginTransaction();
-            // Buscar cliente pelo identificador
-            $stmtCliente = $pdo->prepare("
-                SELECT id 
-                FROM seguro_clientes 
-                WHERE identificador = ? 
-                AND seguro_empresa_id = ?
-                LIMIT 1
-            ");
-            $stmtCliente->execute([$doc['identificador'], $empresa_id]);
-            $cliente = $stmtCliente->fetch(PDO::FETCH_ASSOC);
             
-            if (!$cliente) {
-                // Se não encontrar o cliente pelo identificador, buscar pelo nome do associado
-                // Tentar pela coluna antiga (nome_razao_social) e nova (razao_social)
-                $associado = $doc['associado'] ?? '';
+            // NOVA LÓGICA: Buscar cliente por MATRÍCULA e CONJUNTO (campos obrigatórios)
+            $matricula = $doc['matricula'] ?? '';
+            $conjunto = $doc['conjunto'] ?? '';
+            
+            $cliente = null;
+            $cliente_id = null;
+            
+            // Tentar buscar pelo CONJUNTO + MATRÍCULA no cliente
+            if (!empty($matricula) && !empty($conjunto)) {
+                error_log("Buscando cliente por MATRÍCULA: {$matricula} e CONJUNTO: {$conjunto}");
+                
+                $stmtCliente = $pdo->prepare("
+                    SELECT id 
+                    FROM seguro_clientes 
+                    WHERE matricula = ? 
+                    AND seguro_empresa_id = ?
+                    LIMIT 1
+                ");
+                $stmtCliente->execute([$matricula, $empresa_id]);
+                $cliente = $stmtCliente->fetch(PDO::FETCH_ASSOC);
+                
+                // Se não encontrou pelo cliente.matricula, buscar nos contratos
+                if (!$cliente) {
+                    error_log("Não encontrado na tabela clientes, buscando em contratos...");
+                    
+                    try {
+                        $stmtContrato = $pdo->prepare("
+                            SELECT cc.cliente_id
+                            FROM seguro_contratos_clientes cc
+                            WHERE cc.matricula = ?
+                            AND cc.empresa_id = ?
+                            AND cc.ativo = 'sim'
+                            LIMIT 1
+                        ");
+                        $stmtContrato->execute([$conjunto, $empresa_id]);
+                        $contrato = $stmtContrato->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($contrato) {
+                            $cliente_id = $contrato['cliente_id'];
+                            $cliente = ['id' => $cliente_id];
+                            error_log("Cliente encontrado via contrato: ID {$cliente_id}");
+                        }
+                    } catch (Exception $e) {
+                        error_log("Tabela seguro_contratos_clientes não existe ou erro: " . $e->getMessage());
+                    }
+                }
+            }
+            
+            // Fallback: Se ainda não encontrou, tentar pelo identificador (legado)
+            if (!$cliente && !empty($doc['identificador'])) {
+                error_log("Fallback: Buscando por identificador: {$doc['identificador']}");
+                
+                $stmtCliente = $pdo->prepare("
+                    SELECT id 
+                    FROM seguro_clientes 
+                    WHERE identificador = ? 
+                    AND seguro_empresa_id = ?
+                    LIMIT 1
+                ");
+                $stmtCliente->execute([$doc['identificador'], $empresa_id]);
+                $cliente = $stmtCliente->fetch(PDO::FETCH_ASSOC);
+            }
+            
+            // Fallback: Se ainda não encontrou, buscar pelo nome do associado
+            if (!$cliente && !empty($doc['associado'])) {
+                error_log("Fallback: Buscando por nome do associado: {$doc['associado']}");
+                
+                $associado = $doc['associado'];
                 
                 try {
                     $stmtCliente = $pdo->prepare("
                         SELECT id 
                         FROM seguro_clientes 
-                        WHERE (razao_social = ? OR nome_fantasia = ? OR nome_razao_social = ? OR sigla_fantasia = ?)
+                        WHERE (nome_razao_social = ? OR sigla_fantasia = ?)
                         AND seguro_empresa_id = ?
                         LIMIT 1
                     ");
-                    $stmtCliente->execute([$associado, $associado, $associado, $associado, $empresa_id]);
+                    $stmtCliente->execute([$associado, $associado, $empresa_id]);
                     $cliente = $stmtCliente->fetch(PDO::FETCH_ASSOC);
                 } catch (Exception $e) {
-                    // Se falhar, tentar só com as colunas antigas
-                    try {
-                        $stmtCliente = $pdo->prepare("
-                            SELECT id 
-                            FROM seguro_clientes 
-                            WHERE (nome_razao_social = ? OR sigla_fantasia = ?)
-                            AND seguro_empresa_id = ?
-                            LIMIT 1
-                        ");
-                        $stmtCliente->execute([$associado, $associado, $empresa_id]);
-                        $cliente = $stmtCliente->fetch(PDO::FETCH_ASSOC);
-                    } catch (Exception $e2) {
-                        // Ignorar erro, cliente não será encontrado
-                        error_log("Erro ao buscar cliente por nome: " . $e2->getMessage());
-                    }
+                    error_log("Erro ao buscar cliente por nome: " . $e->getMessage());
                 }
             }
             
@@ -123,27 +163,34 @@ try {
             if (!$cliente) {
                 $cliente_id = null; // NULL = quarentena
                 $clienteNaoEncontrado = 'sim';
-                error_log("Cliente não encontrado para identificador: {$doc['identificador']}");
+                error_log("❌ Cliente NÃO encontrado - Documento vai para QUARENTENA");
+                error_log("   Matrícula: {$matricula}, Conjunto: {$conjunto}");
             } else {
                 $cliente_id = $cliente['id'];
-                error_log("Cliente encontrado: ID {$cliente_id}");
+                error_log("✅ Cliente encontrado: ID {$cliente_id}");
             }
             
-            // Verificar se o documento já existe (verificar apenas por número e empresa)
+            // Verificar se o documento já existe
+            // Critérios: Número do documento + Data de Emissão + Data de Vencimento
             $stmtVerificar = $pdo->prepare("
                 SELECT id 
                 FROM seguro_financeiro 
                 WHERE numero_documento = ? 
+                AND data_emissao = ?
+                AND data_vencimento = ?
                 AND seguro_empresa_id = ?
                 LIMIT 1
             ");
             $stmtVerificar->execute([
                 $doc['numero_documento'],
+                $doc['data_emissao'],
+                $doc['data_vencimento'],
                 $empresa_id
             ]);
             
             if ($stmtVerificar->fetch()) {
-                // Documento já existe, pular silenciosamente
+                // Documento já existe (mesmo número + mesma emissão + mesmo vencimento), pular silenciosamente
+                error_log("⏭️ Documento duplicado pulado: {$doc['numero_documento']}");
                 $pdo->rollBack();
                 $pulados++;
                 continue;
@@ -170,9 +217,8 @@ try {
                     seguro_empresa_id,
                     cliente_id,
                     cliente_nao_encontrado,
-                    identificador_original,
                     unidade,
-                    identificador,
+                    ponteiro,
                     numero_documento,
                     associado,
                     classe,
@@ -185,6 +231,7 @@ try {
                     status,
                     valor_pago,
                     data_baixa,
+                    proposals,
                     data_cadastro
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
@@ -193,9 +240,8 @@ try {
                 $empresa_id,
                 $cliente_id, // NULL se não encontrado
                 $clienteNaoEncontrado, // 'sim' ou 'nao'
-                $doc['identificador'] ?? '', // Guardar identificador original
-                $unidade,
-                $doc['identificador'] ?? '',
+                $doc['unidade'] ?? $unidade,
+                $doc['ponteiro'] ?? '',
                 $doc['numero_documento'] ?? '',
                 $doc['associado'] ?? '',
                 $doc['classe'] ?? '',
@@ -207,7 +253,8 @@ try {
                 $doc['matricula'] ?? '',
                 $doc['status'] ?? 'pendente',
                 $doc['valor_pago'] ?? 0,
-                $doc['data_baixa'] ?? null
+                $doc['data_baixa'] ?? null,
+                $doc['proposals'] ?? ''
             ]);
             
             // Contar quantos foram para quarentena

@@ -79,6 +79,10 @@ function generateExcel($data, $filename) {
         error_log("Iniciando geração do Excel: $filename");
         error_log("Quantidade de registros: " . count($data));
         
+        if (empty($data)) {
+            throw new Exception("Nenhum dado disponível para gerar o relatório Excel");
+        }
+        
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         
@@ -86,7 +90,7 @@ function generateExcel($data, $filename) {
         $headers = array_keys($data[0]);
         $col = 'A';
         foreach ($headers as $header) {
-            $sheet->setCellValue($col . '1', $header);
+            $sheet->setCellValue($col . '1', ucfirst(str_replace('_', ' ', $header)));
             $col++;
         }
         
@@ -195,26 +199,96 @@ function getReportData($reportType, $month, $year) {
                 break;
                 
             case 'lucro_viagem':
+                // Lucro por viagem: Frete - Comissão - Despesas Viagem - Abastecimentos
                 $sql = "SELECT r.id, 
                         CONCAT(r.estado_origem, ' - ', r.estado_destino) as rota,
+                        r.data_saida,
+                        v.placa,
                         r.frete, 
-                        IFNULL(SUM(dv.total_despviagem), 0) AS total_despesas,
-                        (r.frete - IFNULL(SUM(dv.total_despviagem), 0)) AS lucro_estimado
+                        r.comissao,
+                        -- Despesas de viagem (subconsulta para não multiplicar linhas)
+                        (
+                            SELECT COALESCE(SUM(total_despviagem), 0)
+                            FROM despesas_viagem dv
+                            WHERE dv.rota_id = r.id
+                        ) AS total_despesas_viagem,
+                        -- Abastecimentos (subconsulta)
+                        (
+                            SELECT COALESCE(SUM(a.valor_total), 0)
+                            FROM abastecimentos a
+                            WHERE a.veiculo_id = r.veiculo_id
+                              AND DATE(a.data_abastecimento) = DATE(r.data_saida)
+                        ) AS total_abastecimentos,
+                        -- Lucro Bruto (Frete - Comissão)
+                        (r.frete - COALESCE(r.comissao, 0)) AS lucro_bruto,
+                        -- Lucro Líquido (Frete - Comissão - Despesas - Abastecimentos)
+                        (
+                            r.frete - COALESCE(r.comissao, 0) - 
+                            COALESCE((
+                                SELECT SUM(total_despviagem)
+                                FROM despesas_viagem dv
+                                WHERE dv.rota_id = r.id
+                            ), 0) - 
+                            COALESCE((
+                                SELECT SUM(a.valor_total)
+                                FROM abastecimentos a
+                                WHERE a.veiculo_id = r.veiculo_id
+                                  AND DATE(a.data_abastecimento) = DATE(r.data_saida)
+                            ), 0)
+                        ) AS lucro_liquido
                         FROM rotas r
-                        LEFT JOIN despesas_viagem dv ON dv.rota_id = r.id
+                        JOIN veiculos v ON v.id = r.veiculo_id
                         WHERE YEAR(r.data_saida) = :year 
                         AND MONTH(r.data_saida) = :month
-                        GROUP BY r.id, r.estado_origem, r.estado_destino, r.frete
                         ORDER BY r.data_saida DESC";
                 break;
                 
             case 'lucro_total':
+                // Lucro total do período: Frete - Comissão - Despesas Viagem - Abastecimentos
+                // Usando valores literais nas subconsultas para evitar erro de parâmetros duplicados
                 $sql = "SELECT 
-                        SUM(r.frete) AS total_frete,
-                        IFNULL(SUM(dv.total_despviagem), 0) AS total_despesas,
-                        (SUM(r.frete) - IFNULL(SUM(dv.total_despviagem), 0)) AS lucro_liquido
+                        -- Totais
+                        COALESCE(SUM(r.frete), 0) AS total_frete,
+                        COALESCE(SUM(r.comissao), 0) AS total_comissao,
+                        -- Despesas de viagem (subconsulta com valores literais)
+                        (
+                            SELECT COALESCE(SUM(dv.total_despviagem), 0)
+                            FROM despesas_viagem dv
+                            WHERE dv.rota_id IN (
+                                SELECT id FROM rotas 
+                                WHERE YEAR(data_saida) = " . intval($year) . "
+                                AND MONTH(data_saida) = " . intval($month) . "
+                            )
+                        ) AS total_despesas_viagem,
+                        -- Abastecimentos (subconsulta com valores literais)
+                        (
+                            SELECT COALESCE(SUM(a.valor_total), 0)
+                            FROM abastecimentos a
+                            WHERE YEAR(a.data_abastecimento) = " . intval($year) . "
+                            AND MONTH(a.data_abastecimento) = " . intval($month) . "
+                        ) AS total_abastecimentos,
+                        -- Lucro Bruto (Frete - Comissão)
+                        (COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0)) AS lucro_bruto,
+                        -- Lucro Líquido (Frete - Comissão - Despesas - Abastecimentos)
+                        (
+                            COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0) - 
+                            COALESCE((
+                                SELECT SUM(dv.total_despviagem)
+                                FROM despesas_viagem dv
+                                WHERE dv.rota_id IN (
+                                    SELECT id FROM rotas 
+                                    WHERE YEAR(data_saida) = " . intval($year) . "
+                                    AND MONTH(data_saida) = " . intval($month) . "
+                                )
+                            ), 0) - 
+                            COALESCE((
+                                SELECT SUM(a.valor_total)
+                                FROM abastecimentos a
+                                WHERE YEAR(a.data_abastecimento) = " . intval($year) . "
+                                AND MONTH(a.data_abastecimento) = " . intval($month) . "
+                            ), 0)
+                        ) AS lucro_liquido
                         FROM rotas r
-                        LEFT JOIN despesas_viagem dv ON dv.rota_id = r.id
                         WHERE YEAR(r.data_saida) = :year 
                         AND MONTH(r.data_saida) = :month";
                 break;
@@ -828,6 +902,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $data = getReportData($reportType, $month, $year);
         
+        // Tratamento especial para relatórios de lucro_total (apenas 1 linha)
+        if ($reportType === 'lucro_total' && !empty($data)) {
+            // Formatar valores monetários
+            foreach ($data[0] as $key => $value) {
+                if (in_array($key, ['total_frete', 'total_comissao', 'total_despesas_viagem', 
+                                     'total_abastecimentos', 'lucro_bruto', 'lucro_liquido'])) {
+                    $data[0][$key] = 'R$ ' . number_format($value, 2, ',', '.');
+                }
+            }
+        }
+        
         if ($format === 'pdf') {
             // Gerar HTML para PDF
             $html = '<h1>Relatório de ' . ucfirst(str_replace('_', ' ', $reportType)) . '</h1>';
@@ -836,18 +921,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($data)) {
                 $html .= '<table>';
                 $html .= '<tr>';
-                foreach (array_keys($data[0]) as $header) {
-                    $html .= '<th>' . ucfirst(str_replace('_', ' ', $header)) . '</th>';
-                }
-                $html .= '</tr>';
                 
-                foreach ($data as $row) {
-                    $html .= '<tr>';
-                    foreach ($row as $value) {
-                        $html .= '<td>' . htmlspecialchars($value ?? '') . '</td>';
+                // Cabeçalhos
+                $firstRow = is_array($data[0]) ? $data[0] : (count($data) > 0 ? $data[0] : []);
+                if (!empty($firstRow)) {
+                    foreach (array_keys($firstRow) as $header) {
+                        $html .= '<th>' . ucfirst(str_replace('_', ' ', $header)) . '</th>';
                     }
                     $html .= '</tr>';
+                    
+                    // Dados
+                    foreach ($data as $row) {
+                        $html .= '<tr>';
+                        foreach ($row as $value) {
+                            $html .= '<td>' . htmlspecialchars($value ?? '') . '</td>';
+                        }
+                        $html .= '</tr>';
+                    }
+                } else {
+                    $html .= '<tr><td>Nenhum dado disponível</td></tr>';
                 }
+                
                 $html .= '</table>';
             } else {
                 $html .= '<p>Nenhum dado encontrado para o período selecionado.</p>';

@@ -91,6 +91,12 @@ try {
                 $sql_count .= " AND a.motorista_id = :motorista";
             }
 
+            if (!empty($_GET['rota_id'])) {
+                $sql .= " AND a.rota_id = :rota_id";
+                $params[':rota_id'] = $_GET['rota_id'];
+                $sql_count .= " AND a.rota_id = :rota_id";
+            }
+
             if (!empty($_GET['combustivel'])) {
                 $sql .= " AND a.tipo_combustivel = :combustivel";
                 $params[':combustivel'] = $_GET['combustivel'];
