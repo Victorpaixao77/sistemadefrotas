@@ -321,7 +321,10 @@ function getAllMotorists($conn) {
     // Get all motorists without pagination
     $sql = "SELECT m.id, m.nome, m.cpf, m.telefone, m.email, m.cnh,
             d.nome as disponibilidade_nome,
-            c.nome as categoria_cnh_nome
+            c.nome as categoria_cnh_nome,
+            m.porcentagem_comissao,
+            m.disponibilidade_id,
+            m.categoria_cnh_id
             FROM motoristas m
             LEFT JOIN disponibilidades d ON m.disponibilidade_id = d.id
             LEFT JOIN categorias_cnh c ON m.categoria_cnh_id = c.id

@@ -137,7 +137,7 @@ try {
                     SELECT data_abastecimento as data, 'abastecimento' as tipo, valor_total as valor FROM abastecimentos WHERE empresa_id = " . $_SESSION['empresa_id'] . "
                     UNION ALL
                     SELECT created_at as data, 'outra' as tipo, 
-                           (COALESCE(arla, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
+                           (COALESCE(descarga, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
                             COALESCE(estacionamento, 0) + COALESCE(lavagem, 0) + COALESCE(borracharia, 0) + 
                             COALESCE(eletrica_mecanica, 0) + COALESCE(adiantamento, 0)) as valor 
                     FROM despesas_viagem WHERE empresa_id = " . $_SESSION['empresa_id'] . "
@@ -167,7 +167,7 @@ try {
                     SUM(CASE WHEN r.id IS NOT NULL THEN r.frete ELSE 0 END) as receita,
                     SUM(CASE 
                         WHEN dv.id IS NOT NULL THEN (
-                            COALESCE(dv.arla, 0) + COALESCE(dv.pedagios, 0) + COALESCE(dv.caixinha, 0) + 
+                            COALESCE(dv.descarga, 0) + COALESCE(dv.pedagios, 0) + COALESCE(dv.caixinha, 0) + 
                             COALESCE(dv.estacionamento, 0) + COALESCE(dv.lavagem, 0) + COALESCE(dv.borracharia, 0) + 
                             COALESCE(dv.eletrica_mecanica, 0) + COALESCE(dv.adiantamento, 0)
                         )
@@ -202,7 +202,7 @@ try {
                     SELECT data_rota as data, 'frete' as tipo, frete as valor FROM rotas WHERE empresa_id = " . $_SESSION['empresa_id'] . "
                     UNION ALL
                     SELECT created_at as data, 'despesa' as tipo, 
-                           (COALESCE(arla, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
+                           (COALESCE(descarga, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
                             COALESCE(estacionamento, 0) + COALESCE(lavagem, 0) + COALESCE(borracharia, 0) + 
                             COALESCE(eletrica_mecanica, 0) + COALESCE(adiantamento, 0)) as valor 
                     FROM despesas_viagem WHERE empresa_id = " . $_SESSION['empresa_id'] . "

@@ -32,9 +32,7 @@ try {
             -- Despesas de Viagem
             SELECT 
                 created_at as data,
-                COALESCE(arla,0) + COALESCE(pedagios,0) + COALESCE(caixinha,0) + 
-                COALESCE(estacionamento,0) + COALESCE(lavagem,0) + COALESCE(borracharia,0) + 
-                COALESCE(eletrica_mecanica,0) + COALESCE(adiantamento,0) as total
+                COALESCE(total_despviagem, 0) as total
             FROM despesas_viagem
             WHERE empresa_id = :empresa_id_viagem 
             AND MONTH(created_at) = :month_viagem
@@ -44,7 +42,7 @@ try {
             
             -- Despesas Fixas
             SELECT 
-                vencimento as data,
+                COALESCE(data_pagamento, vencimento) as data,
                 valor as total
             FROM despesas_fixas
             WHERE empresa_id = :empresa_id_fixas 
@@ -90,11 +88,12 @@ try {
             -- Abastecimentos
             SELECT 
                 data_abastecimento as data,
-                valor_total as total
+                (valor_total + COALESCE(valor_total_arla, 0)) as total
             FROM abastecimentos
             WHERE empresa_id = :empresa_id_abast
             AND MONTH(data_abastecimento) = :month_abast
             AND YEAR(data_abastecimento) = :year_abast
+            AND status = 'aprovado'
         ) as todas_despesas
         GROUP BY DAY(data)
         ORDER BY dia";
@@ -103,12 +102,20 @@ try {
     $query_km = "
         SELECT 
             DAY(data_rota) as dia,
-            SUM(km_chegada - km_saida) as total_km
+            SUM(
+                CASE 
+                    WHEN total_km IS NOT NULL AND total_km > 0 THEN total_km
+                    WHEN km_chegada IS NOT NULL AND km_saida IS NOT NULL THEN km_chegada - km_saida
+                    ELSE 0
+                END
+            ) as total_km
         FROM rotas
         WHERE empresa_id = :empresa_id_km
+        AND data_rota IS NOT NULL
         AND MONTH(data_rota) = :month_km
         AND YEAR(data_rota) = :year_km
         AND no_prazo = 1
+        AND status = 'aprovado'
         GROUP BY DAY(data_rota)
         ORDER BY dia";
     

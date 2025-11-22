@@ -506,6 +506,12 @@ $total_paginas = $resultado['total_paginas'];
                             <option value="">Todos os veículos</option>
                             <!-- Será preenchido via JavaScript -->
                         </select>
+                        <button type="button" class="btn-restore-layout" id="applyRouteFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearRouteFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
                     </div>
                 </div>
                 
@@ -1288,8 +1294,8 @@ $total_paginas = $resultado['total_paginas'];
                     
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="arla">ARLA</label>
-                            <input type="number" id="arla" name="arla" step="0.01" min="0">
+                            <label for="descarga">Descarga</label>
+                            <input type="number" id="descarga" name="descarga" step="0.01" min="0">
                         </div>
                         
                         <div class="form-group">

@@ -167,8 +167,11 @@ $page_title = "Pneus";
                             <option value="">Todos os veículos</option>
                         </select>
                         
-                        <button id="applyFilters" class="btn-secondary">
-                            <i class="fas fa-filter"></i> Filtrar
+                        <button type="button" class="btn-restore-layout" id="applyTireFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearTireFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
                         </button>
                     </div>
                 </div>
@@ -331,7 +334,28 @@ $page_title = "Pneus";
         
         function initializePage() {
             document.getElementById('addTireBtn').addEventListener('click', showAddTireModal);
-            document.getElementById('applyFilters').addEventListener('click', applyFilters);
+            const applyFiltersBtn = document.getElementById('applyTireFilters');
+            if (applyFiltersBtn) {
+                applyFiltersBtn.addEventListener('click', applyFilters);
+            }
+
+            const clearFiltersBtn = document.getElementById('clearTireFilters');
+            if (clearFiltersBtn) {
+                clearFiltersBtn.addEventListener('click', () => {
+                    const searchInput = document.getElementById('searchTire');
+                    const statusSelect = document.getElementById('statusFilter');
+                    const vehicleSelect = document.getElementById('vehicleFilter');
+                    if (searchInput) searchInput.value = '';
+                    if (statusSelect) statusSelect.value = '';
+                    if (vehicleSelect) vehicleSelect.value = '';
+                    loadTires(1);
+                });
+            }
+
+            const searchInput = document.getElementById('searchTire');
+            if (searchInput) {
+                searchInput.addEventListener('input', debounce(() => loadTires(1), 300));
+            }
             document.getElementById('prevPage').addEventListener('click', function(e) {
                 e.preventDefault();
                 if (currentPage > 1) {
@@ -380,7 +404,16 @@ $page_title = "Pneus";
 
         async function loadTires(page = 1) {
             try {
-                const response = await fetch(`../includes/get_tires.php?page=${page}`);
+                const statusFilter = document.getElementById('statusFilter')?.value || '';
+                const vehicleFilter = document.getElementById('vehicleFilter')?.value || '';
+                const searchTerm = document.getElementById('searchTire')?.value || '';
+
+                let url = `../includes/get_tires.php?page=${page}`;
+                if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
+                if (vehicleFilter) url += `&veiculo=${encodeURIComponent(vehicleFilter)}`;
+                if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
+
+                const response = await fetch(url);
                 const data = await response.json();
                 if (data.success) {
                     updateTiresTable(data.data);
@@ -556,6 +589,14 @@ $page_title = "Pneus";
             if (confirm('Tem certeza que deseja excluir este pneu?')) {
                 deleteTire(tireId);
             }
+        }
+
+        function debounce(fn, delay = 200) {
+            let timeout;
+            return (...args) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => fn.apply(null, args), delay);
+            };
         }
 
         async function deleteTire(tireId) {

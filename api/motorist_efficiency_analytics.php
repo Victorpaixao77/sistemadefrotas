@@ -26,7 +26,7 @@ try {
             COALESCE(SUM(r.frete), 0) as faturamento,
             COALESCE(SUM(r.comissao), 0) as comissao,
             COALESCE(SUM(
-                COALESCE(dv.arla, 0) + 
+                COALESCE(dv.descarga, 0) + 
                 COALESCE(dv.pedagios, 0) + 
                 COALESCE(dv.caixinha, 0) + 
                 COALESCE(dv.estacionamento, 0) + 

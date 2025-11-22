@@ -57,10 +57,14 @@ switch ($action) {
         $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 5;
         $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
         $status = isset($_GET['status']) ? $_GET['status'] : null;
+        $search = isset($_GET['search']) ? $_GET['search'] : null;
         $name = isset($_GET['name']) ? $_GET['name'] : null;
+        if ($search === null && $name !== null) {
+            $search = $name;
+        }
         
         // Return list of motorists
-        echo json_encode(getMotoristsList($limit, $page, $status, $name));
+        echo json_encode(getMotoristsList($limit, $page, $status, $search));
         break;
         
     case 'routes':
@@ -134,10 +138,10 @@ switch ($action) {
  * @param int $limit Maximum number of records
  * @param int $page Page number
  * @param string $status Filter by status
- * @param string $name Filter by name
+ * @param string $search Text search across multiple fields
  * @return array List of motorists and pagination info
  */
-function getMotoristsList($limit = 5, $page = 1, $status = null, $name = null) {
+function getMotoristsList($limit = 5, $page = 1, $status = null, $search = null) {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
@@ -154,9 +158,38 @@ function getMotoristsList($limit = 5, $page = 1, $status = null, $name = null) {
             $params[':status'] = $status;
         }
         
-        if ($name) {
-            $where[] = 'm.nome LIKE :name';
-            $params[':name'] = "%$name%";
+        if ($search) {
+            $search = trim($search);
+            $searchLike = '%' . $search . '%';
+            
+            $searchConditions = [];
+            $params[':search_nome'] = $searchLike;
+            $searchConditions[] = 'm.nome LIKE :search_nome';
+            
+            $params[':search_email'] = $searchLike;
+            $searchConditions[] = 'm.email LIKE :search_email';
+            
+            $params[':search_cnh'] = $searchLike;
+            $searchConditions[] = 'm.cnh LIKE :search_cnh';
+            
+            $params[':search_cpf_mask'] = $searchLike;
+            $searchConditions[] = 'm.cpf LIKE :search_cpf_mask';
+            
+            $params[':search_phone_mask'] = $searchLike;
+            $searchConditions[] = 'm.telefone LIKE :search_phone_mask';
+            
+            $searchDigits = preg_replace('/\D+/', '', $search);
+            if ($searchDigits !== '') {
+                $params[':search_cpf_digits'] = '%' . $searchDigits . '%';
+                $searchConditions[] = "REPLACE(REPLACE(REPLACE(REPLACE(m.cpf, '.', ''), '-', ''), ' ', ''), '/', '') LIKE :search_cpf_digits";
+                
+                $params[':search_phone_digits'] = '%' . $searchDigits . '%';
+                $searchConditions[] = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(m.telefone, '(', ''), ')', ''), '-', ''), ' ', ''), '+', '') LIKE :search_phone_digits";
+            }
+            
+            if (!empty($searchConditions)) {
+                $where[] = '(' . implode(' OR ', $searchConditions) . ')';
+            }
         }
         
         $whereClause = implode(' AND ', $where);

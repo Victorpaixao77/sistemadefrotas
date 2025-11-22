@@ -52,55 +52,85 @@ $can_view_financial_data = can_view_financial_data();
 
 // ====== INDICADORES ACUMULADOS ======
 try {
-    // Conexão já criada: $conn
     // 1. Total de Veículos
-    $total_veiculos = $conn->query("SELECT COUNT(*) FROM veiculos WHERE empresa_id = $empresa_id")->fetchColumn();
+    $stmt = $conn->prepare("SELECT COUNT(*) FROM veiculos WHERE empresa_id = :empresa_id");
+    $stmt->execute([':empresa_id' => $empresa_id]);
+    $total_veiculos = (int)$stmt->fetchColumn();
 
     // 2. Total de Motoristas/Colaboradores
-    $total_motoristas = $conn->query("SELECT COUNT(*) FROM motoristas WHERE empresa_id = $empresa_id")->fetchColumn();
+    $stmt = $conn->prepare("SELECT COUNT(*) FROM motoristas WHERE empresa_id = :empresa_id");
+    $stmt->execute([':empresa_id' => $empresa_id]);
+    $total_motoristas = (int)$stmt->fetchColumn();
 
     // 3. Total de Rotas Realizadas
-    $total_rotas = $conn->query("SELECT COUNT(*) FROM rotas WHERE empresa_id = $empresa_id")->fetchColumn();
+    $stmt = $conn->prepare("SELECT 
+            SUM(CASE WHEN status = 'aprovado' THEN 1 ELSE 0 END) AS concluidas,
+            COUNT(*) AS total_rotas 
+        FROM rotas 
+        WHERE empresa_id = :empresa_id");
+    $stmt->execute([':empresa_id' => $empresa_id]);
+    $rotas_data = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['concluidas' => 0, 'total_rotas' => 0];
+    $total_rotas_concluidas = (int)$rotas_data['concluidas'];
+    $total_rotas = (int)$rotas_data['total_rotas'];
 
-    // 4. Total de Abastecimentos
-    $total_abastecimentos = $conn->query("SELECT COUNT(*) FROM abastecimentos WHERE empresa_id = $empresa_id")->fetchColumn();
-    
-    // 4.1 Valor Total de Abastecimentos
-    $valor_total_abastecimentos = $conn->query("SELECT COALESCE(SUM(valor_total),0) FROM abastecimentos WHERE empresa_id = $empresa_id")->fetchColumn();
+    // 4. Total de Abastecimentos e valor gasto (apenas aprovados)
+    $stmt = $conn->prepare("
+        SELECT 
+            COUNT(*) AS total,
+            COALESCE(SUM(valor_total + COALESCE(valor_total_arla, 0)), 0) AS valor_total
+        FROM abastecimentos 
+        WHERE empresa_id = :empresa_id
+        AND status = 'aprovado'");
+    $stmt->execute([':empresa_id' => $empresa_id]);
+    $abastecimento_data = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['total' => 0, 'valor_total' => 0];
+    $total_abastecimentos = (int)$abastecimento_data['total'];
+    $valor_total_abastecimentos = (float)$abastecimento_data['valor_total'];
 
     // 5. Despesas de Viagem
-    $total_desp_viagem = $conn->query("SELECT COALESCE(SUM(
-        COALESCE(arla,0) + COALESCE(pedagios,0) + COALESCE(caixinha,0) + 
-        COALESCE(estacionamento,0) + COALESCE(lavagem,0) + COALESCE(borracharia,0) + 
-        COALESCE(eletrica_mecanica,0) + COALESCE(adiantamento,0)
-    ),0) FROM despesas_viagem WHERE empresa_id = $empresa_id")->fetchColumn();
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(total_despviagem), 0) FROM despesas_viagem WHERE empresa_id = :empresa_id");
+    $stmt->execute([':empresa_id' => $empresa_id]);
+    $total_desp_viagem = (float)$stmt->fetchColumn();
 
-    // 6. Despesas Fixas
-    $total_desp_fixas = $conn->query("SELECT COALESCE(SUM(valor),0) FROM despesas_fixas WHERE empresa_id = $empresa_id")->fetchColumn();
+    // 6. Despesas Fixas (somente pagas)
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(valor), 0) FROM despesas_fixas WHERE empresa_id = :empresa_id AND data_pagamento IS NOT NULL");
+    $stmt->execute([':empresa_id' => $empresa_id]);
+    $total_desp_fixas = (float)$stmt->fetchColumn();
 
     // 7. Contas Pagas
-    $total_contas_pagas = $conn->query("SELECT COALESCE(SUM(valor),0) FROM contas_pagar WHERE empresa_id = $empresa_id AND status_id = 2")->fetchColumn();
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(valor), 0) FROM contas_pagar WHERE empresa_id = :empresa_id AND status_id = 2");
+    $stmt->execute([':empresa_id' => $empresa_id]);
+    $total_contas_pagas = (float)$stmt->fetchColumn();
 
     // 8. Manutenções de Veículos
-    $total_manutencoes = $conn->query("SELECT COALESCE(SUM(valor),0) FROM manutencoes WHERE empresa_id = $empresa_id")->fetchColumn();
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(valor), 0) FROM manutencoes WHERE empresa_id = :empresa_id");
+    $stmt->execute([':empresa_id' => $empresa_id]);
+    $total_manutencoes = (float)$stmt->fetchColumn();
 
     // 9. Manutenções de Pneus
-    $total_pneu_manutencao = $conn->query("SELECT COALESCE(SUM(custo),0) FROM pneu_manutencao WHERE empresa_id = $empresa_id")->fetchColumn();
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(custo), 0) FROM pneu_manutencao WHERE empresa_id = :empresa_id");
+    $stmt->execute([':empresa_id' => $empresa_id]);
+    $total_pneu_manutencao = (float)$stmt->fetchColumn();
 
-    // 10. Parcelas de Financiamento
-    $total_parcelas_financiamento = $conn->query("SELECT COALESCE(SUM(valor),0) FROM parcelas_financiamento WHERE empresa_id = $empresa_id AND status_id = 2")->fetchColumn();
+    // 10. Parcelas de Financiamento (pagas)
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(valor), 0) FROM parcelas_financiamento WHERE empresa_id = :empresa_id AND status_id = 2");
+    $stmt->execute([':empresa_id' => $empresa_id]);
+    $total_parcelas_financiamento = (float)$stmt->fetchColumn();
 
-    // 11. Total de Faturamento (Fretes)
-    $total_fretes = $conn->query("SELECT COALESCE(SUM(frete),0) FROM rotas WHERE empresa_id = $empresa_id")->fetchColumn();
+    // 11. Total de Faturamento (Fretes) - rotas aprovadas
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(frete), 0) FROM rotas WHERE empresa_id = :empresa_id AND status = 'aprovado'");
+    $stmt->execute([':empresa_id' => $empresa_id]);
+    $total_fretes = (float)$stmt->fetchColumn();
 
-    // 12. Total de Comissões
-    $total_comissoes = $conn->query("SELECT COALESCE(SUM(comissao),0) FROM rotas WHERE empresa_id = $empresa_id")->fetchColumn();
+    // 12. Total de Comissões - rotas aprovadas
+    $stmt = $conn->prepare("SELECT COALESCE(SUM(comissao), 0) FROM rotas WHERE empresa_id = :empresa_id AND status = 'aprovado'");
+    $stmt->execute([':empresa_id' => $empresa_id]);
+    $total_comissoes = (float)$stmt->fetchColumn();
 
     // 13. Lucro Líquido Geral
     $lucro_liquido = $total_fretes
         - $total_comissoes
         - $total_desp_viagem
-        - $valor_total_abastecimentos  // ⚠️ CORRIGIDO: estava faltando!
+        - $valor_total_abastecimentos
         - $total_desp_fixas
         - $total_parcelas_financiamento
         - $total_contas_pagas
@@ -108,7 +138,7 @@ try {
         - $total_pneu_manutencao;
 
 } catch (Exception $e) {
-    $total_veiculos = $total_motoristas = $total_rotas = $total_abastecimentos = 0;
+    $total_veiculos = $total_motoristas = $total_rotas = $total_rotas_concluidas = $total_abastecimentos = 0;
     $valor_total_abastecimentos = 0;
     $total_desp_viagem = $total_desp_fixas = $total_contas_pagas = 0;
     $total_manutencoes = $total_pneu_manutencao = $total_parcelas_financiamento = 0;
@@ -316,8 +346,8 @@ try {
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value"><?php echo $total_rotas; ?></span>
-                                <span class="metric-subtitle">Total de rotas</span>
+                                <span class="metric-value"><?php echo $total_rotas_concluidas; ?></span>
+                                <span class="metric-subtitle">De <?php echo $total_rotas; ?> rotas</span>
                             </div>
                         </div>
                     </div>

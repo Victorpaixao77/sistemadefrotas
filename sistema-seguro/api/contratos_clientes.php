@@ -114,9 +114,16 @@ try {
             $matricula = trim($dados['matricula'] ?? '');
             $placa = trim($dados['placa'] ?? '');
             $porcentagem = floatval($dados['porcentagem_recorrencia'] ?? 0);
+            $dataInicio = $dados['data_inicio'] ?? null;
+            $valor = isset($dados['valor']) && $dados['valor'] !== '' ? floatval($dados['valor']) : null;
+            $situacao = $dados['situacao'] ?? 'aguardando_ativacao';
+            $tipoOs = trim($dados['tipo_os'] ?? '');
+            $envioWhatsapp = $dados['envio_whatsapp'] ?? 'nao';
+            $envioEmail = $dados['envio_email'] ?? 'nao';
+            $planilha = $dados['planilha'] ?? 'nao';
             $observacoes = trim($dados['observacoes'] ?? '');
             
-            error_log("POST - Valores processados: cliente_id=$cliente_id, matricula=$matricula, placa=$placa, porcentagem=$porcentagem");
+            error_log("POST - Valores processados: cliente_id=$cliente_id, matricula=$matricula, placa=$placa, porcentagem=$porcentagem, data_inicio=$dataInicio, valor=$valor, situacao=$situacao, tipo_os=$tipoOs");
             
             // Validações
             if (empty($cliente_id)) {
@@ -140,8 +147,8 @@ try {
             
             // Inserir contrato
             $sql = "INSERT INTO seguro_contratos_clientes 
-                    (cliente_id, empresa_id, matricula, placa, porcentagem_recorrencia, observacoes) 
-                    VALUES (:cliente_id, :empresa_id, :matricula, :placa, :porcentagem, :observacoes)";
+                    (cliente_id, empresa_id, matricula, placa, porcentagem_recorrencia, data_inicio, valor, situacao, tipo_os, envio_whatsapp, envio_email, planilha, observacoes) 
+                    VALUES (:cliente_id, :empresa_id, :matricula, :placa, :porcentagem, :data_inicio, :valor, :situacao, :tipo_os, :envio_whatsapp, :envio_email, :planilha, :observacoes)";
             
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
@@ -150,6 +157,13 @@ try {
                 'matricula' => $matricula,
                 'placa' => $placa,
                 'porcentagem' => $porcentagem,
+                'data_inicio' => $dataInicio,
+                'valor' => $valor,
+                'situacao' => $situacao,
+                'tipo_os' => $tipoOs ?: null,
+                'envio_whatsapp' => $envioWhatsapp,
+                'envio_email' => $envioEmail,
+                'planilha' => $planilha,
                 'observacoes' => $observacoes
             ]);
             
@@ -176,6 +190,13 @@ try {
             $matricula = trim($dados['matricula'] ?? '');
             $placa = trim($dados['placa'] ?? '');
             $porcentagem = floatval($dados['porcentagem_recorrencia'] ?? 0);
+            $dataInicio = $dados['data_inicio'] ?? null;
+            $valor = isset($dados['valor']) && $dados['valor'] !== '' ? floatval($dados['valor']) : null;
+            $situacao = $dados['situacao'] ?? 'aguardando_ativacao';
+            $tipoOs = trim($dados['tipo_os'] ?? '');
+            $envioWhatsapp = $dados['envio_whatsapp'] ?? 'nao';
+            $envioEmail = $dados['envio_email'] ?? 'nao';
+            $planilha = $dados['planilha'] ?? 'nao';
             $observacoes = trim($dados['observacoes'] ?? '');
             
             if (empty($id)) {
@@ -200,6 +221,13 @@ try {
                     SET matricula = :matricula,
                         placa = :placa,
                         porcentagem_recorrencia = :porcentagem,
+                        data_inicio = :data_inicio,
+                        valor = :valor,
+                        situacao = :situacao,
+                        tipo_os = :tipo_os,
+                        envio_whatsapp = :envio_whatsapp,
+                        envio_email = :envio_email,
+                        planilha = :planilha,
                         observacoes = :observacoes
                     WHERE id = :id AND empresa_id = :empresa_id";
             
@@ -208,6 +236,13 @@ try {
                 'matricula' => $matricula,
                 'placa' => $placa,
                 'porcentagem' => $porcentagem,
+                'data_inicio' => $dataInicio,
+                'valor' => $valor,
+                'situacao' => $situacao,
+                'tipo_os' => $tipoOs ?: null,
+                'envio_whatsapp' => $envioWhatsapp,
+                'envio_email' => $envioEmail,
+                'planilha' => $planilha,
                 'observacoes' => $observacoes,
                 'id' => $id,
                 'empresa_id' => $empresa_id

@@ -283,19 +283,23 @@ $total_pages = ceil($total / $limit);
                     </div>
                     
                     <div class="filter-options">
-                        <select id="tipoFilter">
+                        <select id="tipoFilter" title="Tipo de manutenção">
                             <option value="">Todos os tipos</option>
                             <?php
                             $sql = "SELECT id, nome FROM tipo_manutencao_pneus ORDER BY nome";
                             $tipos = executeQuery($conn, $sql);
                             foreach ($tipos as $tipo) {
-                                echo "<option value='" . $tipo['id'] . "'>" . htmlspecialchars($tipo['nome']) . "</option>";
+                                $nomeTipo = htmlspecialchars($tipo['nome']);
+                                echo "<option value='{$nomeTipo}'>{$nomeTipo}</option>";
                             }
                             ?>
                         </select>
                         
-                        <button id="applyFilters" class="btn-secondary">
-                            <i class="fas fa-filter"></i> Filtrar
+                        <button type="button" class="btn-restore-layout" id="applyTireFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearTireFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
                         </button>
                     </div>
                 </div>
@@ -697,24 +701,71 @@ $total_pages = ceil($total / $limit);
         }
         
         function setupFilters() {
-            // Add clear filter button click handler
-            document.getElementById('clearFilterBtn').addEventListener('click', function() {
-                document.getElementById('filterMonth').value = '';
-                window.location.href = window.location.pathname;
-            });
-            
-            // Add apply filter button click handler
-            document.getElementById('applyFilterBtn').addEventListener('click', function() {
-                const monthYear = document.getElementById('filterMonth').value;
-                if (monthYear) {
-                    const [year, month] = monthYear.split('-');
-                    window.location.href = `?mes=${month}&ano=${year}`;
-                } else {
+            const tableBody = document.querySelector('#maintenanceTable tbody');
+            const searchInput = document.getElementById('searchMaintenance');
+            const tipoFilter = document.getElementById('tipoFilter');
+            const applyFiltersBtn = document.getElementById('applyTireFilters');
+            const clearFiltersBtn = document.getElementById('clearTireFilters');
+
+            const applyTableFilters = () => {
+                if (!tableBody) return;
+                const rows = tableBody.querySelectorAll('tr');
+                const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+                const tipoSelecionado = tipoFilter ? tipoFilter.value.toLowerCase() : '';
+
+                rows.forEach(row => {
+                    const rowText = row.textContent.toLowerCase();
+                    const tipoCell = row.querySelector('td:nth-child(4)');
+                    const tipoTexto = tipoCell ? tipoCell.textContent.toLowerCase() : '';
+                    const matchesSearch = !searchTerm || rowText.includes(searchTerm);
+                    const matchesTipo = !tipoSelecionado || tipoTexto.includes(tipoSelecionado);
+                    row.style.display = matchesSearch && matchesTipo ? '' : 'none';
+                });
+            };
+
+            if (searchInput) {
+                searchInput.addEventListener('input', debounce(applyTableFilters, 200));
+            }
+
+            if (tipoFilter) {
+                tipoFilter.addEventListener('change', applyTableFilters);
+            }
+
+            if (applyFiltersBtn) {
+                applyFiltersBtn.addEventListener('click', applyTableFilters);
+            }
+
+            if (clearFiltersBtn) {
+                clearFiltersBtn.addEventListener('click', () => {
+                    if (searchInput) searchInput.value = '';
+                    if (tipoFilter) tipoFilter.value = '';
+                    applyTableFilters();
+                });
+            }
+
+            applyTableFilters();
+
+            const clearFilterBtn = document.getElementById('clearFilterBtn');
+            if (clearFilterBtn) {
+                clearFilterBtn.addEventListener('click', function() {
+                    document.getElementById('filterMonth').value = '';
                     window.location.href = window.location.pathname;
-                }
-            });
+                });
+            }
             
-            // Set the current month/year in the filter if it exists
+            const applyFilterBtn = document.getElementById('applyFilterBtn');
+            if (applyFilterBtn) {
+                applyFilterBtn.addEventListener('click', function() {
+                    const monthYear = document.getElementById('filterMonth').value;
+                    if (monthYear) {
+                        const [year, month] = monthYear.split('-');
+                        window.location.href = `?mes=${month}&ano=${year}`;
+                    } else {
+                        window.location.href = window.location.pathname;
+                    }
+                });
+            }
+            
             const urlParams = new URLSearchParams(window.location.search);
             const mes = urlParams.get('mes');
             const ano = urlParams.get('ano');

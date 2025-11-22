@@ -214,6 +214,12 @@ $total_paginas = $resultado['total_paginas'];
                             <option value="Boleto">Boleto</option>
                             <option value="PIX">PIX</option>
                         </select>
+                        <button type="button" class="btn-restore-layout" id="applyRefuelFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearRefuelFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -244,9 +250,15 @@ $total_paginas = $resultado['total_paginas'];
                                     <td><?php echo htmlspecialchars($abastecimento['veiculo_placa']); ?></td>
                                     <td><?php echo htmlspecialchars($abastecimento['motorista_nome']); ?></td>
                                     <td><?php echo htmlspecialchars($abastecimento['posto']); ?></td>
-                                    <td><?php echo number_format($abastecimento['litros'], 2, ',', '.'); ?></td>
+                                    <td><?php echo number_format($abastecimento['litros'], 3, ',', '.'); ?></td>
                                     <td>R$ <?php echo number_format($abastecimento['valor_litro'], 2, ',', '.'); ?></td>
-                                    <td>R$ <?php echo number_format($abastecimento['valor_total'], 2, ',', '.'); ?></td>
+                                    <?php
+                                        $valor_total_abastecimento = (float)$abastecimento['valor_total'];
+                                        if (!empty($abastecimento['inclui_arla']) && (int)$abastecimento['inclui_arla'] === 1) {
+                                            $valor_total_abastecimento += (float)($abastecimento['valor_total_arla'] ?? 0);
+                                        }
+                                    ?>
+                                    <td>R$ <?php echo number_format($valor_total_abastecimento, 2, ',', '.'); ?></td>
                                     <td>
                                         <?php if (!empty($abastecimento['inclui_arla']) && $abastecimento['inclui_arla'] == 1): ?>
                                             <?php 
@@ -646,9 +658,10 @@ $total_paginas = $resultado['total_paginas'];
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <script>
-        let consumptionChart = null;
-        let efficiencyChart = null;
-        let currentFilter = null;
+        var consumptionChart = null;
+        var efficiencyChart = null;
+        var currentFilter = null;
+        var refuelingCurrentPage = 1;
 
         document.addEventListener('DOMContentLoaded', function() {
             // Inicializa a página
@@ -660,11 +673,7 @@ $total_paginas = $resultado['total_paginas'];
             // Configura filtros
             setupFilters();
 
-            // Garante que o filtro está no mês atual e carrega o resumo
-            const today = new Date();
-            const defaultDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-            document.getElementById('filterMonth').value = defaultDate;
-            currentFilter = defaultDate;
+            // Carrega o resumo (API utiliza o mês atual como padrão)
             loadRefuelingSummary();
         });
         
@@ -674,6 +683,9 @@ $total_paginas = $resultado['total_paginas'];
             
             // Load summary data
             loadRefuelingSummary();
+
+            // Load filter options
+            loadFilterOptions();
             
             // Load chart data
             loadConsumptionChart().then(() => {
@@ -688,25 +700,56 @@ $total_paginas = $resultado['total_paginas'];
             
             // Setup search
             const searchInput = document.getElementById('searchRefueling');
+            if (searchInput) {
             searchInput.addEventListener('input', debounce(() => {
-                loadRefuelingData();
+                    loadRefuelingData(1);
             }, 300));
+
+                searchInput.addEventListener('keydown', event => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault();
+                        loadRefuelingData(1);
+                    }
+                });
+            }
             
             // Setup table buttons
             setupTableButtons();
         }
         
-        function loadRefuelingData() {
-            // Obtém valores dos filtros
-            const search = document.getElementById('searchRefueling').value;
-            const currentPage = new URLSearchParams(window.location.search).get('page') || 1;
-            const vehicleFilter = document.getElementById('vehicleFilter').value;
-            const driverFilter = document.getElementById('driverFilter').value;
-            const fuelFilter = document.getElementById('fuelFilter').value;
-            const paymentFilter = document.getElementById('paymentFilter').value;
+        function loadRefuelingData(page = null) {
+            if (page !== null) {
+                const parsedPage = parseInt(page, 10);
+                refuelingCurrentPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
+            } else {
+                const urlParamsCheck = new URLSearchParams(window.location.search);
+                const urlPage = parseInt(urlParamsCheck.get('page'), 10);
+                if (!Number.isNaN(urlPage) && urlPage > 0) {
+                    refuelingCurrentPage = urlPage;
+                }
+            }
+
+            const urlParams = new URLSearchParams(window.location.search);
+            if (parseInt(urlParams.get('page'), 10) !== refuelingCurrentPage) {
+                urlParams.set('page', refuelingCurrentPage);
+                const queryString = urlParams.toString();
+                const newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}`;
+                window.history.replaceState({}, '', newUrl);
+            }
+
+            const searchInput = document.getElementById('searchRefueling');
+            const vehicleSelect = document.getElementById('vehicleFilter');
+            const driverSelect = document.getElementById('driverFilter');
+            const fuelSelect = document.getElementById('fuelFilter');
+            const paymentSelect = document.getElementById('paymentFilter');
+
+            const search = searchInput ? searchInput.value.trim() : '';
+            const vehicleFilter = vehicleSelect ? vehicleSelect.value : '';
+            const driverFilter = driverSelect ? driverSelect.value : '';
+            const fuelFilter = fuelSelect ? fuelSelect.value : '';
+            const paymentFilter = paymentSelect ? paymentSelect.value : '';
             
-            // Constrói URL com filtros e paginação
-            let url = `../api/refuel_data.php?action=list&page=${currentPage}&limit=5`;
+            let url = `../api/refuel_data.php?action=list&page=${refuelingCurrentPage}&limit=5`;
             if (search) url += `&search=${encodeURIComponent(search)}`;
             if (currentFilter) {
                 const [year, month] = currentFilter.split('-');
@@ -717,20 +760,33 @@ $total_paginas = $resultado['total_paginas'];
             if (fuelFilter) url += `&combustivel=${encodeURIComponent(fuelFilter)}`;
             if (paymentFilter) url += `&pagamento=${encodeURIComponent(paymentFilter)}`;
             
-            // Carrega dados dos abastecimentos
-            fetch(url)
-                .then(response => response.json())
+            fetch(url, { credentials: 'include' })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.success) {
                         updateRefuelingsTable(data.data);
-                        updatePagination(data.pagination);
+                        if (data.pagination) {
+                            refuelingCurrentPage = data.pagination.page || refuelingCurrentPage;
+                            updatePagination(data.pagination);
+                            const updatedParams = new URLSearchParams(window.location.search);
+                            if (parseInt(updatedParams.get('page'), 10) !== refuelingCurrentPage) {
+                                updatedParams.set('page', refuelingCurrentPage);
+                                const newQuery = updatedParams.toString();
+                                const newLocation = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`;
+                                window.history.replaceState({}, '', newLocation);
+                            }
+                        }
                     } else {
                         throw new Error(data.error || 'Erro ao carregar dados dos abastecimentos');
                     }
                 })
                 .catch(error => {
-                    console.error('Error loading refueling data:', error);
-                    alert('Erro ao carregar dados dos abastecimentos: ' + error.message);
+                    console.error('Erro ao carregar dados dos abastecimentos:', error);
                 });
         }
         
@@ -796,6 +852,14 @@ $total_paginas = $resultado['total_paginas'];
         }
         
         function updatePagination(pagination) {
+            if (!pagination) {
+                return;
+            }
+
+            const totalPages = Math.max(1, pagination.totalPages || 1);
+            const current = Math.min(Math.max(1, pagination.page || 1), totalPages);
+            refuelingCurrentPage = current;
+
             const paginationContainer = document.querySelector('.pagination');
             if (!paginationContainer) return;
             
@@ -803,16 +867,34 @@ $total_paginas = $resultado['total_paginas'];
             const nextBtn = paginationContainer.querySelector('a:last-child');
             const paginationInfo = paginationContainer.querySelector('.pagination-info');
             
-            // Atualiza informações da página
-            paginationInfo.textContent = `Página ${pagination.page} de ${pagination.totalPages}`;
+            if (paginationInfo) {
+                paginationInfo.textContent = `Página ${current} de ${totalPages}`;
+            }
             
-            // Atualiza estado dos botões
-            prevBtn.classList.toggle('disabled', pagination.page <= 1);
-            nextBtn.classList.toggle('disabled', pagination.page >= pagination.totalPages);
+            const prevPage = Math.max(1, current - 1);
+            const nextPageValue = Math.min(totalPages, current + 1);
             
-            // Atualiza URLs dos botões
-            prevBtn.href = `?page=${Math.max(1, pagination.page - 1)}`;
-            nextBtn.href = `?page=${Math.min(pagination.totalPages, pagination.page + 1)}`;
+            if (prevBtn) {
+                const isDisabled = current <= 1;
+                prevBtn.classList.toggle('disabled', isDisabled);
+                prevBtn.href = `?page=${prevPage}`;
+                prevBtn.onclick = function(event) {
+                    event.preventDefault();
+                    if (isDisabled) return;
+                    loadRefuelingData(prevPage);
+                };
+            }
+            
+            if (nextBtn) {
+                const isDisabled = current >= totalPages;
+                nextBtn.classList.toggle('disabled', isDisabled);
+                nextBtn.href = `?page=${nextPageValue}`;
+                nextBtn.onclick = function(event) {
+                    event.preventDefault();
+                    if (isDisabled) return;
+                    loadRefuelingData(nextPageValue);
+                };
+            }
         }
         
         function loadRefuelingSummary() {
@@ -835,6 +917,54 @@ $total_paginas = $resultado['total_paginas'];
                 })
                 .catch(error => {
                     console.error('Error loading refueling summary:', error);
+                });
+        }
+
+        function loadFilterOptions() {
+            fetch('../api/refuel_data.php?action=filter_options', { credentials: 'include' })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (!data.success || !data.data) return;
+
+                    const { vehicles = [], drivers = [] } = data.data;
+
+                    const vehicleFilter = document.getElementById('vehicleFilter');
+                    if (vehicleFilter) {
+                        const currentValue = vehicleFilter.value;
+                        vehicleFilter.innerHTML = '<option value=\"\">Todos os veículos</option>';
+                        vehicles.forEach(vehicle => {
+                            const option = document.createElement('option');
+                            option.value = vehicle.id;
+                            option.textContent = vehicle.placa + (vehicle.modelo ? ` - ${vehicle.modelo}` : '');
+                            vehicleFilter.appendChild(option);
+                        });
+                        if (currentValue) {
+                            vehicleFilter.value = currentValue;
+                        }
+                    }
+
+                    const driverFilter = document.getElementById('driverFilter');
+                    if (driverFilter) {
+                        const currentValue = driverFilter.value;
+                        driverFilter.innerHTML = '<option value=\"\">Todos os motoristas</option>';
+                        drivers.forEach(driver => {
+                            const option = document.createElement('option');
+                            option.value = driver.id;
+                            option.textContent = driver.nome;
+                            driverFilter.appendChild(option);
+                        });
+                        if (currentValue) {
+                            driverFilter.value = currentValue;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar opções de filtro:', error);
                 });
         }
 
@@ -1233,18 +1363,19 @@ $total_paginas = $resultado['total_paginas'];
         }
 
         function setupFilters() {
-            // Set default value to current month/year
-            const today = new Date();
-            const defaultDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-            document.getElementById('filterMonth').value = defaultDate;
-            currentFilter = defaultDate;
+            const filterMonthInput = document.getElementById('filterMonth');
+            if (filterMonthInput) {
+                filterMonthInput.value = '';
+            }
+            currentFilter = null;
             updateFilterButtonState();
 
             // Setup filter modal buttons
             document.getElementById('applyFilterBtn').addEventListener('click', () => {
                 const filterMonth = document.getElementById('filterMonth').value;
                 currentFilter = filterMonth;
-                loadRefuelingData();
+                refuelingCurrentPage = 1;
+                loadRefuelingData(1);
                 loadRefuelingSummary();
                 loadConsumptionChart();
                 loadEfficiencyChart();
@@ -1255,7 +1386,8 @@ $total_paginas = $resultado['total_paginas'];
             document.getElementById('clearFilterBtn').addEventListener('click', () => {
                 document.getElementById('filterMonth').value = '';
                 currentFilter = null;
-                loadRefuelingData();
+                refuelingCurrentPage = 1;
+                loadRefuelingData(1);
                 loadRefuelingSummary();
                 loadConsumptionChart();
                 loadEfficiencyChart();
@@ -1464,26 +1596,31 @@ $total_paginas = $resultado['total_paginas'];
     
     .search-box {
         position: relative;
-        width: 200px;
+        flex: 1;
+        max-width: 360px;
+        min-width: 240px;
     }
     
     .search-box input {
         width: 100%;
-        padding: 6px 12px 6px 30px;
+        padding: 6px 40px 6px 12px;
         border-radius: 4px;
         border: 1px solid var(--border-color);
         background-color: var(--bg-tertiary);
         color: var(--text-primary);
         font-size: 0.875rem;
+        box-sizing: border-box;
     }
     
     .search-box i {
         position: absolute;
-        left: 10px;
+        right: 10px;
+        left: auto;
         top: 50%;
         transform: translateY(-50%);
         color: var(--text-secondary);
         font-size: 0.875rem;
+        pointer-events: none;
     }
     
     .pagination {

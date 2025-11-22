@@ -48,6 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 let currentPage = 1;
 let totalPages = 1;
+let searchDebounceTimer = null;
 
 function initializePage() {
     // Get current page from URL or use default
@@ -151,6 +152,17 @@ function setupFilters() {
     const searchInput = document.getElementById('searchRoute');
     if (searchInput) {
         searchInput.addEventListener('input', handleSearch);
+        searchInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                if (searchDebounceTimer) {
+                    clearTimeout(searchDebounceTimer);
+                    searchDebounceTimer = null;
+                }
+                currentPage = 1;
+                loadRouteData(1);
+            }
+        });
     }
     
     // Status filter
@@ -170,16 +182,48 @@ function setupFilters() {
     if (dateFilter) {
         dateFilter.addEventListener('change', handleFilters);
     }
+
+    const applyFiltersBtn = document.getElementById('applyRouteFilters');
+    if (applyFiltersBtn) {
+        applyFiltersBtn.addEventListener('click', () => {
+            currentPage = 1;
+            loadRouteData(1);
+        });
+    }
+
+    const clearFiltersBtn = document.getElementById('clearRouteFilters');
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+
+            if (statusFilter) statusFilter.value = '';
+            if (driverFilter) driverFilter.value = '';
+
+            const vehicleFilter = document.getElementById('vehicleFilter');
+            if (vehicleFilter) vehicleFilter.value = '';
+
+            const dateFilterInput = document.getElementById('dateFilter');
+            if (dateFilterInput) dateFilterInput.value = '';
+
+            currentPage = 1;
+            loadRouteData(1);
+        });
+    }
 }
 
 function handleSearch(event) {
-    // Recarrega os dados com o termo de busca
-    loadRouteData(currentPage);
+    if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
+    }
+    searchDebounceTimer = setTimeout(() => {
+        currentPage = 1;
+        loadRouteData(1);
+    }, 300);
 }
 
 function handleFilters() {
-    // Recarrega os dados com os filtros atualizados
-    loadRouteData(currentPage);
+    currentPage = 1;
+    loadRouteData(1);
 }
 
 function loadSelectOptions() {
@@ -737,21 +781,31 @@ function showRouteDetails(routeId) {
 }
 
 function fillRouteDetails(data) {
+    // Função auxiliar para preencher elemento com segurança
+    const setElementText = (id, text) => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.textContent = text;
+        } else {
+            console.warn(`Elemento ${id} não encontrado no DOM`);
+        }
+    };
+    
     // Preenche os detalhes da rota no modal de visualização
-    document.getElementById('routeOriginDestination').textContent = 
-        `${data.cidade_origem_nome || '-'}, ${data.estado_origem || '-'} → ${data.cidade_destino_nome || '-'}, ${data.estado_destino || '-'}`;
+    setElementText('routeOriginDestination', 
+        `${data.cidade_origem_nome || '-'}, ${data.estado_origem || '-'} → ${data.cidade_destino_nome || '-'}, ${data.estado_destino || '-'}`);
     
     // Status da rota baseado no no_prazo
     const statusText = data.no_prazo === '1' ? 'No Prazo' : data.no_prazo === '0' ? 'Atrasado' : '-';
-    document.getElementById('routeStatus').textContent = statusText;
-    document.getElementById('routeDate').textContent = data.data_rota ? formatDate(data.data_rota) : '-';
+    setElementText('routeStatus', statusText);
+    setElementText('routeDate', data.data_rota ? formatDate(data.data_rota) : '-');
     
     // Informações gerais
-    document.getElementById('detailDriver').textContent = data.motorista_nome || '-';
-    document.getElementById('detailVehicle').textContent = data.veiculo_placa && data.veiculo_modelo ? 
-        `${data.veiculo_placa} (${data.veiculo_modelo})` : data.veiculo_placa || '-';
-    document.getElementById('detailDistance').textContent = data.distancia_km ? 
-        `${parseFloat(data.distancia_km).toFixed(2)} km` : '-';
+    setElementText('detailDriver', data.motorista_nome || '-');
+    setElementText('detailVehicle', data.veiculo_placa && data.veiculo_modelo ? 
+        `${data.veiculo_placa} (${data.veiculo_modelo})` : data.veiculo_placa || '-');
+    setElementText('detailDistance', data.distancia_km ? 
+        `${parseFloat(data.distancia_km).toFixed(2)} km` : '-');
     
     // Consumo de Combustível
     const fuelElement = document.getElementById('detailFuelConsumption');
@@ -767,10 +821,8 @@ function fillRouteDetails(data) {
     }
     
     // Formatação de datas
-    document.getElementById('detailStartTime').textContent = data.data_saida ? 
-        formatDateTime(data.data_saida) : '-';
-    document.getElementById('detailEndTime').textContent = data.data_chegada ? 
-        formatDateTime(data.data_chegada) : '-';
+    setElementText('detailStartTime', data.data_saida ? formatDateTime(data.data_saida) : '-');
+    setElementText('detailEndTime', data.data_chegada ? formatDateTime(data.data_chegada) : '-');
     
     // Calcula duração se houver data de início e fim
     if (data.data_saida && data.data_chegada) {
@@ -779,9 +831,9 @@ function fillRouteDetails(data) {
         const duracao = Math.abs(fim - inicio);
         const horas = Math.floor(duracao / (1000 * 60 * 60));
         const minutos = Math.floor((duracao % (1000 * 60 * 60)) / (1000 * 60));
-        document.getElementById('detailDuration').textContent = `${horas}h ${minutos}min`;
+        setElementText('detailDuration', `${horas}h ${minutos}min`);
     } else {
-        document.getElementById('detailDuration').textContent = '-';
+        setElementText('detailDuration', '-');
     }
     
     // Endereços
@@ -795,15 +847,14 @@ function fillRouteDetails(data) {
         data.estado_destino
     ].filter(Boolean).join(', ') || '-';
     
-    document.getElementById('detailOriginAddress').textContent = enderecoOrigem;
-    document.getElementById('detailDestinationAddress').textContent = enderecoDestino;
+    setElementText('detailOriginAddress', enderecoOrigem);
+    setElementText('detailDestinationAddress', enderecoDestino);
     
     // Informações da Carga
-    document.getElementById('detailCargoDescription').textContent = data.descricao_carga || '-';
-    document.getElementById('detailCargoWeight').textContent = data.peso_carga ? 
-        `${parseFloat(data.peso_carga).toFixed(2)} kg` : '-';
-    document.getElementById('detailCustomer').textContent = data.cliente || '-';
-    document.getElementById('detailCustomerContact').textContent = data.cliente_contato || '-';
+    setElementText('detailCargoDescription', data.descricao_carga || '-');
+    setElementText('detailCargoWeight', data.peso_carga ? `${parseFloat(data.peso_carga).toFixed(2)} kg` : '-');
+    setElementText('detailCustomer', data.cliente || '-');
+    setElementText('detailCustomerContact', data.cliente_contato || '-');
     
     // Informações Financeiras (cards antigos removidos - agora usa Análise de Lucratividade)
     
@@ -814,7 +865,7 @@ function fillRouteDetails(data) {
     }
     
     // Observações
-    document.getElementById('detailNotes').textContent = data.observacoes || 'Nenhuma observação registrada';
+    setElementText('detailNotes', data.observacoes || 'Nenhuma observação registrada');
 }
 
 function formatDateTime(dateString) {
@@ -954,7 +1005,7 @@ function showExpensesModal(routeId) {
 function fillExpensesForm(expenses) {
     // Preenche cada campo com o valor existente ou deixa vazio
     const fields = [
-        'arla', 'pedagios', 'caixinha', 'estacionamento',
+        'descarga', 'pedagios', 'caixinha', 'estacionamento',
         'lavagem', 'borracharia', 'eletrica_mecanica', 'adiantamento'
     ];
     
@@ -969,7 +1020,7 @@ function fillExpensesForm(expenses) {
 
 function setupExpensesCalculations() {
     const expenseInputs = [
-        'arla', 'pedagios', 'caixinha', 'estacionamento',
+        'descarga', 'pedagios', 'caixinha', 'estacionamento',
         'lavagem', 'borracharia', 'eletrica_mecanica', 'adiantamento'
     ];
     
@@ -986,7 +1037,7 @@ function setupExpensesCalculations() {
 
 function calculateTotalExpenses() {
     const expenseInputs = [
-        'arla', 'pedagios', 'caixinha', 'estacionamento',
+        'descarga', 'pedagios', 'caixinha', 'estacionamento',
         'lavagem', 'borracharia', 'eletrica_mecanica', 'adiantamento'
     ];
     

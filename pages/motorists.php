@@ -18,6 +18,106 @@ if(!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true){
 
 // Set page title
 $page_title = "Motoristas";
+
+// Load motorists for listing and metrics
+$conn = getConnection();
+$empresa_id = $_SESSION['empresa_id'];
+
+$stmt = $conn->prepare("
+    SELECT 
+        m.id,
+        m.nome,
+        m.cpf,
+        m.telefone,
+        m.email,
+        m.cnh,
+        m.porcentagem_comissao,
+        d.nome AS disponibilidade_nome,
+        c.nome AS categoria_cnh_nome
+    FROM motoristas m
+    LEFT JOIN disponibilidades d ON m.disponibilidade_id = d.id
+    LEFT JOIN categorias_cnh c ON m.categoria_cnh_id = c.id
+    WHERE m.empresa_id = :empresa_id
+    ORDER BY m.nome ASC
+");
+$stmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+$stmt->execute();
+$motoristas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$total_motoristas = count($motoristas);
+$motoristas_disponiveis = 0;
+$motoristas_indisponiveis = 0;
+$soma_comissoes = 0.0;
+
+foreach ($motoristas as $motorista) {
+    $status = strtolower(iconv('UTF-8', 'ASCII//TRANSLIT', $motorista['disponibilidade_nome'] ?? ''));
+    if (in_array($status, ['ativo', 'disponivel', 'disponivel', 'em-operacao'], true)) {
+        $motoristas_disponiveis++;
+    } else {
+        $motoristas_indisponiveis++;
+    }
+
+    if (isset($motorista['porcentagem_comissao'])) {
+        $soma_comissoes += (float) $motorista['porcentagem_comissao'];
+    }
+}
+
+$media_comissao = $total_motoristas > 0 ? $soma_comissoes / $total_motoristas : 0.0;
+
+// Helper functions
+if (!function_exists('normalize_status_class')) {
+    function normalize_status_class(?string $value): string
+    {
+        if (!$value) {
+            return '';
+        }
+
+        $slug = iconv('UTF-8', 'ASCII//TRANSLIT', $value);
+        $slug = strtolower($slug);
+        $slug = preg_replace('/[^a-z0-9]+/', '-', $slug);
+        return trim($slug, '-');
+    }
+}
+
+if (!function_exists('format_phone_br')) {
+    function format_phone_br(?string $phone): string
+    {
+        if (!$phone) {
+            return '-';
+        }
+
+        $digits = preg_replace('/\D+/', '', $phone);
+        if (strlen($digits) === 11) {
+            return sprintf('(%s) %s-%s', substr($digits, 0, 2), substr($digits, 2, 5), substr($digits, 7));
+        }
+        if (strlen($digits) === 10) {
+            return sprintf('(%s) %s-%s', substr($digits, 0, 2), substr($digits, 2, 4), substr($digits, 6));
+        }
+
+        return $phone;
+    }
+}
+
+if (!function_exists('format_cpf_br')) {
+    function format_cpf_br(?string $cpf): string
+    {
+        if (!$cpf) {
+            return '-';
+        }
+
+        $digits = preg_replace('/\D+/', '', $cpf);
+        if (strlen($digits) !== 11) {
+            return $cpf;
+        }
+
+        return sprintf('%s.%s.%s-%s',
+            substr($digits, 0, 3),
+            substr($digits, 3, 3),
+            substr($digits, 6, 3),
+            substr($digits, 9, 2)
+        );
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -1220,7 +1320,7 @@ $page_title = "Motoristas";
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="totalMotorists">0</span>
+                                <span class="metric-value" id="totalMotorists"><?php echo $total_motoristas; ?></span>
                                 <span class="metric-subtitle">Motoristas cadastrados</span>
                             </div>
                         </div>
@@ -1232,7 +1332,7 @@ $page_title = "Motoristas";
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="activeMotorists">0</span>
+                                <span class="metric-value" id="activeMotorists"><?php echo $motoristas_disponiveis; ?></span>
                                 <span class="metric-subtitle">Em serviço</span>
                             </div>
                         </div>
@@ -1244,8 +1344,8 @@ $page_title = "Motoristas";
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="totalTrips">-</span>
-                                <span class="metric-subtitle">Distribuição por disponibilidade</span>
+                                <span class="metric-value" id="totalTrips"><?php echo $motoristas_indisponiveis; ?></span>
+                                <span class="metric-subtitle">Motoristas indisponíveis</span>
                             </div>
                         </div>
                     </div>
@@ -1256,8 +1356,8 @@ $page_title = "Motoristas";
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="averageRating">-</span>
-                                <span class="metric-subtitle">Total pago no mês</span>
+                                <span class="metric-value" id="averageRating"><?php echo number_format($media_comissao, 2, ',', '.'); ?>%</span>
+                                <span class="metric-subtitle">Média de comissão configurada</span>
                             </div>
                         </div>
                     </div>
@@ -1273,11 +1373,18 @@ $page_title = "Motoristas";
                     <div class="filter-options">
                         <select id="statusFilter">
                             <option value="">Todos os status</option>
-                            <option value="Ativo">Ativo</option>
-                            <option value="Férias">Férias</option>
-                            <option value="Licença">Licença</option>
-                            <option value="Inativo">Inativo</option>
+                            <option value="1">Ativo</option>
+                            <option value="2">Férias</option>
+                            <option value="3">Licença</option>
+                            <option value="4">Inativo</option>
+                            <option value="5">Afastado</option>
                         </select>
+                        <button type="button" class="btn-restore-layout" id="applyMotoristFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearMotoristFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
                     </div>
                 </div>
                 
@@ -1298,7 +1405,40 @@ $page_title = "Motoristas";
                             </tr>
                         </thead>
                         <tbody>
-                            <!-- Dados serão carregados via JavaScript -->
+                            <?php if (!empty($motoristas)): ?>
+                                <?php foreach ($motoristas as $motorista): ?>
+                                    <?php
+                                        $statusNome = $motorista['disponibilidade_nome'] ?? 'Indefinido';
+                                        $statusClass = normalize_status_class($statusNome);
+                                        $comissaoDisplay = isset($motorista['porcentagem_comissao'])
+                                            ? number_format((float) $motorista['porcentagem_comissao'], 2, ',', '.') . '%'
+                                            : '-';
+                                    ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($motorista['nome']); ?></td>
+                                        <td><?php echo htmlspecialchars(format_cpf_br($motorista['cpf'] ?? '')); ?></td>
+                                        <td><?php echo htmlspecialchars($motorista['cnh'] ?? '-'); ?></td>
+                                        <td><?php echo htmlspecialchars($motorista['categoria_cnh_nome'] ?? '-'); ?></td>
+                                        <td><?php echo htmlspecialchars(format_phone_br($motorista['telefone'] ?? '')); ?></td>
+                                        <td><?php echo htmlspecialchars($motorista['email'] ?? '-'); ?></td>
+                                        <td>
+                                            <span class="status-badge <?php echo $statusClass ? 'status-' . $statusClass : ''; ?>">
+                                                <?php echo htmlspecialchars($statusNome ?: 'Indefinido'); ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($comissaoDisplay); ?></td>
+                                        <td class="actions">
+                                            <button class="btn-icon view-btn" data-id="<?php echo (int) $motorista['id']; ?>" title="Ver detalhes">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr class="no-data-row">
+                                    <td colspan="9" class="text-center">Nenhum motorista encontrado</td>
+                                </tr>
+                            <?php endif; ?>
                         </tbody>
                     </table>
                 </div>

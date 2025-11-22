@@ -228,6 +228,12 @@ $total_paginas = $resultado['total_paginas'];
                             <option value="">Todas as formas de pagamento</option>
                             <!-- Será preenchido via JavaScript -->
                         </select>
+                        <button type="button" class="btn-restore-layout" id="applyFixedExpenseFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearFixedExpenseFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
                     </div>
                 </div>
                 

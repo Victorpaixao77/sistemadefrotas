@@ -56,6 +56,29 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
     $base_path = '';
 }
 ?>
+<script>
+// Apply saved theme preference as early as possible to avoid flicker
+(function() {
+    try {
+        const savedTheme = localStorage.getItem('theme');
+        const isLight = savedTheme === 'light';
+        const root = document.documentElement;
+        if (isLight) {
+            root.classList.add('light-theme');
+            if (document.body) {
+                document.body.classList.add('light-theme');
+            }
+        } else {
+            root.classList.remove('light-theme');
+            if (document.body) {
+                document.body.classList.remove('light-theme');
+            }
+        }
+    } catch (error) {
+        console.warn('Não foi possível aplicar a preferência de tema antes do carregamento:', error);
+    }
+})();
+</script>
 <!-- Sidebar Navigation -->
 <div class="sidebar">
     <div class="sidebar-header">
@@ -204,6 +227,11 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                         <li>
                             <a href="/sistema-frotas/pages/multas.php">
                                 <i class="fas fa-ticket-alt"></i> Multas
+                            </a>
+                        </li>
+                        <li>
+                            <a href="/sistema-frotas/pages/comissoes.php">
+                                <i class="fas fa-wallet"></i> Comissão
                             </a>
                         </li>
                     </ul>

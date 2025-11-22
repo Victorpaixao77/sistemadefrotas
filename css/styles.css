@@ -739,7 +739,8 @@ button {
     gap: 8px;
 }
 
-.view-controls button {
+.view-controls button,
+.view-controls a.btn-restore-layout {
     color: var(--text-secondary);
     width: 36px;
     height: 36px;
@@ -749,9 +750,103 @@ button {
     justify-content: center;
 }
 
-.view-controls button:hover {
+.view-controls button:hover,
+.view-controls a.btn-restore-layout:hover {
     background-color: var(--bg-tertiary);
     color: var(--text-primary);
+}
+
+.view-controls .btn-restore-layout {
+    text-decoration: none;
+    color: #fff;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.view-controls .btn-restore-layout:hover {
+    color: #fff;
+}
+
+.light-theme .view-controls .btn-restore-layout {
+    color: var(--text-secondary);
+}
+
+.light-theme .view-controls .btn-restore-layout:hover {
+    color: var(--text-primary);
+}
+
+.filter-section {
+    margin: 20px 0;
+}
+
+.filter-section .search-box {
+    position: relative;
+    max-width: 320px;
+}
+
+.filter-section .search-box input {
+    width: 100%;
+    padding: 10px 36px 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.filter-section .search-box i {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+}
+
+.filter-options {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.filter-options select {
+    min-width: 180px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    transition: border-color 0.2s ease;
+}
+
+.filter-options select:focus {
+    border-color: var(--accent-primary);
+    outline: none;
+}
+
+.filter-options .btn-restore-layout {
+    border: none;
+    background: none;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+}
+
+.filter-options .btn-restore-layout i {
+    font-size: 1rem;
+}
+
+.filter-options .btn-restore-layout:hover {
+    color: var(--accent-primary);
+}
+
+.light-theme .filter-options .btn-restore-layout {
+    color: var(--text-secondary);
+}
+
+.light-theme .filter-options .btn-restore-layout:hover {
+    color: var(--accent-primary);
 }
 
 /* Dashboard Grid */

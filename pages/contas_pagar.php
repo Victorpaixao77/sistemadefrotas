@@ -291,8 +291,11 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         
                         <input type="month" id="mesFilter" placeholder="Filtrar por mês">
                         
-                        <button id="applyFilters" class="btn-secondary">
-                            <i class="fas fa-filter"></i> Filtrar
+                        <button type="button" class="btn-restore-layout" id="applyAccountsFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearAccountsFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
                         </button>
                     </div>
                 </div>
@@ -662,12 +665,48 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
         function setupFilters() {
             console.log('Iniciando setupFilters');
             
+            const searchInput = document.getElementById('searchConta');
+            const statusFilterSelect = document.getElementById('statusFilter');
+            const categoriaFilterSelect = document.getElementById('categoriaFilter');
+            const mesFilter = document.getElementById('mesFilter');
+            const applyFiltersTopBtn = document.getElementById('applyAccountsFilters');
+            const clearFiltersTopBtn = document.getElementById('clearAccountsFilters');
+
+            if (searchInput) {
+                searchInput.addEventListener('input', filterContas);
+            }
+
+            if (statusFilterSelect) {
+                statusFilterSelect.addEventListener('change', filterContas);
+            }
+
+            if (categoriaFilterSelect) {
+                categoriaFilterSelect.addEventListener('change', filterContas);
+            }
+
+            if (mesFilter) {
+                mesFilter.addEventListener('change', filterContas);
+            }
+
+            if (applyFiltersTopBtn) {
+                applyFiltersTopBtn.addEventListener('click', filterContas);
+            }
+
+            if (clearFiltersTopBtn) {
+                clearFiltersTopBtn.addEventListener('click', () => {
+                    if (searchInput) searchInput.value = '';
+                    if (statusFilterSelect) statusFilterSelect.value = '';
+                    if (categoriaFilterSelect) categoriaFilterSelect.value = '';
+                    if (mesFilter) mesFilter.value = '';
+                    filterContas();
+                });
+            }
+
             const filterBtn = document.getElementById('filterBtn');
             const filterModal = document.getElementById('filterModal');
             const closeFilterBtn = document.getElementById('closeFilterBtn');
             const applyFiltersBtn = document.getElementById('applyFiltersBtn');
             const clearFiltersBtn = document.getElementById('clearFiltersBtn');
-            const mesFilter = document.getElementById('mesFilter');
 
             if (!filterBtn || !filterModal || !closeFilterBtn || !applyFiltersBtn || !clearFiltersBtn || !mesFilter) {
                 console.error('Elementos do modal de filtro não encontrados:', {
@@ -777,10 +816,15 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
         
         function filterContas() {
-            const searchText = document.getElementById('searchConta').value.toLowerCase();
-            const statusFilter = document.getElementById('statusFilter').value;
-            const categoriaFilter = document.getElementById('categoriaFilter').value;
-            const mesFilter = document.getElementById('mesFilter').value;
+            const searchInput = document.getElementById('searchConta');
+            const statusSelect = document.getElementById('statusFilter');
+            const categoriaSelect = document.getElementById('categoriaFilter');
+            const mesInput = document.getElementById('mesFilter');
+
+            const searchText = searchInput ? searchInput.value.toLowerCase() : '';
+            const statusFilter = statusSelect ? statusSelect.value : '';
+            const categoriaFilter = categoriaSelect ? categoriaSelect.value : '';
+            const mesFilter = mesInput ? mesInput.value : '';
             
             const tableRows = document.querySelectorAll('#contasTable tbody tr');
             

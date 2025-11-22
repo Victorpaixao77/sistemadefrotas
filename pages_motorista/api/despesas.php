@@ -46,7 +46,7 @@ try {
     $dados = [
         'empresa_id' => $empresa_id,
         'rota_id' => $rota_id,
-        'arla' => $_POST['arla'] ?: 0,
+        'descarga' => $_POST['descarga'] ?: 0,
         'pedagios' => $_POST['pedagios'] ?: 0,
         'caixinha' => $_POST['caixinha'] ?: 0,
         'estacionamento' => $_POST['estacionamento'] ?: 0,
@@ -62,11 +62,11 @@ try {
     if ($action === 'create') {
         // Inserir despesas
         $sql = "INSERT INTO despesas_viagem (
-                    empresa_id, rota_id, arla, pedagios, caixinha,
+                    empresa_id, rota_id, descarga, pedagios, caixinha,
                     estacionamento, lavagem, borracharia, eletrica_mecanica,
                     adiantamento, total_despviagem, status, fonte
                 ) VALUES (
-                    :empresa_id, :rota_id, :arla, :pedagios, :caixinha,
+                    :empresa_id, :rota_id, :descarga, :pedagios, :caixinha,
                     :estacionamento, :lavagem, :borracharia, :eletrica_mecanica,
                     :adiantamento, :total_despviagem, :status, :fonte
                 )";
@@ -78,7 +78,7 @@ try {
     } else {
         // Atualizar despesas
         $sql = "UPDATE despesas_viagem SET
-                    arla = :arla,
+                    descarga = :descarga,
                     pedagios = :pedagios,
                     caixinha = :caixinha,
                     estacionamento = :estacionamento,

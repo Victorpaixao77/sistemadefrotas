@@ -209,8 +209,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 </div>
                 <div class="filter-section">
                     <div class="search-box">
-                        <input type="date" id="filterDataRota" placeholder="Data da Rota">
-                        <select id="filterVeiculo">
+                        <input type="text" id="searchFuelDriver" placeholder="Buscar por motorista, veículo ou posto...">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <div class="filter-options">
+                        <input type="date" id="filterDataRota" title="Data da rota">
+                        <select id="filterVeiculo" title="Veículo">
                             <option value="">Todos os veículos</option>
                             <?php
                             $conn = getConnection();
@@ -222,21 +226,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             }
                             ?>
                         </select>
-                        <select id="filterRota">
+                        <select id="filterRota" title="Rota">
                             <option value="">Todas as rotas</option>
                         </select>
-                        <button id="btnFiltrar" class="btn-primary">Filtrar</button>
-                    </div>
-                    <div class="filter-options">
-                        <select id="statusFilter">
+                        <select id="statusFilter" title="Status">
                             <option value="">Todos os status</option>
                             <option value="pendente">Pendentes</option>
                             <option value="aprovado">Aprovados</option>
                             <option value="rejeitado">Rejeitados</option>
                         </select>
-                        <select id="driverFilter">
+                        <select id="driverFilter" title="Motorista">
                             <option value="">Todos os motoristas</option>
                         </select>
+                        <button type="button" class="btn-restore-layout" id="applyRefuelDriverFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearRefuelDriverFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
                     </div>
                 </div>
                 <div class="table-container">
@@ -561,6 +568,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         }
                     });
             }
+            const searchInput = document.getElementById('searchFuelDriver');
+            const tableBody = document.querySelector('.data-table tbody');
+
+            function applySearchFilter() {
+                if (!tableBody) return;
+                const term = searchInput ? searchInput.value.trim().toLowerCase() : '';
+                const rows = tableBody.querySelectorAll('tr');
+
+                rows.forEach(row => {
+                    const rowText = row.textContent.toLowerCase();
+                    row.style.display = !term || rowText.includes(term) ? '' : 'none';
+                });
+            }
+
+            if (searchInput) {
+                searchInput.addEventListener('input', applySearchFilter);
+            }
+
             // Eventos para filtro dinâmico
             document.getElementById('filterDataRota').addEventListener('change', function() {
                 const data = this.value;
@@ -597,7 +622,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 }
             });
 
-            document.getElementById('btnFiltrar').addEventListener('click', function() {
+            document.getElementById('applyRefuelDriverFilters').addEventListener('click', function() {
                 const data = document.getElementById('filterDataRota').value;
                 const veiculo = document.getElementById('filterVeiculo').value;
                 const rota = document.getElementById('filterRota').value;
@@ -608,8 +633,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if (veiculo) url += `veiculo_id=${veiculo}&`;
                 if (rota) url += `rota_id=${rota}&`;
                 if (status) url += `status=${status}`;
-                
-                window.location.href = url;
+
+                window.location.href = url.endsWith('?') ? 'abastecimentos_motoristas.php' : url;
+            });
+
+            document.getElementById('clearRefuelDriverFilters').addEventListener('click', function() {
+                const dataInput = document.getElementById('filterDataRota');
+                const veiculoSelect = document.getElementById('filterVeiculo');
+                const rotaSelect = document.getElementById('filterRota');
+                const statusSelect = document.getElementById('statusFilter');
+                const driverSelect = document.getElementById('driverFilter');
+
+                if (searchInput) searchInput.value = '';
+                if (dataInput) dataInput.value = '';
+                if (veiculoSelect) veiculoSelect.value = '';
+                if (rotaSelect) rotaSelect.value = '';
+                if (statusSelect) statusSelect.value = '';
+                if (driverSelect) driverSelect.value = '';
+
+                window.location.href = 'abastecimentos_motoristas.php';
             });
 
             // Adicionar função para carregar rotas

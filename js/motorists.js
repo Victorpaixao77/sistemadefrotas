@@ -181,8 +181,26 @@ function switchTab(tabId) {
 function loadMotorists(page = 1) {
     currentPage = page;
     const limit = 5;
-    
-    fetch(`../api/motorist_data.php?action=list&page=${page}&limit=${limit}`)
+
+    const searchInput = document.getElementById('searchMotorist');
+    const statusFilter = document.getElementById('statusFilter');
+
+    const params = new URLSearchParams();
+    params.append('action', 'list');
+    params.append('page', page);
+    params.append('limit', limit);
+
+    const searchTerm = searchInput ? searchInput.value.trim() : '';
+    if (searchTerm) {
+        params.append('search', searchTerm);
+    }
+
+    const statusValue = statusFilter ? statusFilter.value : '';
+    if (statusValue) {
+        params.append('status', statusValue);
+    }
+
+    fetch(`../api/motorist_data.php?${params.toString()}`)
         .then(response => response.json())
         .then(data => {
             if (!data.success) {
@@ -233,13 +251,27 @@ function loadMotorists(page = 1) {
             // Update pagination
             if (data.pagination) {
                 totalPages = data.pagination.total_pages;
-                document.getElementById('currentPage').textContent = page;
-                document.getElementById('totalPages').textContent = totalPages;
+
+                const currentPageElement = document.getElementById('currentPage');
+                if (currentPageElement) {
+                    currentPageElement.textContent = page;
+                }
+
+                const totalPagesElement = document.getElementById('totalPages');
+                if (totalPagesElement) {
+                    totalPagesElement.textContent = totalPages;
+                }
+
                 updatePaginationButtons();
             }
             
             // Update table
             const tbody = document.querySelector('#motoristsTable tbody');
+            if (!tbody) {
+                console.error('Tabela de motoristas não encontrada');
+                return;
+            }
+
             tbody.innerHTML = '';
             
             data.motorists.forEach(motorist => {
@@ -1016,7 +1048,62 @@ function loadDropdownOptions() {
 }
 
 function setupFilters() {
-    // Implementation of setupFilters function
+    const searchInput = document.getElementById('searchMotorist');
+    const statusFilter = document.getElementById('statusFilter');
+    const applyFiltersBtn = document.getElementById('applyMotoristFilters');
+    const clearFiltersBtn = document.getElementById('clearMotoristFilters');
+
+    let debounceTimer = null;
+    const debounceDelay = 300;
+
+    const triggerFilter = () => {
+        loadMotorists(1);
+    };
+
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            if (debounceTimer) {
+                clearTimeout(debounceTimer);
+            }
+            debounceTimer = setTimeout(triggerFilter, debounceDelay);
+        });
+
+        searchInput.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                if (debounceTimer) {
+                    clearTimeout(debounceTimer);
+                }
+                triggerFilter();
+            }
+        });
+    }
+
+    if (statusFilter) {
+        statusFilter.addEventListener('change', () => {
+            triggerFilter();
+        });
+    }
+
+    if (applyFiltersBtn) {
+        applyFiltersBtn.addEventListener('click', event => {
+            event.preventDefault();
+            triggerFilter();
+        });
+    }
+
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', event => {
+            event.preventDefault();
+            if (searchInput) {
+                searchInput.value = '';
+            }
+            if (statusFilter) {
+                statusFilter.value = '';
+            }
+            triggerFilter();
+        });
+    }
 }
 
 function loadDashboardData() {

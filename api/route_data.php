@@ -74,10 +74,64 @@ try {
             $params = [':empresa_id' => $empresa_id];
             
             if (!empty($_GET['search'])) {
-                $search = '%' . $_GET['search'] . '%';
-                $sql .= " AND (co.nome LIKE :search OR cd.nome LIKE :search OR m.nome LIKE :search)";
-                $count_sql .= " AND (co.nome LIKE :search OR cd.nome LIKE :search OR m.nome LIKE :search)";
-                $params[':search'] = $search;
+                $rawSearch = trim($_GET['search']);
+                $normalizedSearch = function_exists('mb_strtolower')
+                    ? mb_strtolower($rawSearch, 'UTF-8')
+                    : strtolower($rawSearch);
+                $searchConditions = [];
+
+                $searchLike = '%' . $normalizedSearch . '%';
+
+                $params[':search_origin'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(co.nome, "")) LIKE :search_origin';
+
+                $params[':search_destination'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(cd.nome, "")) LIKE :search_destination';
+
+                $params[':search_driver_name'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(m.nome, "")) LIKE :search_driver_name';
+
+                $params[':search_vehicle_plate'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(v.placa, "")) LIKE :search_vehicle_plate';
+
+                $params[':search_vehicle_model'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(v.modelo, "")) LIKE :search_vehicle_model';
+
+                $params[':search_combined_route'] = $searchLike;
+                $searchConditions[] = 'LOWER(CONCAT_WS(" ", COALESCE(co.nome, ""), COALESCE(cd.nome, ""))) LIKE :search_combined_route';
+
+                $rawLike = '%' . $rawSearch . '%';
+                $params[':search_route_id'] = $rawLike;
+                $searchConditions[] = 'CAST(r.id AS CHAR) LIKE :search_route_id';
+
+                $params[':search_driver_cpf_mask'] = $rawLike;
+                $searchConditions[] = 'm.cpf LIKE :search_driver_cpf_mask';
+
+                $params[':search_date_br'] = $rawLike;
+                $searchConditions[] = "DATE_FORMAT(r.data_rota, '%d/%m/%Y') LIKE :search_date_br";
+
+                $params[':search_date_iso'] = $rawLike;
+                $searchConditions[] = "DATE_FORMAT(r.data_rota, '%Y-%m-%d') LIKE :search_date_iso";
+
+                $searchDigits = preg_replace('/\D+/', '', $rawSearch);
+                if ($searchDigits !== '') {
+                    $digitsLike = '%' . $searchDigits . '%';
+
+                    $params[':search_driver_cpf_digits'] = $digitsLike;
+                    $searchConditions[] = "REPLACE(REPLACE(REPLACE(m.cpf, '.', ''), '-', ''), ' ', '') LIKE :search_driver_cpf_digits";
+
+                    $params[':search_plate_digits'] = $digitsLike;
+                    $searchConditions[] = "REPLACE(REPLACE(REPLACE(REPLACE(v.placa, '-', ''), ' ', ''), '.', ''), '/', '') LIKE :search_plate_digits";
+
+                    $params[':search_route_id_digits'] = $digitsLike;
+                    $searchConditions[] = 'CAST(r.id AS CHAR) LIKE :search_route_id_digits';
+                }
+
+                if (!empty($searchConditions)) {
+                    $searchClause = '(' . implode(' OR ', $searchConditions) . ')';
+                    $sql .= " AND $searchClause";
+                    $count_sql .= " AND $searchClause";
+                }
             }
             
             if (!empty($_GET['status'])) {

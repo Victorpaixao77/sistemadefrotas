@@ -229,6 +229,12 @@ $kpis = getMultasKPIs($conn);
                             <option value="pago">Pago</option>
                             <option value="recurso">Recurso</option>
                         </select>
+                        <button type="button" class="btn-restore-layout" id="applyFinesFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearFinesFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
                     </div>
                 </div>
 

@@ -30,6 +30,7 @@ try {
                     a.*,
                     a.titulo as assunto,
                     a.solucao as resposta,
+                    a.matricula_conjunto,
                     COALESCE(c.razao_social, c.nome_razao_social) as cliente_nome,
                     u.nome as usuario_nome,
                     DATE_FORMAT(a.data_abertura, '%d/%m/%Y %H:%i') as data_abertura_fmt,
@@ -59,6 +60,7 @@ try {
                     a.*,
                     a.titulo as assunto,
                     a.solucao as resposta,
+                    a.matricula_conjunto,
                     COALESCE(c.razao_social, c.nome_razao_social, 'Cliente não identificado') as cliente_nome,
                     u.nome as usuario_nome,
                     DATE_FORMAT(a.data_abertura, '%d/%m/%Y %H:%i') as data_abertura_fmt,
@@ -110,6 +112,7 @@ try {
             INSERT INTO seguro_atendimentos (
                 seguro_empresa_id,
                 seguro_cliente_id,
+                matricula_conjunto,
                 usuario_id,
                 tipo,
                 prioridade,
@@ -118,12 +121,13 @@ try {
                 status,
                 protocolo,
                 data_abertura
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'aberto', ?, NOW())
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'aberto', ?, NOW())
         ");
         
         $stmt->execute([
             $empresa_id,
             $data['cliente_id'] ?? null,
+            $data['matricula_conjunto'] ?? null,
             $usuario['id'],
             $data['tipo'] ?? 'suporte',
             $data['prioridade'] ?? 'media',

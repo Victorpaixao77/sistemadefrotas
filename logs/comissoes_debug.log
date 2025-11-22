@@ -1,0 +1,85 @@
+[2025-11-12 00:25:46] [comissoes][resumo]
+SQL: 
+        SELECT
+            COUNT(*) AS total_viagens,
+            COALESCE(SUM(r.comissao), 0) AS total_comissao,
+            COALESCE(SUM(r.frete), 0) AS total_frete,
+            COALESCE(SUM(CASE WHEN cp.status = 'pago' THEN r.comissao ELSE 0 END), 0) AS total_pago,
+            COALESCE(SUM(CASE WHEN cp.status = 'pago' THEN 1 ELSE 0 END), 0) AS viagens_pagas
+        FROM rotas r
+        LEFT JOIN comissoes_pagamentos cp ON cp.rota_id = r.id
+        WHERE r.empresa_id = :empresa_id AND r.comissao > 0 AND r.status = 'aprovado' AND (
+            EXISTS (
+                SELECT 1 FROM motoristas m_busca 
+                WHERE m_busca.id = r.motorista_id 
+                AND LOWER(m_busca.nome) LIKE :search_motorista
+            )
+            OR EXISTS (
+                SELECT 1 FROM veiculos v_busca 
+                WHERE v_busca.id = r.veiculo_id 
+                AND (
+                    LOWER(v_busca.placa) LIKE :search_placa
+                    OR LOWER(COALESCE(v_busca.modelo, '')) LIKE :search_modelo
+                )
+            )
+            OR CAST(r.id AS CHAR) LIKE :search_id
+            OR DATE_FORMAT(r.data_rota, '%d/%m/%Y') LIKE :search_data_completa
+            OR DATE_FORMAT(r.data_rota, '%Y-%m') LIKE :search_data_mes
+            OR CAST(r.frete AS CHAR) LIKE :search_numeric
+            OR CAST(r.comissao AS CHAR) LIKE :search_numeric
+        )
+Parametros: {
+    ":empresa_id": 1,
+    ":search_motorista": "%atm-3588 scania 770%",
+    ":search_placa": "%atm-3588 scania 770%",
+    ":search_modelo": "%atm-3588 scania 770%",
+    ":search_id": "%ATM-3588 Scania 770%",
+    ":search_data_completa": "%ATM-3588 Scania 770%",
+    ":search_data_mes": "%ATM-3588 Scania 770%",
+    ":search_numeric": "%3588770%"
+}
+
+[2025-11-12 00:25:46] [comissoes][resumo_erro]
+SQL: 
+        SELECT
+            COUNT(*) AS total_viagens,
+            COALESCE(SUM(r.comissao), 0) AS total_comissao,
+            COALESCE(SUM(r.frete), 0) AS total_frete,
+            COALESCE(SUM(CASE WHEN cp.status = 'pago' THEN r.comissao ELSE 0 END), 0) AS total_pago,
+            COALESCE(SUM(CASE WHEN cp.status = 'pago' THEN 1 ELSE 0 END), 0) AS viagens_pagas
+        FROM rotas r
+        LEFT JOIN comissoes_pagamentos cp ON cp.rota_id = r.id
+        WHERE r.empresa_id = :empresa_id AND r.comissao > 0 AND r.status = 'aprovado' AND (
+            EXISTS (
+                SELECT 1 FROM motoristas m_busca 
+                WHERE m_busca.id = r.motorista_id 
+                AND LOWER(m_busca.nome) LIKE :search_motorista
+            )
+            OR EXISTS (
+                SELECT 1 FROM veiculos v_busca 
+                WHERE v_busca.id = r.veiculo_id 
+                AND (
+                    LOWER(v_busca.placa) LIKE :search_placa
+                    OR LOWER(COALESCE(v_busca.modelo, '')) LIKE :search_modelo
+                )
+            )
+            OR CAST(r.id AS CHAR) LIKE :search_id
+            OR DATE_FORMAT(r.data_rota, '%d/%m/%Y') LIKE :search_data_completa
+            OR DATE_FORMAT(r.data_rota, '%Y-%m') LIKE :search_data_mes
+            OR CAST(r.frete AS CHAR) LIKE :search_numeric
+            OR CAST(r.comissao AS CHAR) LIKE :search_numeric
+        )
+Parametros: {
+    "mensagem": "SQLSTATE[HY093]: Invalid parameter number",
+    "params": {
+        ":empresa_id": 1,
+        ":search_motorista": "%atm-3588 scania 770%",
+        ":search_placa": "%atm-3588 scania 770%",
+        ":search_modelo": "%atm-3588 scania 770%",
+        ":search_id": "%ATM-3588 Scania 770%",
+        ":search_data_completa": "%ATM-3588 Scania 770%",
+        ":search_data_mes": "%ATM-3588 Scania 770%",
+        ":search_numeric": "%3588770%"
+    }
+}
+

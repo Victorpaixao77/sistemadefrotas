@@ -509,8 +509,11 @@ error_log("Chart Data: " . print_r($chart_data, true));
                             ?>
                         </select>
                         
-                        <button id="applyFilters" class="btn-secondary">
-                            <i class="fas fa-filter"></i> Filtrar
+                        <button type="button" class="btn-restore-layout" id="applyFinancingFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearFinancingFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
                         </button>
                     </div>
                 </div>
@@ -1124,7 +1127,41 @@ error_log("Chart Data: " . print_r($chart_data, true));
         
         function setupFilters() {
             const searchBox = document.getElementById('searchFinanciamento');
-            searchBox.addEventListener('input', filterFinanciamentos);
+            const statusSelect = document.getElementById('statusFilter');
+            const bancoSelect = document.getElementById('bancoFilter');
+            const mesSelect = document.getElementById('mesFilter');
+            const applyFiltersBtn = document.getElementById('applyFinancingFilters');
+            const clearFiltersBtn = document.getElementById('clearFinancingFilters');
+
+            if (searchBox) {
+                searchBox.addEventListener('input', filterFinanciamentos);
+            }
+
+            if (statusSelect) {
+                statusSelect.addEventListener('change', filterFinanciamentos);
+            }
+
+            if (bancoSelect) {
+                bancoSelect.addEventListener('change', filterFinanciamentos);
+            }
+
+            if (mesSelect) {
+                mesSelect.addEventListener('change', filterFinanciamentos);
+            }
+
+            if (applyFiltersBtn) {
+                applyFiltersBtn.addEventListener('click', filterFinanciamentos);
+            }
+
+            if (clearFiltersBtn) {
+                clearFiltersBtn.addEventListener('click', () => {
+                    if (searchBox) searchBox.value = '';
+                    if (statusSelect) statusSelect.value = '';
+                    if (bancoSelect) bancoSelect.value = '';
+                    if (mesSelect) mesSelect.value = '';
+                    filterFinanciamentos();
+                });
+            }
             
             // Add filter button click handler
             document.getElementById('filterBtn').addEventListener('click', function() {
@@ -1157,10 +1194,15 @@ error_log("Chart Data: " . print_r($chart_data, true));
         }
         
         function filterFinanciamentos() {
-            const searchText = document.getElementById('searchFinanciamento').value.toLowerCase();
-            const statusFilter = document.getElementById('statusFilter').value;
-            const bancoFilter = document.getElementById('bancoFilter').value;
-            const mesFilter = document.getElementById('mesFilter').value;
+            const searchInput = document.getElementById('searchFinanciamento');
+            const statusSelect = document.getElementById('statusFilter');
+            const bancoSelect = document.getElementById('bancoFilter');
+            const mesSelect = document.getElementById('mesFilter');
+
+            const searchText = searchInput ? searchInput.value.toLowerCase() : '';
+            const statusFilter = statusSelect ? statusSelect.value : '';
+            const bancoFilter = bancoSelect ? bancoSelect.value : '';
+            const mesFilter = mesSelect ? mesSelect.value : '';
             
             const tableRows = document.querySelectorAll('#financiamentosTable tbody tr');
             

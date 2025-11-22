@@ -401,8 +401,71 @@ function initializeCharts() {
 }
 
 function setupFilters() {
-    // Implementar setup dos filtros
-    console.log('Setting up filters...');
+    const tableBody = document.querySelector('#maintenanceTable tbody');
+    if (!tableBody) {
+        return;
+    }
+
+    const searchInput = document.getElementById('searchMaintenance');
+    const vehicleFilter = document.getElementById('vehicleFilter');
+    const maintenanceTypeFilter = document.getElementById('maintenanceTypeFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    const supplierFilter = document.getElementById('supplierFilter');
+    const applyBtn = document.getElementById('applyMaintenanceFilters');
+    const clearBtn = document.getElementById('clearMaintenanceFilters');
+
+    const applyFilters = () => {
+        const rows = tableBody.querySelectorAll('tr');
+        const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        const selectedVehicle = vehicleFilter ? vehicleFilter.value.toLowerCase() : '';
+        const selectedType = maintenanceTypeFilter ? maintenanceTypeFilter.value.toLowerCase() : '';
+        const selectedStatus = statusFilter ? statusFilter.value.toLowerCase() : '';
+        const selectedSupplier = supplierFilter ? supplierFilter.value.toLowerCase() : '';
+
+        rows.forEach(row => {
+            const rowText = row.textContent.toLowerCase();
+            const vehicleCell = row.querySelector('td:nth-child(2)');
+            const typeCell = row.querySelector('td:nth-child(3)');
+            const supplierCell = row.querySelector('td:nth-child(5)');
+            const statusCell = row.querySelector('td:nth-child(6)');
+
+            const matchesSearch = !searchTerm || rowText.includes(searchTerm);
+            const matchesVehicle = !selectedVehicle || (vehicleCell && vehicleCell.textContent.toLowerCase().includes(selectedVehicle));
+            const matchesType = !selectedType || (typeCell && typeCell.textContent.toLowerCase().includes(selectedType));
+            const matchesSupplier = !selectedSupplier || (supplierCell && supplierCell.textContent.toLowerCase().includes(selectedSupplier));
+            const matchesStatus = !selectedStatus || (statusCell && statusCell.textContent.toLowerCase().includes(selectedStatus));
+
+            row.style.display = (matchesSearch && matchesVehicle && matchesType && matchesSupplier && matchesStatus) ? '' : 'none';
+        });
+    };
+
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(applyFilters, 200));
+    }
+
+    if (vehicleFilter) vehicleFilter.addEventListener('change', applyFilters);
+    if (maintenanceTypeFilter) maintenanceTypeFilter.addEventListener('change', applyFilters);
+    if (statusFilter) statusFilter.addEventListener('change', applyFilters);
+    if (supplierFilter) supplierFilter.addEventListener('change', applyFilters);
+
+    if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+            applyFilters();
+        });
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            if (vehicleFilter) vehicleFilter.value = '';
+            if (maintenanceTypeFilter) maintenanceTypeFilter.value = '';
+            if (statusFilter) statusFilter.value = '';
+            if (supplierFilter) supplierFilter.value = '';
+            applyFilters();
+        });
+    }
+
+    applyFilters();
 }
 
 function loadSuppliers() {

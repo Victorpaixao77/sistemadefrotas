@@ -122,6 +122,12 @@ try {
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" href="contratos.php">
+                    <i class="fas fa-file-contract me-2"></i>
+                    Contratos
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" href="financeiro.php">
                     <i class="fas fa-chart-line me-2"></i>
                     Financeiro

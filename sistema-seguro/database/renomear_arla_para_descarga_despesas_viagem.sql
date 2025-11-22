@@ -1,0 +1,3 @@
+ALTER TABLE despesas_viagem
+CHANGE COLUMN arla descarga DECIMAL(10,2) NULL DEFAULT NULL;
+

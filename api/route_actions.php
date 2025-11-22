@@ -117,7 +117,7 @@ try {
                 if ($checkStmt->rowCount() > 0) {
                     // Update existing expenses
                     $sql = "UPDATE despesas_viagem SET 
-                        arla = :arla, 
+                        descarga = :descarga, 
                         pedagios = :pedagios, 
                         caixinha = :caixinha, 
                         estacionamento = :estacionamento, 
@@ -131,11 +131,11 @@ try {
                 } else {
                     // Insert new expenses
                     $sql = "INSERT INTO despesas_viagem (
-                        rota_id, empresa_id, arla, pedagios, caixinha, 
+                        rota_id, empresa_id, descarga, pedagios, caixinha, 
                         estacionamento, lavagem, borracharia, 
                         eletrica_mecanica, adiantamento
                     ) VALUES (
-                        :rota_id, :empresa_id, :arla, :pedagios, :caixinha, 
+                        :rota_id, :empresa_id, :descarga, :pedagios, :caixinha, 
                         :estacionamento, :lavagem, :borracharia, 
                         :eletrica_mecanica, :adiantamento
                     )";
@@ -146,7 +146,7 @@ try {
                 
                 // Bind parameters for both INSERT and UPDATE
                 $stmt->bindParam(':rota_id', $data['rota_id'], PDO::PARAM_INT);
-                $stmt->bindParam(':arla', $data['arla'], PDO::PARAM_STR);
+                $stmt->bindParam(':descarga', $data['descarga'], PDO::PARAM_STR);
                 $stmt->bindParam(':pedagios', $data['pedagios'], PDO::PARAM_STR);
                 $stmt->bindParam(':caixinha', $data['caixinha'], PDO::PARAM_STR);
                 $stmt->bindParam(':estacionamento', $data['estacionamento'], PDO::PARAM_STR);

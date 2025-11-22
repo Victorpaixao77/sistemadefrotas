@@ -130,6 +130,12 @@ $counts = getDashboardCounts();
                         <select id="vehicleFilter">
                             <option value="">Todos os veículos</option>
                         </select>
+                        <button type="button" class="btn-restore-layout" id="applyRouteFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearRouteFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
                     </div>
                 </div>
                 <div class="table-container">
@@ -570,7 +576,7 @@ $counts = getDashboardCounts();
             // Função para preencher o formulário de despesas
             function fillExpensesForm(despesas) {
                 const fields = [
-                    'arla', 'pedagios', 'caixinha', 'estacionamento', 'lavagem',
+                    'descarga', 'pedagios', 'caixinha', 'estacionamento', 'lavagem',
                     'borracharia', 'eletrica_mecanica', 'adiantamento', 'total_despviagem'
                 ];
                 fields.forEach(f => {
@@ -581,7 +587,7 @@ $counts = getDashboardCounts();
             // Função para calcular o total das despesas
             function calculateTotalExpenses() {
                 const fields = [
-                    'arla', 'pedagios', 'caixinha', 'estacionamento', 'lavagem',
+                    'descarga', 'pedagios', 'caixinha', 'estacionamento', 'lavagem',
                     'borracharia', 'eletrica_mecanica', 'adiantamento'
                 ];
                 let total = 0;
@@ -593,7 +599,7 @@ $counts = getDashboardCounts();
             }
 
             // Listeners para cálculo automático
-            ['arla','pedagios','caixinha','estacionamento','lavagem','borracharia','eletrica_mecanica','adiantamento']
+            ['descarga','pedagios','caixinha','estacionamento','lavagem','borracharia','eletrica_mecanica','adiantamento']
                 .forEach(f => {
                     document.getElementById(f).addEventListener('input', calculateTotalExpenses);
                 });
@@ -833,8 +839,8 @@ $counts = getDashboardCounts();
                     <input type="hidden" id="expenseRouteId" name="rota_id">
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="arla">ARLA</label>
-                            <input type="number" id="arla" name="arla" step="0.01" min="0">
+                            <label for="descarga">Descarga</label>
+                            <input type="number" id="descarga" name="descarga" step="0.01" min="0">
                         </div>
                         <div class="form-group">
                             <label for="pedagios">Pedágios</label>

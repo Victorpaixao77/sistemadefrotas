@@ -135,8 +135,8 @@ $despesa = $stmt->fetch(PDO::FETCH_ASSOC);
                             
                             <div class="form-grid">
                                 <div class="form-group">
-                                    <label for="arla">ARLA (R$)</label>
-                                    <input type="number" id="arla" name="arla" class="form-control" step="0.01" value="<?php echo $despesa['arla'] ?? '0.00'; ?>" onchange="calcularTotal()">
+                                    <label for="descarga">Descarga (R$)</label>
+                                    <input type="number" id="descarga" name="descarga" class="form-control" step="0.01" value="<?php echo $despesa['descarga'] ?? '0.00'; ?>" onchange="calcularTotal()">
                                 </div>
                                 
                                 <div class="form-group">
@@ -207,7 +207,7 @@ $despesa = $stmt->fetch(PDO::FETCH_ASSOC);
     <script>
     function calcularTotal() {
         const campos = [
-            'arla',
+            'descarga',
             'pedagios',
             'caixinha',
             'estacionamento',

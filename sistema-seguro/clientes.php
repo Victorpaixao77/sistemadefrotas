@@ -272,6 +272,12 @@ $empresa_id = obterEmpresaId();
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" href="contratos.php">
+                    <i class="fas fa-file-contract me-2"></i>
+                    Contratos
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" href="financeiro.php">
                     <i class="fas fa-chart-line me-2"></i>
                     Financeiro
@@ -595,15 +601,18 @@ $empresa_id = obterEmpresaId();
                                     <table class="table table-bordered table-hover" id="tabelaContratos">
                                         <thead class="table-light">
                                             <tr>
-                                                <th width="25%">CONJUNTO</th>
-                                                <th width="35%">Placa(s)</th>
-                                                <th width="20%">% Recorrência</th>
-                                                <th width="20%">Ações</th>
+                                                <th width="12%">CONJUNTO</th>
+                                                <th width="20%">Placa(s)</th>
+                                                <th width="10%">% Rec.</th>
+                                                <th width="10%">Data Início</th>
+                                                <th width="12%">Valor Mensal</th>
+                                                <th width="18%">Situação</th>
+                                                <th width="18%">Ações</th>
                                             </tr>
                                         </thead>
                                         <tbody id="listaContratos">
                                             <tr id="semContratos">
-                                                <td colspan="4" class="text-center text-muted">
+                                                <td colspan="7" class="text-center text-muted">
                                                     <i class="fas fa-inbox fa-2x mb-2"></i><br>
                                                     Nenhum contrato cadastrado. Clique em "Adicionar Contrato" para começar.
                                                 </td>
@@ -1223,6 +1232,93 @@ $empresa_id = obterEmpresaId();
                                 <span class="input-group-text">%</span>
                             </div>
                             <small class="text-muted">Porcentagem de comissão para este contrato</small>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="contratoDataInicio" class="form-label">
+                                    Data de Início
+                                </label>
+                                <input type="date" class="form-control" id="contratoDataInicio">
+                                <small class="text-muted">Quando o contrato iniciou</small>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="contratoValor" class="form-label">
+                                    Valor Mensal
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">R$</span>
+                                    <input type="number" class="form-control" id="contratoValor"
+                                           min="0" step="0.01" placeholder="0.00">
+                                </div>
+                                <small class="text-muted">Valor mensal do contrato</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="contratoSituacao" class="form-label">
+                                Situação <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="contratoSituacao" required>
+                                <option value="aguardando_ativacao">Aguardando Ativação</option>
+                                <option value="ativo">Ativo</option>
+                                <option value="aguardando_link">Aguardando Link</option>
+                                <option value="aguardando_vistoria">Aguardando Vistoria</option>
+                                <option value="devolvido_para_unidade">Devolvido para Unidade</option>
+                                <option value="aguardando_assinatura">Aguardando Assinatura</option>
+                                <option value="desistencia">Desistência</option>
+                                <option value="negociar_cliente">Negociar Cliente</option>
+                            </select>
+                            <small class="text-muted">Status atual do contrato</small>
+                        </div>
+                        
+                        <!-- Campos de Controle -->
+                        <div class="mb-3">
+                            <label for="contratoTipoOs" class="form-label">
+                                Tipo de OS
+                            </label>
+                            <select class="form-select" id="contratoTipoOs">
+                                <option value="">Selecione...</option>
+                                <option value="ABRIR OS">ABRIR OS</option>
+                                <option value="TROCA DE TITULARIDADE">TROCA DE TITULARIDADE</option>
+                                <option value="REATIVAÇÃO DE PLACA">REATIVAÇÃO DE PLACA</option>
+                                <option value="PREENCHER TIPO DE OS">PREENCHER TIPO DE OS</option>
+                                <option value="SEM ORDEM">SEM ORDEM</option>
+                            </select>
+                            <small class="text-muted">Tipo de Ordem de Serviço</small>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="contratoEnvioWhatsapp" class="form-label">
+                                    Envio WhatsApp
+                                </label>
+                                <select class="form-select" id="contratoEnvioWhatsapp">
+                                    <option value="nao">Não</option>
+                                    <option value="sim">Sim</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label for="contratoEnvioEmail" class="form-label">
+                                    Envio E-mail
+                                </label>
+                                <select class="form-select" id="contratoEnvioEmail">
+                                    <option value="nao">Não</option>
+                                    <option value="sim">Sim</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label for="contratoPlanilha" class="form-label">
+                                    Planilha
+                                </label>
+                                <select class="form-select" id="contratoPlanilha">
+                                    <option value="nao">Não</option>
+                                    <option value="sim">Sim</option>
+                                </select>
+                            </div>
                         </div>
                         
                         <div class="mb-3">
@@ -2994,9 +3090,36 @@ $empresa_id = obterEmpresaId();
                         const tr = document.createElement('tr');
                         tr.id = 'contrato-' + contrato.id;
                         tr.setAttribute('data-contrato-id', contrato.id);
+                        
+                        // Formatar data
+                        const dataInicio = contrato.data_inicio ? 
+                            new Date(contrato.data_inicio).toLocaleDateString('pt-BR') : '-';
+                        
+                        // Formatar valor
+                        const valor = contrato.valor ? 
+                            'R$ ' + parseFloat(contrato.valor).toFixed(2).replace('.', ',') : '-';
+                        
+                        // Definir badge da situação
+                        const situacoes = {
+                            'aguardando_ativacao': { badge: 'warning', texto: 'Aguardando Ativação' },
+                            'ativo': { badge: 'success', texto: 'Ativo' },
+                            'aguardando_link': { badge: 'info', texto: 'Aguardando Link' },
+                            'aguardando_vistoria': { badge: 'primary', texto: 'Aguardando Vistoria' },
+                            'devolvido_para_unidade': { badge: 'secondary', texto: 'Devolvido' },
+                            'aguardando_assinatura': { badge: 'warning', texto: 'Aguardando Assinatura' },
+                            'desistencia': { badge: 'danger', texto: 'Desistência' },
+                            'negociar_cliente': { badge: 'dark', texto: 'Negociar Cliente' }
+                        };
+                        
+                        const sit = situacoes[contrato.situacao] || { badge: 'secondary', texto: contrato.situacao || 'N/A' };
+                        const badgeSituacao = '<span class="badge bg-' + sit.badge + '">' + sit.texto + '<\/span>';
+                        
                         tr.innerHTML = '<td class="contrato-matricula"><strong>' + contrato.matricula + '</strong><\/td>' +
                             '<td class="contrato-placa">' + (contrato.placa || '-') + '<\/td>' +
                             '<td class="contrato-porcentagem"><span class="badge bg-info">' + parseFloat(contrato.porcentagem_recorrencia).toFixed(2) + '%<\/span><\/td>' +
+                            '<td class="contrato-data-inicio">' + dataInicio + '<\/td>' +
+                            '<td class="contrato-valor"><strong>' + valor + '<\/strong><\/td>' +
+                            '<td class="contrato-situacao">' + badgeSituacao + '<\/td>' +
                             '<td>' +
                                 '<button type="button" class="btn btn-sm btn-warning me-1" onclick="event.stopPropagation(); editarContratoInline(' + contrato.id + '); return false;" title="Editar">' +
                                     '<i class="fas fa-edit"><\/i>' +
@@ -3009,7 +3132,7 @@ $empresa_id = obterEmpresaId();
                     });
                 } else {
                     tbody.innerHTML = '<tr id="semContratos">' +
-                        '<td colspan="4" class="text-center text-muted">' +
+                        '<td colspan="7" class="text-center text-muted">' +
                             '<i class="fas fa-inbox fa-2x mb-2"><\/i><br>' +
                             'Nenhum contrato cadastrado. Clique em "Adicionar Contrato" para começar.' +
                         '<\/td>' +
@@ -3022,10 +3145,10 @@ $empresa_id = obterEmpresaId();
                 if (error.message && error.message.includes('JSON')) {
                     const tbody = document.getElementById('listaContratos');
                     tbody.innerHTML = '<tr>' +
-                        '<td colspan="4" class="text-center text-warning">' +
+                        '<td colspan="7" class="text-center text-warning">' +
                             '<i class="fas fa-exclamation-triangle fa-2x mb-2"><\/i><br>' +
                             '<strong>Tabela de contratos não foi criada ainda<\/strong><br>' +
-                            '<small>Execute: <a href="criar_tabela_contratos.php" target="_blank">criar_tabela_contratos.php<\/a><\/small>' +
+                            '<small>Execute o script de criação da tabela<\/small>' +
                         '<\/td>' +
                     '<\/tr>';
                 }
@@ -3046,6 +3169,13 @@ $empresa_id = obterEmpresaId();
             const matricula = document.getElementById('contratoMatricula').value.trim();
             const placa = document.getElementById('contratoPlaca').value.trim();
             const porcentagem = document.getElementById('contratoPorcentagem').value;
+            const dataInicio = document.getElementById('contratoDataInicio').value;
+            const valor = document.getElementById('contratoValor').value;
+            const situacao = document.getElementById('contratoSituacao').value;
+            const tipoOs = document.getElementById('contratoTipoOs').value.trim();
+            const envioWhatsapp = document.getElementById('contratoEnvioWhatsapp').value;
+            const envioEmail = document.getElementById('contratoEnvioEmail').value;
+            const planilha = document.getElementById('contratoPlanilha').value;
             const observacoes = document.getElementById('contratoObservacoes').value.trim();
             
             if (!matricula || !placa || !porcentagem) {
@@ -3060,6 +3190,13 @@ $empresa_id = obterEmpresaId();
                     matricula: matricula,
                     placa: placa,
                     porcentagem_recorrencia: porcentagem,
+                    data_inicio: dataInicio || null,
+                    valor: valor || null,
+                    situacao: situacao,
+                    tipo_os: tipoOs || null,
+                    envio_whatsapp: envioWhatsapp,
+                    envio_email: envioEmail,
+                    planilha: planilha,
                     observacoes: observacoes
                 };
                 
@@ -3137,6 +3274,13 @@ $empresa_id = obterEmpresaId();
                     tr.setAttribute('data-original-matricula', contrato.matricula);
                     tr.setAttribute('data-original-placa', contrato.placa || '');
                     tr.setAttribute('data-original-porcentagem', contrato.porcentagem_recorrencia);
+                    tr.setAttribute('data-original-data-inicio', contrato.data_inicio || '');
+                    tr.setAttribute('data-original-valor', contrato.valor || '');
+                    tr.setAttribute('data-original-situacao', contrato.situacao || 'aguardando_ativacao');
+                    
+                    // Formatar data para input[type=date]
+                    const dataInicioFormatada = contrato.data_inicio || '';
+                    const situacaoAtual = contrato.situacao || 'aguardando_ativacao';
                     
                     // Substituir células por inputs editáveis
                     tr.innerHTML = '<td>' +
@@ -3150,6 +3294,24 @@ $empresa_id = obterEmpresaId();
                                 '<input type="number" class="form-control" id="edit-porcentagem-' + contratoId + '" value="' + parseFloat(contrato.porcentagem_recorrencia).toFixed(2) + '" min="0" max="100" step="0.01" required>' +
                                 '<span class="input-group-text">%<\/span>' +
                             '<\/div>' +
+                        '<\/td>' +
+                        '<td>' +
+                            '<input type="date" class="form-control form-control-sm" id="edit-data-inicio-' + contratoId + '" value="' + dataInicioFormatada + '">' +
+                        '<\/td>' +
+                        '<td>' +
+                            '<input type="number" class="form-control form-control-sm" id="edit-valor-' + contratoId + '" value="' + (contrato.valor || '') + '" min="0" step="0.01" placeholder="0.00">' +
+                        '<\/td>' +
+                        '<td>' +
+                            '<select class="form-select form-select-sm" id="edit-situacao-' + contratoId + '">' +
+                                '<option value="aguardando_ativacao"' + (situacaoAtual == 'aguardando_ativacao' ? ' selected' : '') + '>Aguardando Ativação<\/option>' +
+                                '<option value="ativo"' + (situacaoAtual == 'ativo' ? ' selected' : '') + '>Ativo<\/option>' +
+                                '<option value="aguardando_link"' + (situacaoAtual == 'aguardando_link' ? ' selected' : '') + '>Aguardando Link<\/option>' +
+                                '<option value="aguardando_vistoria"' + (situacaoAtual == 'aguardando_vistoria' ? ' selected' : '') + '>Aguardando Vistoria<\/option>' +
+                                '<option value="devolvido_para_unidade"' + (situacaoAtual == 'devolvido_para_unidade' ? ' selected' : '') + '>Devolvido<\/option>' +
+                                '<option value="aguardando_assinatura"' + (situacaoAtual == 'aguardando_assinatura' ? ' selected' : '') + '>Aguardando Assinatura<\/option>' +
+                                '<option value="desistencia"' + (situacaoAtual == 'desistencia' ? ' selected' : '') + '>Desistência<\/option>' +
+                                '<option value="negociar_cliente"' + (situacaoAtual == 'negociar_cliente' ? ' selected' : '') + '>Negociar Cliente<\/option>' +
+                            '<\/select>' +
                         '<\/td>' +
                         '<td>' +
                             '<button type="button" class="btn btn-sm btn-success me-1" onclick="event.stopPropagation(); salvarContratoInline(' + contratoId + '); return false;" title="Salvar">' +
@@ -3186,8 +3348,11 @@ $empresa_id = obterEmpresaId();
             const matricula = document.getElementById('edit-matricula-' + contratoId).value.trim();
             const placa = document.getElementById('edit-placa-' + contratoId).value.trim();
             const porcentagem = document.getElementById('edit-porcentagem-' + contratoId).value;
+            const dataInicio = document.getElementById('edit-data-inicio-' + contratoId).value;
+            const valor = document.getElementById('edit-valor-' + contratoId).value;
+            const situacao = document.getElementById('edit-situacao-' + contratoId).value;
             
-            if (!matricula || !placa || !porcentagem) {
+            if (!matricula || !placa || !porcentagem || !situacao) {
                 alert('Preencha todos os campos obrigatórios');
                 return;
             }
@@ -3201,6 +3366,9 @@ $empresa_id = obterEmpresaId();
                         matricula: matricula,
                         placa: placa,
                         porcentagem_recorrencia: porcentagem,
+                        data_inicio: dataInicio || null,
+                        valor: valor || null,
+                        situacao: situacao,
                         observacoes: ''
                     })
                 });

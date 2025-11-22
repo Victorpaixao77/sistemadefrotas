@@ -114,55 +114,62 @@ function closeAllModals() {
 }
 
 function setupFilters() {
-    // Search functionality
     const searchInput = document.getElementById('searchVehicle');
-    if (searchInput) {
-        searchInput.addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            const rows = document.querySelectorAll('#vehiclesTable tbody tr');
-            
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(searchTerm) ? '' : 'none';
-            });
-        });
-    }
-    
-    // Status filter
     const statusFilter = document.getElementById('statusFilter');
-    if (statusFilter) {
-        statusFilter.addEventListener('change', function() {
-            const selectedStatus = this.value.toLowerCase();
-            const rows = document.querySelectorAll('#vehiclesTable tbody tr');
-            
-            rows.forEach(row => {
-                const statusCell = row.querySelector('td:nth-child(5)');
-                if (!selectedStatus || statusCell.textContent.toLowerCase().includes(selectedStatus)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-        });
-    }
-    
-    // Type filter
     const typeFilter = document.getElementById('typeFilter');
-    if (typeFilter) {
-        typeFilter.addEventListener('change', function() {
-            const selectedType = this.value.toLowerCase();
-            const rows = document.querySelectorAll('#vehiclesTable tbody tr');
-            
-            rows.forEach(row => {
-                const typeCell = row.querySelector('td:nth-child(2)');
-                if (!selectedType || typeCell.textContent.toLowerCase().includes(selectedType)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
+    const applyButton = document.getElementById('applyVehicleFilters');
+    const clearButton = document.getElementById('clearVehicleFilters');
+
+    function filterVehicles() {
+        const rows = document.querySelectorAll('#vehiclesTable tbody tr');
+        const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        const selectedStatus = statusFilter ? statusFilter.value.toLowerCase() : '';
+        const selectedType = typeFilter ? typeFilter.value.toLowerCase() : '';
+
+        rows.forEach(row => {
+            const rowText = row.textContent.toLowerCase();
+            const statusCell = row.querySelector('td:nth-child(5)');
+            const modelCell = row.querySelector('td:nth-child(2)');
+            const brandCell = row.querySelector('td:nth-child(3)');
+
+            const matchesSearch = !searchTerm || rowText.includes(searchTerm);
+            const matchesStatus = !selectedStatus || (statusCell && statusCell.textContent.toLowerCase().includes(selectedStatus));
+            const matchesType = !selectedType || (
+                (modelCell && modelCell.textContent.toLowerCase().includes(selectedType)) ||
+                (brandCell && brandCell.textContent.toLowerCase().includes(selectedType))
+            );
+
+            row.style.display = matchesSearch && matchesStatus && matchesType ? '' : 'none';
         });
     }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', filterVehicles);
+    }
+
+    if (statusFilter) {
+        statusFilter.addEventListener('change', filterVehicles);
+    }
+
+    if (typeFilter) {
+        typeFilter.addEventListener('change', filterVehicles);
+    }
+
+    if (applyButton) {
+        applyButton.addEventListener('click', filterVehicles);
+    }
+
+    if (clearButton) {
+        clearButton.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            if (statusFilter) statusFilter.value = '';
+            if (typeFilter) typeFilter.value = '';
+            filterVehicles();
+        });
+    }
+
+    // Aplicar filtros inicialmente para garantir consistência
+    filterVehicles();
 }
 
 function loadSelectOptions() {

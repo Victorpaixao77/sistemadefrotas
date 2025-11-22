@@ -193,6 +193,12 @@ try {
                 </a>
             </li>
             <li class="nav-item">
+                <a class="nav-link" href="contratos.php">
+                    <i class="fas fa-file-contract me-2"></i>
+                    Contratos
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link" href="financeiro.php">
                     <i class="fas fa-chart-line me-2"></i>
                     Financeiro
@@ -389,11 +395,12 @@ try {
                 <table class="table table-hover">
                     <thead class="table-light">
                         <tr>
-                            <th width="8%">ID</th>
-                            <th width="12%">Data</th>
-                            <th width="20%">Cliente</th>
-                            <th width="25%">Assunto</th>
-                            <th width="12%">Categoria</th>
+                            <th width="7%">ID</th>
+                            <th width="10%">Data</th>
+                            <th width="15%">Cliente</th>
+                            <th width="10%">CONJUNTO</th>
+                            <th width="20%">Assunto</th>
+                            <th width="10%">Categoria</th>
                             <th width="8%">Prioridade</th>
                             <th width="8%">Status</th>
                             <th width="7%">Ações</th>
@@ -401,7 +408,7 @@ try {
                     </thead>
                     <tbody id="tabelaHistoricoAtendimentos">
                         <tr>
-                            <td colspan="8" class="text-center py-4">
+                            <td colspan="9" class="text-center py-4">
                                 <i class="fas fa-spinner fa-spin me-2"></i>
                                 Carregando atendimentos...
                             </td>
@@ -452,8 +459,13 @@ try {
                                     <!-- Clientes serão carregados dinamicamente via JavaScript -->
                                 </select>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="category" class="form-label">Tipo de Atendimento <span class="text-danger">*</span></label>
+                            <div class="col-md-3 mb-3">
+                                <label for="matriculaConjunto" class="form-label">CONJUNTO / Matrícula</label>
+                                <input type="text" class="form-control" id="matriculaConjunto" placeholder="Ex: 382">
+                                <small class="text-muted">Opcional - Vincular OS ao conjunto</small>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="category" class="form-label">Tipo <span class="text-danger">*</span></label>
                                 <select class="form-select" id="category" required>
                                     <option value="">Selecione...</option>
                                     <option value="suporte">Suporte</option>
@@ -632,7 +644,11 @@ try {
                     todosClientes.forEach(cliente => {
                         const option = document.createElement('option');
                         option.value = cliente.id;
-                        option.textContent = `${cliente.codigo} - ${cliente.nome_razao_social}`;
+                        
+                        // Mostrar MATRÍCULA do cliente (campo 'matricula', não 'codigo')
+                        const matricula = cliente.matricula || cliente.codigo || cliente.id;
+                        option.textContent = `${matricula} - ${cliente.nome_razao_social}`;
+                        
                         selectCliente.appendChild(option);
                     });
                 } else {
@@ -825,7 +841,7 @@ try {
             const tbody = document.getElementById('tabelaHistoricoAtendimentos');
             
             if (!todosAtendimentos || todosAtendimentos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4"><i class="fas fa-inbox me-2"></i>Nenhum atendimento encontrado</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4"><i class="fas fa-inbox me-2"></i>Nenhum atendimento encontrado</td></tr>';
                 return;
             }
             
@@ -873,6 +889,11 @@ try {
                                 </div>
                                 ${atend.cliente_nome || 'Cliente não identificado'}
                             </div>
+                        </td>
+                        <td>
+                            ${atend.matricula_conjunto ? 
+                                `<span class="badge bg-primary">${atend.matricula_conjunto}</span>` : 
+                                '<small class="text-muted">-</small>'}
                         </td>
                         <td>${atend.assunto || atend.titulo || '-'}</td>
                         <td>${atend.tipo || '-'}</td>
@@ -952,6 +973,12 @@ try {
                                         <th>Cliente:</th>
                                         <td>${atend.cliente_nome || 'Não identificado'}</td>
                                     </tr>
+                                    ${atend.matricula_conjunto ? `
+                                    <tr>
+                                        <th>CONJUNTO/Matrícula:</th>
+                                        <td><span class="badge bg-primary">${atend.matricula_conjunto}</span></td>
+                                    </tr>
+                                    ` : ''}
                                     <tr>
                                         <th>Data Abertura:</th>
                                         <td>${atend.data_abertura_fmt || '-'}</td>
@@ -1189,6 +1216,7 @@ try {
             const prioridade = document.getElementById('priority').value;
             const assunto = document.getElementById('subject').value;
             const descricao = document.getElementById('description').value;
+            const matriculaConjunto = document.getElementById('matriculaConjunto').value.trim();
             
             if (!clienteId) {
                 alert('Selecione um cliente!');
@@ -1204,7 +1232,8 @@ try {
                         tipo: categoria,
                         prioridade: prioridade,
                         assunto: assunto,
-                        descricao: descricao
+                        descricao: descricao,
+                        matricula_conjunto: matriculaConjunto || null
                     })
                 });
                 
@@ -1280,11 +1309,144 @@ try {
 
         window.irParaPaginaAtend = irParaPaginaAtend;
         
+        // ===== PRÉ-PREENCHER FORMULÁRIO SE VEM DOS CONTRATOS =====
+        function verificarParametrosURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Verificar se deve filtrar por matrícula (MAS NÃO SE FOR ACTION=NOVO)
+            const matriculaFiltro = urlParams.get('matricula');
+            const action = urlParams.get('action');
+            
+            if (matriculaFiltro && action !== 'novo') {
+                console.log('Filtrando atendimentos por matrícula:', matriculaFiltro);
+                
+                // Aplicar filtro de busca
+                setTimeout(() => {
+                    const searchInput = document.getElementById('ticketSearch');
+                    if (searchInput) {
+                        searchInput.value = matriculaFiltro;
+                        searchInput.dispatchEvent(new Event('input'));
+                        
+                        // Destacar o campo de busca
+                        searchInput.style.border = '2px solid #ffc107';
+                        searchInput.style.backgroundColor = '#fff3cd';
+                        
+                        // Adicionar mensagem de filtro ativo
+                        const msgFiltro = document.createElement('div');
+                        msgFiltro.className = 'alert alert-warning alert-dismissible fade show mt-2';
+                        msgFiltro.id = 'alertaFiltroAtivo';
+                        msgFiltro.innerHTML = `
+                            <strong><i class="fas fa-filter me-2"></i>Filtro Ativo:</strong> 
+                            Exibindo atendimentos do CONJUNTO/Matrícula: <strong>${matriculaFiltro}</strong>
+                            <button type="button" class="btn-close" onclick="limparFiltroMatricula()"></button>
+                        `;
+                        
+                        const container = searchInput.closest('.search-container');
+                        if (container) {
+                            // Remover alerta antigo se existir
+                            const alertaAntigo = document.getElementById('alertaFiltroAtivo');
+                            if (alertaAntigo) alertaAntigo.remove();
+                            
+                            container.insertBefore(msgFiltro, container.firstChild);
+                        }
+                    }
+                }, 500);
+            }
+            
+            // Verificar se deve abrir novo atendimento
+            if (action === 'novo' && urlParams.get('cliente_id')) {
+                console.log('Abrindo formulário de atendimento automaticamente...');
+                
+                // Abrir o modal automaticamente
+                setTimeout(() => {
+                    const modal = new bootstrap.Modal(document.getElementById('newTicketModal'));
+                    modal.show();
+                    
+                    // Pré-selecionar cliente
+                    const clienteId = urlParams.get('cliente_id');
+                    document.getElementById('client').value = clienteId;
+                    
+                    // Pré-preencher matrícula se fornecida
+                    const matricula = urlParams.get('matricula');
+                    if (matricula) {
+                        document.getElementById('matriculaConjunto').value = matricula;
+                        document.getElementById('subject').placeholder = `OS para CONJUNTO ${matricula}`;
+                    }
+                }, 1000); // Aguardar clientes serem carregados
+            }
+        }
+        
+        // Limpar formulário ao fechar modal
+        document.getElementById('newTicketModal').addEventListener('hidden.bs.modal', function() {
+            console.log('📋 Modal fechado - limpando formulário...');
+            
+            const form = document.getElementById('newTicketForm');
+            if (form) {
+                form.reset();
+            }
+            
+            // Limpar placeholder do assunto
+            const subjectInput = document.getElementById('subject');
+            if (subjectInput) {
+                subjectInput.placeholder = 'Descreva o problema ou solicitação...';
+            }
+            
+            // Limpar campo de matrícula
+            const matriculaInput = document.getElementById('matriculaConjunto');
+            if (matriculaInput) {
+                matriculaInput.value = '';
+            }
+            
+            // Se veio de action=novo, limpar URL
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('action') === 'novo') {
+                console.log('🧹 Limpando parâmetros da URL...');
+                const url = new URL(window.location);
+                url.searchParams.delete('action');
+                url.searchParams.delete('cliente_id');
+                url.searchParams.delete('matricula');
+                window.history.pushState({}, '', url);
+            }
+        });
+        
+        // Limpar filtro de matrícula
+        window.limparFiltroMatricula = function() {
+            console.log('🧹 Limpando filtro de matrícula...');
+            
+            // Limpar campo de busca
+            const searchInput = document.getElementById('ticketSearch');
+            if (searchInput) {
+                searchInput.value = '';
+                searchInput.style.border = '';
+                searchInput.style.backgroundColor = '';
+                searchInput.dispatchEvent(new Event('input'));
+            }
+            
+            // Remover alerta amarelo
+            const alertas = document.querySelectorAll('.alert-warning');
+            alertas.forEach(alerta => {
+                if (alerta.textContent.includes('Filtro Ativo') || alerta.textContent.includes('CONJUNTO')) {
+                    alerta.remove();
+                    console.log('✅ Alerta removido');
+                }
+            });
+            
+            // Remover parâmetro da URL
+            const url = new URL(window.location);
+            url.searchParams.delete('matricula');
+            url.searchParams.delete('action');
+            url.searchParams.delete('cliente_id');
+            window.history.pushState({}, '', url);
+            
+            console.log('✅ Filtro limpo completamente');
+        }
+        
         // ===== INICIALIZAR =====
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Iniciando carregamento de dados...');
             carregarClientes();
             carregarAtendimentos();
+            verificarParametrosURL();
             
             // Listener para mudança de registros por página
             document.getElementById('atendimentosPorPagina').addEventListener('change', function() {

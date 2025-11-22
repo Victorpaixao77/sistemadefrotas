@@ -52,6 +52,9 @@ try {
                 FROM abastecimentos a
                 LEFT JOIN veiculos v ON a.veiculo_id = v.id
                 LEFT JOIN motoristas m ON a.motorista_id = m.id
+                LEFT JOIN rotas r ON a.rota_id = r.id
+                LEFT JOIN cidades co ON r.cidade_origem_id = co.id
+                LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
                 WHERE a.empresa_id = :empresa_id AND a.status = 'aprovado'";
             
             // Prepara a consulta base para buscar os registros
@@ -73,10 +76,104 @@ try {
             $params = [':empresa_id' => $empresa_id];
             
             if (!empty($_GET['search'])) {
-                $search = '%' . $_GET['search'] . '%';
-                $sql .= " AND (v.placa LIKE :search OR m.nome LIKE :search OR a.posto LIKE :search)";
-                $params[':search'] = $search;
-                $sql_count .= " AND (v.placa LIKE :search OR m.nome LIKE :search OR a.posto LIKE :search)";
+                $rawSearch = trim($_GET['search']);
+                $normalizedSearch = function_exists('mb_strtolower')
+                    ? mb_strtolower($rawSearch, 'UTF-8')
+                    : strtolower($rawSearch);
+                $normalizedSearch = trim($normalizedSearch);
+                $searchConditions = [];
+
+                $searchLike = '%' . $normalizedSearch . '%';
+                $rawLike = '%' . $rawSearch . '%';
+
+                // Veículo: placa e modelo
+                $params[':search_vehicle_plate'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(v.placa, "")) LIKE :search_vehicle_plate';
+
+                $params[':search_vehicle_model'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(v.modelo, "")) LIKE :search_vehicle_model';
+
+                // Motorista: nome e CPF
+                $params[':search_driver_name'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(m.nome, "")) LIKE :search_driver_name';
+
+                $params[':search_driver_cpf_mask'] = $rawLike;
+                $searchConditions[] = 'm.cpf LIKE :search_driver_cpf_mask';
+
+                // Posto e forma de pagamento
+                $params[':search_station'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(a.posto, "")) LIKE :search_station';
+
+                $params[':search_payment'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(a.forma_pagamento, "")) LIKE :search_payment';
+
+                // Tipo de combustível
+                $params[':search_fuel'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(a.tipo_combustivel, "")) LIKE :search_fuel';
+
+                // Cidades de origem e destino
+                $params[':search_origin'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(co.nome, "")) LIKE :search_origin';
+
+                $params[':search_destination'] = $searchLike;
+                $searchConditions[] = 'LOWER(COALESCE(cd.nome, "")) LIKE :search_destination';
+
+                // Combinação cidade origem + destino
+                $params[':search_route_concat'] = $searchLike;
+                $searchConditions[] = 'LOWER(CONCAT_WS(" ", COALESCE(co.nome, ""), COALESCE(cd.nome, ""))) LIKE :search_route_concat';
+
+                // IDs e datas
+                $params[':search_refuel_id'] = $rawLike;
+                $searchConditions[] = 'CAST(a.id AS CHAR) LIKE :search_refuel_id';
+
+                $params[':search_route_id'] = $rawLike;
+                $searchConditions[] = 'CAST(r.id AS CHAR) LIKE :search_route_id';
+
+                $params[':search_date_br'] = $rawLike;
+                $searchConditions[] = "DATE_FORMAT(a.data_abastecimento, '%d/%m/%Y') LIKE :search_date_br";
+
+                $params[':search_date_iso'] = $rawLike;
+                $searchConditions[] = "DATE_FORMAT(a.data_abastecimento, '%Y-%m-%d') LIKE :search_date_iso";
+
+                // Busca por números (CPF/placa sem máscara, valores)
+                $searchDigits = preg_replace('/\D+/', '', $rawSearch);
+                if ($searchDigits !== '') {
+                    $digitsLike = '%' . $searchDigits . '%';
+
+                    $params[':search_driver_cpf_digits'] = $digitsLike;
+                    $searchConditions[] = "REPLACE(REPLACE(REPLACE(m.cpf, '.', ''), '-', ''), ' ', '') LIKE :search_driver_cpf_digits";
+
+                    $params[':search_plate_digits'] = $digitsLike;
+                    $searchConditions[] = "REPLACE(REPLACE(REPLACE(v.placa, '-', ''), ' ', ''), '.', '') LIKE :search_plate_digits";
+
+                    $params[':search_id_digits'] = $digitsLike;
+                    $searchConditions[] = 'CAST(a.id AS CHAR) LIKE :search_id_digits';
+                }
+
+                // Busca numérica para valores monetários ou litros
+                $normalizedNumber = str_replace(['R$', ' '], '', str_replace(',', '.', $rawSearch));
+                if (is_numeric($normalizedNumber)) {
+                    $params[':search_numeric_exact'] = (float) $normalizedNumber;
+                    $searchConditions[] = 'ABS(a.valor_total - :search_numeric_exact) < 0.01';
+                    $searchConditions[] = 'ABS(a.valor_litro - :search_numeric_exact) < 0.01';
+                    $searchConditions[] = 'ABS(a.litros - :search_numeric_exact) < 0.01';
+                }
+
+                if (!empty($searchConditions)) {
+                    $params[':search_general'] = $searchLike;
+                    $searchConditions[] = "LOWER(CONCAT_WS(' ', 
+                        COALESCE(v.placa, ''), 
+                        COALESCE(v.modelo, ''), 
+                        COALESCE(m.nome, ''), 
+                        COALESCE(a.posto, ''), 
+                        COALESCE(a.tipo_combustivel, ''), 
+                        COALESCE(a.forma_pagamento, '')
+                    )) LIKE :search_general";
+
+                    $searchClause = '(' . implode(' OR ', $searchConditions) . ')';
+                    $sql .= " AND $searchClause";
+                    $sql_count .= " AND $searchClause";
+                }
             }
             
             if (!empty($_GET['veiculo'])) {
@@ -148,6 +245,65 @@ try {
                     'limit' => $limit,
                     'total' => $total,
                     'totalPages' => ceil($total / $limit)
+                ]
+            ]);
+            break;
+
+        case 'filter_options':
+            // Buscar veículos distintos
+            $sqlVehicles = "SELECT DISTINCT 
+                    v.id, 
+                    v.placa, 
+                    v.modelo
+                FROM abastecimentos a
+                INNER JOIN veiculos v ON a.veiculo_id = v.id
+                WHERE a.empresa_id = :empresa_id AND a.status = 'aprovado'
+                ORDER BY v.placa ASC";
+            $stmtVehicles = $conn->prepare($sqlVehicles);
+            $stmtVehicles->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmtVehicles->execute();
+            $vehicles = $stmtVehicles->fetchAll(PDO::FETCH_ASSOC);
+
+            // Buscar motoristas distintos
+            $sqlDrivers = "SELECT DISTINCT 
+                    m.id, 
+                    m.nome
+                FROM abastecimentos a
+                INNER JOIN motoristas m ON a.motorista_id = m.id
+                WHERE a.empresa_id = :empresa_id AND a.status = 'aprovado'
+                ORDER BY m.nome ASC";
+            $stmtDrivers = $conn->prepare($sqlDrivers);
+            $stmtDrivers->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmtDrivers->execute();
+            $drivers = $stmtDrivers->fetchAll(PDO::FETCH_ASSOC);
+
+            // Buscar combustíveis distintos
+            $sqlFuels = "SELECT DISTINCT a.tipo_combustivel 
+                FROM abastecimentos a
+                WHERE a.empresa_id = :empresa_id AND a.status = 'aprovado' AND a.tipo_combustivel IS NOT NULL AND a.tipo_combustivel <> ''
+                ORDER BY a.tipo_combustivel ASC";
+            $stmtFuels = $conn->prepare($sqlFuels);
+            $stmtFuels->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmtFuels->execute();
+            $fuels = array_column($stmtFuels->fetchAll(PDO::FETCH_ASSOC), 'tipo_combustivel');
+
+            // Buscar formas de pagamento distintas
+            $sqlPayments = "SELECT DISTINCT a.forma_pagamento 
+                FROM abastecimentos a
+                WHERE a.empresa_id = :empresa_id AND a.status = 'aprovado' AND a.forma_pagamento IS NOT NULL AND a.forma_pagamento <> ''
+                ORDER BY a.forma_pagamento ASC";
+            $stmtPayments = $conn->prepare($sqlPayments);
+            $stmtPayments->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmtPayments->execute();
+            $payments = array_column($stmtPayments->fetchAll(PDO::FETCH_ASSOC), 'forma_pagamento');
+
+            echo json_encode([
+                'success' => true,
+                'data' => [
+                    'vehicles' => $vehicles,
+                    'drivers' => $drivers,
+                    'fuels' => $fuels,
+                    'payments' => $payments
                 ]
             ]);
             break;

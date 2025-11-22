@@ -483,6 +483,12 @@ $kpis = getKPIMetrics($conn);
                             <option value="">Todos os fornecedores</option>
                             <!-- Será preenchido via JavaScript -->
                         </select>
+                        <button type="button" class="btn-restore-layout" id="applyMaintenanceFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearMaintenanceFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
                     </div>
                 </div>
                 

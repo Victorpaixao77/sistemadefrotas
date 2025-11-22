@@ -255,6 +255,13 @@ $total_paginas = $resultado['total_paginas'];
                             <option value="D">Categoria D</option>
                             <option value="E">Categoria E</option>
                         </select>
+
+                        <button type="button" class="btn-restore-layout" id="applyMotoristFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearMotoristFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
                     </div>
                 </div>
                 

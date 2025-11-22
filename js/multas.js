@@ -48,6 +48,8 @@ function initializeMultas() {
 
     // Event listeners para modais
     setupModalEventListeners();
+
+    setupTableFilters();
 }
 
 function initializeMultasCharts() {
@@ -108,6 +110,72 @@ function loadPontosPorMotoristaChart() {
         .catch(error => {
             console.error('Erro ao carregar dados de pontos por motorista:', error);
         });
+}
+
+function setupTableFilters() {
+    const tableBody = document.querySelector('#multasTable tbody');
+    if (!tableBody) return;
+
+    const searchInput = document.getElementById('searchMulta');
+    const vehicleFilter = document.getElementById('vehicleFilter');
+    const driverFilter = document.getElementById('driverFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    const applyBtn = document.getElementById('applyFinesFilters');
+    const clearBtn = document.getElementById('clearFinesFilters');
+
+    const applyFilters = () => {
+        const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+        const vehicleValue = vehicleFilter ? vehicleFilter.value.trim().toLowerCase() : '';
+        const driverValue = driverFilter ? driverFilter.value.trim().toLowerCase() : '';
+        const statusValue = statusFilter ? statusFilter.value.trim().toLowerCase() : '';
+
+        const rows = tableBody.querySelectorAll('tr');
+        rows.forEach(row => {
+            const rowText = row.textContent.toLowerCase();
+            const vehicleCell = row.querySelector('td:nth-child(2)');
+            const driverCell = row.querySelector('td:nth-child(3)');
+            const statusCell = row.querySelector('td:nth-child(8)');
+
+            const matchesSearch = !searchTerm || rowText.includes(searchTerm);
+            const matchesVehicle = !vehicleValue || (vehicleCell && vehicleCell.textContent.toLowerCase().includes(vehicleValue));
+            const matchesDriver = !driverValue || (driverCell && driverCell.textContent.toLowerCase().includes(driverValue));
+            const matchesStatus = !statusValue || (statusCell && statusCell.textContent.toLowerCase().includes(statusValue));
+
+            row.style.display = (matchesSearch && matchesVehicle && matchesDriver && matchesStatus) ? '' : 'none';
+        });
+    };
+
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(applyFilters, 200));
+    }
+
+    if (vehicleFilter) vehicleFilter.addEventListener('change', applyFilters);
+    if (driverFilter) driverFilter.addEventListener('change', applyFilters);
+    if (statusFilter) statusFilter.addEventListener('change', applyFilters);
+
+    if (applyBtn) {
+        applyBtn.addEventListener('click', applyFilters);
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            if (vehicleFilter) vehicleFilter.value = '';
+            if (driverFilter) driverFilter.value = '';
+            if (statusFilter) statusFilter.value = '';
+            applyFilters();
+        });
+    }
+
+    applyFilters();
+}
+
+function debounce(fn, wait = 200) {
+    let timeout;
+    return (...args) => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => fn.apply(null, args), wait);
+    };
 }
 
 function createMultasPorMesChart(data) {

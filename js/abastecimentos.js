@@ -1,5 +1,8 @@
 // Lógica dinâmica para o modal de Abastecimento
 
+var currentFilter = null;
+var refuelingCurrentPage = 1;
+
 document.addEventListener('DOMContentLoaded', function() {
     let filtroData = '';
     let filtroVeiculo = '';
@@ -207,6 +210,7 @@ document.addEventListener('DOMContentLoaded', function() {
     resetRotas();
 });
 
+
 // Função para preencher selects de edição sem disparar filtro dinâmico
 async function preencherCamposEdicao(refuel) {
     // Preencher Data da Rota
@@ -353,17 +357,40 @@ window.openEditRefuelModal = function(refuel) {
     document.getElementById('refuelModal').classList.add('active');
 }
 
-function loadRefuelingData() {
-    // Obtém valores dos filtros
-    const search = document.getElementById('searchRefueling').value;
-    const currentPage = new URLSearchParams(window.location.search).get('page') || 1;
-    const vehicleFilter = document.getElementById('vehicleFilter').value;
-    const driverFilter = document.getElementById('driverFilter').value;
-    const fuelFilter = document.getElementById('fuelFilter').value;
-    const paymentFilter = document.getElementById('paymentFilter').value;
+function loadRefuelingData(page = null) {
+    if (page !== null) {
+        const parsedPage = parseInt(page, 10);
+        refuelingCurrentPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
+    } else {
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlPage = parseInt(urlParams.get('page'), 10);
+        if (!Number.isNaN(urlPage) && urlPage > 0) {
+            refuelingCurrentPage = urlPage;
+        }
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (parseInt(urlParams.get('page'), 10) !== refuelingCurrentPage) {
+        urlParams.set('page', refuelingCurrentPage);
+        const queryString = urlParams.toString();
+        const newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}`;
+        window.history.replaceState({}, '', newUrl);
+    }
+
+    const searchInput = document.getElementById('searchRefueling');
+    const vehicleSelect = document.getElementById('vehicleFilter');
+    const driverSelect = document.getElementById('driverFilter');
+    const fuelSelect = document.getElementById('fuelFilter');
+    const paymentSelect = document.getElementById('paymentFilter');
+
+    const search = searchInput ? searchInput.value.trim() : '';
+    const vehicleFilter = vehicleSelect ? vehicleSelect.value : '';
+    const driverFilter = driverSelect ? driverSelect.value : '';
+    const fuelFilter = fuelSelect ? fuelSelect.value : '';
+    const paymentFilter = paymentSelect ? paymentSelect.value : '';
     
     // Constrói URL com filtros e paginação
-    let url = `../api/refuel_data.php?action=list&page=${currentPage}&limit=5`;
+    let url = `../api/refuel_data.php?action=list&page=${refuelingCurrentPage}&limit=5`;
     if (search) url += `&search=${encodeURIComponent(search)}`;
     if (currentFilter) {
         const [year, month] = currentFilter.split('-');
@@ -377,13 +404,23 @@ function loadRefuelingData() {
     console.log('Carregando dados dos abastecimentos:', url);
     
     // Carrega dados dos abastecimentos
-    fetch(url)
+    fetch(url, { credentials: 'include' })
         .then(response => response.json())
         .then(data => {
             console.log('Resposta do backend:', data);
             if (data.success) {
                 updateRefuelingsTable(data.data);
-                updatePagination(data.pagination);
+                if (data.pagination) {
+                    refuelingCurrentPage = data.pagination.page || refuelingCurrentPage;
+                    updatePagination(data.pagination);
+                    const updatedParams = new URLSearchParams(window.location.search);
+                    if (parseInt(updatedParams.get('page'), 10) !== refuelingCurrentPage) {
+                        updatedParams.set('page', refuelingCurrentPage);
+                        const newQueryString = updatedParams.toString();
+                        const newLocation = `${window.location.pathname}${newQueryString ? `?${newQueryString}` : ''}`;
+                        window.history.replaceState({}, '', newLocation);
+                    }
+                }
             } else {
                 throw new Error(data.error || 'Erro ao carregar dados dos abastecimentos');
             }
@@ -392,6 +429,52 @@ function loadRefuelingData() {
             console.error('Error loading refueling data:', error);
             alert('Erro ao carregar dados dos abastecimentos: ' + error.message);
         });
+}
+
+function updatePagination(pagination) {
+    if (!pagination) {
+        return;
+    }
+
+    const totalPages = Math.max(1, pagination.totalPages || 1);
+    const current = Math.min(Math.max(1, pagination.page || 1), totalPages);
+    refuelingCurrentPage = current;
+
+    const paginationContainer = document.querySelector('.pagination');
+    if (!paginationContainer) return;
+    
+    const prevBtn = paginationContainer.querySelector('a:first-child');
+    const nextBtn = paginationContainer.querySelector('a:last-child');
+    const paginationInfo = paginationContainer.querySelector('.pagination-info');
+    
+    if (paginationInfo) {
+        paginationInfo.textContent = `Página ${current} de ${totalPages}`;
+    }
+    
+    const prevPage = Math.max(1, current - 1);
+    const nextPageValue = Math.min(totalPages, current + 1);
+    
+    if (prevBtn) {
+        const isDisabled = current <= 1;
+        prevBtn.classList.toggle('disabled', isDisabled);
+        prevBtn.href = `?page=${prevPage}`;
+        prevBtn.onclick = function(event) {
+            event.preventDefault();
+            if (isDisabled) return;
+            loadRefuelingData(prevPage);
+        };
+    }
+    
+    if (nextBtn) {
+        const isDisabled = current >= totalPages;
+        nextBtn.classList.toggle('disabled', isDisabled);
+        nextBtn.href = `?page=${nextPageValue}`;
+        nextBtn.onclick = function(event) {
+            event.preventDefault();
+            if (isDisabled) return;
+            loadRefuelingData(nextPageValue);
+        };
+    }
 }
 
 function updateRefuelingsTable(refuelings) {
@@ -409,6 +492,14 @@ function updateRefuelingsTable(refuelings) {
             });
             
             const row = document.createElement('tr');
+            const valorTotalAbastecimento = (() => {
+                const valorBase = parseFloat(refuel.valor_total || 0);
+                if (refuel.inclui_arla == 1) {
+                    const valorArla = parseFloat(refuel.valor_total_arla || 0);
+                    return valorBase + valorArla;
+                }
+                return valorBase;
+            })();
             const rotaInfo = (refuel.cidade_origem_nome && refuel.cidade_destino_nome) 
                 ? `${refuel.cidade_origem_nome} → ${refuel.cidade_destino_nome}`
                 : '-';
@@ -418,9 +509,9 @@ function updateRefuelingsTable(refuelings) {
                 <td>${refuel.veiculo_placa || '-'}</td>
                 <td>${refuel.motorista_nome || '-'}</td>
                 <td>${refuel.posto || '-'}</td>
-                <td>${formatNumber(refuel.litros, 1)} L</td>
+                <td>${formatNumber(refuel.litros, 3)} L</td>
                 <td>R$ ${formatNumber(refuel.valor_litro, 2)}</td>
-                <td>R$ ${formatNumber(refuel.valor_total, 2)}</td>
+                <td>R$ ${formatNumber(valorTotalAbastecimento, 2)}</td>
                 <td>
                     ${refuel.inclui_arla == 1 ? 
                         (() => {
@@ -690,8 +781,8 @@ function showEditRefuelModal(id) {
                 
                 // Formata os valores numéricos corretamente
                 document.getElementById('litros').value = Number(refuel.litros).toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
+                    minimumFractionDigits: 3,
+                    maximumFractionDigits: 3
                 });
                 document.getElementById('valor_litro').value = Number(refuel.valor_litro).toLocaleString('pt-BR', {
                     minimumFractionDigits: 2,
@@ -1368,6 +1459,11 @@ function loadMonthlyCostChart() {
         url += `&year=${year}&month=${month}`;
     }
 
+    const existingChart = Chart.getChart('monthlyCostChart');
+    if (existingChart) {
+        existingChart.destroy();
+    }
+
     return fetch(url)
         .then(response => response.json())
         .then(data => {
@@ -1465,21 +1561,22 @@ function loadMonthlyCostChart() {
 }
 
 function setupFilters() {
-    // Set default value to current month/year
-    const today = new Date();
-    const defaultDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-    document.getElementById('filterMonth').value = defaultDate;
-    currentFilter = defaultDate;
+    const filterMonthInput = document.getElementById('filterMonth');
+    if (filterMonthInput) {
+        filterMonthInput.value = '';
+    }
+    currentFilter = null;
     updateFilterButtonState();
 
     // Setup filter modal buttons
     document.getElementById('applyFilterBtn').addEventListener('click', () => {
         const filterMonth = document.getElementById('filterMonth').value;
         currentFilter = filterMonth;
+        refuelingCurrentPage = 1;
         
         // Atualiza todos os dados e gráficos
         Promise.all([
-            loadRefuelingData(),
+            loadRefuelingData(1),
             loadRefuelingSummary(),
             loadConsumptionChart(),
             loadEfficiencyChart(),
@@ -1498,10 +1595,11 @@ function setupFilters() {
     document.getElementById('clearFilterBtn').addEventListener('click', () => {
         document.getElementById('filterMonth').value = '';
         currentFilter = null;
+        refuelingCurrentPage = 1;
         
         // Atualiza todos os dados e gráficos
         Promise.all([
-            loadRefuelingData(),
+            loadRefuelingData(1),
             loadRefuelingSummary(),
             loadConsumptionChart(),
             loadEfficiencyChart(),
@@ -1525,6 +1623,9 @@ function initializePage() {
     
     // Load summary data
     loadRefuelingSummary();
+
+    // Load filter options
+    loadFilterOptions();
     
     // Load all charts
     Promise.all([
@@ -1545,12 +1646,100 @@ function initializePage() {
     
     // Setup search
     const searchInput = document.getElementById('searchRefueling');
+    if (searchInput) {
     searchInput.addEventListener('input', debounce(() => {
-        loadRefuelingData();
+            loadRefuelingData(1);
     }, 300));
+
+        searchInput.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                loadRefuelingData(1);
+            }
+        });
+    }
+
+    const applyFiltersBtn = document.getElementById('applyRefuelFilters');
+    if (applyFiltersBtn) {
+        applyFiltersBtn.addEventListener('click', () => {
+            loadRefuelingData(1);
+        });
+    }
+
+    const clearFiltersBtn = document.getElementById('clearRefuelFilters');
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            const vehicleFilter = document.getElementById('vehicleFilter');
+            const driverFilter = document.getElementById('driverFilter');
+            const fuelFilter = document.getElementById('fuelFilter');
+            const paymentFilter = document.getElementById('paymentFilter');
+            const filterMonthInput = document.getElementById('filterMonth');
+
+            if (vehicleFilter) vehicleFilter.value = '';
+            if (driverFilter) driverFilter.value = '';
+            if (fuelFilter) fuelFilter.value = '';
+            if (paymentFilter) paymentFilter.value = '';
+            if (filterMonthInput) filterMonthInput.value = '';
+
+            currentFilter = null;
+            refuelingCurrentPage = 1;
+            updateFilterButtonState();
+
+            loadRefuelingData(1);
+        });
+    }
     
     // Setup table buttons
     setupTableButtons();
+}
+
+function loadFilterOptions() {
+    fetch('../api/refuel_data.php?action=filter_options', { credentials: 'include' })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (!data.success || !data.data) return;
+
+            const { vehicles = [], drivers = [] } = data.data;
+
+            const vehicleFilter = document.getElementById('vehicleFilter');
+            if (vehicleFilter) {
+                const currentValue = vehicleFilter.value;
+                vehicleFilter.innerHTML = '<option value="">Todos os veículos</option>';
+                vehicles.forEach(vehicle => {
+                    const option = document.createElement('option');
+                    option.value = vehicle.id;
+                    option.textContent = vehicle.placa + (vehicle.modelo ? ` - ${vehicle.modelo}` : '');
+                    vehicleFilter.appendChild(option);
+                });
+                if (currentValue) {
+                    vehicleFilter.value = currentValue;
+                }
+            }
+
+            const driverFilter = document.getElementById('driverFilter');
+            if (driverFilter) {
+                const currentValue = driverFilter.value;
+                driverFilter.innerHTML = '<option value="">Todos os motoristas</option>';
+                drivers.forEach(driver => {
+                    const option = document.createElement('option');
+                    option.value = driver.id;
+                    option.textContent = driver.nome;
+                    driverFilter.appendChild(option);
+                });
+                if (currentValue) {
+                    driverFilter.value = currentValue;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar opções de filtro:', error);
+        });
 }
 
 function carregarMotoristas(veiculoId, data) {

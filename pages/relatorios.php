@@ -152,7 +152,7 @@ function getReportData($reportType, $month, $year) {
                 $sql = "SELECT r.id AS id_viagem, 
                         CONCAT(r.estado_origem, ' - ', r.estado_destino) as rota,
                         SUM(dv.total_despviagem) AS total_despesas,
-                        SUM(dv.arla) as total_arla,
+                        SUM(dv.descarga) as total_descarga,
                         SUM(dv.pedagios) as total_pedagios,
                         SUM(dv.caixinha) as total_caixinha,
                         SUM(dv.estacionamento) as total_estacionamento,

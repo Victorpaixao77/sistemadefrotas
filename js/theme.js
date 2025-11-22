@@ -2,6 +2,16 @@
  * Theme management functionality
  */
 
+(function() {
+    const savedTheme = localStorage.getItem('theme');
+    const isLight = savedTheme === 'light';
+    if (isLight) {
+        document.documentElement.classList.add('light-theme');
+    } else {
+        document.documentElement.classList.remove('light-theme');
+    }
+})();
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize theme from localStorage
     initializeTheme();
@@ -10,21 +20,27 @@ document.addEventListener('DOMContentLoaded', function() {
     setupThemeToggle();
 });
 
+function applyThemeClass(isLight) {
+    const classAction = isLight ? 'add' : 'remove';
+    document.documentElement.classList[classAction]('light-theme');
+    if (document.body) {
+        document.body.classList.toggle('light-theme', isLight);
+    }
+}
+
 /**
  * Initialize theme from saved preference
  */
 function initializeTheme() {
     // Check if theme preference exists in localStorage
     const savedTheme = localStorage.getItem('theme');
+    const isLight = savedTheme === 'light';
     
-    if (savedTheme) {
-        // Apply saved theme
-        document.body.classList.toggle('light-theme', savedTheme === 'light');
-    } else {
-        // Default to dark theme if no preference (match the design)
-        document.body.classList.remove('light-theme');
+    if (!savedTheme) {
         localStorage.setItem('theme', 'dark');
     }
+    
+    applyThemeClass(isLight);
     
     // Add transition class after initial load (for smooth transitions later)
     setTimeout(() => {
@@ -50,11 +66,11 @@ function setupThemeToggle() {
  * Toggle between light and dark themes
  */
 function toggleTheme() {
-    // Toggle theme class on body
-    document.body.classList.toggle('light-theme');
+    const isLight = !document.documentElement.classList.contains('light-theme');
+    applyThemeClass(isLight);
     
     // Save preference to localStorage
-    const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+    const currentTheme = isLight ? 'light' : 'dark';
     localStorage.setItem('theme', currentTheme);
     
     // Update any theme-specific elements

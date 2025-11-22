@@ -360,28 +360,35 @@ $total_pages = $result['total_pages'];
                 </div>
                 
                 <!-- Search and Filter -->
-                <div class="filter-section">
+                <form class="filter-section" id="vehicleFilterForm" onsubmit="return false;">
                     <div class="search-box">
-                        <input type="text" id="searchVehicle" placeholder="Buscar veículo...">
+                        <input type="text" id="searchVehicle" placeholder="Buscar veículo, placa ou motorista...">
                         <i class="fas fa-search"></i>
                     </div>
                     
                     <div class="filter-options">
-                        <select id="statusFilter">
+                        <select id="statusFilter" title="Status do veículo">
                             <option value="">Todos os status</option>
                             <option value="Ativo">Ativo</option>
                             <option value="Manutenção">Em Manutenção</option>
                             <option value="Inativo">Inativo</option>
                         </select>
                         
-                        <select id="typeFilter">
+                        <select id="typeFilter" title="Tipo / Modelo">
                             <option value="">Todos os tipos</option>
                             <option value="Mercedes">Mercedes-Benz</option>
                             <option value="Volvo">Volvo</option>
                             <option value="Scania">Scania</option>
                         </select>
+
+                        <button type="button" class="btn-restore-layout" id="applyVehicleFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearVehicleFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
                     </div>
-                </div>
+                </form>
                 
                 <!-- Vehicles List Table -->
                 <div class="data-table-container">

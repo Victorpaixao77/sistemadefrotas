@@ -203,6 +203,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             <option value="">Todos os veículos</option>
                             <!-- Preencher via JS se desejar -->
                         </select>
+                        <button type="button" class="btn-restore-layout" id="applyChecklistFilters" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="btn-restore-layout" id="clearChecklistFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
                     </div>
                 </div>
                 <div class="table-container">
@@ -385,6 +391,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         </div>
     </div>
     <script>
+    (function setupChecklistFilters() {
+        const tableBody = document.querySelector('.data-table tbody');
+        if (!tableBody) return;
+
+        const searchInput = document.getElementById('searchChecklist');
+        const driverFilter = document.getElementById('driverFilter');
+        const vehicleFilter = document.getElementById('vehicleFilter');
+        const applyBtn = document.getElementById('applyChecklistFilters');
+        const clearBtn = document.getElementById('clearChecklistFilters');
+
+        const applyFilters = () => {
+            const rows = tableBody.querySelectorAll('tr');
+            const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
+            const driverValue = driverFilter ? driverFilter.value.trim().toLowerCase() : '';
+            const vehicleValue = vehicleFilter ? vehicleFilter.value.trim().toLowerCase() : '';
+
+            rows.forEach(row => {
+                const rowText = row.textContent.toLowerCase();
+                const driverCell = row.querySelector('td:nth-child(3)');
+                const vehicleCell = row.querySelector('td:nth-child(2)');
+
+                const matchesSearch = !searchTerm || rowText.includes(searchTerm);
+                const matchesDriver = !driverValue || (driverCell && driverCell.textContent.toLowerCase().includes(driverValue));
+                const matchesVehicle = !vehicleValue || (vehicleCell && vehicleCell.textContent.toLowerCase().includes(vehicleValue));
+
+                row.style.display = (matchesSearch && matchesDriver && matchesVehicle) ? '' : 'none';
+            });
+        };
+
+        if (searchInput) {
+            searchInput.addEventListener('input', applyFilters);
+        }
+
+        if (driverFilter) driverFilter.addEventListener('change', applyFilters);
+        if (vehicleFilter) vehicleFilter.addEventListener('change', applyFilters);
+
+        if (applyBtn) {
+            applyBtn.addEventListener('click', applyFilters);
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                if (searchInput) searchInput.value = '';
+                if (driverFilter) driverFilter.value = '';
+                if (vehicleFilter) vehicleFilter.value = '';
+                applyFilters();
+            });
+        }
+
+        applyFilters();
+    })();
+
     // Abrir modal de visualização ao clicar no botão
     function boolToSimNao(val) {
         if (val === null || val === undefined) return '-';

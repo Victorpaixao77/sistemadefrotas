@@ -633,6 +633,21 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.querySelectorAll('.filter-options select').forEach(select => {
             select.addEventListener('change', loadDespesasData);
         });
+        const applyFiltersBtn = document.getElementById('applyFixedExpenseFilters');
+        if (applyFiltersBtn) {
+            applyFiltersBtn.addEventListener('click', () => loadDespesasData());
+        }
+        const clearFiltersBtn = document.getElementById('clearFixedExpenseFilters');
+        if (clearFiltersBtn) {
+            clearFiltersBtn.addEventListener('click', () => {
+                const searchInput = document.getElementById('searchDespesa');
+                if (searchInput) searchInput.value = '';
+                document.querySelectorAll('.filter-options select').forEach(select => {
+                    select.value = '';
+                });
+                loadDespesasData();
+            });
+        }
         
         // Setup modal close buttons
         document.querySelectorAll('.close-modal').forEach(button => {
