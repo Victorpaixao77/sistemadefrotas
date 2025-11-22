@@ -124,7 +124,42 @@ try {
             --danger-bg: rgba(239, 68, 68, 0.1);
         }
         
+        /* Garantir que o conteúdo não ultrapasse a tela quando o sidebar expande */
+        body {
+            overflow-x: hidden;
+        }
+        
+        .app-container {
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden;
+        }
+        
+        .main-content {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+        
+        .dashboard-content {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            box-sizing: border-box;
+        }
+        
+        /* Garantir que elementos com largura fixa se ajustem */
+        #area-montagem-flex {
+            max-width: 100%;
+            overflow-x: auto;
+            box-sizing: border-box;
+        }
+        
         .vehicle-section {
+            max-width: 100%;
+            overflow-x: hidden;
+            box-sizing: border-box;
             background: var(--bg-secondary);
             border-radius: 10px;
             padding: 20px;
@@ -562,6 +597,10 @@ try {
             grid-template-columns: 1fr 300px;
             gap: 20px;
             margin-top: 20px;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            box-sizing: border-box;
         }
         
         @media (max-width: 1200px) {
@@ -707,8 +746,10 @@ try {
         }
         #componente-cavalo-wrapper, #componente-carreta-wrapper {
             width: 340px;
+            max-width: 100%;
             height: 500px;
             display: flex;
+            box-sizing: border-box;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
@@ -1010,6 +1051,148 @@ try {
             from { transform: translateY(-50px); opacity: 0; }
             to { transform: translateY(0); opacity: 1; }
         }
+        
+        /* Estilos para Dashboard Actions - usando estilos globais do styles.css */
+        
+        /* Estilos para Modais */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s;
+        }
+        
+        .modal-content {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s;
+        }
+        
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 1.5em;
+        }
+        
+        .close-modal {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        
+        .close-modal:hover {
+            color: var(--text-primary);
+        }
+        
+        .modal-body {
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        
+        .help-section {
+            margin-bottom: 25px;
+        }
+        
+        .help-section h3 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        
+        .help-section ul, .help-section ol {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+        
+        .help-section li {
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+        
+        .help-section strong {
+            color: var(--text-primary);
+        }
+        
+        @media (max-width: 768px) {
+            .modal-content {
+                width: 95%;
+                margin: 20px;
+            }
+            
+            #componente-cavalo-wrapper, #componente-carreta-wrapper {
+                width: 100%;
+                max-width: 300px;
+            }
+            
+            #area-montagem-flex {
+                flex-direction: column;
+                gap: 32px;
+            }
+        }
+        
+        /* Ajustar quando o sidebar está expandido */
+        @media (max-width: 1400px) {
+            #componente-cavalo-wrapper, #componente-carreta-wrapper {
+                width: 100%;
+                max-width: 300px;
+            }
+            
+            #area-montagem-flex {
+                gap: 32px;
+            }
+        }
+        
+        /* Garantir que elementos não ultrapassem a largura disponível */
+        .bloco-veiculo-flex {
+            max-width: 100%;
+            box-sizing: border-box;
+        }
     </style>
 </head>
 <body>
@@ -1026,6 +1209,19 @@ try {
             <div class="dashboard-content">
                 <div class="dashboard-header">
                     <h1><?php echo $page_title; ?></h1>
+                    <div class="dashboard-actions">
+                        <div class="view-controls">
+                            <button id="filterBtn" class="btn-restore-layout" title="Filtros">
+                                <i class="fas fa-filter"></i>
+                            </button>
+                            <button id="exportBtn" class="btn-toggle-layout" title="Exportar">
+                                <i class="fas fa-file-export"></i>
+                            </button>
+                            <button id="helpBtn" class="btn-help" title="Ajuda">
+                                <i class="fas fa-question-circle"></i>
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 
                 <?php if (isset($error)): ?>
@@ -3237,9 +3433,336 @@ try {
                     atualizarDashboardPneusEmUso();
                 });
         }
+        
+        // Controle de Modais
+        document.addEventListener('DOMContentLoaded', function() {
+            // Modal de Filtros
+            const filterBtn = document.getElementById('filterBtn');
+            const filterModal = document.getElementById('filterModal');
+            const filterClose = filterModal?.querySelector('.close-modal');
+            
+            if (filterBtn && filterModal) {
+                filterBtn.addEventListener('click', function() {
+                    filterModal.style.display = 'flex';
+                });
+            }
+            
+            if (filterClose) {
+                filterClose.addEventListener('click', function() {
+                    filterModal.style.display = 'none';
+                });
+            }
+            
+            // Modal de Ajuda
+            const helpBtn = document.getElementById('helpBtn');
+            const helpModal = document.getElementById('helpModal');
+            const helpClose = helpModal?.querySelector('.close-modal');
+            
+            if (helpBtn && helpModal) {
+                helpBtn.addEventListener('click', function() {
+                    helpModal.style.display = 'flex';
+                });
+            }
+            
+            if (helpClose) {
+                helpClose.addEventListener('click', function() {
+                    helpModal.style.display = 'none';
+                });
+            }
+            
+            // Fechar modais ao clicar fora
+            window.addEventListener('click', function(event) {
+                if (event.target === filterModal) {
+                    filterModal.style.display = 'none';
+                }
+                if (event.target === helpModal) {
+                    helpModal.style.display = 'none';
+                }
+            });
+            
+            // Botão de Exportar
+            const exportBtn = document.getElementById('exportBtn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', function() {
+                    exportarDados();
+                });
+            }
+        });
+        
+        // Função para aplicar filtros
+        function aplicarFiltros() {
+            const status = document.getElementById('filterStatus')?.value || '';
+            const marca = document.getElementById('filterMarca')?.value || '';
+            const modelo = document.getElementById('filterModelo')?.value || '';
+            const numeroSerie = document.getElementById('filterNumeroSerie')?.value || '';
+            const veiculo = document.getElementById('filterVeiculo')?.value || '';
+            
+            // Aplicar filtros nos pneus disponíveis
+            if (window.pneusDisponiveis) {
+                let pneusFiltrados = window.pneusDisponiveis.filter(pneu => {
+                    if (status && status !== 'disponivel') return false;
+                    if (marca && !pneu.marca?.toLowerCase().includes(marca.toLowerCase())) return false;
+                    if (modelo && !pneu.modelo?.toLowerCase().includes(modelo.toLowerCase())) return false;
+                    if (numeroSerie && !pneu.numero_serie?.includes(numeroSerie)) return false;
+                    return true;
+                });
+                
+                // Atualizar área de estoque ou lista de pneus disponíveis
+                console.log('Pneus filtrados:', pneusFiltrados.length);
+                alert(`Filtros aplicados! ${pneusFiltrados.length} pneu(s) encontrado(s).`);
+            }
+            
+            // Se houver veículo selecionado, recarregar
+            const veiculoSelecionado = document.getElementById('veiculoSelectorFlex')?.value;
+            if (veiculoSelecionado && veiculo === veiculoSelecionado) {
+                onSelecionarVeiculoFlexivel(veiculoSelecionado);
+            }
+            
+            // Fechar modal
+            document.getElementById('filterModal').style.display = 'none';
+        }
+        
+        // Função para limpar filtros
+        function limparFiltros() {
+            document.getElementById('filterStatus').value = '';
+            document.getElementById('filterMarca').value = '';
+            document.getElementById('filterModelo').value = '';
+            document.getElementById('filterNumeroSerie').value = '';
+            document.getElementById('filterVeiculo').value = '';
+            
+            // Recarregar dados sem filtros
+            if (window.carregarPneusDisponiveis) {
+                carregarPneusDisponiveis().then(() => {
+                    const veiculoSelecionado = document.getElementById('veiculoSelectorFlex')?.value;
+                    if (veiculoSelecionado) {
+                        onSelecionarVeiculoFlexivel(veiculoSelecionado);
+                    }
+                });
+            }
+            
+            document.getElementById('filterModal').style.display = 'none';
+        }
+        
+        // Função para exportar dados
+        function exportarDados() {
+            const veiculoSelecionado = document.getElementById('veiculoSelectorFlex')?.value;
+            
+            if (!veiculoSelecionado) {
+                alert('Por favor, selecione um veículo primeiro.');
+                return;
+            }
+            
+            // Criar dados para exportação
+            const dados = {
+                veiculo: veiculoSelecionado,
+                data: new Date().toLocaleDateString('pt-BR'),
+                pneus: window.pneusEmUso || [],
+                pneusDisponiveis: window.pneusDisponiveis || []
+            };
+            
+            // Converter para CSV
+            let csv = 'Gestão de Pneus - Relatório\n';
+            csv += `Data: ${dados.data}\n`;
+            csv += `Veículo: ${veiculoSelecionado}\n\n`;
+            csv += 'Pneus em Uso\n';
+            csv += 'Número de Série,Marca,Modelo,Status,Posição\n';
+            
+            if (dados.pneus.length > 0) {
+                dados.pneus.forEach(pneu => {
+                    csv += `${pneu.numero_serie || ''},${pneu.marca || ''},${pneu.modelo || ''},${pneu.status_nome || ''},${pneu.posicao || ''}\n`;
+                });
+            } else {
+                csv += 'Nenhum pneu em uso\n';
+            }
+            
+            csv += '\nPneus Disponíveis\n';
+            csv += 'Número de Série,Marca,Modelo,Status\n';
+            
+            if (dados.pneusDisponiveis.length > 0) {
+                dados.pneusDisponiveis.forEach(pneu => {
+                    csv += `${pneu.numero_serie || ''},${pneu.marca || ''},${pneu.modelo || ''},${pneu.status_nome || ''}\n`;
+                });
+            } else {
+                csv += 'Nenhum pneu disponível\n';
+            }
+            
+            // Download do arquivo
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `relatorio_pneus_${new Date().getTime()}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            alert('Relatório exportado com sucesso!');
+        }
     </script>
     
     <!-- Novo sistema de eixos com banco de dados -->
     <script src="../js/gestao_interativa_eixos.js"></script>
+    
+    <!-- Modal de Filtros -->
+    <div class="modal" id="filterModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2><i class="fas fa-filter"></i> Filtros de Pneus</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="filterStatus">Status:</label>
+                    <select id="filterStatus" class="form-control">
+                        <option value="">Todos</option>
+                        <option value="disponivel">Disponível</option>
+                        <option value="em_uso">Em Uso</option>
+                        <option value="manutencao">Em Manutenção</option>
+                        <option value="critico">Crítico</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filterMarca">Marca:</label>
+                    <input type="text" id="filterMarca" class="form-control" placeholder="Ex: Michelin, Bridgestone...">
+                </div>
+                <div class="form-group">
+                    <label for="filterModelo">Modelo:</label>
+                    <input type="text" id="filterModelo" class="form-control" placeholder="Ex: XZA2, R268...">
+                </div>
+                <div class="form-group">
+                    <label for="filterNumeroSerie">Número de Série:</label>
+                    <input type="text" id="filterNumeroSerie" class="form-control" placeholder="Buscar por número de série">
+                </div>
+                <div class="form-group">
+                    <label for="filterVeiculo">Veículo:</label>
+                    <select id="filterVeiculo" class="form-control">
+                        <option value="">Todos</option>
+                        <?php foreach ($veiculos as $v): ?>
+                            <option value="<?= $v['id'] ?>"><?= $v['placa'] ?> - <?= $v['modelo'] ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button onclick="aplicarFiltros()" class="btn btn-primary" style="flex: 1;">
+                        <i class="fas fa-check"></i> Aplicar Filtros
+                    </button>
+                    <button onclick="limparFiltros()" class="btn btn-secondary" style="flex: 1;">
+                        <i class="fas fa-times"></i> Limpar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Ajuda -->
+    <div class="modal" id="helpModal">
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h2><i class="fas fa-question-circle"></i> Ajuda - Gestão Interativa de Pneus</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <h3>Visão Geral</h3>
+                    <p>A página de Gestão Interativa de Pneus permite gerenciar toda a frota de pneus de forma visual e intuitiva. Aqui você pode alocar, remover, enviar para manutenção e acompanhar o status de cada pneu em tempo real.</p>
+                </div>
+
+                <div class="help-section">
+                    <h3>Funcionalidades Principais</h3>
+                    <ul>
+                        <li><strong>Gestão Visual:</strong> Visualize os pneus instalados em cada veículo através de uma interface gráfica interativa.</li>
+                        <li><strong>Drag and Drop:</strong> Arraste pneus entre posições ou para o estoque de forma simples.</li>
+                        <li><strong>Modo Flexível:</strong> Configure eixos personalizados para cada veículo (caminhão e carreta).</li>
+                        <li><strong>Alertas Inteligentes:</strong> Receba notificações sobre pneus que precisam de atenção.</li>
+                        <li><strong>Histórico:</strong> Acompanhe todo o histórico de alocações e movimentações.</li>
+                        <li><strong>Estatísticas:</strong> Visualize gráficos e métricas de performance dos pneus.</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Como Usar</h3>
+                    <ol>
+                        <li><strong>Selecionar Veículo:</strong>
+                            <ul>
+                                <li>Escolha um veículo no seletor no topo da página</li>
+                                <li>O sistema carregará automaticamente os pneus instalados</li>
+                            </ul>
+                        </li>
+                        <li><strong>Alocar Pneu:</strong>
+                            <ul>
+                                <li>Clique em uma posição vazia no veículo</li>
+                                <li>Selecione um pneu disponível do estoque</li>
+                                <li>Confirme a alocação</li>
+                            </ul>
+                        </li>
+                        <li><strong>Mover Pneu (Drag and Drop):</strong>
+                            <ul>
+                                <li>Clique e segure um pneu instalado</li>
+                                <li>Arraste para outra posição ou para a área de estoque</li>
+                                <li>Solte para confirmar a movimentação</li>
+                            </ul>
+                        </li>
+                        <li><strong>Enviar para Manutenção:</strong>
+                            <ul>
+                                <li>Clique em um pneu instalado</li>
+                                <li>Selecione "Enviar para Manutenção"</li>
+                                <li>O pneu será removido e marcado como em manutenção</li>
+                            </ul>
+                        </li>
+                        <li><strong>Configurar Eixos (Modo Flexível):</strong>
+                            <ul>
+                                <li>Use os botões "Adicionar Eixo" para criar novos eixos</li>
+                                <li>Configure a quantidade de pneus por eixo</li>
+                                <li>Salve o layout para uso futuro</li>
+                            </ul>
+                        </li>
+                    </ol>
+                </div>
+
+                <div class="help-section">
+                    <h3>Legenda de Cores</h3>
+                    <ul>
+                        <li><strong style="color: #28a745;">Verde (Disponível):</strong> Posição vazia, pronta para receber um pneu</li>
+                        <li><strong style="color: #007bff;">Azul (Em Uso):</strong> Pneu instalado e em bom estado</li>
+                        <li><strong style="color: #ffc107;">Amarelo (Alerta):</strong> Pneu precisa de atenção, planejar troca</li>
+                        <li><strong style="color: #fd7e14;">Laranja (Pressão):</strong> Problema de pressão ou calibração</li>
+                        <li><strong style="color: #dc3545;">Vermelho (Crítico):</strong> Troca urgente necessária</li>
+                        <li><strong style="color: #6c757d;">Cinza (Manutenção):</strong> Pneu em reparo</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Indicadores (KPIs)</h3>
+                    <ul>
+                        <li><strong>Total de Veículos:</strong> Número de veículos cadastrados no sistema</li>
+                        <li><strong>Pneus Disponíveis:</strong> Quantidade de pneus em estoque prontos para uso</li>
+                        <li><strong>Pneus em Uso:</strong> Total de pneus atualmente instalados em veículos</li>
+                        <li><strong>Em Manutenção:</strong> Pneus que estão sendo reparados</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Gráficos e Análises</h3>
+                    <ul>
+                        <li><strong>Distribuição por Status:</strong> Visualize a distribuição de pneus por status</li>
+                        <li><strong>Tendência de Uso:</strong> Acompanhe o uso de pneus nos últimos 6 meses</li>
+                        <li><strong>Indicadores de Performance:</strong> Métricas importantes de eficiência</li>
+                    </ul>
+                </div>
+
+                <div class="help-section">
+                    <h3>Dicas</h3>
+                    <ul>
+                        <li>Use os filtros para encontrar pneus específicos rapidamente</li>
+                        <li>Exporte relatórios para análise externa</li>
+                        <li>Configure alertas para pneus críticos</li>
+                        <li>Mantenha o histórico atualizado para análises futuras</li>
+                        <li>Use o modo flexível para veículos com configurações especiais</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html> 

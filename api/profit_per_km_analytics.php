@@ -57,9 +57,7 @@ try {
             SELECT 
                 created_at as data,
                 'despesa' as tipo,
-                COALESCE(arla,0) + COALESCE(pedagios,0) + COALESCE(caixinha,0) + 
-                COALESCE(estacionamento,0) + COALESCE(lavagem,0) + COALESCE(borracharia,0) + 
-                COALESCE(eletrica_mecanica,0) + COALESCE(adiantamento,0) as valor
+                COALESCE(total_despviagem, 0) as valor
             FROM despesas_viagem
             WHERE empresa_id = :empresa_id_viagem
             

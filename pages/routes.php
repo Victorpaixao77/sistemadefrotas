@@ -331,6 +331,18 @@ $total_paginas = $resultado['total_paginas'];
                 width: 100% !important;
             }
         }
+        
+        /* Estilos para links de simuladores externos */
+        .simulation-form a[target="_blank"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(63, 166, 255, 0.3) !important;
+            border-color: #1e7ecb !important;
+            background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%) !important;
+        }
+        
+        .simulation-form a[target="_blank"]:active {
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
@@ -1158,6 +1170,39 @@ $total_paginas = $resultado['total_paginas'];
                         <button id="simulateRouteBtnModal" style="width: 100%; padding: 12px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 10px;">
                             <i class="fas fa-calculator"></i> Simular Rota
                         </button>
+                        
+                        <!-- Links para Simuladores Externos -->
+                        <div style="margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 8px; border: 1px solid #dee2e6;">
+                            <h4 style="color: #1976d2; margin-bottom: 12px; font-weight: 600; font-size: 1em;">
+                                <i class="fas fa-external-link-alt"></i> Simuladores de Rotas Online
+                            </h4>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                                <a href="https://rotasbrasil.com.br/" target="_blank" rel="noopener noreferrer" 
+                                   style="display: flex; align-items: center; gap: 8px; padding: 10px; background: white; border: 2px solid #3fa6ff; border-radius: 6px; text-decoration: none; color: #1976d2; font-weight: 500; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <i class="fas fa-route" style="color: #3fa6ff;"></i>
+                                    <span>Rotas Brasil</span>
+                                    <i class="fas fa-external-link-alt" style="margin-left: auto; font-size: 0.8em; opacity: 0.7;"></i>
+                                </a>
+                                <a href="https://www.webrouter.com.br/way/#/calcularRota" target="_blank" rel="noopener noreferrer" 
+                                   style="display: flex; align-items: center; gap: 8px; padding: 10px; background: white; border: 2px solid #3fa6ff; border-radius: 6px; text-decoration: none; color: #1976d2; font-weight: 500; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <i class="fas fa-map-marked-alt" style="color: #3fa6ff;"></i>
+                                    <span>WebRouter</span>
+                                    <i class="fas fa-external-link-alt" style="margin-left: auto; font-size: 0.8em; opacity: 0.7;"></i>
+                                </a>
+                                <a href="https://qualp.com.br/#/" target="_blank" rel="noopener noreferrer" 
+                                   style="display: flex; align-items: center; gap: 8px; padding: 10px; background: white; border: 2px solid #3fa6ff; border-radius: 6px; text-decoration: none; color: #1976d2; font-weight: 500; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <i class="fas fa-route" style="color: #3fa6ff;"></i>
+                                    <span>Qualp</span>
+                                    <i class="fas fa-external-link-alt" style="margin-left: auto; font-size: 0.8em; opacity: 0.7;"></i>
+                                </a>
+                                <a href="https://www.semparar.com.br/trace-sua-rota" target="_blank" rel="noopener noreferrer" 
+                                   style="display: flex; align-items: center; gap: 8px; padding: 10px; background: white; border: 2px solid #3fa6ff; border-radius: 6px; text-decoration: none; color: #1976d2; font-weight: 500; transition: all 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                    <i class="fas fa-tag" style="color: #3fa6ff;"></i>
+                                    <span>Sem Parar</span>
+                                    <i class="fas fa-external-link-alt" style="margin-left: auto; font-size: 0.8em; opacity: 0.7;"></i>
+                                </a>
+                            </div>
+                        </div>
                     </div>
                     
                     <!-- Mapa de Simulação -->

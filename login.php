@@ -363,14 +363,88 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             bottom: 50%; right: 65%; font-size: 1.05em; color: #fff; opacity: 0.14;}
         .phrase18 {
             top: 85%; left: 25%; font-size: 1.1em; color: #3fa6ff; opacity: 0.17;}
-        @media (max-width: 700px) {
-            .bg-phrase { font-size: 0.9em !important; max-width: 180px; }
-            .phrase1, .phrase2, .phrase3, .phrase4, .phrase5, .phrase6, .phrase7, .phrase8, .phrase9,
-            .phrase10, .phrase11, .phrase12, .phrase13, .phrase14, .phrase15, .phrase16, .phrase17, .phrase18 {
-                left: unset; right: unset; top: unset; bottom: unset;
-                position: static; display: block; margin: 8px auto; text-align: center;
+        
+        /* Media query para tablets/iPad (768px - 1024px) */
+        @media (min-width: 701px) and (max-width: 1024px) {
+            .bg-phrase { 
+                font-size: 0.8em !important; 
+                max-width: 180px; 
+                opacity: 0.1 !important;
             }
-            .login-background-texts { position: static; margin-bottom: 12px; }
+            .login-background-texts { 
+                position: fixed; 
+                inset: 0;
+                z-index: 0;
+            }
+            .login-container {
+                position: relative;
+                z-index: 1;
+            }
+            /* Reposicionar frases para não sobrepor o formulário centralizado */
+            /* Esconder frases que ficam na área central (30% - 70% vertical) */
+            .phrase4, .phrase7, .phrase9, .phrase14, .phrase16, .phrase17 {
+                display: none !important;
+            }
+            .phrase1 { top: 5% !important; left: 5% !important; }
+            .phrase2 { top: 10% !important; right: 5% !important; }
+            .phrase3 { bottom: 5% !important; left: 5% !important; }
+            .phrase5 { bottom: 10% !important; right: 5% !important; }
+            .phrase6 { top: 15% !important; right: 3% !important; }
+            .phrase8 { display: none !important; }
+            .phrase10 { top: 8% !important; left: 6% !important; }
+            .phrase11 { top: 20% !important; right: 6% !important; }
+            .phrase12 { bottom: 8% !important; left: 6% !important; }
+            .phrase13 { top: 25% !important; left: 7% !important; }
+            .phrase15 { bottom: 12% !important; right: 8% !important; }
+            .phrase18 { bottom: 8% !important; left: 30% !important; }
+        }
+        
+        @media (max-width: 700px) {
+            .bg-phrase { 
+                font-size: 0.75em !important; 
+                max-width: 140px; 
+                opacity: 0.1 !important;
+            }
+            .login-background-texts { 
+                position: fixed; 
+                inset: 0;
+                z-index: 0;
+            }
+            .login-container {
+                position: relative;
+                z-index: 1;
+            }
+            /* Ajustar posicionamento das frases para não sobrepor o formulário */
+            .phrase1 { top: 2% !important; left: 2% !important; }
+            .phrase2 { top: 5% !important; right: 2% !important; }
+            .phrase3 { bottom: 2% !important; left: 2% !important; }
+            .phrase4 { top: 8% !important; left: 1% !important; font-size: 0.9em !important; }
+            .phrase5 { bottom: 5% !important; right: 2% !important; }
+            .phrase6 { top: 12% !important; right: 1% !important; }
+            .phrase7 { bottom: 8% !important; left: 50% !important; transform: translateX(-50%); }
+            .phrase8 { display: none; }
+            .phrase9 { top: 3% !important; right: 30% !important; }
+            .phrase10 { top: 6% !important; left: 3% !important; }
+            .phrase11 { top: 10% !important; right: 3% !important; }
+            .phrase12 { bottom: 3% !important; left: 3% !important; }
+            .phrase13 { top: 15% !important; left: 4% !important; }
+            .phrase14 { top: 9% !important; right: 8% !important; }
+            .phrase15 { bottom: 6% !important; right: 10% !important; }
+            .phrase16 { top: 4% !important; left: 20% !important; }
+            .phrase17 { display: none; }
+            .phrase18 { bottom: 4% !important; left: 20% !important; }
+        }
+        
+        @media (max-width: 500px) {
+            .bg-phrase { 
+                font-size: 0.65em !important; 
+                max-width: 120px;
+                opacity: 0.08 !important;
+            }
+            /* Esconder mais frases em telas muito pequenas */
+            .phrase4, .phrase6, .phrase9, .phrase10, .phrase11, .phrase13, .phrase14, .phrase15, .phrase16, .phrase18 {
+                display: none;
+            }
         }
     </style>
 </head>
