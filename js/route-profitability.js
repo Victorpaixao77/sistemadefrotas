@@ -71,16 +71,24 @@ function exibirAnaliseCompl(route, despesasViagem, abastecimentosArray) {
         }
     }
     
-    // Calcular total de abastecimentos
+    // Calcular total de abastecimentos (incluindo ARLA)
     let totalAbastecimentos = 0;
+    let quantidadeAbastecimentos = 0;
     if (Array.isArray(abastecimentosArray)) {
+        quantidadeAbastecimentos = abastecimentosArray.length;
         abastecimentosArray.forEach(abast => {
-            totalAbastecimentos += parseFloat(abast.valor_total || 0);
+            let valorAbastecimento = parseFloat(abast.valor_total || 0);
+            // Adicionar valor do ARLA se o abastecimento incluir ARLA
+            if (abast.inclui_arla == 1 || abast.inclui_arla === '1') {
+                valorAbastecimento += parseFloat(abast.valor_total_arla || 0);
+            }
+            totalAbastecimentos += valorAbastecimento;
         });
     }
     
     console.log('   Total Despesas:', totalDespesas);
     console.log('   Total Abastecimentos:', totalAbastecimentos);
+    console.log('   Quantidade de Abastecimentos:', quantidadeAbastecimentos);
     
     // Cálculos de lucratividade
     const receitaBruta = frete;
@@ -158,7 +166,12 @@ function exibirAnaliseCompl(route, despesasViagem, abastecimentosArray) {
     // Deduções
     html += gerarLinhaTabela('➖ Comissão Motorista', comissao, receitaBruta, 'danger');
     html += gerarLinhaTabela('➖ Despesas de Viagem', totalDespesas, receitaBruta, 'danger');
-    html += gerarLinhaTabela('➖ Abastecimentos (Combustível)', totalAbastecimentos, receitaBruta, 'danger');
+    
+    // Abastecimentos com quantidade
+    const textoAbastecimentos = quantidadeAbastecimentos > 0 
+        ? `➖ Abastecimentos (Combustível) <span style="font-size: 0.85em; color: #6c757d; font-weight: normal;">(${quantidadeAbastecimentos} ${quantidadeAbastecimentos === 1 ? 'abastecimento' : 'abastecimentos'})</span>`
+        : '➖ Abastecimentos (Combustível)';
+    html += gerarLinhaTabela(textoAbastecimentos, totalAbastecimentos, receitaBruta, 'danger');
     html += gerarLinhaDivisoria();
     
     // Lucro Bruto

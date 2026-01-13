@@ -11,6 +11,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inicializar seletor de cores
     initColorPalette();
+    
+    // Inicializar seletor de empresa (se existir)
+    initEmpresaSelector();
 });
 
 /**
@@ -277,4 +280,105 @@ function getDefaultColorValue(variable) {
     };
     
     return defaultColors[variable] || '#000000';
+}
+
+/**
+ * Inicializar seletor de empresa (para usuários com acesso global)
+ */
+function initEmpresaSelector() {
+    const empresaSelectorBtn = document.getElementById('empresaSelectorBtn');
+    const empresaDropdown = document.getElementById('empresaDropdown');
+    const empresaDropdownList = document.getElementById('empresaDropdownList');
+    
+    if (!empresaSelectorBtn || !empresaDropdown || !empresaDropdownList) return;
+    
+    // Toggle dropdown
+    empresaSelectorBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        empresaDropdown.classList.toggle('show');
+        
+        // Se abrindo, carregar empresas
+        if (empresaDropdown.classList.contains('show')) {
+            carregarEmpresas();
+        }
+    });
+    
+    // Fechar ao clicar fora
+    document.addEventListener('click', function(e) {
+        if (!empresaDropdown.contains(e.target) && !empresaSelectorBtn.contains(e.target)) {
+            empresaDropdown.classList.remove('show');
+        }
+    });
+    
+    // Carregar lista de empresas
+    function carregarEmpresas() {
+        empresaDropdownList.innerHTML = '<div style="padding: 12px; text-align: center; color: #999;">Carregando...</div>';
+        
+        fetch('/sistema-frotas/api/trocar_empresa.php?action=listar', {
+            credentials: 'same-origin'
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.empresas) {
+                empresaDropdownList.innerHTML = '';
+                
+                if (data.empresas.length === 0) {
+                    empresaDropdownList.innerHTML = '<div style="padding: 12px; text-align: center; color: #999;">Nenhuma empresa encontrada</div>';
+                    return;
+                }
+                
+                data.empresas.forEach(empresa => {
+                    const item = document.createElement('div');
+                    item.className = 'empresa-dropdown-item';
+                    if (empresa.id == data.empresa_atual) {
+                        item.classList.add('active');
+                    }
+                    
+                    item.innerHTML = `
+                        <h4>${empresa.razao_social}</h4>
+                        ${empresa.nome_fantasia ? `<p>${empresa.nome_fantasia}</p>` : ''}
+                    `;
+                    
+                    item.addEventListener('click', function() {
+                        if (empresa.id != data.empresa_atual) {
+                            trocarEmpresa(empresa.id);
+                        }
+                    });
+                    
+                    empresaDropdownList.appendChild(item);
+                });
+            } else {
+                empresaDropdownList.innerHTML = '<div style="padding: 12px; text-align: center; color: #c33;">Erro ao carregar empresas</div>';
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar empresas:', error);
+            empresaDropdownList.innerHTML = '<div style="padding: 12px; text-align: center; color: #c33;">Erro ao carregar empresas</div>';
+        });
+    }
+    
+    // Trocar de empresa
+    function trocarEmpresa(empresaId) {
+        const formData = new FormData();
+        formData.append('empresa_id', empresaId);
+        
+        fetch('/sistema-frotas/api/trocar_empresa.php?action=trocar', {
+            method: 'POST',
+            credentials: 'same-origin',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                // Recarregar a página para atualizar dados
+                window.location.reload();
+            } else {
+                alert('Erro ao trocar de empresa: ' + (data.error || 'Erro desconhecido'));
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao trocar empresa:', error);
+            alert('Erro ao trocar de empresa');
+        });
+    }
 }

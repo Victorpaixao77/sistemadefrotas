@@ -58,6 +58,28 @@ require_once 'notifications.php';
             </div>
         </div>
         
+        <?php if (!empty($_SESSION['acesso_todas_empresas']) && $_SESSION['acesso_todas_empresas'] === true): ?>
+        <!-- Seletor de Empresa (apenas para usuários com acesso global) -->
+        <div class="header-icon-wrapper" style="position: relative;">
+            <button class="header-icon-btn" title="Trocar Empresa" id="empresaSelectorBtn" onclick="event.preventDefault(); event.stopPropagation();">
+                <i class="fas fa-building"></i>
+            </button>
+            
+            <!-- Dropdown de Empresas -->
+            <div class="empresa-dropdown" id="empresaDropdown">
+                <div class="empresa-dropdown-header">
+                    <h3>Trocar de Empresa</h3>
+                </div>
+                <div class="empresa-dropdown-list" id="empresaDropdownList">
+                    <div style="padding: 12px; text-align: center; color: #999;">Carregando...</div>
+                </div>
+                <div class="empresa-dropdown-footer">
+                    <a href="selecionar_empresa.php" class="view-all-link">Ver todas as empresas</a>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+        
         <!-- Alternador de tema -->
         <div class="theme-toggle" id="themeToggle" title="Alternar tema">
             <div class="theme-toggle-thumb"></div>
@@ -188,12 +210,83 @@ require_once 'notifications.php';
 }
 
 .notification-dropdown,
-.profile-dropdown {
+.profile-dropdown,
+.empresa-dropdown {
     display: none;
     opacity: 0;
     visibility: hidden;
     transform: translateY(-10px);
     transition: all 0.3s ease;
+}
+
+.empresa-dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    width: 300px;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 1000;
+    margin-top: 8px;
+}
+
+.empresa-dropdown-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--bg-tertiary);
+}
+
+.empresa-dropdown-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.empresa-dropdown-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.empresa-dropdown-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    border-bottom: 1px solid var(--bg-tertiary);
+}
+
+.empresa-dropdown-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.empresa-dropdown-item.active {
+    background: var(--accent-primary);
+    color: white;
+}
+
+.empresa-dropdown-item h4 {
+    margin: 0 0 4px 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.empresa-dropdown-item p {
+    margin: 0;
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.empresa-dropdown-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--bg-tertiary);
+    text-align: center;
+}
+
+.empresa-dropdown.show {
+    display: block;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
 }
 
 .header-icon-wrapper {

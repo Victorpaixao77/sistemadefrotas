@@ -8,6 +8,11 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
+// Registrar log de logout antes de limpar a sessão
+if (isset($_SESSION['usuario_id']) && isset($_SESSION['empresa_id'])) {
+    registrarLogAcesso($_SESSION['usuario_id'], $_SESSION['empresa_id'], 'logout', 'sucesso', 'Logout realizado pelo usuário');
+}
+
 // Limpar todas as variáveis de sessão
 $_SESSION = [];
 

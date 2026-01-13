@@ -6,7 +6,7 @@ configure_session();
 session_start();
 require_authentication();
 
-$page_title = "Lucratividade - Dashboard Avançado (Exemplo)";
+$page_title = "Lucratividade 2.0 - Inteligência de Negócio (Demo)";
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -19,883 +19,538 @@ $page_title = "Lucratividade - Dashboard Avançado (Exemplo)";
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-waterfall"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.1.0"></script>
     
     <style>
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
+        :root {
+            --card-bg: #ffffff;
+            --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --text-muted: #6b7280;
+            --text-main: #111827;
+            --accent-sim: #8b5cf6; /* Purple for simulation */
+            --accent-forecast: #3b82f6; /* Blue for forecast */
         }
-        
-        .kpi-card {
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            border-left: 4px solid var(--accent-primary);
-            transition: transform 0.3s, box-shadow 0.3s;
+
+        body {
+            background-color: #f3f4f6;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
         }
-        
-        .kpi-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+
+        .dashboard-content {
+            padding: 2rem;
+            max-width: 1600px;
+            margin: 0 auto;
         }
-        
-        .kpi-card.success {
-            border-left-color: var(--accent-success);
-        }
-        
-        .kpi-card.warning {
-            border-left-color: var(--accent-warning);
-        }
-        
-        .kpi-card.danger {
-            border-left-color: var(--accent-danger);
-        }
-        
-        .kpi-card.info {
-            border-left-color: var(--accent-secondary);
-        }
-        
-        .kpi-header {
+
+        .dashboard-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 15px;
+            margin-bottom: 2rem;
         }
-        
-        .kpi-title {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .kpi-icon {
-            font-size: 1.5rem;
-            opacity: 0.7;
-        }
-        
-        .kpi-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 5px;
-        }
-        
-        .kpi-subtitle {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-        
-        .kpi-trend {
+
+        .dashboard-header h1 {
+            font-size: 1.875rem;
+            font-weight: 800;
+            color: var(--text-main);
             display: flex;
             align-items: center;
-            gap: 5px;
-            margin-top: 10px;
-            font-size: 0.85rem;
+            gap: 0.75rem;
         }
-        
-        .kpi-trend.positive {
-            color: var(--accent-success);
+
+        .badge-beta {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
-        
-        .kpi-trend.negative {
-            color: var(--accent-danger);
+
+        /* Grid Layouts */
+        .grid-cols-12 { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1.5rem; }
+        .col-span-12 { grid-column: span 12; }
+        .col-span-8 { grid-column: span 8; }
+        .col-span-6 { grid-column: span 6; }
+        .col-span-4 { grid-column: span 4; }
+        .col-span-3 { grid-column: span 3; }
+
+        @media (max-width: 1280px) {
+            .col-span-3 { grid-column: span 6; }
         }
-        
-        .filters-section {
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 30px;
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
+        @media (max-width: 1024px) {
+            .col-span-8, .col-span-6, .col-span-4 { grid-column: span 12; }
         }
-        
-        .filter-group {
+
+        /* Cards */
+        .card {
+            background: var(--card-bg);
+            border-radius: 1rem;
+            box-shadow: var(--card-shadow);
+            padding: 1.5rem;
+            height: 100%;
             display: flex;
             flex-direction: column;
-            gap: 8px;
         }
-        
-        .filter-group label {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-        
-        .filter-group select,
-        .filter-group input {
-            padding: 10px;
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            font-size: 0.9rem;
-        }
-        
-        .chart-container {
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        
-        .chart-header {
+
+        .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
+            margin-bottom: 1.5rem;
         }
-        
-        .chart-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-        
-        .analysis-section {
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .analysis-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        
-        .analysis-card {
-            background: var(--bg-primary);
-            border-radius: 8px;
-            padding: 15px;
-            border-left: 4px solid var(--accent-primary);
-        }
-        
-        .analysis-card h4 {
-            margin: 0 0 10px 0;
-            color: var(--text-primary);
-            font-size: 1rem;
-        }
-        
-        .ranking-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        
-        .ranking-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            margin-bottom: 8px;
-            background: var(--bg-secondary);
-            border-radius: 6px;
-        }
-        
-        .ranking-position {
+
+        .card-title {
+            font-size: 1.125rem;
             font-weight: 700;
-            color: var(--accent-primary);
-            margin-right: 10px;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-        
-        .btn-export {
-            background: var(--accent-primary);
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
+
+        /* Simulation Section */
+        .sim-panel {
+            background: linear-gradient(to bottom right, #ffffff, #f5f3ff);
+            border: 1px solid #e9d5ff;
+        }
+
+        .slider-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .slider-label {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-main);
+        }
+
+        .slider-value {
+            font-weight: 700;
+            color: var(--accent-sim);
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--accent-sim);
+            border-radius: 50%;
             cursor: pointer;
-            font-weight: 500;
-            transition: background 0.3s;
+            transition: transform 0.1s;
         }
-        
-        .btn-export:hover {
-            background: var(--accent-secondary);
+
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
         }
+
+        .sim-result {
+            text-align: center;
+            padding: 1rem;
+            background: rgba(139, 92, 246, 0.1);
+            border-radius: 0.75rem;
+            margin-top: auto;
+        }
+
+        .sim-result-label { font-size: 0.875rem; color: var(--text-muted); }
+        .sim-result-value { font-size: 2rem; font-weight: 800; color: var(--accent-sim); }
+        .sim-result-diff { font-size: 0.875rem; font-weight: 600; }
+
+        /* Forecast Section */
+        .forecast-insight {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            color: #1e40af;
+        }
+
+        /* Offenders Table */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 0.75rem 1rem; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid #e5e7eb; }
+        td { padding: 1rem; border-bottom: 1px solid #f3f4f6; font-size: 0.875rem; color: var(--text-main); }
+        tr:last-child td { border-bottom: none; }
         
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 12px;
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
             font-size: 0.75rem;
             font-weight: 600;
         }
-        
-        .badge-success {
-            background: rgba(16, 185, 129, 0.2);
-            color: var(--accent-success);
+        .status-danger { background: #fee2e2; color: #ef4444; }
+        .status-warning { background: #fef3c7; color: #d97706; }
+
+        /* KPI Mini Cards */
+        .kpi-mini {
+            padding: 1rem;
+            border-radius: 0.75rem;
+            background: #fff;
+            border: 1px solid #e5e7eb;
         }
-        
-        .badge-warning {
-            background: rgba(245, 158, 11, 0.2);
-            color: var(--accent-warning);
-        }
-        
-        .badge-danger {
-            background: rgba(239, 68, 68, 0.2);
-            color: var(--accent-danger);
-        }
+        .kpi-mini-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+        .kpi-mini-value { font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin: 0.25rem 0; }
+        .kpi-mini-trend { font-size: 0.75rem; font-weight: 600; }
+        .trend-up { color: #10b981; }
+        .trend-down { color: #ef4444; }
+
     </style>
 </head>
 <body>
     <?php include '../includes/sidebar_pages.php'; ?>
     <div class="main-content">
         <?php include '../includes/header.php'; ?>
+        
         <div class="dashboard-content">
             <div class="dashboard-header">
-                <h1><i class="fas fa-chart-line"></i> <?php echo $page_title; ?></h1>
-                <div class="dashboard-actions">
-                    <div class="view-controls">
-                        <button id="exportBtn" class="btn-restore-layout" title="Exportar">
-                            <i class="fas fa-file-export"></i>
-                        </button>
-                        <button id="helpBtn" class="btn-help" title="Ajuda">
-                            <i class="fas fa-question-circle"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Filtros Avançados -->
-            <div class="filters-section">
-                <div class="filter-group">
-                    <label><i class="fas fa-calendar"></i> Período</label>
-                    <select id="periodFilter">
-                        <option value="month">Mensal</option>
-                        <option value="quarter">Trimestral</option>
-                        <option value="semester">Semestral</option>
-                        <option value="year">Anual</option>
-                        <option value="custom">Personalizado</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label><i class="fas fa-truck"></i> Veículo</label>
-                    <select id="vehicleFilter">
-                        <option value="">Todos os Veículos</option>
-                        <option value="1">ABC-1234 - Caminhão 1</option>
-                        <option value="2">DEF-5678 - Caminhão 2</option>
-                        <option value="3">GHI-9012 - Caminhão 3</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label><i class="fas fa-user"></i> Motorista</label>
-                    <select id="driverFilter">
-                        <option value="">Todos os Motoristas</option>
-                        <option value="1">João Silva</option>
-                        <option value="2">Maria Santos</option>
-                        <option value="3">Pedro Oliveira</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label><i class="fas fa-users"></i> Cliente</label>
-                    <select id="clientFilter">
-                        <option value="">Todos os Clientes</option>
-                        <option value="1">Cliente A</option>
-                        <option value="2">Cliente B</option>
-                        <option value="3">Cliente C</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label><i class="fas fa-route"></i> Tipo de Frete</label>
-                    <select id="freightTypeFilter">
-                        <option value="">Todos os Tipos</option>
-                        <option value="fcl">FCL</option>
-                        <option value="lcl">LCL</option>
-                        <option value="express">Expresso</option>
-                    </select>
-                </div>
-                <div class="filter-group" style="display: flex; align-items: flex-end;">
-                    <button class="btn-export" onclick="aplicarFiltros()" style="width: 100%;">
-                        <i class="fas fa-filter"></i> Aplicar Filtros
+                <h1>
+                    <i class="fas fa-brain" style="color: var(--accent-sim);"></i> 
+                    Inteligência de Negócio
+                    <span class="badge-beta">BETA</span>
+                </h1>
+                <div style="display: flex; gap: 1rem;">
+                    <button class="btn btn-secondary" onclick="resetSimulation()">
+                        <i class="fas fa-undo"></i> Resetar Simulação
+                    </button>
+                    <button class="btn btn-primary">
+                        <i class="fas fa-file-export"></i> Relatório Executivo
                     </button>
                 </div>
             </div>
-            
-            <!-- KPIs Principais -->
-            <div class="dashboard-grid">
-                <div class="kpi-card success">
-                    <div class="kpi-header">
-                        <span class="kpi-title">Lucro Líquido</span>
-                        <i class="fas fa-dollar-sign kpi-icon"></i>
-                    </div>
-                    <div class="kpi-value">R$ 125.450,00</div>
-                    <div class="kpi-subtitle">Período atual</div>
-                    <div class="kpi-trend positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+12.5% vs mês anterior</span>
-                    </div>
-                </div>
-                
-                <div class="kpi-card info">
-                    <div class="kpi-header">
-                        <span class="kpi-title">ROI (Retorno sobre Investimento)</span>
-                        <i class="fas fa-chart-pie kpi-icon"></i>
-                    </div>
-                    <div class="kpi-value">18.5%</div>
-                    <div class="kpi-subtitle">Taxa de retorno</div>
-                    <div class="kpi-trend positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+2.3% vs mês anterior</span>
-                    </div>
-                </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-header">
-                        <span class="kpi-title">Ticket Médio por Rota</span>
-                        <i class="fas fa-receipt kpi-icon"></i>
-                    </div>
-                    <div class="kpi-value">R$ 3.250,00</div>
-                    <div class="kpi-subtitle">Média por rota</div>
-                    <div class="kpi-trend positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+5.2% vs mês anterior</span>
-                    </div>
-                </div>
-                
-                <div class="kpi-card warning">
-                    <div class="kpi-header">
-                        <span class="kpi-title">Custo por Quilômetro</span>
-                        <i class="fas fa-road kpi-icon"></i>
-                    </div>
-                    <div class="kpi-value">R$ 2,85</div>
-                    <div class="kpi-subtitle">Por km rodado</div>
-                    <div class="kpi-trend negative">
-                        <i class="fas fa-arrow-down"></i>
-                        <span>-3.1% vs mês anterior</span>
-                    </div>
-                </div>
-                
-                <div class="kpi-card">
-                    <div class="kpi-header">
-                        <span class="kpi-title">Margem Operacional</span>
-                        <i class="fas fa-percentage kpi-icon"></i>
-                    </div>
-                    <div class="kpi-value">24.8%</div>
-                    <div class="kpi-subtitle">Margem líquida</div>
-                    <div class="kpi-trend positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+1.8% vs mês anterior</span>
-                    </div>
-                </div>
-                
-                <div class="kpi-card info">
-                    <div class="kpi-header">
-                        <span class="kpi-title">Taxa de Ocupação</span>
-                        <i class="fas fa-box kpi-icon"></i>
-                    </div>
-                    <div class="kpi-value">78.5%</div>
-                    <div class="kpi-subtitle">Rotas com carga</div>
-                    <div class="kpi-trend positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+4.2% vs mês anterior</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Gráfico de Cascata (Waterfall) -->
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h3 class="chart-title"><i class="fas fa-chart-bar"></i> Análise de Fluxo Financeiro (Waterfall)</h3>
-                    <button class="btn-export" onclick="exportChart('waterfallChart')">
-                        <i class="fas fa-download"></i> Exportar
-                    </button>
-                </div>
-                <canvas id="waterfallChart" height="80"></canvas>
-            </div>
-            
-            <!-- Gráficos em Grid -->
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-bottom: 30px;">
-                <!-- Gráfico de Tendência Anual -->
-                <div class="chart-container">
-                    <div class="chart-header">
-                        <h3 class="chart-title"><i class="fas fa-chart-line"></i> Tendência Anual</h3>
-                    </div>
-                    <canvas id="trendChart"></canvas>
-                </div>
-                
-                <!-- Gráfico de Pareto -->
-                <div class="chart-container">
-                    <div class="chart-header">
-                        <h3 class="chart-title"><i class="fas fa-chart-pie"></i> Análise de Pareto (80/20)</h3>
-                    </div>
-                    <canvas id="paretoChart"></canvas>
-                </div>
-            </div>
-            
-            <!-- Análises Detalhadas -->
-            <div class="analysis-section">
-                <h2 style="margin-bottom: 20px; color: var(--text-primary);">
-                    <i class="fas fa-chart-bar"></i> Análises Detalhadas
-                </h2>
-                
-                <div class="analysis-grid">
-                    <!-- Ranking de Veículos -->
-                    <div class="analysis-card">
-                        <h4><i class="fas fa-truck"></i> Top 5 Veículos Mais Rentáveis</h4>
-                        <ul class="ranking-list">
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">1º</span>
-                                    <span>ABC-1234 - Caminhão 1</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-success);">R$ 45.200,00</strong>
-                                    <span class="badge badge-success">+15%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">2º</span>
-                                    <span>DEF-5678 - Caminhão 2</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-success);">R$ 38.500,00</strong>
-                                    <span class="badge badge-success">+12%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">3º</span>
-                                    <span>GHI-9012 - Caminhão 3</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-success);">R$ 32.100,00</strong>
-                                    <span class="badge badge-success">+8%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">4º</span>
-                                    <span>JKL-3456 - Caminhão 4</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-warning);">R$ 28.900,00</strong>
-                                    <span class="badge badge-warning">+3%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">5º</span>
-                                    <span>MNO-7890 - Caminhão 5</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-warning);">R$ 25.400,00</strong>
-                                    <span class="badge badge-warning">+1%</span>
-                                </div>
-                            </li>
-                        </ul>
+
+            <!-- Section 1: Simulation & Forecast -->
+            <div class="grid-cols-12" style="margin-bottom: 2rem;">
+                <!-- Simulator -->
+                <div class="col-span-4 card sim-panel">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fas fa-sliders-h"></i> Simulador de Cenários</h3>
+                        <i class="fas fa-question-circle text-muted" title="Ajuste os parâmetros para ver o impacto no lucro projetado."></i>
                     </div>
                     
-                    <!-- Ranking de Motoristas -->
-                    <div class="analysis-card">
-                        <h4><i class="fas fa-user"></i> Top 5 Motoristas Mais Rentáveis</h4>
-                        <ul class="ranking-list">
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">1º</span>
-                                    <span>João Silva</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-success);">R$ 52.300,00</strong>
-                                    <span class="badge badge-success">+18%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">2º</span>
-                                    <span>Maria Santos</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-success);">R$ 48.100,00</strong>
-                                    <span class="badge badge-success">+14%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">3º</span>
-                                    <span>Pedro Oliveira</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-success);">R$ 41.800,00</strong>
-                                    <span class="badge badge-success">+10%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">4º</span>
-                                    <span>Ana Costa</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-warning);">R$ 38.200,00</strong>
-                                    <span class="badge badge-warning">+6%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">5º</span>
-                                    <span>Carlos Souza</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-warning);">R$ 35.600,00</strong>
-                                    <span class="badge badge-warning">+4%</span>
-                                </div>
-                            </li>
-                        </ul>
+                    <div class="slider-group">
+                        <div class="slider-header">
+                            <span class="slider-label">Preço do Combustível</span>
+                            <span class="slider-value" id="val-fuel">0%</span>
+                        </div>
+                        <input type="range" id="slider-fuel" min="-20" max="20" value="0" oninput="updateSimulation()">
+                        <small class="text-muted">Impacto direto no custo variável</small>
+                    </div>
+
+                    <div class="slider-group">
+                        <div class="slider-header">
+                            <span class="slider-label">Valor do Frete Médio</span>
+                            <span class="slider-value" id="val-freight">0%</span>
+                        </div>
+                        <input type="range" id="slider-freight" min="-20" max="20" value="0" oninput="updateSimulation()">
+                        <small class="text-muted">Impacto direto na receita</small>
+                    </div>
+
+                    <div class="slider-group">
+                        <div class="slider-header">
+                            <span class="slider-label">Custo de Manutenção</span>
+                            <span class="slider-value" id="val-maint">0%</span>
+                        </div>
+                        <input type="range" id="slider-maint" min="-20" max="20" value="0" oninput="updateSimulation()">
+                        <small class="text-muted">Impacto em custos de frota</small>
+                    </div>
+
+                    <div class="sim-result">
+                        <div class="sim-result-label">Lucro Líquido Projetado (Mensal)</div>
+                        <div class="sim-result-value" id="sim-profit">R$ 45.200</div>
+                        <div class="sim-result-diff trend-up" id="sim-diff">+0.0% vs Atual</div>
+                    </div>
+                </div>
+
+                <!-- AI Forecast -->
+                <div class="col-span-8 card">
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="fas fa-chart-line"></i> Projeção Inteligente (AI Forecast)</h3>
+                        <span class="badge-beta" style="background: #eff6ff; color: #3b82f6;">Confiança: Alta</span>
                     </div>
                     
-                    <!-- Ranking de Clientes -->
-                    <div class="analysis-card">
-                        <h4><i class="fas fa-users"></i> Top 5 Clientes Mais Rentáveis</h4>
-                        <ul class="ranking-list">
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">1º</span>
-                                    <span>Cliente A</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-success);">R$ 68.500,00</strong>
-                                    <span class="badge badge-success">+22%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">2º</span>
-                                    <span>Cliente B</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-success);">R$ 55.200,00</strong>
-                                    <span class="badge badge-success">+16%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">3º</span>
-                                    <span>Cliente C</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-success);">R$ 42.800,00</strong>
-                                    <span class="badge badge-success">+12%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">4º</span>
-                                    <span>Cliente D</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-warning);">R$ 38.100,00</strong>
-                                    <span class="badge badge-warning">+7%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span class="ranking-position">5º</span>
-                                    <span>Cliente E</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-warning);">R$ 32.400,00</strong>
-                                    <span class="badge badge-warning">+5%</span>
-                                </div>
-                            </li>
-                        </ul>
+                    <div class="forecast-insight" id="forecast-text">
+                        <i class="fas fa-lightbulb"></i> 
+                        Baseado no histórico de 12 meses, sua tendência é de <strong>crescimento de 5%</strong>. 
+                        Atenção para sazonalidade em Dezembro.
                     </div>
-                    
-                    <!-- Análise por Tipo de Frete -->
-                    <div class="analysis-card">
-                        <h4><i class="fas fa-route"></i> Lucratividade por Tipo de Frete</h4>
-                        <ul class="ranking-list">
-                            <li class="ranking-item">
-                                <div>
-                                    <span><i class="fas fa-box"></i> FCL</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-success);">R$ 85.200,00</strong>
-                                    <span class="badge badge-success">Margem: 28%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span><i class="fas fa-boxes"></i> LCL</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-success);">R$ 45.300,00</strong>
-                                    <span class="badge badge-success">Margem: 22%</span>
-                                </div>
-                            </li>
-                            <li class="ranking-item">
-                                <div>
-                                    <span><i class="fas fa-shipping-fast"></i> Expresso</span>
-                                </div>
-                                <div>
-                                    <strong style="color: var(--accent-warning);">R$ 28.100,00</strong>
-                                    <span class="badge badge-warning">Margem: 18%</span>
-                                </div>
-                            </li>
-                        </ul>
+
+                    <div style="flex: 1; min-height: 300px;">
+                        <canvas id="forecastChart"></canvas>
                     </div>
                 </div>
             </div>
-            
-            <!-- Breakdown de Custos -->
-            <div class="chart-container">
-                <div class="chart-header">
-                    <h3 class="chart-title"><i class="fas fa-chart-pie"></i> Distribuição Detalhada de Custos</h3>
+
+            <!-- Section 2: Financial Health Overview -->
+            <div class="grid-cols-12" style="margin-bottom: 2rem;">
+                <div class="col-span-3 kpi-mini">
+                    <div class="kpi-mini-label">Receita Total</div>
+                    <div class="kpi-mini-value">R$ 152.400</div>
+                    <div class="kpi-mini-trend trend-up"><i class="fas fa-arrow-up"></i> 12% vs mês ant.</div>
                 </div>
-                <canvas id="costBreakdownChart"></canvas>
+                <div class="col-span-3 kpi-mini">
+                    <div class="kpi-mini-label">Custo Total</div>
+                    <div class="kpi-mini-value">R$ 107.200</div>
+                    <div class="kpi-mini-trend trend-down"><i class="fas fa-arrow-up"></i> 8% vs mês ant.</div>
+                </div>
+                <div class="col-span-3 kpi-mini">
+                    <div class="kpi-mini-label">Margem Líquida</div>
+                    <div class="kpi-mini-value">29.6%</div>
+                    <div class="kpi-mini-trend trend-up"><i class="fas fa-arrow-up"></i> 1.2% vs mês ant.</div>
+                </div>
+                <div class="col-span-3 kpi-mini">
+                    <div class="kpi-mini-label">ROI</div>
+                    <div class="kpi-mini-value">15.2%</div>
+                    <div class="kpi-mini-trend trend-up"><i class="fas fa-arrow-up"></i> 0.5% vs mês ant.</div>
+                </div>
+            </div>
+
+            <!-- Section 3: Offenders & Waterfall -->
+            <div class="grid-cols-12">
+                <!-- Offenders Table -->
+                <div class="col-span-8 card">
+                    <div class="card-header">
+                        <h3 class="card-title" style="color: #ef4444;"><i class="fas fa-exclamation-triangle"></i> Ofensores de Lucratividade</h3>
+                        <button class="btn btn-sm btn-outline">Ver Todos</button>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Rota / Veículo</th>
+                                    <th>Motorista</th>
+                                    <th>Receita</th>
+                                    <th>Custo</th>
+                                    <th>Prejuízo</th>
+                                    <th>Diagnóstico IA</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>SP-RJ (Rota 104)</strong><br><small class="text-muted">ABC-1234</small></td>
+                                    <td>João Silva</td>
+                                    <td>R$ 4.200</td>
+                                    <td>R$ 4.850</td>
+                                    <td class="text-danger font-bold">- R$ 650</td>
+                                    <td><span class="status-badge status-danger">Consumo Excessivo (+15%)</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>MG-SP (Rota 201)</strong><br><small class="text-muted">DEF-5678</small></td>
+                                    <td>Pedro Santos</td>
+                                    <td>R$ 3.800</td>
+                                    <td>R$ 4.100</td>
+                                    <td class="text-danger font-bold">- R$ 300</td>
+                                    <td><span class="status-badge status-warning">Tempo de Espera Alto</span></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>PR-SC (Rota 305)</strong><br><small class="text-muted">GHI-9012</small></td>
+                                    <td>Maria Costa</td>
+                                    <td>R$ 5.100</td>
+                                    <td>R$ 5.250</td>
+                                    <td class="text-danger font-bold">- R$ 150</td>
+                                    <td><span class="status-badge status-warning">Manutenção Não Prevista</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Waterfall Chart -->
+                <div class="col-span-4 card">
+                    <div class="card-header">
+                        <h3 class="card-title">Composição do Custo</h3>
+                    </div>
+                    <div style="flex: 1; min-height: 250px;">
+                        <canvas id="waterfallChart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    
+
     <script>
-        // Dados mockados para demonstração
-        const mockData = {
-            lucro: 125450,
-            receita: 505000,
-            despesas: 379550,
-            roi: 18.5,
-            ticketMedio: 3250,
-            custoKm: 2.85,
-            margem: 24.8,
-            ocupacao: 78.5
+        // Base Data (Mock)
+        const baseData = {
+            revenue: 152400,
+            costs: {
+                fuel: 45000,     // Variable
+                maint: 15000,    // Variable
+                fixed: 30000,    // Fixed
+                personnel: 17200 // Fixed
+            },
+            profit: 45200
         };
-        
-        // Gráfico de Cascata (Waterfall)
-        const waterfallCtx = document.getElementById('waterfallChart').getContext('2d');
-        new Chart(waterfallCtx, {
-            type: 'bar',
-            data: {
-                labels: ['Receita Inicial', 'Despesas Combustível', 'Despesas Manutenção', 'Despesas Fixas', 'Despesas Viagem', 'Lucro Final'],
-                datasets: [{
-                    label: 'Valor (R$)',
-                    data: [505000, -202000, -85000, -62500, -30050, 125450],
-                    backgroundColor: [
-                        'rgba(16, 185, 129, 0.8)',
-                        'rgba(239, 68, 68, 0.8)',
-                        'rgba(239, 68, 68, 0.8)',
-                        'rgba(239, 68, 68, 0.8)',
-                        'rgba(239, 68, 68, 0.8)',
-                        'rgba(16, 185, 129, 0.8)'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return 'R$ ' + Math.abs(context.parsed.y).toLocaleString('pt-BR', {minimumFractionDigits: 2});
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + Math.abs(value).toLocaleString('pt-BR');
-                            }
-                        }
-                    }
-                }
-            }
+
+        let forecastChart = null;
+        let waterfallChart = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            Chart.register(ChartDataLabels);
+            initCharts();
+            updateSimulation(); // Initial calc
         });
-        
-        // Gráfico de Tendência Anual
-        const trendCtx = document.getElementById('trendChart').getContext('2d');
-        new Chart(trendCtx, {
-            type: 'line',
-            data: {
-                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-                datasets: [{
-                    label: 'Lucro 2024',
-                    data: [95000, 105000, 98000, 112000, 108000, 115000, 118000, 120000, 122000, 123500, 124000, 125450],
-                    borderColor: 'rgba(16, 185, 129, 1)',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }, {
-                    label: 'Lucro 2023',
-                    data: [85000, 92000, 88000, 95000, 98000, 102000, 105000, 108000, 110000, 112000, 113000, 115000],
-                    borderColor: 'rgba(59, 130, 246, 1)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    tension: 0.4,
-                    fill: true
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': R$ ' + context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-                            }
-                        }
-                    }
+
+        // --- Simulation Logic ---
+        function updateSimulation() {
+            // Get slider values
+            const fuelPct = parseInt(document.getElementById('slider-fuel').value);
+            const freightPct = parseInt(document.getElementById('slider-freight').value);
+            const maintPct = parseInt(document.getElementById('slider-maint').value);
+
+            // Update UI labels
+            document.getElementById('val-fuel').textContent = (fuelPct > 0 ? '+' : '') + fuelPct + '%';
+            document.getElementById('val-freight').textContent = (freightPct > 0 ? '+' : '') + freightPct + '%';
+            document.getElementById('val-maint').textContent = (maintPct > 0 ? '+' : '') + maintPct + '%';
+
+            // Calculate new values
+            const newRevenue = baseData.revenue * (1 + (freightPct / 100));
+            const newFuelCost = baseData.costs.fuel * (1 + (fuelPct / 100));
+            const newMaintCost = baseData.costs.maint * (1 + (maintPct / 100));
+            
+            const totalCost = newFuelCost + newMaintCost + baseData.costs.fixed + baseData.costs.personnel;
+            const newProfit = newRevenue - totalCost;
+
+            // Update Result Card
+            const profitEl = document.getElementById('sim-profit');
+            const diffEl = document.getElementById('sim-diff');
+
+            profitEl.textContent = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(newProfit);
+            
+            const diffPct = ((newProfit - baseData.profit) / baseData.profit) * 100;
+            diffEl.textContent = (diffPct > 0 ? '+' : '') + diffPct.toFixed(1) + '% vs Atual';
+            diffEl.className = 'sim-result-diff ' + (diffPct >= 0 ? 'trend-up' : 'trend-down');
+
+            // Update Forecast Chart with simulated data
+            updateForecastChart(newProfit);
+        }
+
+        function resetSimulation() {
+            document.getElementById('slider-fuel').value = 0;
+            document.getElementById('slider-freight').value = 0;
+            document.getElementById('slider-maint').value = 0;
+            updateSimulation();
+        }
+
+        // --- Charts ---
+        function initCharts() {
+            // Forecast Chart
+            const ctxForecast = document.getElementById('forecastChart').getContext('2d');
+            forecastChart = new Chart(ctxForecast, {
+                type: 'line',
+                data: {
+                    labels: ['Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez (Atual)', 'Jan (Proj)', 'Fev (Proj)', 'Mar (Proj)'],
+                    datasets: [{
+                        label: 'Lucro Real',
+                        data: [38000, 41000, 39500, 42000, 44000, 45200, null, null, null],
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'Projeção (Simulada)',
+                        data: [null, null, null, null, null, 45200, 46500, 47800, 49000], // Initial dummy data
+                        borderColor: '#8b5cf6',
+                        borderDash: [5, 5],
+                        tension: 0.4,
+                        pointStyle: 'circle',
+                        pointRadius: 5,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#8b5cf6'
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: false,
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + value.toLocaleString('pt-BR');
-                            }
-                        }
-                    }
-                }
-            }
-        });
-        
-        // Gráfico de Pareto
-        const paretoCtx = document.getElementById('paretoChart').getContext('2d');
-        new Chart(paretoCtx, {
-            type: 'bar',
-            data: {
-                labels: ['Combustível', 'Manutenção', 'Despesas Fixas', 'Despesas Viagem', 'Outros'],
-                datasets: [{
-                    label: 'Valor (R$)',
-                    data: [202000, 85000, 62500, 30050, 0],
-                    backgroundColor: [
-                        'rgba(239, 68, 68, 0.8)',
-                        'rgba(245, 158, 11, 0.8)',
-                        'rgba(59, 130, 246, 0.8)',
-                        'rgba(139, 92, 246, 0.8)',
-                        'rgba(107, 114, 128, 0.8)'
-                    ]
-                }, {
-                    label: 'Acumulado (%)',
-                    type: 'line',
-                    data: [53.2, 75.6, 92.1, 100, 100],
-                    borderColor: 'rgba(16, 185, 129, 1)',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    yAxisID: 'y1',
-                    fill: false
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        display: true
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                if (context.datasetIndex === 0) {
-                                    return 'Valor: R$ ' + context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-                                } else {
-                                    return 'Acumulado: ' + context.parsed.y.toFixed(1) + '%';
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    xMin: 5,
+                                    xMax: 5,
+                                    borderColor: '#9ca3af',
+                                    borderWidth: 2,
+                                    borderDash: [2, 2],
+                                    label: {
+                                        display: true,
+                                        content: 'Hoje',
+                                        position: 'start'
+                                    }
                                 }
                             }
                         }
                     }
+                }
+            });
+
+            // Waterfall Chart
+            const ctxWaterfall = document.getElementById('waterfallChart').getContext('2d');
+            waterfallChart = new Chart(ctxWaterfall, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Combustível', 'Pessoal', 'Manutenção', 'Fixos', 'Lucro'],
+                    datasets: [{
+                        data: [45000, 17200, 15000, 30000, 45200],
+                        backgroundColor: ['#ef4444', '#f59e0b', '#f97316', '#6b7280', '#10b981'],
+                        borderWidth: 0
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        position: 'left',
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + value.toLocaleString('pt-BR');
-                            }
-                        }
-                    },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        max: 100,
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            }
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        }
-                    }
-                }
-            }
-        });
-        
-        // Gráfico de Distribuição de Custos
-        const costBreakdownCtx = document.getElementById('costBreakdownChart').getContext('2d');
-        new Chart(costBreakdownCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Combustível', 'Manutenção', 'Despesas Fixas', 'Despesas Viagem', 'Financiamento', 'Outros'],
-                datasets: [{
-                    data: [202000, 85000, 62500, 30050, 15000, 0],
-                    backgroundColor: [
-                        'rgba(239, 68, 68, 0.8)',
-                        'rgba(245, 158, 11, 0.8)',
-                        'rgba(59, 130, 246, 0.8)',
-                        'rgba(139, 92, 246, 0.8)',
-                        'rgba(236, 72, 153, 0.8)',
-                        'rgba(107, 114, 128, 0.8)'
-                    ]
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'right'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                const label = context.label || '';
-                                const value = context.parsed || 0;
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = ((value / total) * 100).toFixed(1);
-                                return label + ': R$ ' + value.toLocaleString('pt-BR', {minimumFractionDigits: 2}) + ' (' + percentage + '%)';
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' },
+                        datalabels: {
+                            color: '#fff',
+                            formatter: (value, ctx) => {
+                                let sum = 0;
+                                let dataArr = ctx.chart.data.datasets[0].data;
+                                dataArr.map(data => { sum += data; });
+                                let percentage = (value*100 / sum).toFixed(0)+"%";
+                                return percentage;
                             }
                         }
                     }
                 }
-            }
-        });
-        
-        function aplicarFiltros() {
-            alert('Filtros aplicados! (Funcionalidade de exemplo)');
+            });
         }
-        
-        function exportChart(chartId) {
-            alert('Exportando gráfico: ' + chartId + ' (Funcionalidade de exemplo)');
+
+        function updateForecastChart(simulatedProfit) {
+            if (!forecastChart) return;
+
+            // Simple projection logic: apply the simulated profit as the baseline for future months with slight growth
+            const p1 = simulatedProfit * 1.02; // +2%
+            const p2 = simulatedProfit * 1.04; // +4%
+            const p3 = simulatedProfit * 1.06; // +6%
+
+            // Update the "Projection" dataset (index 1)
+            // Index 5 is "Dez (Atual)", so 6, 7, 8 are Jan, Feb, Mar
+            forecastChart.data.datasets[1].data = [null, null, null, null, null, baseData.profit, p1, p2, p3];
+            forecastChart.update();
         }
-        
-        // Configurar botão de ajuda
-        document.getElementById('helpBtn')?.addEventListener('click', function() {
-            alert('Modal de ajuda será implementado aqui');
-        });
-        
-        // Configurar botão de exportar
-        document.getElementById('exportBtn')?.addEventListener('click', function() {
-            alert('Funcionalidade de exportação será implementada aqui');
-        });
     </script>
 </body>
 </html>
-

@@ -33,11 +33,12 @@ $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
 $stmt->execute();
 $usuarios_motoristas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Buscar usuários do sistema (admin/gestor)
+// Buscar usuários do sistema (admin/gestor) - excluindo usuários ocultos
 $stmt = $conn->prepare('
     SELECT u.*, "sistema" as tipo_usuario_sistema
     FROM usuarios u 
     WHERE u.empresa_id = :empresa_id 
+    AND (u.is_oculto IS NULL OR u.is_oculto = 0)
     ORDER BY u.data_cadastro DESC
 ');
 $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);

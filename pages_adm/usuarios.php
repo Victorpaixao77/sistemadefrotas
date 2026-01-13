@@ -35,15 +35,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                     // Hash da senha
                     $senha_hash = password_hash($_POST['senha'], PASSWORD_DEFAULT);
+                    
+                    // Verificar se tem acesso a todas as empresas
+                    $is_oculto = isset($_POST['is_oculto']) && $_POST['is_oculto'] == '1' ? 1 : 0;
+                    $acesso_todas_empresas = isset($_POST['acesso_todas_empresas']) && $_POST['acesso_todas_empresas'] == '1' ? 1 : 0;
+                    
+                    // Se tem acesso a todas empresas, empresa_id pode ser NULL ou primeira empresa
+                    $empresa_id_final = $acesso_todas_empresas ? ($empresa_cliente['id'] ?? null) : $empresa_cliente['id'];
 
-                    $stmt = $pdo->prepare("INSERT INTO usuarios (nome, email, senha, empresa_id, tipo_usuario, status, is_admin) VALUES (?, ?, ?, ?, ?, 'ativo', ?)");
+                    $stmt = $pdo->prepare("INSERT INTO usuarios (nome, email, senha, empresa_id, tipo_usuario, status, is_admin, is_oculto, acesso_todas_empresas) VALUES (?, ?, ?, ?, ?, 'ativo', ?, ?, ?)");
                     $stmt->execute([
                         $_POST['nome'],
                         $_POST['email'],
                         $senha_hash,
-                        $empresa_cliente['id'], // Usando o ID da empresa_clientes
+                        $empresa_id_final,
                         $_POST['tipo_usuario'],
-                        $_POST['tipo_usuario'] == 'admin' ? 1 : 0
+                        $_POST['tipo_usuario'] == 'admin' ? 1 : 0,
+                        $is_oculto,
+                        $acesso_todas_empresas
                     ]);
                     
                     // Obter o ID do usuário recém-criado
@@ -158,24 +167,33 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         throw new Exception("Empresa não encontrada.");
                     }
 
-                    $sql = "UPDATE usuarios SET nome = ?, email = ?, empresa_id = ?, tipo_usuario = ?, status = ?, is_admin = ?";
+                    // Verificar campos de oculto e acesso
+                    $is_oculto = isset($_POST['is_oculto']) && $_POST['is_oculto'] == '1' ? 1 : 0;
+                    $acesso_todas_empresas = isset($_POST['acesso_todas_empresas']) && $_POST['acesso_todas_empresas'] == '1' ? 1 : 0;
+                    
+                    // Se tem acesso a todas empresas, empresa_id pode ser NULL ou primeira empresa
+                    $empresa_id_final = $acesso_todas_empresas ? ($empresa_cliente['id'] ?? null) : $empresa_cliente['id'];
+                    
+                    $sql = "UPDATE usuarios SET nome = ?, email = ?, empresa_id = ?, tipo_usuario = ?, status = ?, is_admin = ?, is_oculto = ?, acesso_todas_empresas = ?";
                     $params = [
                         $_POST['nome'],
                         $_POST['email'],
-                        $empresa_cliente['id'], // Usando o ID da empresa_clientes
+                        $empresa_id_final,
                         $_POST['tipo_usuario'],
                         $_POST['status'],
                         $_POST['tipo_usuario'] == 'admin' ? 1 : 0,
-                        $_POST['id']
+                        $is_oculto,
+                        $acesso_todas_empresas
                     ];
 
                     // Se uma nova senha foi fornecida
                     if (!empty($_POST['senha'])) {
-                        $sql .= ", senha = ?";
-                        $params[] = password_hash($_POST['senha'], PASSWORD_DEFAULT);
+                        $sql = str_replace("SET nome", "SET senha = ?, nome", $sql);
+                        array_splice($params, 0, 0, password_hash($_POST['senha'], PASSWORD_DEFAULT));
                     }
 
                     $sql .= " WHERE id = ?";
+                    $params[] = $_POST['id'];
                     $stmt = $pdo->prepare($sql);
                     $stmt->execute($params);
 
@@ -285,15 +303,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Buscar usuários com informações da empresa
+// Buscar usuários com informações da empresa (incluindo ocultos para admins)
 try {
     $stmt = $pdo->query("
         SELECT u.*, e.razao_social as empresa_nome, e.empresa_adm_id 
         FROM usuarios u 
         LEFT JOIN empresa_clientes e ON u.empresa_id = e.id 
-        ORDER BY u.nome
+        ORDER BY u.is_oculto DESC, u.nome
     ");
     $usuarios = $stmt->fetchAll();
+    
+    // Adicionar empresa_adm_id aos usuários para o JavaScript (caso não tenha vindo do JOIN)
+    foreach ($usuarios as &$usuario) {
+        if (empty($usuario['empresa_adm_id']) && !empty($usuario['empresa_id'])) {
+            $stmt_emp = $pdo->prepare("SELECT empresa_adm_id FROM empresa_clientes WHERE id = ?");
+            $stmt_emp->execute([$usuario['empresa_id']]);
+            $emp = $stmt_emp->fetch();
+            if ($emp) {
+                $usuario['empresa_adm_id'] = $emp['empresa_adm_id'];
+            }
+        }
+    }
 
     // Buscar empresas para o select
     $stmt = $pdo->query("
@@ -497,6 +527,8 @@ try {
                         <th>Empresa</th>
                         <th>Tipo</th>
                         <th>Status</th>
+                        <th>Oculto</th>
+                        <th>Acesso Global</th>
                         <th>Data de Cadastro</th>
                         <th>Ações</th>
                     </tr>
@@ -522,6 +554,20 @@ try {
                                 <span class="badge <?php echo $usuario['status'] == 'ativo' ? 'badge-ativo' : 'badge-inativo'; ?>">
                                     <?php echo ucfirst($usuario['status']); ?>
                                 </span>
+                            </td>
+                            <td>
+                                <?php if (!empty($usuario['is_oculto']) && $usuario['is_oculto'] == 1): ?>
+                                    <span class="badge badge-admin">Sim</span>
+                                <?php else: ?>
+                                    <span class="badge badge-inativo">Não</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if (!empty($usuario['acesso_todas_empresas']) && $usuario['acesso_todas_empresas'] == 1): ?>
+                                    <span class="badge badge-admin">Sim</span>
+                                <?php else: ?>
+                                    <span class="badge badge-inativo">Não</span>
+                                <?php endif; ?>
                             </td>
                             <td><?php echo date('d/m/Y', strtotime($usuario['data_cadastro'])); ?></td>
                             <td class="actions">
@@ -577,6 +623,18 @@ try {
                         <option value="motorista">Motorista</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="is_oculto" name="is_oculto" value="1">
+                        <span>Usuário Oculto (não aparece nas listagens)</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="acesso_todas_empresas" name="acesso_todas_empresas" value="1">
+                        <span>Acesso a Todas as Empresas</span>
+                    </label>
+                </div>
                 <button type="submit" class="btn">Salvar</button>
             </form>
         </div>
@@ -628,6 +686,18 @@ try {
                         <option value="inativo">Inativo</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="edit_is_oculto" name="is_oculto" value="1">
+                        <span>Usuário Oculto (não aparece nas listagens)</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="edit_acesso_todas_empresas" name="acesso_todas_empresas" value="1">
+                        <span>Acesso a Todas as Empresas</span>
+                    </label>
+                </div>
                 <button type="submit" class="btn">Atualizar</button>
             </form>
         </div>
@@ -656,6 +726,9 @@ try {
             }
             document.getElementById('edit_tipo_usuario').value = tipoUsuario;
             document.getElementById('edit_status').value = usuario.status;
+            // Preencher checkboxes
+            document.getElementById('edit_is_oculto').checked = usuario.is_oculto == 1;
+            document.getElementById('edit_acesso_todas_empresas').checked = usuario.acesso_todas_empresas == 1;
             document.getElementById('editModal').style.display = 'block';
         }
 

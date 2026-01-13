@@ -134,6 +134,14 @@
                         <span class="sidebar-link-text">Configuração</span>
                     </a>
                 </li>
+                <li class="sidebar-nav-item">
+                    <a href="/sistema-frotas/pages/log_acessos.php" class="sidebar-link">
+                        <div class="sidebar-link-icon">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <span class="sidebar-link-text">Log de Acessos</span>
+                    </a>
+                </li>
             </ul>
         </nav>
     </div>

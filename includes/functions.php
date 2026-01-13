@@ -269,3 +269,60 @@ function updateCompanyData($data) {
         return false;
     }
 }
+
+/**
+ * Registra um log de acesso no sistema
+ * 
+ * @param int $usuario_id ID do usuário
+ * @param int $empresa_id ID da empresa
+ * @param string $tipo Tipo de acesso (login, logout, tentativa_login_falha)
+ * @param string $status Status do acesso (sucesso, falha)
+ * @param string $descricao Descrição adicional (opcional)
+ * @return boolean True se registrado com sucesso
+ */
+function registrarLogAcesso($usuario_id, $empresa_id, $tipo = 'login', $status = 'sucesso', $descricao = null) {
+    try {
+        $conn = getConnection();
+        
+        // Criar tabela se não existir
+        $conn->exec("CREATE TABLE IF NOT EXISTS log_acessos (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            usuario_id INT NOT NULL,
+            empresa_id INT NOT NULL,
+            tipo_acesso ENUM('login', 'logout', 'tentativa_login_falha', 'sessao_expirada') DEFAULT 'login',
+            status ENUM('sucesso', 'falha') DEFAULT 'sucesso',
+            ip_address VARCHAR(45),
+            user_agent TEXT,
+            descricao TEXT,
+            data_acesso TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_usuario (usuario_id),
+            INDEX idx_empresa (empresa_id),
+            INDEX idx_tipo (tipo_acesso),
+            INDEX idx_data (data_acesso)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+        
+        // Obter IP do cliente
+        $ip_address = getClientIp();
+        
+        // Obter User Agent
+        $user_agent = isset($_SERVER['HTTP_USER_AGENT']) ? substr($_SERVER['HTTP_USER_AGENT'], 0, 500) : null;
+        
+        // Inserir log
+        $sql = "INSERT INTO log_acessos (usuario_id, empresa_id, tipo_acesso, status, ip_address, user_agent, descricao) 
+                VALUES (:usuario_id, :empresa_id, :tipo_acesso, :status, :ip_address, :user_agent, :descricao)";
+        
+        $stmt = $conn->prepare($sql);
+        $stmt->bindValue(':usuario_id', $usuario_id, PDO::PARAM_INT);
+        $stmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindValue(':tipo_acesso', $tipo, PDO::PARAM_STR);
+        $stmt->bindValue(':status', $status, PDO::PARAM_STR);
+        $stmt->bindValue(':ip_address', $ip_address, PDO::PARAM_STR);
+        $stmt->bindValue(':user_agent', $user_agent, PDO::PARAM_STR);
+        $stmt->bindValue(':descricao', $descricao, PDO::PARAM_STR);
+        
+        return $stmt->execute();
+    } catch(PDOException $e) {
+        error_log("Erro ao registrar log de acesso: " . $e->getMessage());
+        return false;
+    }
+}

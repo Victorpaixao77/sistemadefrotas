@@ -33,8 +33,8 @@ try {
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         echo json_encode([
             'success' => true, 
-            'nome_personalizado' => $row ? $row['nome_personalizado'] : 'Desenvolvimento',
-            'logo_empresa' => $row ? $row['logo_empresa'] : null
+            'nome_personalizado' => $row ? $row['nome_personalizado'] : 'Frotec Online',
+            'logo_empresa' => $row && $row['logo_empresa'] ? $row['logo_empresa'] : 'logo.png'
         ]);
         exit;
     }
@@ -52,9 +52,12 @@ try {
             $stmt2->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
             $stmt2->execute();
         } else {
-            $stmt2 = $conn->prepare('INSERT INTO configuracoes (empresa_id, nome_personalizado, data_criacao, data_atualizacao) VALUES (:empresa_id, :nome, NOW(), NOW())');
+            $nome_padrao = 'Frotec Online';
+            $logo_padrao = 'logo.png';
+            $stmt2 = $conn->prepare('INSERT INTO configuracoes (empresa_id, nome_personalizado, logo_empresa, data_criacao, data_atualizacao) VALUES (:empresa_id, :nome, :logo, NOW(), NOW())');
             $stmt2->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
             $stmt2->bindParam(':nome', $nome);
+            $stmt2->bindParam(':logo', $logo_padrao);
             $stmt2->execute();
         }
         echo json_encode(['success' => true]);
@@ -96,25 +99,24 @@ try {
             
             if ($check_stmt->rowCount() == 0) {
                 // Criar configuração padrão se não existir
-                $empresa_stmt = $conn->prepare('SELECT razao_social FROM empresa_clientes WHERE id = :empresa_id LIMIT 1');
-                $empresa_stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-                $empresa_stmt->execute();
-                $empresa_nome = $empresa_stmt->fetchColumn() ?: 'Empresa';
+                $nome_padrao = 'Frotec Online';
+                $logo_padrao = 'logo.png';
                 
                 $create_stmt = $conn->prepare('INSERT INTO configuracoes (
-                    empresa_id, cor_menu, nome_personalizado, data_criacao, data_atualizacao,
+                    empresa_id, cor_menu, nome_personalizado, logo_empresa, data_criacao, data_atualizacao,
                     notificar_abastecimentos, notificar_manutencoes, notificar_viagens,
                     limite_km_manutencao, limite_dias_manutencao, notificar_pneus_vida_util,
                     notificar_pneus_recapagem, notificar_pneus_troca_frequente,
                     calcular_todas_despesas, calcular_despesas_fixas, calcular_despesas_viagem,
                     calcular_abastecimentos, calcular_manutencao, calcular_manutencao_pneus, calcular_comissoes
                 ) VALUES (
-                    :empresa_id, "#343a40", :nome_empresa, NOW(), NOW(),
+                    :empresa_id, "#343a40", :nome_empresa, :logo_empresa, NOW(), NOW(),
                     0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0
                 )');
                 
                 $create_stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-                $create_stmt->bindParam(':nome_empresa', $empresa_nome);
+                $create_stmt->bindParam(':nome_empresa', $nome_padrao);
+                $create_stmt->bindParam(':logo_empresa', $logo_padrao);
                 $create_stmt->execute();
             }
             

@@ -5,8 +5,8 @@ require_once __DIR__ . '/../includes/permissions.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 $empresa_id = $_SESSION['empresa_id'] ?? null;
-$nome_personalizado = 'Desenvolvimento';
-$logo_path = null;
+$nome_personalizado = 'Frotec Online';
+$logo_path = 'logo.png';
 
 if ($empresa_id) {
     try {
@@ -17,15 +17,20 @@ if ($empresa_id) {
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($row) {
             if (!empty($row['nome_personalizado'])) {
-            $nome_personalizado = $row['nome_personalizado'];
+                $nome_personalizado = $row['nome_personalizado'];
             }
             if (!empty($row['logo_empresa'])) {
-                // Construir o caminho completo da logo
-                if (strpos($row['logo_empresa'], 'uploads/') !== 0) {
-                    // Se não começar com 'uploads/', adicionar o caminho
-                    $logo_path = 'uploads/logos/' . $row['logo_empresa'];
+                // Se for o logo padrão do sistema, usar direto
+                if ($row['logo_empresa'] === 'logo.png') {
+                    $logo_path = 'logo.png';
                 } else {
-                    $logo_path = $row['logo_empresa'];
+                    // Construir o caminho completo da logo personalizada
+                    if (strpos($row['logo_empresa'], 'uploads/') !== 0) {
+                        // Se não começar com 'uploads/', adicionar o caminho
+                        $logo_path = 'uploads/logos/' . $row['logo_empresa'];
+                    } else {
+                        $logo_path = $row['logo_empresa'];
+                    }
                 }
             }
         }

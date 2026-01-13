@@ -25,9 +25,10 @@ if (isset($_COOKIE['remember_user']) && !isset($_SESSION['loggedin']) && !isset(
             $user_email = $parts[1];
             
             $conn = getConnection();
-            $sql = "SELECT u.id, u.nome, u.email, u.empresa_id, u.status as usuario_status, u.foto_perfil, u.tipo_usuario 
+            $sql = "SELECT u.id, u.nome, u.email, u.empresa_id, u.status as usuario_status, u.foto_perfil, u.tipo_usuario, 
+                           u.acesso_todas_empresas
                    FROM usuarios u 
-                   JOIN empresa_clientes e ON u.empresa_id = e.id 
+                   LEFT JOIN empresa_clientes e ON u.empresa_id = e.id 
                    WHERE u.id = :user_id AND u.email = :user_email AND u.status = 'ativo'";
             
             $stmt = $conn->prepare($sql);
@@ -37,18 +38,29 @@ if (isset($_COOKIE['remember_user']) && !isset($_SESSION['loggedin']) && !isset(
             if ($stmt->execute() && $stmt->rowCount() == 1) {
                 $row = $stmt->fetch();
                 
+                // Verificar se tem acesso a todas as empresas
+                $tem_acesso_global = !empty($row['acesso_todas_empresas']) && $row['acesso_todas_empresas'] == 1;
+                $_SESSION["acesso_todas_empresas"] = $tem_acesso_global;
+                
                 // Store data in session variables
                 $_SESSION["loggedin"] = true;
                 $_SESSION["id"] = $row["id"];
                 $_SESSION["usuario_id"] = $row["id"];
                 $_SESSION["nome"] = $row["nome"];
                 $_SESSION["email"] = $row["email"];
-                $_SESSION["empresa_id"] = $row["empresa_id"];
                 $_SESSION["foto_perfil"] = $row["foto_perfil"];
                 $_SESSION["tipo_usuario"] = $row["tipo_usuario"];
                 
-                // Redirect to index
-                header("location: index.php");
+                // Se tem acesso global, redirecionar para seleção de empresa
+                if ($tem_acesso_global) {
+                    registrarLogAcesso($row["id"], null, 'login', 'sucesso', 'Login automático via cookie - aguardando seleção de empresa');
+                    header("location: selecionar_empresa.php");
+                } else {
+                    $empresa_id_login = $row["empresa_id"];
+                    $_SESSION["empresa_id"] = $empresa_id_login;
+                    registrarLogAcesso($row["id"], $empresa_id_login, 'login', 'sucesso', 'Login automático via cookie Remember Me');
+                    header("location: index.php");
+                }
                 exit;
             } else {
                 // Invalid cookie, clear it
@@ -100,10 +112,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     try {
         $conn = getConnection();
         
-        // Prepare a select statement
-        $sql = "SELECT u.id, u.nome, u.email, u.senha, u.empresa_id, u.status as usuario_status, u.foto_perfil, u.tipo_usuario 
+        // Prepare a select statement - buscar usuário com ou sem empresa (para acesso_todas_empresas)
+        $sql = "SELECT u.id, u.nome, u.email, u.senha, u.empresa_id, u.status as usuario_status, u.foto_perfil, u.tipo_usuario, 
+                       u.acesso_todas_empresas, u.is_oculto
                FROM usuarios u 
-               JOIN empresa_clientes e ON u.empresa_id = e.id 
+               LEFT JOIN empresa_clientes e ON u.empresa_id = e.id 
                WHERE u.email = :username";
         
         if ($stmt = $conn->prepare($sql)) {
@@ -119,30 +132,61 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     }
                     // Verify password
                     else if (password_verify($password, $row['senha'])) {
+                        // Verificar se tem acesso a todas as empresas
+                        $tem_acesso_global = !empty($row['acesso_todas_empresas']) && $row['acesso_todas_empresas'] == 1;
+                        $_SESSION["acesso_todas_empresas"] = $tem_acesso_global;
+                        
                         // Store data in session variables
                         $_SESSION["loggedin"] = true;
                         $_SESSION["id"] = $row["id"];
                         $_SESSION["usuario_id"] = $row["id"];
                         $_SESSION["nome"] = $row["nome"];
                         $_SESSION["email"] = $row["email"];
-                        $_SESSION["empresa_id"] = $row["empresa_id"];
                         $_SESSION["foto_perfil"] = $row["foto_perfil"];
                         $_SESSION["tipo_usuario"] = $row["tipo_usuario"];
                         
-                        // Handle "Remember Me" functionality
-                        if ($remember) {
-                            // Set cookie for 30 days
-                            $cookie_value = base64_encode($row["id"] . ":" . $row["email"]);
-                            setcookie("remember_user", $cookie_value, time() + (30 * 24 * 60 * 60), "/", "", false, true);
+                        // Se tem acesso global, redirecionar para seleção de empresa
+                        if ($tem_acesso_global) {
+                            // Não definir empresa_id ainda, deixar o usuário escolher
+                            // Registrar log de acesso bem-sucedido (sem empresa ainda)
+                            registrarLogAcesso($row["id"], null, 'login', 'sucesso', 'Login realizado - aguardando seleção de empresa');
                             
-                            // Save login data for form restoration
-                            $saved_data = json_encode(['username' => $username]);
-                            $saved_cookie_value = base64_encode($saved_data);
-                            setcookie("saved_login", $saved_cookie_value, time() + (30 * 24 * 60 * 60), "/", "", false, true);
+                            // Handle "Remember Me" functionality
+                            if ($remember) {
+                                $cookie_value = base64_encode($row["id"] . ":" . $row["email"]);
+                                setcookie("remember_user", $cookie_value, time() + (30 * 24 * 60 * 60), "/", "", false, true);
+                                
+                                $saved_data = json_encode(['username' => $username]);
+                                $saved_cookie_value = base64_encode($saved_data);
+                                setcookie("saved_login", $saved_cookie_value, time() + (30 * 24 * 60 * 60), "/", "", false, true);
+                            } else {
+                                setcookie("remember_user", "", time() - 3600, "/", "", false, true);
+                                setcookie("saved_login", "", time() - 3600, "/", "", false, true);
+                            }
+                            
+                            // Redirecionar para seleção de empresa
+                            header("location: selecionar_empresa.php");
+                            exit;
                         } else {
-                            // Clear remember me cookie if not checked
-                            setcookie("remember_user", "", time() - 3600, "/", "", false, true);
-                            setcookie("saved_login", "", time() - 3600, "/", "", false, true);
+                            // Usuário normal - definir empresa_id
+                            $empresa_id_login = $row["empresa_id"];
+                            $_SESSION["empresa_id"] = $empresa_id_login;
+                            
+                            // Registrar log de acesso bem-sucedido
+                            registrarLogAcesso($row["id"], $empresa_id_login, 'login', 'sucesso', 'Login realizado com sucesso');
+                            
+                            // Handle "Remember Me" functionality
+                            if ($remember) {
+                                $cookie_value = base64_encode($row["id"] . ":" . $row["email"]);
+                                setcookie("remember_user", $cookie_value, time() + (30 * 24 * 60 * 60), "/", "", false, true);
+                                
+                                $saved_data = json_encode(['username' => $username]);
+                                $saved_cookie_value = base64_encode($saved_data);
+                                setcookie("saved_login", $saved_cookie_value, time() + (30 * 24 * 60 * 60), "/", "", false, true);
+                            } else {
+                                setcookie("remember_user", "", time() - 3600, "/", "", false, true);
+                                setcookie("saved_login", "", time() - 3600, "/", "", false, true);
+                            }
                         }
                         
                         // Redirect user to the original URL or index page
@@ -151,9 +195,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         header("location: " . $redirect_url);
                         exit;
                     } else {
+                        // Registrar tentativa de login falha
+                        registrarLogAcesso($row["id"], $row["empresa_id"], 'tentativa_login_falha', 'falha', 'Senha inválida');
                         $error = "Senha inválida.";
                     }
                 } else {
+                    // Tentar registrar tentativa de login com usuário inexistente
+                    // Como não temos o ID do usuário, vamos usar 0
+                    try {
+                        registrarLogAcesso(0, 0, 'tentativa_login_falha', 'falha', 'Usuário não encontrado: ' . $username);
+                    } catch (Exception $e) {
+                        // Ignorar erro de log se a tabela não existir ainda
+                    }
                     $error = "Usuário não encontrado.";
                 }
             } else {

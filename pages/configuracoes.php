@@ -20,8 +20,8 @@ $stmt = $conn->prepare('SELECT nome_personalizado, logo_empresa FROM configuraco
 $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
 $stmt->execute();
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
-$nome_personalizado = $row ? $row['nome_personalizado'] : 'Desenvolvimento';
-$logo_path = $row ? $row['logo_empresa'] : null;
+$nome_personalizado = $row ? $row['nome_personalizado'] : 'Frotec Online';
+$logo_path = $row && $row['logo_empresa'] ? $row['logo_empresa'] : 'logo.png';
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
