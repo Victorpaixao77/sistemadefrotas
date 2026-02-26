@@ -13,15 +13,21 @@ session_start();
 // Set page title
 $page_title = "Contas a Pagar";
 
+// Por página: 5, 10, 25, 50, 100 — padrão 10
+$per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
+    $per_page = 10;
+}
+
 // Obter conexão com o banco de dados
 $conn = getConnection();
 
 // Função para buscar contas com paginação
-function getContasPagar($page = 1) {
+function getContasPagar($page = 1, $per_page = 10) {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
-        $limit = 5; // Registros por página
+        $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
         $offset = ($page - 1) * $limit;
         
         // Primeiro, conta o total de registros
@@ -73,7 +79,7 @@ function getContasPagar($page = 1) {
 $pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 
 // Buscar contas com paginação
-$resultado = getContasPagar($pagina_atual);
+$resultado = getContasPagar($pagina_atual, $per_page);
 $contas = $resultado['contas'];
 $total_paginas = $resultado['total_paginas'];
 
@@ -179,6 +185,20 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             color: var(--text-secondary);
             font-size: 0.875rem;
         }
+
+        .filter-options .filter-label {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            margin-right: 0.25rem;
+        }
+        .filter-options .filter-per-page {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
@@ -272,6 +292,17 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                     
                     <div class="filter-options">
+                        <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.5rem;">
+                            <span class="filter-label">Por página</span>
+                            <input type="hidden" name="page" value="1">
+                            <select name="per_page" class="filter-per-page" onchange="this.form.submit()">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                        </form>
                         <select id="statusFilter">
                             <option value="">Todos os status</option>
                             <option value="Pendente">Pendente</option>
@@ -350,12 +381,17 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 </div>
                 
                 <!-- Pagination -->
+                <?php
+                $prev_params = ['page' => max(1, $pagina_atual - 1), 'per_page' => $per_page];
+                $next_params = ['page' => min($total_paginas, $pagina_atual + 1), 'per_page' => $per_page];
+                $total_reg = (int)($resultado['total'] ?? 0);
+                ?>
                 <div class="pagination">
-                    <a href="#" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" id="prevPage">
+                    <a href="?<?php echo htmlspecialchars(http_build_query($prev_params)); ?>" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" id="prevPage">
                         <i class="fas fa-chevron-left"></i>
                     </a>
-                    <span class="pagination-info">Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?></span>
-                    <a href="#" class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>" id="nextPage">
+                    <span class="pagination-info">Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?> (<?php echo $total_reg; ?> registros)</span>
+                    <a href="?<?php echo htmlspecialchars(http_build_query($next_params)); ?>" class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>" id="nextPage">
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>

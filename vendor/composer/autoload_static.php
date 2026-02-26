@@ -25,8 +25,14 @@ class ComposerStaticInit62e10e6c8df9afc192311b196c75bb33
             'Psr\\SimpleCache\\' => 16,
             'Psr\\Log\\' => 8,
             'Psr\\Http\\Message\\' => 17,
-            'Psr\\Http\\Client\\' => 16,
             'PhpOffice\\PhpSpreadsheet\\' => 25,
+        ),
+        'N' => 
+        array (
+            'NFePHP\\NFe\\' => 11,
+            'NFePHP\\Gtin\\' => 12,
+            'NFePHP\\Common\\' => 14,
+            'NFePHP\\CTe\\' => 11,
         ),
         'M' => 
         array (
@@ -34,6 +40,10 @@ class ComposerStaticInit62e10e6c8df9afc192311b196c75bb33
             'Mpdf\\PsrHttpMessageShim\\' => 24,
             'Mpdf\\' => 5,
             'Matrix\\' => 7,
+        ),
+        'J' => 
+        array (
+            'JsonSchema\\' => 11,
         ),
         'D' => 
         array (
@@ -69,16 +79,27 @@ class ComposerStaticInit62e10e6c8df9afc192311b196c75bb33
         ),
         'Psr\\Http\\Message\\' => 
         array (
-            0 => __DIR__ . '/..' . '/psr/http-factory/src',
-            1 => __DIR__ . '/..' . '/psr/http-message/src',
-        ),
-        'Psr\\Http\\Client\\' => 
-        array (
-            0 => __DIR__ . '/..' . '/psr/http-client/src',
+            0 => __DIR__ . '/..' . '/psr/http-message/src',
         ),
         'PhpOffice\\PhpSpreadsheet\\' => 
         array (
             0 => __DIR__ . '/..' . '/phpoffice/phpspreadsheet/src/PhpSpreadsheet',
+        ),
+        'NFePHP\\NFe\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/nfephp-org/sped-nfe/src',
+        ),
+        'NFePHP\\Gtin\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/nfephp-org/sped-gtin/src',
+        ),
+        'NFePHP\\Common\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/nfephp-org/sped-common/src',
+        ),
+        'NFePHP\\CTe\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/nfephp-org/sped-cte/src',
         ),
         'Mpdf\\PsrLogAwareTrait\\' => 
         array (
@@ -95,6 +116,10 @@ class ComposerStaticInit62e10e6c8df9afc192311b196c75bb33
         'Matrix\\' => 
         array (
             0 => __DIR__ . '/..' . '/markbaker/matrix/classes/src',
+        ),
+        'JsonSchema\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/justinrainbow/json-schema/src/JsonSchema',
         ),
         'DeepCopy\\' => 
         array (

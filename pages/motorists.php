@@ -19,6 +19,12 @@ if(!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true){
 // Set page title
 $page_title = "Motoristas";
 
+// Por página: 5, 10, 25, 50, 100 — padrão 10 (usado pelo JS/API)
+$per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
+    $per_page = 10;
+}
+
 // Load motorists for listing and metrics
 $conn = getConnection();
 $empresa_id = $_SESSION['empresa_id'];
@@ -201,6 +207,20 @@ if (!function_exists('format_cpf_br')) {
             font-size: 0.9rem;
             color: var(--text-color);
             padding: 0 10px;
+        }
+        
+        .filter-options .filter-label {
+            font-size: 0.9rem;
+            color: var(--text-color);
+            margin-right: 0.25rem;
+        }
+        .filter-options .filter-per-page {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-color);
+            font-size: 0.9rem;
         }
         
         /* Estilos para a seção de análise */
@@ -1369,8 +1389,18 @@ if (!function_exists('format_cpf_br')) {
                         <input type="text" id="searchMotorist" placeholder="Buscar motorista...">
                         <i class="fas fa-search"></i>
                     </div>
-                    
                     <div class="filter-options">
+                        <form method="get" action="" id="formPerPageMotorists" style="display:inline-flex; align-items:center; gap:0.5rem;">
+                            <span class="filter-label">Por página</span>
+                            <input type="hidden" name="page" value="1">
+                            <select id="perPageMotorists" name="per_page" class="filter-per-page" title="Registros por página" onchange="this.form.submit()">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                        </form>
                         <select id="statusFilter">
                             <option value="">Todos os status</option>
                             <option value="1">Ativo</option>
@@ -1444,16 +1474,14 @@ if (!function_exists('format_cpf_br')) {
                 </div>
                 
                 <!-- Pagination -->
-                <div class="pagination" id="motoristsPagination">
-                    <a href="#" class="pagination-btn" id="prevPageBtn">
+                <div class="pagination" id="motoristsPagination" data-per-page="<?php echo (int)$per_page; ?>">
+                    <a href="?page=1&per_page=<?php echo (int)$per_page; ?>" class="pagination-btn disabled" id="prevPageBtn">
                         <i class="fas fa-chevron-left"></i>
                     </a>
-                    
-                    <span class="pagination-info">
-                        Página <span id="currentPage">1</span> de <span id="totalPages">1</span>
+                    <span class="pagination-info" id="paginationMotoristsInfo">
+                        Página <span id="currentPage">1</span> de <span id="totalPages">1</span> (0 registros)
                     </span>
-                    
-                    <a href="#" class="pagination-btn" id="nextPageBtn">
+                    <a href="?page=1&per_page=<?php echo (int)$per_page; ?>" class="pagination-btn" id="nextPageBtn">
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>

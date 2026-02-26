@@ -116,15 +116,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const rotaId = form.rota_id.value;
         
         if (!motoristaId) {
-            alert('Por favor, selecione um motorista');
+            if (typeof showToast === 'function') showToast('Por favor, selecione um motorista', 'error');
+            else alert('Por favor, selecione um motorista');
             return;
         }
         if (!veiculoId) {
-            alert('Por favor, selecione um veículo');
+            if (typeof showToast === 'function') showToast('Por favor, selecione um veículo', 'error');
+            else alert('Por favor, selecione um veículo');
             return;
         }
         if (!rotaId) {
-            alert('Por favor, selecione uma rota');
+            if (typeof showToast === 'function') showToast('Por favor, selecione uma rota', 'error');
+            else alert('Por favor, selecione uma rota');
             return;
         }
         
@@ -187,17 +190,34 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert(data.message);
+                if (typeof showToast === 'function') {
+                    showToast(data.message || 'Abastecimento salvo com sucesso.', 'success');
+                } else {
+                    alert(data.message);
+                }
                 closeModal();
-                // Recarrega a página para garantir atualização total
-                window.location.href = window.location.pathname + '?page=1';
+                try { sessionStorage.removeItem('abastecimentos_filter_options'); } catch (e) {}
+                if (typeof loadRefuelingData === 'function') loadRefuelingData(1);
+                if (typeof loadRefuelingSummary === 'function') loadRefuelingSummary();
+                if (typeof loadConsumptionChart === 'function') loadConsumptionChart();
+                if (typeof loadEfficiencyChart === 'function') loadEfficiencyChart();
+                if (typeof loadAnomaliesChart === 'function') {
+                    loadAnomaliesChart();
+                    loadDriverConsumptionChart();
+                    loadVehicleEfficiencyChart();
+                    loadMonthlyCostChart();
+                }
             } else {
                 throw new Error(data.error || 'Erro ao salvar abastecimento');
             }
         })
         .catch(error => {
             console.error('Error saving refuel:', error);
-            alert('Erro ao salvar abastecimento: ' + error.message);
+            if (typeof showToast === 'function') {
+                showToast('Erro ao salvar abastecimento: ' + error.message, 'error');
+            } else {
+                alert('Erro ao salvar abastecimento: ' + error.message);
+            }
         });
     });
 
@@ -369,12 +389,16 @@ function loadRefuelingData(page = null) {
         }
     }
 
+    const perPageSelect = document.getElementById('perPageRefuel');
+    const perPageFromSelect = perPageSelect ? parseInt(perPageSelect.value, 10) : 10;
+    const limit = [5, 10, 25, 50, 100].indexOf(perPageFromSelect) >= 0 ? perPageFromSelect : 10;
     const urlParams = new URLSearchParams(window.location.search);
-    if (parseInt(urlParams.get('page'), 10) !== refuelingCurrentPage) {
-        urlParams.set('page', refuelingCurrentPage);
-        const queryString = urlParams.toString();
-        const newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}`;
-        window.history.replaceState({}, '', newUrl);
+    urlParams.set('page', refuelingCurrentPage);
+    urlParams.set('per_page', limit);
+    const isDefault = refuelingCurrentPage === 1 && limit === 10;
+    const desiredSearch = isDefault ? '' : '?' + urlParams.toString();
+    if (window.location.search !== desiredSearch) {
+        window.history.replaceState({}, '', window.location.pathname + desiredSearch);
     }
 
     const searchInput = document.getElementById('searchRefueling');
@@ -389,8 +413,8 @@ function loadRefuelingData(page = null) {
     const fuelFilter = fuelSelect ? fuelSelect.value : '';
     const paymentFilter = paymentSelect ? paymentSelect.value : '';
     
-    // Constrói URL com filtros e paginação
-    let url = `../api/refuel_data.php?action=list&page=${refuelingCurrentPage}&limit=5`;
+    // Constrói URL com filtros e paginação (limit = valor do select "Por página")
+    let url = `../api/refuel_data.php?action=list&page=${refuelingCurrentPage}&limit=${limit}`;
     if (search) url += `&search=${encodeURIComponent(search)}`;
     if (currentFilter) {
         const [year, month] = currentFilter.split('-');
@@ -414,11 +438,12 @@ function loadRefuelingData(page = null) {
                     refuelingCurrentPage = data.pagination.page || refuelingCurrentPage;
                     updatePagination(data.pagination);
                     const updatedParams = new URLSearchParams(window.location.search);
-                    if (parseInt(updatedParams.get('page'), 10) !== refuelingCurrentPage) {
-                        updatedParams.set('page', refuelingCurrentPage);
-                        const newQueryString = updatedParams.toString();
-                        const newLocation = `${window.location.pathname}${newQueryString ? `?${newQueryString}` : ''}`;
-                        window.history.replaceState({}, '', newLocation);
+                    updatedParams.set('page', refuelingCurrentPage);
+                    updatedParams.set('per_page', limit);
+                    const isDefaultAbast = refuelingCurrentPage === 1 && limit === 10;
+                    const desiredSearchAbast = isDefaultAbast ? '' : '?' + updatedParams.toString();
+                    if (window.location.search !== desiredSearchAbast) {
+                        window.history.replaceState({}, '', window.location.pathname + desiredSearchAbast);
                     }
                 }
             } else {
@@ -445,10 +470,16 @@ function updatePagination(pagination) {
     
     const prevBtn = paginationContainer.querySelector('a:first-child');
     const nextBtn = paginationContainer.querySelector('a:last-child');
-    const paginationInfo = paginationContainer.querySelector('.pagination-info');
+    const perPageSelect = document.getElementById('perPageRefuel');
+    const perPage = perPageSelect ? parseInt(perPageSelect.value, 10) : 10;
+    const perPageParam = [5, 10, 25, 50, 100].indexOf(perPage) >= 0 ? perPage : 10;
     
+    const paginationInfo = paginationContainer.querySelector('.pagination-info');
+    const totalRegistros = pagination.total || (current * perPageParam);
     if (paginationInfo) {
-        paginationInfo.textContent = `Página ${current} de ${totalPages}`;
+        paginationInfo.textContent = totalPages > 1
+            ? `Página ${current} de ${totalPages} (${totalRegistros} registros)`
+            : `${totalRegistros} registros`;
     }
     
     const prevPage = Math.max(1, current - 1);
@@ -457,7 +488,7 @@ function updatePagination(pagination) {
     if (prevBtn) {
         const isDisabled = current <= 1;
         prevBtn.classList.toggle('disabled', isDisabled);
-        prevBtn.href = `?page=${prevPage}`;
+        prevBtn.href = `?page=${prevPage}&per_page=${perPageParam}`;
         prevBtn.onclick = function(event) {
             event.preventDefault();
             if (isDisabled) return;
@@ -468,7 +499,7 @@ function updatePagination(pagination) {
     if (nextBtn) {
         const isDisabled = current >= totalPages;
         nextBtn.classList.toggle('disabled', isDisabled);
-        nextBtn.href = `?page=${nextPageValue}`;
+        nextBtn.href = `?page=${nextPageValue}&per_page=${perPageParam}`;
         nextBtn.onclick = function(event) {
             event.preventDefault();
             if (isDisabled) return;

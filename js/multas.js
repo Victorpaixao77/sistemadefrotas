@@ -2,6 +2,7 @@
 document.addEventListener('DOMContentLoaded', function() {
     initializeMultas();
     initializeMultasCharts();
+    initializeDenatranConsulta();
 });
 
 function initializeMultas() {
@@ -50,6 +51,148 @@ function initializeMultas() {
     setupModalEventListeners();
 
     setupTableFilters();
+}
+
+// --- Consulta DETRAN (WSDenatran) ---
+function formatarCpfDisplay(cpf) {
+    var n = (cpf || '').replace(/\D/g, '');
+    if (n.length !== 11) return cpf || '';
+    return n.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+}
+
+function initializeDenatranConsulta() {
+    const form = document.getElementById('denatranForm');
+    const tipoSelect = document.getElementById('denatran_tipo');
+    const cpfGroup = document.getElementById('denatran_cpf_group');
+    const placaGroup = document.getElementById('denatran_placa_group');
+    const exigibilidadeGroup = document.getElementById('denatran_exigibilidade_group');
+    const cnpjGroup = document.getElementById('denatran_cnpj_group');
+    const cpfUsuarioInput = document.getElementById('denatran_cpf_usuario');
+
+    function toggleTipoFields() {
+        const tipo = tipoSelect ? tipoSelect.value : 'cpf';
+        if (cpfGroup) cpfGroup.style.display = tipo === 'cpf' ? '' : 'none';
+        if (placaGroup) placaGroup.style.display = tipo === 'placa' ? '' : 'none';
+        if (exigibilidadeGroup) exigibilidadeGroup.style.display = tipo === 'placa' ? '' : 'none';
+        if (cnpjGroup) cnpjGroup.style.display = tipo === 'cnpj' ? '' : 'none';
+    }
+
+    if (tipoSelect) tipoSelect.addEventListener('change', toggleTipoFields);
+    toggleTipoFields();
+
+    // Pré-preencher CPF do usuário (quem consulta) com o valor das Configurações
+    if (cpfUsuarioInput) {
+        fetch('../api/configuracoes.php?action=get_config_denatran', { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (res.success && res.data && res.data.cpf_usuario && res.data.cpf_usuario.length === 11) {
+                    cpfUsuarioInput.value = formatarCpfDisplay(res.data.cpf_usuario);
+                    if (cpfUsuarioInput.placeholder) cpfUsuarioInput.placeholder = 'Preenchido pelas configurações';
+                }
+            })
+            .catch(function() {});
+    }
+
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            consultarDenatran();
+        });
+    }
+}
+
+function consultarDenatran() {
+    const btn = document.getElementById('denatranConsultarBtn');
+    const container = document.getElementById('denatranResultContainer');
+    const msgEl = document.getElementById('denatranResultMessage');
+    const tbody = document.getElementById('denatranResultBody');
+    const tipo = document.getElementById('denatran_tipo').value;
+    const cpfUsuario = (document.getElementById('denatran_cpf_usuario').value || '').replace(/\D/g, '');
+    const cpf = (document.getElementById('denatran_cpf').value || '').replace(/\D/g, '');
+    const placa = (document.getElementById('denatran_placa').value || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    const exigibilidade = document.getElementById('denatran_exigibilidade').value;
+    const cnpj = (document.getElementById('denatran_cnpj').value || '').replace(/\D/g, '');
+    const dataInicio = document.getElementById('denatran_data_inicio').value || '';
+    const dataFim = document.getElementById('denatran_data_fim').value || '';
+
+    if (cpfUsuario.length !== 11) {
+        showAlert('Informe o CPF do usuário (quem consulta) com 11 dígitos.', 'error');
+        return;
+    }
+    if (tipo === 'cpf' && cpf.length !== 11) {
+        showAlert('Informe o CPF do condutor/proprietário.', 'error');
+        return;
+    }
+    if (tipo === 'placa' && placa.length < 7) {
+        showAlert('Informe a placa do veículo (7 caracteres).', 'error');
+        return;
+    }
+    if (tipo === 'cnpj' && cnpj.length !== 14) {
+        showAlert('Informe o CNPJ com 14 dígitos.', 'error');
+        return;
+    }
+
+    const params = new URLSearchParams();
+    params.set('action', 'consultar');
+    params.set('tipo', tipo);
+    params.set('cpf_usuario', cpfUsuario);
+    if (dataInicio) params.set('dataInicio', dataInicio);
+    if (dataFim) params.set('dataFim', dataFim);
+    if (tipo === 'cpf') params.set('cpf', cpf);
+    if (tipo === 'placa') {
+        params.set('placa', placa);
+        params.set('exigibilidade', exigibilidade);
+    }
+    if (tipo === 'cnpj') params.set('cnpj', cnpj);
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Consultando...';
+    }
+    if (container) container.style.display = 'block';
+    if (msgEl) msgEl.textContent = 'Carregando...';
+    if (tbody) tbody.innerHTML = '';
+
+    fetch('../api/denatran_infracoes.php?' + params.toString(), { method: 'GET' })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (msgEl) msgEl.textContent = data.message || (data.success ? 'Consulta concluída.' : 'Erro na consulta.');
+            if (data.success && data.infracoes && data.infracoes.length > 0) {
+                tbody.innerHTML = data.infracoes.map(function(inf) {
+                    var dataInfracao = inf.dataInfracao ? formatarDataISO(inf.dataInfracao) : '-';
+                    var valor = inf.valorIntegralInfracao != null ? 'R$ ' + Number(inf.valorIntegralInfracao).toFixed(2).replace('.', ',') : '-';
+                    var exig = inf.descricaoIndicadorExigibilidade || '-';
+                    var orgao = inf.descricaoOrgaoAutuador || inf.codigoOrgaoAutuador || '-';
+                    return '<tr><td>' + escapeHtml(inf.numeroAutoInfracao || '-') + '</td><td>' + escapeHtml(inf.placa || '-') + '</td><td>' + escapeHtml(inf.descricaoInfracao || '-') + '</td><td>' + dataInfracao + '</td><td>' + valor + '</td><td>' + escapeHtml(exig) + '</td><td>' + escapeHtml(orgao) + '</td></tr>';
+                }).join('');
+            } else if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center">' + (data.success ? 'Nenhuma infração encontrada.' : '') + '</td></tr>';
+            }
+        })
+        .catch(function(err) {
+            if (msgEl) msgEl.textContent = 'Erro ao consultar: ' + (err.message || 'verifique a conexão.');
+            if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="text-center">Erro na requisição.</td></tr>';
+        })
+        .finally(function() {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-search"></i> Consultar no DETRAN';
+            }
+        });
+}
+
+function formatarDataISO(s) {
+    if (!s) return '-';
+    var d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+}
+
+function escapeHtml(str) {
+    if (str == null) return '';
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
 function initializeMultasCharts() {

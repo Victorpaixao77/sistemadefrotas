@@ -18,12 +18,18 @@ require_authentication();
 // Set page title
 $page_title = "Rotas";
 
+// Por página: 5, 10, 25, 50, 100 — padrão 10
+$per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
+    $per_page = 10;
+}
+
 // Função para buscar rotas do banco de dados
-function getRotas($page = 1) {
+function getRotas($page = 1, $per_page = 10) {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
-        $limit = 5; // Registros por página
+        $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
         $offset = ($page - 1) * $limit;
         
         // Primeiro, conta o total de registros
@@ -75,7 +81,7 @@ function getRotas($page = 1) {
 $pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 
 // Buscar rotas com paginação
-$resultado = getRotas($pagina_atual);
+$resultado = getRotas($pagina_atual, $per_page);
 $rotas = $resultado['rotas'];
 $total_paginas = $resultado['total_paginas'];
 ?>
@@ -133,6 +139,20 @@ $total_paginas = $resultado['total_paginas'];
         .pagination-info {
             font-size: 0.9rem;
             color: var(--text-color);
+        }
+
+        .filter-options .filter-label {
+            font-size: 0.9rem;
+            color: var(--text-color);
+            margin-right: 0.25rem;
+        }
+        .filter-options .filter-per-page {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-color);
+            font-size: 0.9rem;
         }
 
         /* Estilos específicos para o modal de ajuda */
@@ -363,17 +383,20 @@ $total_paginas = $resultado['total_paginas'];
                         <button id="addRouteBtn" class="btn-add-widget">
                             <i class="fas fa-plus"></i> Nova Rota
                         </button>
+                        <button id="importNfeXmlBtn" class="btn-add-widget" type="button" title="Importar XML da NF-e e criar rota" style="background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);">
+                            <i class="fas fa-file-import"></i> Importar XML NF-e
+                        </button>
                         <button id="simulateRouteBtn" class="btn-add-widget" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);">
                             <i class="fas fa-route"></i> Simular Rota
                         </button>
                         <div class="view-controls">
-                            <button id="filterBtn" class="btn-restore-layout" title="Filtros">
+                            <button id="filterBtn" class="btn-restore-layout" title="Filtros" aria-label="Abrir filtros por período">
                                 <i class="fas fa-filter"></i>
                             </button>
-                            <button id="exportBtn" class="btn-toggle-layout" title="Exportar">
+                            <button id="exportBtn" class="btn-toggle-layout" title="Exportar" aria-label="Exportar rotas em CSV">
                                 <i class="fas fa-file-export"></i>
                             </button>
-                            <button id="helpBtn" class="btn-help" title="Ajuda">
+                            <button id="helpBtn" class="btn-help" title="Ajuda" aria-label="Ajuda sobre rotas">
                                 <i class="fas fa-question-circle"></i>
                             </button>
                         </div>
@@ -499,8 +522,18 @@ $total_paginas = $resultado['total_paginas'];
                         <input type="text" id="searchRoute" placeholder="Buscar rota...">
                         <i class="fas fa-search"></i>
                     </div>
-                    
                     <div class="filter-options">
+                        <form method="get" action="" id="formPerPageRoutes" style="display:inline-flex; align-items:center; gap:0.5rem;">
+                            <span class="filter-label">Por página</span>
+                            <input type="hidden" name="page" value="1">
+                            <select id="perPageRoutes" name="per_page" class="filter-per-page" title="Registros por página">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                        </form>
                         <select id="statusFilter">
                             <option value="">Todos os status</option>
                             <option value="Concluída">Concluídas</option>
@@ -528,7 +561,11 @@ $total_paginas = $resultado['total_paginas'];
                 </div>
                 
                 <!-- Route Table -->
-                <div class="table-container">
+                <div class="table-container" id="routeTableContainer">
+                    <div class="table-loading" id="routeTableLoading" style="display:none; padding: 2rem; text-align: center;">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Carregando rotas...</span>
+                    </div>
                     <table class="data-table">
                         <thead>
                             <tr>
@@ -560,16 +597,16 @@ $total_paginas = $resultado['total_paginas'];
                                     </span>
                                 </td>
                                 <td class="actions">
-                                    <button class="btn-icon view-btn" data-id="<?php echo $rota['id']; ?>" title="Ver detalhes">
+                                    <button class="btn-icon view-btn" data-id="<?php echo $rota['id']; ?>" title="Ver detalhes" aria-label="Ver detalhes da rota">
                                         <i class="fas fa-eye"></i>
                                     </button>
-                                    <button class="btn-icon edit-btn" data-id="<?php echo $rota['id']; ?>" title="Editar">
+                                    <button class="btn-icon edit-btn" data-id="<?php echo $rota['id']; ?>" title="Editar" aria-label="Editar rota">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button class="btn-icon expenses-btn" data-id="<?php echo $rota['id']; ?>" title="Despesas de Viagem">
+                                    <button class="btn-icon expenses-btn" data-id="<?php echo $rota['id']; ?>" title="Despesas de Viagem" aria-label="Despesas da viagem">
                                         <i class="fas fa-money-bill"></i>
                                     </button>
-                                    <button class="btn-icon delete-btn" data-id="<?php echo $rota['id']; ?>" title="Excluir">
+                                    <button class="btn-icon delete-btn" data-id="<?php echo $rota['id']; ?>" title="Excluir" aria-label="Excluir rota">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
@@ -580,22 +617,22 @@ $total_paginas = $resultado['total_paginas'];
                 </div>
                 
                 <!-- Pagination -->
-                <div class="pagination">
-                    <?php if ($total_paginas > 1): ?>
-                        <a href="#" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" 
-                           onclick="return changePage(<?php echo $pagina_atual - 1; ?>)">
-                            <i class="fas fa-chevron-left"></i>
-                        </a>
-                        
-                        <span class="pagination-info">
-                            Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
-                        </span>
-                        
-                        <a href="#" class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>"
-                           onclick="return changePage(<?php echo $pagina_atual + 1; ?>)">
-                            <i class="fas fa-chevron-right"></i>
-                        </a>
-                    <?php endif; ?>
+                <?php
+                $base_params = ['page' => 1, 'per_page' => $per_page];
+                $prev_params = array_merge($base_params, ['page' => max(1, $pagina_atual - 1)]);
+                $next_params = array_merge($base_params, ['page' => min($total_paginas, $pagina_atual + 1)]);
+                ?>
+                <div class="pagination" id="paginationRoutesContainer" data-per-page="<?php echo (int)$per_page; ?>">
+                    <a href="?<?php echo htmlspecialchars(http_build_query($prev_params)); ?>" class="pagination-btn pagination-prev <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" data-page="<?php echo max(1, $pagina_atual - 1); ?>" data-direction="prev">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    <span class="pagination-info" id="paginationRoutesInfo">
+                        <?php if ($total_paginas > 1): ?>Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?> (<?php echo (int)$resultado['total']; ?> registros)
+                        <?php else: ?><?php echo (int)$resultado['total']; ?> registros<?php endif; ?>
+                    </span>
+                    <a href="?<?php echo htmlspecialchars(http_build_query($next_params)); ?>" class="pagination-btn pagination-next <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>" data-page="<?php echo min($total_paginas, $pagina_atual + 1); ?>" data-direction="next">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
                 </div>
                 
                 <!-- Analytics Section -->
@@ -670,6 +707,32 @@ $total_paginas = $resultado['total_paginas'];
             
             <!-- Footer -->
             <?php include '../includes/footer.php'; ?>
+        </div>
+    </div>
+    
+    <!-- Modal Importar XML NF-e -->
+    <div class="modal" id="importNfeXmlModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Importar XML da NF-e</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Selecione o arquivo XML da NF-e. A rota será criada com origem (emitente), destino (destinatário), data, descrição da carga e, quando disponível nas informações complementares, motorista, veículo e km.</p>
+                <form id="importNfeXmlForm">
+                    <div class="form-group">
+                        <label for="nfeXmlFile">Arquivo XML da NF-e</label>
+                        <input type="file" id="nfeXmlFile" name="xml_file" accept=".xml,application/xml,text/xml" required>
+                    </div>
+                    <div id="importNfeXmlStatus" class="mt-2" style="display:none;"></div>
+                    <div class="form-actions" style="margin-top:1rem;">
+                        <button type="button" class="btn-secondary close-modal">Cancelar</button>
+                        <button type="submit" id="importNfeXmlSubmit" class="btn-primary">
+                            <i class="fas fa-file-import"></i> Importar e criar rota
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
     
@@ -1120,13 +1183,21 @@ $total_paginas = $resultado['total_paginas'];
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label for="filterMonth">Selecione o Mês/Ano</label>
-                    <input type="month" id="filterMonth" name="filterMonth">
+                    <label for="filterMonth">Mês/Ano</label>
+                    <input type="month" id="filterMonth" name="filterMonth" title="Ou use o período abaixo">
+                </div>
+                <div class="form-group">
+                    <label for="filterDateFrom">Data início</label>
+                    <input type="date" id="filterDateFrom" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="filterDateTo">Data fim</label>
+                    <input type="date" id="filterDateTo" class="form-control">
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="clearFilterBtn" class="btn-secondary">Limpar Filtro</button>
-                <button id="applyFilterBtn" class="btn-primary">Aplicar</button>
+                <button id="clearFilterBtn" class="btn-secondary" aria-label="Limpar filtro de período">Limpar Filtro</button>
+                <button id="applyFilterBtn" class="btn-primary" aria-label="Aplicar filtro de período">Aplicar</button>
             </div>
         </div>
     </div>
@@ -1473,11 +1544,72 @@ $total_paginas = $resultado['total_paginas'];
       box-shadow:0 2px 8px #0007;
     ></div>
 
-    <!-- JavaScript Files -->
-    <script src="../js/header.js"></script>
+    <!-- Toast container: topo direito como em abastecimentos; z-index abaixo do dropdown do header (100) para não bloquear o menu -->
+    <div id="toastContainer" class="toast-container" aria-live="polite" style="position:fixed;top:80px;right:20px;left:auto;bottom:auto;z-index:50;display:flex;flex-direction:column;gap:8px;max-width:360px;pointer-events:none;"></div>
+    <script>
+    function showToast(message, type) {
+        type = type || 'info';
+        var container = document.getElementById('toastContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.className = 'toast-container';
+            container.setAttribute('aria-live', 'polite');
+            container.style.cssText = 'position:fixed;top:80px;right:20px;left:auto;bottom:auto;z-index:50;display:flex;flex-direction:column;gap:8px;max-width:360px;pointer-events:none;';
+            document.body.appendChild(container);
+        }
+        if (container.parentNode !== document.body) {
+            document.body.appendChild(container);
+        }
+        var toast = document.createElement('div');
+        toast.className = 'toast toast-' + type;
+        toast.setAttribute('role', 'alert');
+        var icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle');
+        toast.innerHTML = '<i class="fas ' + icon + '"></i><span>' + (message || '') + '</span>';
+        toast.style.cssText = 'padding:12px 16px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);display:flex;align-items:center;gap:10px;transition:opacity 0.3s ease;pointer-events:auto;opacity:1;';
+        if (type === 'success') { toast.style.background = '#d4edda'; toast.style.color = '#155724'; }
+        else if (type === 'error') { toast.style.background = '#f8d7da'; toast.style.color = '#721c24'; }
+        else { toast.style.background = '#d1ecf1'; toast.style.color = '#0c5460'; }
+        container.appendChild(toast);
+        setTimeout(function() { toast.style.opacity = '0'; setTimeout(function() { toast.remove(); }, 300); }, 4000);
+    }
+    window.showToast = showToast;
+    </script>
+
+    <!-- JavaScript Files (header.js já é carregado pelo includes/header.php) -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <script src="../js/routes.js"></script>
+    <script>
+    // Garantir dropdown do perfil no menu superior (igual às outras páginas)
+    (function() {
+        function initProfileDropdownOnce() {
+            if (window.__profileDropdownInited) return;
+            var btn = document.getElementById('userProfileBtn');
+            var dropdown = document.getElementById('profileDropdown');
+            if (!btn || !dropdown) return;
+            window.__profileDropdownInited = true;
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropdown.classList.toggle('show');
+                btn.classList.toggle('active');
+            });
+            document.addEventListener('click', function(e) {
+                if (dropdown.classList.contains('show') && !dropdown.contains(e.target) && !btn.contains(e.target)) {
+                    dropdown.classList.remove('show');
+                    btn.classList.remove('active');
+                }
+            });
+            dropdown.addEventListener('click', function(e) { e.stopPropagation(); });
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initProfileDropdownOnce);
+        } else {
+            initProfileDropdownOnce();
+        }
+    })();
+    </script>
     
     <!-- Google Maps Scripts -->
     <script src="../google-maps/maps.js"></script>
@@ -2571,3 +2703,4 @@ $total_paginas = $resultado['total_paginas'];
     </script>
 </body>
 </html>
+

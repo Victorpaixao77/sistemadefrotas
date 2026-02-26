@@ -42,9 +42,12 @@ try {
     
     switch ($action) {
         case 'list':
-            // Parâmetros de paginação
-            $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-            $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 5;
+            // Parâmetros de paginação (por página: 5, 10, 25, 50, 100; padrão 10)
+            $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+            $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+            if (!in_array($limit, [5, 10, 25, 50, 100], true)) {
+                $limit = 10;
+            }
             $offset = ($page - 1) * $limit;
 
             // Prepara a consulta base para contar o total de registros
@@ -234,8 +237,8 @@ try {
             
             $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Log para debug
-            error_log("Dados dos abastecimentos: " . print_r($result, true));
+            // Log para debug (desativado em produção)
+            // error_log("Dados dos abastecimentos: " . print_r($result, true));
             
             echo json_encode([
                 'success' => true,

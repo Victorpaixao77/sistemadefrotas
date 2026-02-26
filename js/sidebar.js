@@ -97,6 +97,9 @@ function setupMobileMenu() {
  * Initialize dropdown menu states from localStorage
  */
 function initializeDropdowns() {
+    const pathname = (window.location.pathname || '').replace(/\\/g, '/');
+    const isFiscalPage = /\/fiscal\/pages\/(nfe|cte|mdfe|eventos)\.php$/i.test(pathname);
+    
     // Get saved dropdown states
     let dropdownStates = {};
     
@@ -110,18 +113,39 @@ function initializeDropdowns() {
         console.error('Error parsing saved dropdown states:', error);
     }
     
-    // Apply saved states
+    // Apply saved states (or force open for current section)
+    const dropdownToggles = document.querySelectorAll('.sidebar-dropdown-toggle');
     const dropdowns = document.querySelectorAll('.sidebar-dropdown');
     
     dropdowns.forEach((dropdown, index) => {
-        const parentLink = dropdown.previousElementSibling;
+        const parentLink = dropdownToggles[index];
+        if (!parentLink) return;
         
-        if (parentLink && dropdownStates[index] === true) {
+        const linkText = (parentLink.querySelector('.sidebar-link-text') && parentLink.querySelector('.sidebar-link-text').textContent) || '';
+        const isSistemaFiscal = linkText.indexOf('Sistema Fiscal') !== -1;
+        const shouldOpen = isFiscalPage && isSistemaFiscal ? true : (dropdownStates[index] === true);
+        
+        if (shouldOpen) {
             dropdown.style.display = 'block';
             parentLink.classList.add('active');
-            parentLink.querySelector('.dropdown-icon').classList.add('rotate');
+            const icon = parentLink.querySelector('.dropdown-icon');
+            if (icon) icon.classList.add('rotate');
+        }
+        
+        // Marcar link ativo no submenu quando estiver na página fiscal
+        if (isFiscalPage && isSistemaFiscal) {
+            dropdown.querySelectorAll('a[href]').forEach(function(a) {
+                const href = (a.getAttribute('href') || '').replace(/^https?:\/\/[^/]*/, '');
+                const hrefPath = href.replace(/^https?:\/\/[^/]*/, '') || href;
+                const match = (pathname === hrefPath || pathname === href) || (pathname.endsWith('cte.php') && href.endsWith('cte.php')) || (pathname.endsWith('nfe.php') && href.endsWith('nfe.php')) || (pathname.endsWith('mdfe.php') && href.endsWith('mdfe.php')) || (pathname.endsWith('eventos.php') && href.endsWith('eventos.php'));
+                a.classList.toggle('active', !!match);
+            });
         }
     });
+    
+    if (isFiscalPage) {
+        saveDropdownStates();
+    }
 }
 
 /**

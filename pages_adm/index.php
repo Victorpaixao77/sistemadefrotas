@@ -30,11 +30,13 @@ try {
     $stmt = $pdo->query("
         SELECT e.*, 
                COUNT(CASE WHEN v.status_id IN (1, 2) THEN v.id END) as total_veiculos,
-               (COUNT(CASE WHEN v.status_id IN (1, 2) THEN v.id END) * e.valor_por_veiculo) as valor_total
+               (COUNT(CASE WHEN v.status_id IN (1, 2) THEN v.id END) * e.valor_por_veiculo) as valor_total,
+               p.nome as plano_nome
         FROM empresa_adm e 
         LEFT JOIN empresa_clientes ec ON e.id = ec.empresa_adm_id
         LEFT JOIN veiculos v ON ec.id = v.empresa_id 
-        GROUP BY e.id, e.razao_social, e.cnpj, e.email, e.data_cadastro, e.valor_por_veiculo 
+        LEFT JOIN adm_planos p ON e.plano_id = p.id
+        GROUP BY e.id, e.razao_social, e.cnpj, e.email, e.data_cadastro, e.valor_por_veiculo, p.nome
         ORDER BY e.razao_social ASC
     ");
     $empresas_recentes = $stmt->fetchAll();
@@ -170,6 +172,7 @@ try {
                         <th>CNPJ</th>
                         <th>Email</th>
                         <th>Data de Cadastro</th>
+                        <th>Plano</th>
                         <th>Total de Veículos</th>
                         <th>Valor por Veículo</th>
                         <th>Total a Pagar</th>
@@ -182,6 +185,7 @@ try {
                             <td><?php echo htmlspecialchars($empresa['cnpj']); ?></td>
                             <td><?php echo htmlspecialchars($empresa['email']); ?></td>
                             <td><?php echo date('d/m/Y', strtotime($empresa['data_cadastro'])); ?></td>
+                            <td><?php echo htmlspecialchars($empresa['plano_nome'] ?? 'Sem plano'); ?></td>
                             <td><?php echo $empresa['total_veiculos']; ?></td>
                             <td>R$ <?php echo number_format($empresa['valor_por_veiculo'], 2, ',', '.'); ?></td>
                             <td>R$ <?php echo number_format($empresa['valor_total'], 2, ',', '.'); ?></td>

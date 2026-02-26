@@ -1,3 +1,9 @@
+<?php
+// Incluir arquivo de permissões se ainda não foi incluído
+if (!function_exists('can_access_fiscal_system')) {
+    require_once __DIR__ . '/permissions.php';
+}
+?>
 <!-- Sidebar Navigation -->
 <div class="sidebar">
     <div class="sidebar-header">
@@ -93,6 +99,7 @@
                         </li>
                     </ul>
                 </li>
+                <?php if (can_access_tire_management()): ?>
                 <li class="sidebar-nav-item">
                     <a href="#" class="sidebar-link sidebar-dropdown-toggle">
                         <div class="sidebar-link-icon">
@@ -110,6 +117,7 @@
                         </li>
                     </ul>
                 </li>
+                <?php endif; ?>
                 <li class="sidebar-nav-item">
                     <a href="/sistema-frotas/pages/lucratividade.php" class="sidebar-link">
                         <div class="sidebar-link-icon">
@@ -134,6 +142,16 @@
                         <span class="sidebar-link-text">Configuração</span>
                     </a>
                 </li>
+                <?php if (function_exists('can_manage_system_settings') && can_manage_system_settings()): ?>
+                <li class="sidebar-nav-item">
+                    <a href="/sistema-frotas/pages/debug_apis.php" class="sidebar-link">
+                        <div class="sidebar-link-icon">
+                            <i class="fas fa-bug"></i>
+                        </div>
+                        <span class="sidebar-link-text">Debug APIs</span>
+                    </a>
+                </li>
+                <?php endif; ?>
                 <li class="sidebar-nav-item">
                     <a href="/sistema-frotas/pages/log_acessos.php" class="sidebar-link">
                         <div class="sidebar-link-icon">

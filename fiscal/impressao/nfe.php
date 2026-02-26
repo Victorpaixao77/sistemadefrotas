@@ -74,9 +74,9 @@ $total_cofins = 0;
 
 foreach ($itens as $item) {
     $total_itens += $item['valor_total_item'];
-    $total_icms += $item['icms_valor'] ?? 0;
-    $total_pis += $item['pis_valor'] ?? 0;
-    $total_cofins += $item['cofins_valor'] ?? 0;
+    $total_icms += $item['valor_icms'] ?? $item['icms_valor'] ?? 0;
+    $total_pis += $item['valor_pis'] ?? $item['pis_valor'] ?? 0;
+    $total_cofins += $item['valor_cofins'] ?? $item['cofins_valor'] ?? 0;
 }
 
 $total_geral = $total_itens + ($nfe['valor_total'] - $total_itens);

@@ -19,12 +19,18 @@ $conn = getConnection();
 // Set page title
 $page_title = "Despesas Fixas";
 
+// Por página: 5, 10, 25, 50, 100 — padrão 10
+$per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
+    $per_page = 10;
+}
+
 // Função para buscar despesas fixas do banco de dados
-function getDespesasFixas($page = 1) {
+function getDespesasFixas($page = 1, $per_page = 10) {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
-        $limit = 5; // Registros por página
+        $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
         $offset = ($page - 1) * $limit;
         
         // Primeiro, conta o total de registros
@@ -75,7 +81,7 @@ function getDespesasFixas($page = 1) {
 $pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 
 // Buscar despesas com paginação
-$resultado = getDespesasFixas($pagina_atual);
+$resultado = getDespesasFixas($pagina_atual, $per_page);
 $despesas = $resultado['despesas'];
 $total_paginas = $resultado['total_paginas'];
 ?>
@@ -197,8 +203,18 @@ $total_paginas = $resultado['total_paginas'];
                         <input type="text" id="searchDespesa" placeholder="Buscar despesa...">
                         <i class="fas fa-search"></i>
                     </div>
-                    
                     <div class="filter-options">
+                        <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.5rem;">
+                            <span class="filter-label">Por página</span>
+                            <input type="hidden" name="page" value="1">
+                            <select name="per_page" class="filter-per-page" onchange="this.form.submit()">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                        </form>
                         <select id="vehicleFilter">
                             <option value="">Todos os veículos</option>
                             <!-- Será preenchido via JavaScript -->
@@ -292,17 +308,16 @@ $total_paginas = $resultado['total_paginas'];
                 </div>
                 
                 <!-- Paginação -->
+                <?php $total_reg_df = (int)($resultado['total'] ?? 0); ?>
                 <div class="pagination">
-                    <a href="?page=<?php echo max(1, $pagina_atual - 1); ?>" 
+                    <a href="?page=<?php echo max(1, $pagina_atual - 1); ?>&per_page=<?php echo (int)$per_page; ?>" 
                        class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
                         <i class="fas fa-chevron-left"></i>
                     </a>
-                    
                     <span class="pagination-info">
-                        Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
+                        Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?> (<?php echo $total_reg_df; ?> registros)
                     </span>
-                    
-                    <a href="?page=<?php echo min($total_paginas, $pagina_atual + 1); ?>" 
+                    <a href="?page=<?php echo min($total_paginas, $pagina_atual + 1); ?>&per_page=<?php echo (int)$per_page; ?>" 
                        class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
                         <i class="fas fa-chevron-right"></i>
                     </a>

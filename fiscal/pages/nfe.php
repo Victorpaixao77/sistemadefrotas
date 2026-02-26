@@ -125,6 +125,45 @@ $page_title = "Gestão Fiscal de Transporte";
             margin-bottom: 15px;
         }
         
+        /* Tabela simples de NF-e */
+        .nfe-table-wrap { overflow-x: auto; }
+        .nfe-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .nfe-table th, .nfe-table td {
+            border: 1px solid var(--border-color);
+            padding: 8px 10px;
+            text-align: left;
+        }
+        .nfe-table th:first-child, .nfe-table td:first-child { width: 32px; text-align: center; }
+        .nfe-table th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .nfe-table tbody tr:hover { background: #dee2e6; }
+        .nfe-table .col-num { text-align: right; }
+        .nfe-table .col-vlr { text-align: right; white-space: nowrap; }
+        .nfe-table .col-chave { font-family: monospace; font-size: 0.75rem; max-width: 280px; overflow: hidden; text-overflow: ellipsis; }
+        .nfe-table .col-acoes { white-space: nowrap; }
+        .nfe-table .col-acoes a, .nfe-table .col-acoes button {
+            padding: 4px 8px;
+            margin: 0 2px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+        .nfe-table .col-acoes a:hover, .nfe-table .col-acoes button:hover { color: var(--primary-color); }
+        .nfe-table .situacao-autorizada, .nfe-table .situacao-recebida, .nfe-table .situacao-consultada_sefaz { color: #155724; font-weight: 500; }
+        .nfe-table .situacao-pendente { color: #856404; }
+        .nfe-table .situacao-cancelada { color: #721c24; }
+        
+        #modalVisualizarNfeBody dl dt { font-weight: 600; color: #6c757d; }
+        #modalVisualizarNfeBody dl dd { margin-bottom: 0.5rem; }
+        
         .document-header {
             display: flex;
             justify-content: space-between;
@@ -271,19 +310,16 @@ $page_title = "Gestão Fiscal de Transporte";
                     <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
                         <button id="receberNFEBtn" class="btn-add-widget" onclick="receberNFE()">
-                            <i class="fas fa-download"></i> Receber NF-e
+                            <i class="fas fa-search"></i> Consultar NF-e
                         </button>
-                        <button id="gerenciarCTEBtn" class="btn-add-widget" onclick="window.location.href='cte.php'">
-                            <i class="fas fa-truck"></i> Gerenciar CT-e
+                        <button id="sincronizarCnpjBtn" class="btn-add-widget" type="button" onclick="sincronizarNfeCnpj(false)" title="Buscar NF-e novas do meu CNPJ (desde a última sincronização)">
+                            <i class="fas fa-cloud-download-alt"></i> Buscar NF-e do meu CNPJ
                         </button>
-                        <button id="gerenciarMDFEBtn" class="btn-add-widget" onclick="window.location.href='mdfe.php'">
-                            <i class="fas fa-route"></i> Gerenciar MDF-e
-                        </button>
-                        <button id="sincronizarSefazBtn" class="btn-add-widget" onclick="sincronizarSefaz()">
-                            <i class="fas fa-sync"></i> Sincronizar SEFAZ
+                        <button id="sincronizarCnpjZeroBtn" class="btn-add-widget" type="button" onclick="sincronizarNfeCnpj(true)" title="Buscar desde o início (últimos 3 meses na SEFAZ). Use se não trouxe notas que você sabe que existem." style="margin-left: 4px;">
+                            <i class="fas fa-history"></i> Buscar desde o início
                         </button>
                         <div class="view-controls">
-                            <button id="refreshBtn" class="btn-restore-layout" title="Atualizar">
+                            <button id="refreshBtn" class="btn-restore-layout" title="Atualizar lista">
                                 <i class="fas fa-sync-alt"></i>
                             </button>
                             <button id="exportBtn" class="btn-toggle-layout" title="Exportar">
@@ -293,295 +329,57 @@ $page_title = "Gestão Fiscal de Transporte";
                     </div>
                 </div>
                 
-                <!-- KPI Cards Row -->
-                <div class="dashboard-grid">
-                    <div class="dashboard-card">
-                        <div class="card-header">
-                            <h3>NF-e Recebidas</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="nfeRecebidas">0</span>
-                                <span class="metric-subtitle">Documentos recebidos</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-card">
-                        <div class="card-header">
-                            <h3>CT-e Pendentes</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="ctePendentes">0</span>
-                                <span class="metric-subtitle">Aguardando autorização</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-card">
-                        <div class="card-header">
-                            <h3>CT-e Autorizados</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="cteAutorizados">0</span>
-                                <span class="metric-subtitle">Documentos aprovados</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-card">
-                        <div class="card-header">
-                            <h3>Status SEFAZ</h3>
-                            <button id="refreshSefazBtn" class="btn-sm" style="float: right; padding: 2px 8px; font-size: 12px;">
-                                <i class="fas fa-sync-alt"></i>
-                            </button>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <div id="sefazStatus">
-                                    <span class="status-badge status-warning">
-                                        <i class="fas fa-clock"></i> Verificando...
-                                    </span>
-                                </div>
-                                <span class="metric-subtitle" id="sefazSubtitle">Testando conexão...</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Document Tabs -->
-                <div class="document-tabs">
-                    <button class="document-tab active" data-target="nfeContent">NF-e Recebidas</button>
-                    <button class="document-tab" data-target="cteContent">CT-e</button>
-                    <button class="document-tab" data-target="mdfeContent">MDF-e</button>
-                </div>
-                
-                <!-- NF-e Content -->
-                <div id="nfeContent" class="document-content active">
-                    <div class="document-list">
-                        <h3>NF-e Recebidas do Cliente</h3>
-                        <div id="nfeList">
-                            <p>Carregando NF-e...</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- CT-e Content -->
-                <div id="cteContent" class="document-content">
-                    <div class="document-list">
-                        <h3>CT-e (Conhecimento de Transporte)</h3>
-                        <div id="cteList">
-                            <p>Carregando CT-e...</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- MDF-e Content -->
-                <div id="mdfeContent" class="document-content">
-                    <div class="document-list">
-                        <h3>MDF-e (Manifesto de Documentos)</h3>
-                        <div id="mdfeList">
-                            <p>Carregando MDF-e...</p>
-                        </div>
+                <!-- Lista de NF-e Recebidas -->
+                <div class="document-list nfe-table-wrap" style="margin-top: 20px;">
+                    <h3>NF-e Recebidas do Cliente</h3>
+                    <div id="nfeList">
+                        <p>Carregando NF-e...</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- Modal para Receber NF-e -->
+    <!-- Modal para Consultar NF-e -->
     <div class="modal fade" id="receberNfeModal" tabindex="-1" aria-labelledby="receberNfeModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="receberNfeModalLabel">📥 Receber NF-e do Cliente</h5>
+                    <h5 class="modal-title" id="receberNfeModalLabel">🔍 Consultar NF-e</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="alert alert-info mb-4">
+                    <div class="alert alert-info mb-3">
                         <i class="fas fa-info-circle"></i>
-                        <strong>Escolha o método de recebimento:</strong> Selecione como deseja receber a NF-e do seu cliente.
-                                </div>
-                    
-                    <!-- Botões das três situações de recebimento -->
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <div class="card h-100 border-primary">
-                                <div class="card-body text-center">
-                                <div class="mb-3">
-                                        <i class="fas fa-file-code fa-3x text-primary"></i>
-                                </div>
-                                    <h5 class="card-title">Upload XML</h5>
-                                    <p class="card-text">
-                                        <small class="text-success">
-                                            <i class="fas fa-check-circle"></i> Recomendado
-                                        </small><br>
-                                        Upload do arquivo XML da NF-e autorizada pela SEFAZ
-                                    </p>
-                                    <ul class="list-unstyled text-start small mb-3">
-                                        <li><i class="fas fa-check text-success"></i> Integridade garantida</li>
-                                        <li><i class="fas fa-check text-success"></i> Sem erros de digitação</li>
-                                        <li><i class="fas fa-check text-success"></i> Dados validados</li>
-                                    </ul>
-                                    <button type="button" class="btn btn-primary btn-sm w-100" onclick="abrirMetodoXML()">
-                                        <i class="fas fa-upload"></i> Enviar XML
-                                    </button>
-                            </div>
-                        </div>
-                        </div>
-                        
-                        <div class="col-md-4">
-                            <div class="card h-100 border-warning">
-                                <div class="card-body text-center">
-                                <div class="mb-3">
-                                        <i class="fas fa-keyboard fa-3x text-warning"></i>
-                                </div>
-                                    <h5 class="card-title">Digitação Manual</h5>
-                                    <p class="card-text">
-                                        <small class="text-warning">
-                                            <i class="fas fa-exclamation-triangle"></i> Plano B
-                                        </small><br>
-                                        Preencher manualmente os dados da NF-e
-                                    </p>
-                                    <ul class="list-unstyled text-start small mb-3">
-                                        <li><i class="fas fa-info text-info"></i> Quando XML não disponível</li>
-                                        <li><i class="fas fa-clock text-secondary"></i> Mais demorado</li>
-                                        <li><i class="fas fa-exclamation text-warning"></i> Sujeito a erros</li>
-                                    </ul>
-                                    <button type="button" class="btn btn-warning btn-sm w-100" onclick="abrirMetodoManual()">
-                                        <i class="fas fa-edit"></i> Digitar Dados
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                            <div class="col-md-4">
-                            <div class="card h-100 border-info">
-                                <div class="card-body text-center">
-                                <div class="mb-3">
-                                        <i class="fas fa-search fa-3x text-info"></i>
-                                    </div>
-                                    <h5 class="card-title">Consulta SEFAZ</h5>
-                                    <p class="card-text">
-                                        <small class="text-info">
-                                            <i class="fas fa-certificate"></i> Requer Certificado
-                                        </small><br>
-                                        Buscar automaticamente na SEFAZ
-                                    </p>
-                                    <ul class="list-unstyled text-start small mb-3">
-                                        <li><i class="fas fa-shield-alt text-success"></i> Dados atualizados</li>
-                                        <li><i class="fas fa-sync text-info"></i> Consulta automática</li>
-                                        <li><i class="fas fa-certificate text-primary"></i> Certificado digital</li>
-                                    </ul>
-                                    <button type="button" class="btn btn-info btn-sm w-100" onclick="abrirMetodoSefaz()">
-                                        <i class="fas fa-search"></i> Consultar SEFAZ
-                                    </button>
-                                </div>
-                            </div>
-                                </div>
-                            </div>
-                    
-                    <!-- Container para formulários (inicialmente oculto) -->
-                    <div id="formularioContainer" class="mt-4" style="display: none;">
-                        <hr>
+                        <strong>Consulta SEFAZ:</strong> Informe a chave de acesso da NF-e para buscar e receber a nota automaticamente (requer certificado digital).
+                    </div>
+                    <div id="formularioContainer" class="mt-3">
                         <div id="formularioContent"></div>
-                                </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">❌ Cancelar</button>
                     <button type="button" class="btn btn-primary" id="btnReceberNfe" onclick="processarRecebimentoNFE()" style="display: none;">
-                        📥 Receber NF-e
+                        🔍 Consultar NF-e
                     </button>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- Modal para Criar CT-e -->
-    <div class="modal fade" id="criarCTEModal" tabindex="-1" aria-labelledby="criarCTEModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
+    <!-- Modal Visualizar NF-e (dados básicos) -->
+    <div class="modal fade" id="modalVisualizarNfe" tabindex="-1" aria-labelledby="modalVisualizarNfeLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="criarCTEModalLabel">🚛 Criar CT-e</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title" id="modalVisualizarNfeLabel"><i class="fas fa-file-invoice"></i> NF-e</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                 </div>
-                <div class="modal-body">
-                    <form id="criarCTEForm">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="veiculoId" class="form-label">Veículo</label>
-                                    <select class="form-select" id="veiculoId" name="veiculo_id" required>
-                                        <option value="">Selecione o veículo</option>
-                                        <option value="1">Caminhão 01 - ABC-1234</option>
-                                        <option value="2">Caminhão 02 - DEF-5678</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="motoristaId" class="form-label">Motorista</label>
-                                    <select class="form-select" id="motoristaId" name="motorista_id" required>
-                                        <option value="">Selecione o motorista</option>
-                                        <option value="1">João Silva</option>
-                                        <option value="2">Pedro Santos</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="origem" class="form-label">Origem</label>
-                                    <input type="text" class="form-control" id="origem" name="origem" required>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="destino" class="form-label">Destino</label>
-                                    <input type="text" class="form-control" id="destino" name="destino" required>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label for="valorFrete" class="form-label">Valor do Frete</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">R$</span>
-                                        <input type="number" class="form-control" id="valorFrete" name="valor_frete" step="0.01" min="0" required>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label for="pesoTotal" class="form-label">Peso Total</label>
-                                    <input type="number" class="form-control" id="pesoTotal" name="peso_total" step="0.01" min="0" required>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label for="volumesTotal" class="form-label">Volumes Total</label>
-                                    <input type="number" class="form-control" id="volumesTotal" name="volumes_total" min="1" required>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">NF-e para Transportar</label>
-                            <div id="nfeSelecao" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">
-                                <p>Carregando NF-e disponíveis...</p>
-                            </div>
-                        </div>
-                    </form>
+                <div class="modal-body" id="modalVisualizarNfeBody">
+                    <p class="text-muted">Carregando...</p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">❌ Cancelar</button>
-                    <button type="button" class="btn btn-primary" onclick="salvarCTE()">🚛 Criar CT-e</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
                 </div>
             </div>
         </div>
@@ -597,64 +395,27 @@ $page_title = "Gestão Fiscal de Transporte";
     <script src="../../js/sidebar.js"></script>
     <script src="../../js/theme.js"></script>
     
-    <!-- Fiscal System JavaScript -->
-    <script src="../assets/js/fiscal.js"></script>
-    
     <script>
-        // Configurar abas de documentos
         document.addEventListener('DOMContentLoaded', function() {
-            const tabs = document.querySelectorAll('.document-tab');
-            const contents = document.querySelectorAll('.document-content');
+            // Carregar lista de NF-e ao abrir a página
+            carregarNFE();
             
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const target = tab.getAttribute('data-target');
-                    
-                    // Atualizar abas ativas
-                    tabs.forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    
-                    // Atualizar conteúdo ativo
-                    contents.forEach(content => {
-                        content.classList.remove('active');
-                        if (content.id === target) {
-                            content.classList.add('active');
-                        }
-                    });
-                    
-                    // Carregar dados da aba selecionada
-                    if (target === 'nfeContent') {
-                        carregarNFE();
-                    } else if (target === 'cteContent') {
-                        carregarCTE();
-                    } else if (target === 'mdfeContent') {
-                        carregarMDFE();
-                    }
+            // Botão de atualizar lista
+            const refreshBtn = document.getElementById('refreshBtn');
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', function() {
+                    carregarNFE();
                 });
-            });
-            
-            // Botão de atualizar
-            document.getElementById('refreshBtn').addEventListener('click', function() {
-                atualizarDados();
-            });
-            
-            // Botão de atualizar SEFAZ
-            document.getElementById('refreshSefazBtn').addEventListener('click', function() {
-                verificarStatusSefaz(true); // Forçar refresh
-            });
-            
-            // Carregar dados iniciais
-            carregarDadosIniciais();
-            verificarStatusSefaz();
+            }
         });
         
         // Funções para receber NF-e do cliente
         function receberNFE() {
             const modal = new bootstrap.Modal(document.getElementById('receberNfeModal'));
-            modal.show();
-            
-            // Resetar formulários e status
             resetarFormulariosRecebimento();
+            modal.show();
+            // Abrir direto o formulário de Consulta SEFAZ
+            setTimeout(function() { abrirMetodoSefaz(); }, 300);
         }
         
         function resetarFormulariosRecebimento() {
@@ -885,14 +646,13 @@ $page_title = "Gestão Fiscal de Transporte";
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert(`✅ NF-e recebida com sucesso!\n\nChave: ${data.chave_acesso}\nNúmero: ${data.numero_nfe}\nEmitente: ${data.emitente}\nValor: R$ ${parseFloat(data.valor_total || 0).toFixed(2)}`);
+alert(`✅ NF-e recebida com sucesso!\n\nChave: ${data.chave_acesso}\nNúmero: ${data.numero_nfe}\nEmitente: ${data.emitente || 'N/A'}\nValor: R$ ${parseFloat(data.valor_total || 0).toFixed(2)}`);
                     
                     // Fechar modal
                     const modal = bootstrap.Modal.getInstance(document.getElementById('receberNfeModal'));
                     modal.hide();
                     
                     // Atualizar dados
-                    carregarDadosIniciais();
                     carregarNFE();
                 } else {
                     alert('❌ Erro ao processar XML: ' + (data.error || 'Erro desconhecido'));
@@ -940,7 +700,6 @@ $page_title = "Gestão Fiscal de Transporte";
                     modal.hide();
                     
                     // Atualizar dados
-                    carregarDadosIniciais();
                     carregarNFE();
                 } else {
                     alert('❌ Erro ao receber NF-e: ' + (data.error || 'Erro desconhecido'));
@@ -1007,14 +766,13 @@ $page_title = "Gestão Fiscal de Transporte";
                 progressBar.style.width = '100%';
                 
                 if (data.success) {
-                    alert(`✅ NF-e consultada na SEFAZ com sucesso!\n\nChave: ${data.chave_acesso}\nNúmero: ${data.numero_nfe}\nEmitente: ${data.emitente}\nValor: R$ ${parseFloat(data.valor_total || 0).toFixed(2)}\nProtocolo: ${data.protocolo || 'N/A'}`);
+alert(`✅ NF-e consultada na SEFAZ com sucesso!\n\nChave: ${data.chave_acesso}\nNúmero: ${data.numero_nfe}\nEmitente: ${data.emitente || 'N/A'}\nValor: R$ ${parseFloat(data.valor_total || 0).toFixed(2)}\nProtocolo: ${data.protocolo || 'N/A'}`);
                     
                     // Fechar modal
                     const modal = bootstrap.Modal.getInstance(document.getElementById('receberNfeModal'));
                     modal.hide();
                     
                     // Atualizar dados
-                    carregarDadosIniciais();
                     carregarNFE();
                 } else {
                     alert('❌ Erro na consulta SEFAZ: ' + (data.error || 'Erro desconhecido'));
@@ -1035,89 +793,49 @@ $page_title = "Gestão Fiscal de Transporte";
             });
         }
         
-        // Funções para criar CT-e
-        function criarCTE() {
-            // Carregar NF-e disponíveis primeiro
-            carregarNFEDisponiveis().then(() => {
-                const modal = new bootstrap.Modal(document.getElementById('criarCTEModal'));
-                modal.show();
-            });
-        }
-        
-        function carregarNFEDisponiveis() {
-            return fetch('../api/documentos_fiscais_v2.php?action=list&tipo=nfe&status=recebida')
-                .then(response => response.json())
+        function sincronizarNfeCnpj(desdeInicio) {
+            const btn = document.getElementById('sincronizarCnpjBtn');
+            const btnZero = document.getElementById('sincronizarCnpjZeroBtn');
+            const activeBtn = desdeInicio ? btnZero : btn;
+            if (!activeBtn) return;
+            const originalText = activeBtn.innerHTML;
+            activeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (desdeInicio ? 'Buscando desde o início...' : 'Buscando NF-e...');
+            activeBtn.disabled = true;
+            if (btn) btn.disabled = true;
+            if (btnZero) btnZero.disabled = true;
+            const formData = new FormData();
+            formData.append('action', 'sincronizar_nfe_cnpj');
+            if (desdeInicio) formData.append('forcar_zero', '1');
+            fetch('../api/documentos_fiscais_v2.php', { method: 'POST', body: formData })
+                .then(r => r.json())
                 .then(data => {
-                    if (data.success && data.documentos) {
-                        let html = '';
-                        data.documentos.forEach(nfe => {
-                            html += `
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="nfe_ids[]" value="${nfe.id}" id="nfe_${nfe.id}">
-                                    <label class="form-check-label" for="nfe_${nfe.id}">
-                                        NF-e ${nfe.numero_nfe} - ${nfe.cliente_razao_social} - R$ ${parseFloat(nfe.valor_total || 0).toFixed(2)}
-                                    </label>
-                                </div>
-                            `;
-                        });
-                        document.getElementById('nfeSelecao').innerHTML = html;
+                    if (data.success) {
+                        let texto = data.message || 'Sincronização concluída.';
+                        if (data.sefaz && (data.sefaz.cStat != null || data.sefaz.xMotivo)) {
+                            texto += '\n\nSEFAZ: cStat=' + (data.sefaz.cStat ?? '-') + ' - ' + (data.sefaz.xMotivo || '');
+                            if (data.sefaz.numDocZip != null) texto += '\nDocumentos no lote: ' + data.sefaz.numDocZip;
+                            if (data.sefaz.numResNFe != null) texto += ' (resumos NF-e: ' + data.sefaz.numResNFe + ')';
+                            if (data.sefaz.cStat === '656') {
+                                texto += '\n\n' + (data.sefaz.dica || 'Aguarde cerca de 1 hora. Depois use apenas "Buscar NF-e do meu CNPJ" (sem "desde o início") para buscar só notas novas.');
+                                if (data.sefaz.ult_nsu_gravado != null && data.sefaz.ult_nsu_gravado !== '') {
+                                    texto += '\n\nO sistema já gravou o NSU da SEFAZ para a próxima consulta. Após 1 hora, clique em "Buscar NF-e do meu CNPJ" (o botão azul, sem "desde o início").';
+                                }
+                            }
+                        }
+                        alert(texto);
+                        carregarNFE();
                     } else {
-                        document.getElementById('nfeSelecao').innerHTML = '<p>Nenhuma NF-e disponível para transporte</p>';
+                        alert('Erro: ' + (data.error || data.message || 'Erro desconhecido'));
                     }
                 })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    document.getElementById('nfeSelecao').innerHTML = '<p>Erro ao carregar NF-e</p>';
+                .catch(err => {
+                    console.error(err);
+                    alert('Erro ao sincronizar NF-e.');
+                })
+                .finally(() => {
+                    if (btn) { btn.innerHTML = '<i class="fas fa-cloud-download-alt"></i> Buscar NF-e do meu CNPJ'; btn.disabled = false; }
+                    if (btnZero) { btnZero.innerHTML = '<i class="fas fa-history"></i> Buscar desde o início'; btnZero.disabled = false; }
                 });
-        }
-        
-        function salvarCTE() {
-            const formData = new FormData(document.getElementById('criarCTEForm'));
-            formData.append('action', 'criar_cte');
-            
-            // Adicionar NF-e selecionadas
-            const nfeSelecionadas = document.querySelectorAll('input[name="nfe_ids[]"]:checked');
-            if (nfeSelecionadas.length === 0) {
-                alert('Selecione pelo menos uma NF-e para transportar');
-                return;
-            }
-            
-            nfeSelecionadas.forEach(nfe => {
-                formData.append('nfe_ids[]', nfe.value);
-            });
-            
-            fetch('../api/documentos_fiscais_v2.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(`✅ CT-e criado com sucesso!\n\nNúmero: ${data.numero_cte}\nStatus: ${data.status}`);
-                    
-                    // Fechar modal
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('criarCTEModal'));
-                    modal.hide();
-                    
-                    // Limpar formulário
-                    document.getElementById('criarCTEForm').reset();
-                    
-                    // Atualizar dados
-                    carregarDadosIniciais();
-                    carregarCTE();
-                } else {
-                    alert('❌ Erro ao criar CT-e: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Erro:', error);
-                alert('Erro ao criar CT-e');
-            });
-        }
-        
-        // Funções para criar MDF-e
-        function criarMDFE() {
-            alert('Funcionalidade de criação de MDF-e será implementada em breve!');
         }
         
         // Funções de carregamento de dados
@@ -1126,42 +844,51 @@ $page_title = "Gestão Fiscal de Transporte";
             msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 15px; border-radius: 5px;">' +
                 '<strong>🔄 Carregando NF-e...</strong></div>';
             
-            fetch('../api/documentos_fiscais_v2.php?action=list&tipo=nfe&limit=20')
+            fetch('../api/documentos_fiscais_v2.php?action=list&tipo=nfe&limit=100')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
                         if (data.documentos && data.documentos.length > 0) {
-                            let html = '<div style="margin-bottom: 15px;"><strong>📋 NF-e Recebidas:</strong></div>';
-                            data.documentos.forEach(doc => {
-                                const statusClass = doc.status === 'entregue' ? 'success' : 
-                                                  doc.status === 'em_transporte' ? 'warning' : 'info';
-                                const statusText = doc.status === 'entregue' ? 'Entregue' : 
-                                                 doc.status === 'em_transporte' ? 'Em Transporte' : 'Recebida';
-                                const dataFormatada = new Date(doc.data_emissao).toLocaleDateString('pt-BR');
-                                
-                                html += `<div class="document-item">
-                                    <div class="document-header">
-                                        <h4>NF-e ${doc.numero_nfe.toString().padStart(3, '0')}</h4>
-                                        <span class="status-badge status-${statusClass}">${statusText}</span>
-                                    </div>
-                                    <div class="document-details">
-                                        <p><strong>Data:</strong> ${dataFormatada}</p>
-                                        <p><strong>Valor:</strong> R$ ${parseFloat(doc.valor_total || 0).toFixed(2).replace('.', ',')}</p>
-                                        <p><strong>Cliente:</strong> ${doc.cliente_razao_social || 'Cliente'}</p>
-                                        <p><strong>Peso:</strong> ${parseFloat(doc.peso_carga || 0).toFixed(2)} kg</p>
-                                        <p><strong>Volumes:</strong> ${doc.volumes || 0}</p>
-                                    </div>
-                                    <div class="document-actions">
-                                        <button onclick="visualizarNFE(${doc.id})" class="btn-sm btn-secondary">
-                                            👁️ Visualizar
-                                        </button>
-                                    </div>
-                                </div>`;
+                            const docs = data.documentos;
+                            let html = '<table class="nfe-table"><thead><tr>';
+                            html += '<th></th>';
+                            html += '<th>Mod</th><th>Série</th><th>Número</th><th>Chave de Acesso</th><th>Emissão</th>';
+                            html += '<th>Cliente/Fornecedor</th><th>Vlr Nota</th><th>Recibo</th><th>Situação</th>';
+                            html += '<th class="col-acoes">Ações</th></tr></thead><tbody>';
+                            
+                            docs.forEach(doc => {
+                                const dataEmissao = doc.data_emissao ? new Date(doc.data_emissao).toLocaleDateString('pt-BR') : '-';
+                                const numero = String(doc.numero_nfe || '').padStart(9, '0');
+                                const serie = doc.serie_nfe || '-';
+                                const vlr = parseFloat(doc.valor_total || 0).toFixed(2).replace('.', ',');
+                                const recibo = doc.protocolo_autorizacao || '0';
+                                const situacao = doc.status === 'consultada_sefaz' ? 'Consultada SEFAZ' : 
+                                    doc.status === 'entregue' ? 'Entregue' : doc.status === 'em_transporte' ? 'Em Transporte' : 
+                                    doc.status === 'cancelada' ? 'Cancelada' : doc.status === 'autorizado' || doc.status === 'autorizada' ? 'Autorizada' :
+                                    (doc.status ? doc.status.replace(/_/g, ' ') : 'Recebida');
+                                const situacaoClass = (doc.status || 'recebida').replace(/_/g, '-');
+                                html += '<tr>';
+                                html += '<td><input type="checkbox" class="nfe-check" data-id="' + doc.id + '"></td>';
+                                html += '<td class="col-num">55</td>';
+                                html += '<td>' + escapeHtml(serie) + '</td>';
+                                html += '<td class="col-num">' + escapeHtml(numero) + '</td>';
+                                html += '<td class="col-chave" title="' + escapeHtml(doc.chave_acesso || '') + '">' + escapeHtml(doc.chave_acesso || '-') + '</td>';
+                                html += '<td>' + dataEmissao + '</td>';
+                                html += '<td>' + escapeHtml(doc.cliente_razao_social || 'Cliente') + '</td>';
+                                html += '<td class="col-vlr">R$ ' + vlr + '</td>';
+                                html += '<td class="col-num">' + escapeHtml(recibo) + '</td>';
+                                html += '<td class="situacao-' + situacaoClass + '">' + escapeHtml(situacao) + '</td>';
+                                html += '<td class="col-acoes">';
+                                html += '<a href="#" onclick="abrirModalNfe(' + doc.id + '); return false;" title="Visualizar"><i class="fas fa-search"></i></a>';
+                                html += '<a href="#" onclick="downloadNfeXml(' + doc.id + '); return false;" title="Download XML"><i class="fas fa-file-code"></i></a>';
+                                html += '<a href="#" onclick="downloadNfePdf(' + doc.id + '); return false;" title="Download PDF"><i class="fas fa-file-pdf"></i></a>';
+                                html += '</td></tr>';
                             });
+                            html += '</tbody></table>';
                             msg.innerHTML = html;
                         } else {
                             msg.innerHTML = '<div style="color: #6c757d; background: #f8f9fa; padding: 15px; border-radius: 5px;">' +
-                                '<strong>📭 Nenhuma NF-e recebida</strong><br>Clique em "Receber NF-e" para adicionar documentos</div>';
+                                '<strong>📭 Nenhuma NF-e recebida</strong><br>Use "Buscar NF-e do meu CNPJ" para puxar automaticamente ou "Consultar NF-e" para buscar por chave</div>';
                         }
                     } else {
                         throw new Error(data.error || 'Erro desconhecido');
@@ -1174,191 +901,82 @@ $page_title = "Gestão Fiscal de Transporte";
                 });
         }
         
-        function carregarCTE() {
-            const msg = document.getElementById('cteList');
-            msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 15px; border-radius: 5px;">' +
-                '<strong>🔄 Carregando CT-e...</strong></div>';
+        function escapeHtml(s) {
+            if (s == null) return '';
+            const div = document.createElement('div');
+            div.textContent = s;
+            return div.innerHTML;
+        }
+        
+        function downloadNfeXml(id) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '../api/download_nfe_xml.php';
+            form.target = '_blank';
+            const input = document.createElement('input');
+            input.type = 'hidden'; input.name = 'id'; input.value = id;
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+        }
+        
+        function downloadNfePdf(id) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '../api/download_nfe_pdf.php';
+            form.target = '_blank';
+            const input = document.createElement('input');
+            input.type = 'hidden'; input.name = 'id'; input.value = id;
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+        }
+        
+        function abrirModalNfe(id) {
+            const modal = new bootstrap.Modal(document.getElementById('modalVisualizarNfe'));
+            const body = document.getElementById('modalVisualizarNfeBody');
+            const title = document.getElementById('modalVisualizarNfeLabel');
+            body.innerHTML = '<p class="text-muted">Carregando...</p>';
+            modal.show();
             
-            fetch('../api/documentos_fiscais_v2.php?action=list&tipo=cte&limit=20')
-                .then(response => response.json())
+            fetch('../api/documentos_fiscais_v2.php?action=get&tipo=nfe&id=' + id)
+                .then(r => r.json())
                 .then(data => {
-                    if (data.success) {
-                        if (data.documentos && data.documentos.length > 0) {
-                            let html = '<div style="margin-bottom: 15px;"><strong>🚛 CT-e Criados:</strong></div>';
-                            data.documentos.forEach(doc => {
-                                const statusClass = doc.status === 'autorizado' ? 'success' : 
-                                                  doc.status === 'pendente' ? 'warning' : 'info';
-                                const statusText = doc.status === 'autorizado' ? 'Autorizado' : 
-                                                 doc.status === 'pendente' ? 'Pendente' : 'Rascunho';
-                                const dataFormatada = new Date(doc.data_emissao).toLocaleDateString('pt-BR');
-                                
-                                html += `<div class="document-item">
-                                    <div class="document-header">
-                                        <h4>CT-e ${doc.numero_cte.toString().padStart(3, '0')}</h4>
-                                        <span class="status-badge status-${statusClass}">${statusText}</span>
-                                    </div>
-                                    <div class="document-details">
-                                        <p><strong>Data:</strong> ${dataFormatada}</p>
-                                        <p><strong>Valor Frete:</strong> R$ ${parseFloat(doc.valor_total || 0).toFixed(2).replace('.', ',')}</p>
-                                        <p><strong>Origem:</strong> ${doc.origem || 'N/A'}</p>
-                                        <p><strong>Destino:</strong> ${doc.destino || 'N/A'}</p>
-                                        <p><strong>Peso:</strong> ${parseFloat(doc.peso_carga || 0).toFixed(2)} kg</p>
-                                        <p><strong>Volumes:</strong> ${doc.volumes_carga || 0}</p>
-                                    </div>
-                                    <div class="document-actions">
-                                        <button onclick="editarCTE(${doc.id})" class="btn-sm btn-info">
-                                            ✏️ Editar
-                                        </button>
-                                        <button onclick="enviarCTESefaz(${doc.id})" class="btn-sm btn-success">
-                                            🚀 Enviar SEFAZ
-                                        </button>
-                                        <button onclick="visualizarCTE(${doc.id})" class="btn-sm btn-secondary">
-                                            👁️ Visualizar
-                                        </button>
-                                    </div>
-                                </div>`;
-                            });
-                            msg.innerHTML = html;
-                        } else {
-                            msg.innerHTML = '<div style="color: #6c757d; background: #f8f9fa; padding: 15px; border-radius: 5px;">' +
-                                '<strong>📭 Nenhum CT-e criado</strong><br>Clique em "Criar CT-e" para gerar documentos de transporte</div>';
-                        }
-                    } else {
-                        throw new Error(data.error || 'Erro desconhecido');
+                    if (!data.success || !data.documento) {
+                        body.innerHTML = '<p class="text-danger">NF-e não encontrada.</p>';
+                        return;
                     }
+                    const d = data.documento;
+                    const dataEmissao = d.data_emissao ? new Date(d.data_emissao).toLocaleDateString('pt-BR') : '-';
+                    const vlr = parseFloat(d.valor_total || 0).toFixed(2).replace('.', ',');
+                    const situacao = d.status === 'consultada_sefaz' ? 'Consultada SEFAZ' : 
+                        d.status === 'entregue' ? 'Entregue' : d.status === 'em_transporte' ? 'Em Transporte' : 
+                        d.status === 'cancelada' ? 'Cancelada' : d.status === 'autorizado' || d.status === 'autorizada' ? 'Autorizada' :
+                        (d.status ? d.status.replace(/_/g, ' ') : 'Recebida');
+                    title.textContent = 'NF-e ' + (d.numero_nfe || id);
+                    body.innerHTML = '<dl class="row mb-0">' +
+                        '<dt class="col-sm-4">Número</dt><dd class="col-sm-8">' + escapeHtml(d.numero_nfe || '-') + '</dd>' +
+                        '<dt class="col-sm-4">Série</dt><dd class="col-sm-8">' + escapeHtml(d.serie_nfe || '-') + '</dd>' +
+                        '<dt class="col-sm-4">Chave de acesso</dt><dd class="col-sm-8"><code class="small">' + escapeHtml(d.chave_acesso || '-') + '</code></dd>' +
+                        '<dt class="col-sm-4">Data de emissão</dt><dd class="col-sm-8">' + dataEmissao + '</dd>' +
+                        '<dt class="col-sm-4">Emitente / Cliente</dt><dd class="col-sm-8">' + escapeHtml(d.cliente_razao_social || 'Cliente') + '</dd>' +
+                        '<dt class="col-sm-4">Valor total</dt><dd class="col-sm-8">R$ ' + vlr + '</dd>' +
+                        '<dt class="col-sm-4">Status</dt><dd class="col-sm-8">' + escapeHtml(situacao) + '</dd>' +
+                        '<dt class="col-sm-4">Protocolo</dt><dd class="col-sm-8">' + escapeHtml(d.protocolo_autorizacao || '-') + '</dd>' +
+                        '</dl>';
                 })
-                .catch(error => {
-                    console.error('❌ Erro ao carregar CT-e:', error);
-                    msg.innerHTML = '<div style="color: #dc3545; background: #f8d7da; padding: 15px; border-radius: 5px;">' +
-                        '<strong>❌ Erro ao carregar dados!</strong><br>' + error.message + '</div>';
+                .catch(err => {
+                    body.innerHTML = '<p class="text-danger">Erro ao carregar dados.</p>';
                 });
-        }
-        
-        function carregarMDFE() {
-            const msg = document.getElementById('mdfeList');
-            msg.innerHTML = '<div style="color: #6c757d; background: #f8f9fa; padding: 15px; border-radius: 5px;">' +
-                '<strong>📋 Funcionalidade em desenvolvimento</strong><br>MDF-e será implementado em breve</div>';
-        }
-        
-        function carregarDadosIniciais() {
-            // Carregar dados reais da API
-            fetch('../api/documentos_fiscais_v2.php?action=totals')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        if (data.totais.nfe) {
-                            const nfe = data.totais.nfe;
-                            document.getElementById('nfeRecebidas').textContent = nfe.total || '0';
-                        }
-                        if (data.totais.cte) {
-                            const cte = data.totais.cte;
-                            document.getElementById('ctePendentes').textContent = cte.pendentes || '0';
-                            document.getElementById('cteAutorizados').textContent = cte.autorizados || '0';
-                        }
-                    } else {
-                        // Fallback para dados padrão
-                        document.getElementById('nfeRecebidas').textContent = '0';
-                        document.getElementById('ctePendentes').textContent = '0';
-                        document.getElementById('cteAutorizados').textContent = '0';
-                    }
-                })
-                .catch(error => {
-                    console.error('❌ Erro ao carregar dados:', error);
-                    // Fallback para dados padrão
-                    document.getElementById('nfeRecebidas').textContent = '0';
-                    document.getElementById('ctePendentes').textContent = '0';
-                    document.getElementById('cteAutorizados').textContent = '0';
-                });
-        }
-        
-        function atualizarDados() {
-            carregarDadosIniciais();
-            carregarNFE();
-            carregarCTE();
-        }
-        
-        function sincronizarSefaz() {
-            const msg = document.getElementById('nfeList');
-            msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 15px; border-radius: 5px;">' +
-                '<strong>🔄 Sincronizando com SEFAZ...</strong><br>Verificando status dos documentos...</div>';
-            
-            // Simular sincronização
-            setTimeout(() => {
-                msg.innerHTML = '<div style="color: #28a745; background: #d4edda; padding: 15px; border-radius: 5px;">' +
-                    '<strong>✅ Sincronização concluída!</strong><br>Status atualizado para todos os documentos</div>';
-                
-                // Recarregar dados
-                setTimeout(() => {
-                    atualizarDados();
-                }, 1000);
-            }, 3000);
         }
         
         // Funções auxiliares
         function visualizarNFE(id) {
-            window.open(`../visualizar_nfe.php?id=${id}`, '_blank');
+            abrirModalNfe(id);
         }
         
-        function editarCTE(id) {
-            alert('Funcionalidade de edição de CT-e será implementada em breve!');
-        }
-        
-        function enviarCTESefaz(id) {
-            if (!confirm('Confirma o envio deste CT-e para SEFAZ?\n\nEsta operação não pode ser desfeita.')) {
-                return;
-            }
-            
-            const formData = new FormData();
-            formData.append('action', 'enviar_sefaz');
-            formData.append('id', id);
-            formData.append('tipo_documento', 'cte');
-            
-            fetch('../api/documentos_fiscais_v2.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(`✅ CT-e enviado para SEFAZ com sucesso!\n\nStatus: ${data.status}\nProtocolo: ${data.protocolo}`);
-                    carregarCTE();
-                } else {
-                    alert('❌ Erro ao enviar para SEFAZ: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Erro:', error);
-                alert('Erro ao enviar para SEFAZ');
-            });
-        }
-        
-        function visualizarCTE(id) {
-            alert('Funcionalidade de visualização de CT-e será implementada em breve!');
-        }
-        
-        function verificarStatusSefaz(forceRefresh = false) {
-            const statusElement = document.getElementById('sefazStatus');
-            const subtitleElement = document.getElementById('sefazSubtitle');
-            
-            // Mostrar carregando
-            statusElement.innerHTML = '<span class="status-badge status-warning"><i class="fas fa-clock"></i> Verificando...</span>';
-            subtitleElement.textContent = 'Testando conexão...';
-            
-            // Simular verificação de status
-            setTimeout(() => {
-                const status = Math.random() > 0.3 ? 'online' : 'offline';
-                const cor = status === 'online' ? 'success' : 'danger';
-                const texto = status === 'online' ? 'Sistema SEFAZ funcionando normalmente' : 'Problemas detectados no SEFAZ';
-                const tempo = Math.floor(Math.random() * 200) + 50;
-                
-                statusElement.innerHTML = `<span class="status-badge status-${cor}">
-                    <i class="fas fa-${status === 'online' ? 'check-circle' : 'exclamation-triangle'}"></i> 
-                    ${status === 'online' ? 'Online' : 'Offline'}
-                </span>`;
-                
-                subtitleElement.textContent = `${texto} (${tempo}ms)`;
-            }, 1500);
-        }
     </script>
     
     <!-- Footer -->

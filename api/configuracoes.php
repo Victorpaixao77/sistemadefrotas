@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../fiscal/includes/CryptoManager.php';
 
 configure_session();
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -10,7 +11,7 @@ header('Content-Type: application/json');
 // Verificar se o usuário está autenticado
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
     http_response_code(401);
-    echo json_encode(['error' => 'Não autorizado']);
+    echo json_encode(['success' => false, 'message' => 'Não autorizado']);
     exit;
 }
 
@@ -142,7 +143,6 @@ try {
         }
 
         $file = $_FILES['arquivo_certificado'];
-        $allowed_types = ['application/x-pkcs12', 'application/pkcs12'];
         $allowed_extensions = ['.pfx', '.p12'];
         $max_size = 10 * 1024 * 1024; // 10MB
 
@@ -158,23 +158,14 @@ try {
             exit;
         }
 
-        // Validar dados do formulário
+        // Validar dados do formulário (data de validade será lida do certificado)
         $nome_certificado = trim($_POST['nome_certificado'] ?? '');
         $senha_certificado = $_POST['senha_certificado'] ?? '';
-        $data_validade = $_POST['data_validade'] ?? '';
         $tipo_certificado = $_POST['tipo_certificado'] ?? 'A1';
         $observacoes = trim($_POST['observacoes'] ?? '');
 
-        if (!$nome_certificado || !$senha_certificado || !$data_validade) {
-            echo json_encode(['success' => false, 'error' => 'Todos os campos obrigatórios devem ser preenchidos']);
-            exit;
-        }
-
-        // Validar data de validade
-        $data_validade_obj = new DateTime($data_validade);
-        $hoje = new DateTime();
-        if ($data_validade_obj <= $hoje) {
-            echo json_encode(['success' => false, 'error' => 'A data de validade deve ser futura']);
+        if (!$nome_certificado || !$senha_certificado) {
+            echo json_encode(['success' => false, 'error' => 'Nome e senha do certificado são obrigatórios']);
             exit;
         }
 
@@ -190,11 +181,52 @@ try {
 
         if (move_uploaded_file($file['tmp_name'], $filepath)) {
             try {
+                // Tentar ler o certificado e extrair a data de validade real
+                $pkcs12 = @file_get_contents($filepath);
+                if ($pkcs12 === false) {
+                    throw new Exception('Não foi possível ler o arquivo de certificado enviado');
+                }
+
+                $certs = [];
+                if (!openssl_pkcs12_read($pkcs12, $certs, $senha_certificado)) {
+                    throw new Exception('Senha do certificado inválida ou arquivo PFX/P12 corrompido');
+                }
+
+                if (empty($certs['cert'])) {
+                    throw new Exception('Certificado A1 não encontrado dentro do arquivo PFX/P12');
+                }
+
+                $certInfo = openssl_x509_parse($certs['cert']);
+                $data_validade = null;
+                if (!empty($certInfo['validTo_time_t'])) {
+                    $data_validade = date('Y-m-d', $certInfo['validTo_time_t']);
+                } elseif (!empty($certInfo['validTo'])) {
+                    $ts = strtotime($certInfo['validTo']);
+                    if ($ts) {
+                        $data_validade = date('Y-m-d', $ts);
+                    }
+                }
+
+                if (empty($data_validade)) {
+                    throw new Exception('Não foi possível determinar a data de validade do certificado');
+                }
+
+                // Validar se a data de validade ainda é futura
+                $data_validade_obj = new DateTime($data_validade);
+                $hoje = new DateTime();
+                if ($data_validade_obj <= $hoje) {
+                    throw new Exception('O certificado já está vencido ou vence hoje');
+                }
+
                 // Iniciar transação
                 $conn->beginTransaction();
 
-                // Criptografar a senha do certificado
-                $senha_criptografada = password_hash($senha_certificado, PASSWORD_DEFAULT);
+                // Criptografar a senha do certificado com CryptoManager (reversível)
+                $crypto = new CryptoManager();
+                $senha_criptografada = $crypto->encrypt($senha_certificado);
+                if ($senha_criptografada === false) {
+                    throw new Exception('Falha ao criptografar a senha do certificado');
+                }
 
                 // Inserir certificado na tabela fiscal_certificados_digitais
                 $stmt = $conn->prepare('INSERT INTO fiscal_certificados_digitais (
@@ -228,7 +260,8 @@ try {
                     echo json_encode([
                         'success' => true, 
                         'message' => 'Certificado enviado com sucesso!',
-                        'certificado_id' => $certificado_id
+                        'certificado_id' => $certificado_id,
+                        'data_validade' => $data_validade
                     ]);
                 } else {
                     throw new Exception('Erro ao salvar certificado no banco de dados');
@@ -240,7 +273,7 @@ try {
                 if (file_exists($filepath)) {
                     unlink($filepath);
                 }
-                throw new Exception('Erro ao processar certificado: ' . $e->getMessage());
+                echo json_encode(['success' => false, 'error' => 'Erro ao processar certificado: ' . $e->getMessage()]);
             }
         } else {
             echo json_encode(['success' => false, 'error' => 'Erro ao fazer upload do arquivo']);
@@ -1251,6 +1284,197 @@ try {
         // Aqui você pode implementar a lógica para limpar o cache
         // Por enquanto, vamos apenas retornar sucesso
         echo json_encode(['success' => true, 'message' => 'Cache limpo com sucesso!']);
+        exit;
+    }
+
+    // ========== Consulta de Multas (DETRAN / WSDenatran) ==========
+    if ($action === 'get_config_denatran') {
+        $conn->exec("CREATE TABLE IF NOT EXISTS certificados_denatran (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            nome_certificado VARCHAR(255) NOT NULL,
+            arquivo_certificado VARCHAR(255) NOT NULL,
+            arquivo_chave VARCHAR(255) DEFAULT NULL,
+            senha_criptografada VARCHAR(255) DEFAULT NULL,
+            data_validade DATE DEFAULT NULL,
+            data_upload DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ativo TINYINT(1) NOT NULL DEFAULT 1,
+            KEY idx_empresa (empresa_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_denatran (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            habilitado TINYINT(1) NOT NULL DEFAULT 0,
+            base_url VARCHAR(500) NOT NULL DEFAULT 'https://wsdenatrandes-des07116.apps.dev.serpro',
+            cpf_usuario VARCHAR(20) DEFAULT NULL,
+            certificado_denatran_id INT DEFAULT NULL,
+            data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_empresa (empresa_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // Migrar tabela antiga: se existir coluna cert_path, adicionar certificado_denatran_id se não existir
+        try {
+            $conn->exec("ALTER TABLE configuracoes_denatran ADD COLUMN certificado_denatran_id INT DEFAULT NULL");
+        } catch (Exception $e) { /* coluna já existe */ }
+        $stmt = $conn->prepare('SELECT habilitado, base_url, cpf_usuario, certificado_denatran_id FROM configuracoes_denatran WHERE empresa_id = :empresa_id LIMIT 1');
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $data = [
+            'habilitado' => 0,
+            'base_url' => 'https://wsdenatrandes-des07116.apps.dev.serpro',
+            'cpf_usuario' => '',
+            'certificado' => null
+        ];
+        if ($row) {
+            $data['habilitado'] = (int)$row['habilitado'];
+            $data['base_url'] = $row['base_url'] ?? $data['base_url'];
+            $data['cpf_usuario'] = $row['cpf_usuario'] ?? '';
+            $cert_id = isset($row['certificado_denatran_id']) ? (int)$row['certificado_denatran_id'] : 0;
+            if ($cert_id > 0) {
+                $st = $conn->prepare('SELECT id, nome_certificado, data_validade, data_upload FROM certificados_denatran WHERE id = :id AND empresa_id = :empresa_id LIMIT 1');
+                $st->bindParam(':id', $cert_id, PDO::PARAM_INT);
+                $st->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+                $st->execute();
+                $cert = $st->fetch(PDO::FETCH_ASSOC);
+                if ($cert) {
+                    $data['certificado'] = [
+                        'id' => (int)$cert['id'],
+                        'nome_certificado' => $cert['nome_certificado'],
+                        'data_validade' => $cert['data_validade'],
+                        'data_upload' => $cert['data_upload']
+                    ];
+                }
+            }
+        }
+        echo json_encode(['success' => true, 'data' => $data]);
+        exit;
+    }
+    if ($action === 'save_config_denatran') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!$input) $input = $_POST;
+        $habilitado = !empty($input['habilitado']) ? 1 : 0;
+        $base_url = trim($input['base_url'] ?? 'https://wsdenatrandes-des07116.apps.dev.serpro');
+        $cpf_usuario = preg_replace('/\D/', '', $input['cpf_usuario'] ?? '');
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_denatran (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            habilitado TINYINT(1) NOT NULL DEFAULT 0,
+            base_url VARCHAR(500) NOT NULL DEFAULT 'https://wsdenatrandes-des07116.apps.dev.serpro',
+            cpf_usuario VARCHAR(20) DEFAULT NULL,
+            certificado_denatran_id INT DEFAULT NULL,
+            data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_empresa (empresa_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        try {
+            $conn->exec("ALTER TABLE configuracoes_denatran ADD COLUMN certificado_denatran_id INT DEFAULT NULL");
+        } catch (Exception $e) { /* coluna já existe */ }
+        $stmt = $conn->prepare('INSERT INTO configuracoes_denatran (empresa_id, habilitado, base_url, cpf_usuario) VALUES (:empresa_id, :habilitado, :base_url, :cpf_usuario) ON DUPLICATE KEY UPDATE habilitado = :habilitado_upd, base_url = :base_url_upd, cpf_usuario = :cpf_usuario_upd, data_atualizacao = NOW()');
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindParam(':habilitado', $habilitado, PDO::PARAM_INT);
+        $stmt->bindParam(':base_url', $base_url);
+        $stmt->bindParam(':cpf_usuario', $cpf_usuario);
+        $stmt->bindParam(':habilitado_upd', $habilitado, PDO::PARAM_INT);
+        $stmt->bindParam(':base_url_upd', $base_url);
+        $stmt->bindParam(':cpf_usuario_upd', $cpf_usuario);
+        $stmt->execute();
+        echo json_encode(['success' => true, 'message' => 'Configuração da consulta de multas (DETRAN) salva com sucesso.']);
+        exit;
+    }
+    if ($action === 'upload_certificado_denatran') {
+        if (!isset($_FILES['arquivo_certificado'])) {
+            echo json_encode(['success' => false, 'error' => 'Nenhum arquivo de certificado enviado']);
+            exit;
+        }
+        $file = $_FILES['arquivo_certificado'];
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $allowed = ['pfx', 'p12'];
+        if (!in_array($ext, $allowed)) {
+            echo json_encode(['success' => false, 'error' => 'Use apenas certificado .pfx ou .p12 (igual ao Certificado A1).']);
+            exit;
+        }
+        if ($file['size'] > 10 * 1024 * 1024) {
+            echo json_encode(['success' => false, 'error' => 'Arquivo muito grande. Máximo 10MB']);
+            exit;
+        }
+        $nome_certificado = trim($_POST['nome_certificado'] ?? 'Certificado DETRAN');
+        $senha = $_POST['senha_certificado'] ?? '';
+        $data_validade = $_POST['data_validade'] ?? null;
+        if (!$senha) {
+            echo json_encode(['success' => false, 'error' => 'Informe a senha do certificado.']);
+            exit;
+        }
+        $upload_dir = dirname(__DIR__) . '/uploads/certificados_denatran/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0755, true);
+        }
+        $pfx_content = file_get_contents($file['tmp_name']);
+        $certificates = [];
+        if (!openssl_pkcs12_read($pfx_content, $certificates, $senha)) {
+            echo json_encode(['success' => false, 'error' => 'Senha do certificado inválida ou arquivo corrompido.']);
+            exit;
+        }
+        $cert_pem = $certificates['cert'] ?? '';
+        $key_pem = $certificates['pkey'] ?? '';
+        if (!$cert_pem || !$key_pem) {
+            echo json_encode(['success' => false, 'error' => 'Não foi possível extrair certificado e chave do arquivo.']);
+            exit;
+        }
+        $prefix = 'denatran_' . $empresa_id . '_' . uniqid();
+        $cert_filename = $prefix . '_cert.pem';
+        $key_filename = $prefix . '_key.pem';
+        if (file_put_contents($upload_dir . $cert_filename, $cert_pem) === false || file_put_contents($upload_dir . $key_filename, $key_pem) === false) {
+            echo json_encode(['success' => false, 'error' => 'Erro ao salvar arquivos do certificado.']);
+            exit;
+        }
+        $conn->exec("CREATE TABLE IF NOT EXISTS certificados_denatran (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            nome_certificado VARCHAR(255) NOT NULL,
+            arquivo_certificado VARCHAR(255) NOT NULL,
+            arquivo_chave VARCHAR(255) DEFAULT NULL,
+            senha_criptografada VARCHAR(255) DEFAULT NULL,
+            data_validade DATE DEFAULT NULL,
+            data_upload DATETIME DEFAULT CURRENT_TIMESTAMP,
+            ativo TINYINT(1) NOT NULL DEFAULT 1,
+            KEY idx_empresa (empresa_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $senha_cripto = password_hash($senha, PASSWORD_DEFAULT);
+        $stmt = $conn->prepare('INSERT INTO certificados_denatran (empresa_id, nome_certificado, arquivo_certificado, arquivo_chave, senha_criptografada, data_validade) VALUES (:empresa_id, :nome, :arquivo_cert, :arquivo_key, :senha, :data_validade)');
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindParam(':nome', $nome_certificado);
+        $stmt->bindParam(':arquivo_cert', $cert_filename);
+        $stmt->bindParam(':arquivo_key', $key_filename);
+        $stmt->bindParam(':senha', $senha_cripto);
+        $stmt->bindParam(':data_validade', $data_validade ?: null);
+        $stmt->execute();
+        $cert_id = $conn->lastInsertId();
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_denatran (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            habilitado TINYINT(1) NOT NULL DEFAULT 0,
+            base_url VARCHAR(500) NOT NULL DEFAULT 'https://wsdenatrandes-des07116.apps.dev.serpro',
+            cpf_usuario VARCHAR(20) DEFAULT NULL,
+            certificado_denatran_id INT DEFAULT NULL,
+            data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_empresa (empresa_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        try {
+            $conn->exec("ALTER TABLE configuracoes_denatran ADD COLUMN certificado_denatran_id INT DEFAULT NULL");
+        } catch (Exception $e) { }
+        $upd = $conn->prepare('UPDATE configuracoes_denatran SET certificado_denatran_id = :cert_id, data_atualizacao = NOW() WHERE empresa_id = :empresa_id');
+        $upd->bindParam(':cert_id', $cert_id, PDO::PARAM_INT);
+        $upd->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $upd->execute();
+        if ($upd->rowCount() === 0) {
+            $ins = $conn->prepare('INSERT INTO configuracoes_denatran (empresa_id, habilitado, base_url, cpf_usuario, certificado_denatran_id) VALUES (:empresa_id, 0, "https://wsdenatrandes-des07116.apps.dev.serpro", "", :cert_id)');
+            $ins->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $ins->bindParam(':cert_id', $cert_id, PDO::PARAM_INT);
+            $ins->execute();
+        }
+        echo json_encode(['success' => true, 'message' => 'Certificado DETRAN enviado e vinculado com sucesso.', 'certificado_id' => (int)$cert_id]);
         exit;
     }
     

@@ -46,8 +46,15 @@ let currentMotoristId = null;
 let performanceChart = null;
 
 function initializePage() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const page = parseInt(urlParams.get('page'), 10) || 1;
+    const perPageFromUrl = parseInt(urlParams.get('per_page'), 10);
+    const perPageEl = document.getElementById('perPageMotorists');
+    if (perPageEl && !Number.isNaN(perPageFromUrl) && [5, 10, 25, 50, 100].indexOf(perPageFromUrl) >= 0) {
+        perPageEl.value = String(perPageFromUrl);
+    }
     // Load initial data
-    loadMotorists(1);
+    loadMotorists(page);
     
     // Setup button events
     document.getElementById('addMotoristBtn')?.addEventListener('click', showAddMotoristModal);
@@ -180,7 +187,9 @@ function switchTab(tabId) {
 
 function loadMotorists(page = 1) {
     currentPage = page;
-    const limit = 5;
+    const perPageSelect = document.getElementById('perPageMotorists');
+    const perPageFromSelect = perPageSelect ? parseInt(perPageSelect.value, 10) : 10;
+    const limit = [5, 10, 25, 50, 100].indexOf(perPageFromSelect) >= 0 ? perPageFromSelect : 10;
 
     const searchInput = document.getElementById('searchMotorist');
     const statusFilter = document.getElementById('statusFilter');
@@ -262,7 +271,15 @@ function loadMotorists(page = 1) {
                     totalPagesElement.textContent = totalPages;
                 }
 
-                updatePaginationButtons();
+                updatePaginationButtons(data.pagination);
+                const urlParams = new URLSearchParams(window.location.search);
+                urlParams.set('page', page);
+                urlParams.set('per_page', limit);
+                const isDefault = parseInt(page, 10) === 1 && parseInt(limit, 10) === 10;
+                const desiredSearch = isDefault ? '' : '?' + urlParams.toString();
+                if (window.location.search !== desiredSearch) {
+                    window.history.replaceState({}, '', window.location.pathname + desiredSearch);
+                }
             }
             
             // Update table
@@ -837,16 +854,27 @@ function setupPagination() {
     }
 }
 
-function updatePaginationButtons() {
+function updatePaginationButtons(pagination) {
     const prevBtn = document.getElementById('prevPageBtn');
     const nextBtn = document.getElementById('nextPageBtn');
+    const perPageSelect = document.getElementById('perPageMotorists');
+    const perPage = perPageSelect ? parseInt(perPageSelect.value, 10) : 10;
+    const perPageParam = [5, 10, 25, 50, 100].indexOf(perPage) >= 0 ? perPage : 10;
     
     if (prevBtn) {
         prevBtn.classList.toggle('disabled', currentPage <= 1);
+        prevBtn.href = `?page=${Math.max(1, currentPage - 1)}&per_page=${perPageParam}`;
     }
     
     if (nextBtn) {
         nextBtn.classList.toggle('disabled', currentPage >= totalPages);
+        nextBtn.href = `?page=${Math.min(totalPages, currentPage + 1)}&per_page=${perPageParam}`;
+    }
+    
+    const paginationInfo = document.getElementById('paginationMotoristsInfo');
+    if (paginationInfo && totalPages > 0) {
+        const total = (pagination && pagination.total) ? pagination.total : (totalPages * perPageParam);
+        paginationInfo.innerHTML = `Página <span id="currentPage">${currentPage}</span> de <span id="totalPages">${totalPages}</span> (${total} registros)`;
     }
 }
 

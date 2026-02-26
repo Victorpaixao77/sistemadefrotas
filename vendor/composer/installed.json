@@ -161,6 +161,74 @@
             "install-path": "./pcre"
         },
         {
+            "name": "justinrainbow/json-schema",
+            "version": "5.3.1",
+            "version_normalized": "5.3.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/jsonrainbow/json-schema.git",
+                "reference": "b5a44b6391a3bbb75c9f2b73e1ef03d6045e1e20"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/jsonrainbow/json-schema/zipball/b5a44b6391a3bbb75c9f2b73e1ef03d6045e1e20",
+                "reference": "b5a44b6391a3bbb75c9f2b73e1ef03d6045e1e20",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.1"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "~2.2.20||~2.15.1",
+                "json-schema/json-schema-test-suite": "1.2.0",
+                "phpunit/phpunit": "^4.8.35"
+            },
+            "time": "2025-12-12T08:56:22+00:00",
+            "bin": [
+                "bin/validate-json"
+            ],
+            "type": "library",
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "JsonSchema\\": "src/JsonSchema/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Bruno Prieto Reis",
+                    "email": "bruno.p.reis@gmail.com"
+                },
+                {
+                    "name": "Justin Rainbow",
+                    "email": "justin.rainbow@gmail.com"
+                },
+                {
+                    "name": "Igor Wiedler",
+                    "email": "igor@wiedler.ch"
+                },
+                {
+                    "name": "Robert Schönthal",
+                    "email": "seroscho@googlemail.com"
+                }
+            ],
+            "description": "A library to validate a json schema.",
+            "homepage": "https://github.com/justinrainbow/json-schema",
+            "keywords": [
+                "json",
+                "schema"
+            ],
+            "support": {
+                "issues": "https://github.com/jsonrainbow/json-schema/issues",
+                "source": "https://github.com/jsonrainbow/json-schema/tree/5.3.1"
+            },
+            "install-path": "../justinrainbow/json-schema"
+        },
+        {
             "name": "maennchen/zipstream-php",
             "version": "3.1.2",
             "version_normalized": "3.1.2.0",
@@ -356,17 +424,17 @@
         },
         {
             "name": "mpdf/mpdf",
-            "version": "v8.2.5",
-            "version_normalized": "8.2.5.0",
+            "version": "v8.2.7",
+            "version_normalized": "8.2.7.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/mpdf/mpdf.git",
-                "reference": "e175b05e3e00977b85feb96a8cccb174ac63621f"
+                "reference": "b59670a09498689c33ce639bac8f5ba26721dab3"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mpdf/mpdf/zipball/e175b05e3e00977b85feb96a8cccb174ac63621f",
-                "reference": "e175b05e3e00977b85feb96a8cccb174ac63621f",
+                "url": "https://api.github.com/repos/mpdf/mpdf/zipball/b59670a09498689c33ce639bac8f5ba26721dab3",
+                "reference": "b59670a09498689c33ce639bac8f5ba26721dab3",
                 "shasum": ""
             },
             "require": {
@@ -376,7 +444,7 @@
                 "mpdf/psr-log-aware-trait": "^2.0 || ^3.0",
                 "myclabs/deep-copy": "^1.7",
                 "paragonie/random_compat": "^1.4|^2.0|^9.99.99",
-                "php": "^5.6 || ^7.0 || ~8.0.0 || ~8.1.0 || ~8.2.0 || ~8.3.0 || ~8.4.0",
+                "php": "^5.6 || ^7.0 || ~8.0.0 || ~8.1.0 || ~8.2.0 || ~8.3.0 || ~8.4.0 || ~8.5.0",
                 "psr/http-message": "^1.0 || ^2.0",
                 "psr/log": "^1.0 || ^2.0 || ^3.0",
                 "setasign/fpdi": "^2.1"
@@ -393,7 +461,7 @@
                 "ext-xml": "Needed mainly for SVG manipulation",
                 "ext-zlib": "Needed for compression of embedded resources, such as fonts"
             },
-            "time": "2024-11-18T15:30:42+00:00",
+            "time": "2025-12-01T10:18:02+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -538,17 +606,17 @@
         },
         {
             "name": "myclabs/deep-copy",
-            "version": "1.13.1",
-            "version_normalized": "1.13.1.0",
+            "version": "1.13.4",
+            "version_normalized": "1.13.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/myclabs/DeepCopy.git",
-                "reference": "1720ddd719e16cf0db4eb1c6eca108031636d46c"
+                "reference": "07d290f0c47959fd5eed98c95ee5602db07e0b6a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/myclabs/DeepCopy/zipball/1720ddd719e16cf0db4eb1c6eca108031636d46c",
-                "reference": "1720ddd719e16cf0db4eb1c6eca108031636d46c",
+                "url": "https://api.github.com/repos/myclabs/DeepCopy/zipball/07d290f0c47959fd5eed98c95ee5602db07e0b6a",
+                "reference": "07d290f0c47959fd5eed98c95ee5602db07e0b6a",
                 "shasum": ""
             },
             "require": {
@@ -564,7 +632,7 @@
                 "phpspec/prophecy": "^1.10",
                 "phpunit/phpunit": "^7.5.20 || ^8.5.23 || ^9.5.13"
             },
-            "time": "2025-04-29T12:36:36+00:00",
+            "time": "2025-08-01T08:46:24+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -589,7 +657,7 @@
             ],
             "support": {
                 "issues": "https://github.com/myclabs/DeepCopy/issues",
-                "source": "https://github.com/myclabs/DeepCopy/tree/1.13.1"
+                "source": "https://github.com/myclabs/DeepCopy/tree/1.13.4"
             },
             "funding": [
                 {
@@ -598,6 +666,335 @@
                 }
             ],
             "install-path": "../myclabs/deep-copy"
+        },
+        {
+            "name": "nfephp-org/sped-common",
+            "version": "v5.1.16",
+            "version_normalized": "5.1.16.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/nfephp-org/sped-common.git",
+                "reference": "1c6b03dd06b396ee3680d07c9c071b82f869fd42"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/nfephp-org/sped-common/zipball/1c6b03dd06b396ee3680d07c9c071b82f869fd42",
+                "reference": "1c6b03dd06b396ee3680d07c9c071b82f869fd42",
+                "shasum": ""
+            },
+            "require": {
+                "ext-curl": "*",
+                "ext-dom": "*",
+                "ext-mbstring": "*",
+                "ext-openssl": "*",
+                "ext-soap": "*",
+                "php": ">= 7.4",
+                "psr/log": "^1.0||^2.0||^3.0"
+            },
+            "require-dev": {
+                "phpcompatibility/php-compatibility": "^9.3",
+                "phpstan/phpstan": "^1.4",
+                "phpunit/phpunit": "^9.3",
+                "scrutinizer/ocular": "^1.8",
+                "squizlabs/php_codesniffer": "^3.6"
+            },
+            "time": "2025-07-02T12:34:43+00:00",
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-v5.0": "5.0-dev"
+                }
+            },
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "NFePHP\\Common\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "LGPL-3.0-or-later",
+                "GPL-3.0-or-later",
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Roberto L. Machado",
+                    "email": "linux.rlm@gmail.com.br",
+                    "homepage": "http://www.nfephp.org",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Gustavo Lidani",
+                    "email": "lidanig0@gmail.com",
+                    "homepage": "https://github.com/lidani",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Comunidade NFePHP",
+                    "homepage": "https://github.com/nfephp-org/sped-common/graphs/contributors"
+                }
+            ],
+            "description": "sped-common é parte do projeto NFePHP.",
+            "homepage": "https://github.com/nfephp-org/sped-common",
+            "keywords": [
+                "nfe",
+                "nfephp",
+                "sped"
+            ],
+            "support": {
+                "issues": "https://github.com/nfephp-org/sped-common/issues",
+                "source": "https://github.com/nfephp-org/sped-common/tree/v5.1.16"
+            },
+            "install-path": "../nfephp-org/sped-common"
+        },
+        {
+            "name": "nfephp-org/sped-cte",
+            "version": "v5.0.1",
+            "version_normalized": "5.0.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/nfephp-org/sped-cte.git",
+                "reference": "4f6ec80dd3bb0dafc1d4f23acdfd253e335013a1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/nfephp-org/sped-cte/zipball/4f6ec80dd3bb0dafc1d4f23acdfd253e335013a1",
+                "reference": "4f6ec80dd3bb0dafc1d4f23acdfd253e335013a1",
+                "shasum": ""
+            },
+            "require": {
+                "ext-dom": "*",
+                "ext-json": "*",
+                "ext-libxml": "*",
+                "ext-openssl": "*",
+                "ext-simplexml": "*",
+                "ext-soap": "*",
+                "ext-zlib": "*",
+                "justinrainbow/json-schema": "^5.2",
+                "nfephp-org/sped-common": "^5.0",
+                "php": ">=7.0"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^0.12",
+                "phpunit/phpunit": "^5.7",
+                "scrutinizer/ocular": "^1.3",
+                "sebastian/phpcpd": "^3.0",
+                "squizlabs/php_codesniffer": "^3.4"
+            },
+            "time": "2025-06-06T19:01:16+00:00",
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "v4.0": "4.0-dev"
+                }
+            },
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "NFePHP\\CTe\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "LGPL-3.0-or-later",
+                "GPL-3.0-or-later",
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Roberto L. Machado",
+                    "email": "linux.rlm@gmail.com.br",
+                    "homepage": "http://www.nfephp.org",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Comunidade NFePHP",
+                    "homepage": "https://github.com/nfephp-org/sped-cte/graphs/contributors"
+                }
+            ],
+            "description": "API para geração e comunicação da CTe com as SEFAZ autorizadoras.",
+            "homepage": "https://github.com/nfephp-org/sped-cte",
+            "keywords": [
+                "cte",
+                "nfephp",
+                "sped"
+            ],
+            "support": {
+                "issues": "https://github.com/nfephp-org/sped-cte/issues",
+                "source": "https://github.com/nfephp-org/sped-cte/tree/v5.0.1"
+            },
+            "install-path": "../nfephp-org/sped-cte"
+        },
+        {
+            "name": "nfephp-org/sped-gtin",
+            "version": "v1.1.2",
+            "version_normalized": "1.1.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/nfephp-org/sped-gtin.git",
+                "reference": "a00b9bc26f91bd5583f24ec341b7e5149a9769a1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/nfephp-org/sped-gtin/zipball/a00b9bc26f91bd5583f24ec341b7e5149a9769a1",
+                "reference": "a00b9bc26f91bd5583f24ec341b7e5149a9769a1",
+                "shasum": ""
+            },
+            "require": {
+                "ext-curl": "*",
+                "ext-dom": "*",
+                "ext-json": "*",
+                "ext-libxml": "*",
+                "ext-openssl": "*",
+                "ext-simplexml": "*",
+                "ext-soap": "*",
+                "nfephp-org/sped-common": "^5.1.0",
+                "php": ">= 7.4"
+            },
+            "require-dev": {
+                "phpcompatibility/php-compatibility": "^9.3",
+                "phpstan/phpstan": "^1.4",
+                "phpunit/phpunit": "^9.3",
+                "scrutinizer/ocular": "^1.8",
+                "squizlabs/php_codesniffer": "dev-master"
+            },
+            "time": "2025-05-30T20:52:05+00:00",
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "v1.0": "1.0-dev"
+                }
+            },
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "NFePHP\\Gtin\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "LGPL-3.0-or-later",
+                "GPL-3.0-or-later",
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Roberto L. Machado",
+                    "email": "linux.rlm@gmail.com.br",
+                    "homepage": "https://github.com/nfephp-org",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Gustavo Lidani",
+                    "email": "lidanig0@gmail.com",
+                    "homepage": "https://github.com/lidani",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Comunidade NFePHP",
+                    "homepage": "https://github.com/nfephp-org/sped-gtin/graphs/contributors"
+                }
+            ],
+            "description": "Classes for validation of GTIN codes.",
+            "homepage": "https://github.com/nfephp-org/sped-gtin",
+            "keywords": [
+                "gtin",
+                "nfce",
+                "nfe",
+                "nfephp",
+                "sped"
+            ],
+            "support": {
+                "issues": "https://github.com/nfephp-org/sped-gtin/issues",
+                "source": "https://github.com/nfephp-org/sped-gtin/tree/v1.1.2"
+            },
+            "install-path": "../nfephp-org/sped-gtin"
+        },
+        {
+            "name": "nfephp-org/sped-nfe",
+            "version": "v5.2.5",
+            "version_normalized": "5.2.5.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/nfephp-org/sped-nfe.git",
+                "reference": "f49d543e735d30afacd92c3fe286c677a7d0ee35"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/nfephp-org/sped-nfe/zipball/f49d543e735d30afacd92c3fe286c677a7d0ee35",
+                "reference": "f49d543e735d30afacd92c3fe286c677a7d0ee35",
+                "shasum": ""
+            },
+            "require": {
+                "ext-dom": "*",
+                "ext-json": "*",
+                "ext-libxml": "*",
+                "ext-openssl": "*",
+                "ext-simplexml": "*",
+                "ext-soap": "*",
+                "ext-zlib": "*",
+                "justinrainbow/json-schema": "^5.2",
+                "nfephp-org/sped-common": "^5.1.0",
+                "nfephp-org/sped-gtin": "^1.1.0",
+                "php": ">= 7.4"
+            },
+            "require-dev": {
+                "phpcompatibility/php-compatibility": "^9.3",
+                "phpstan/phpstan": "^1.4",
+                "phpunit/phpunit": "^9.3",
+                "squizlabs/php_codesniffer": "^3.6"
+            },
+            "time": "2026-02-04T13:27:20+00:00",
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "v5.1": "5.1-dev"
+                }
+            },
+            "installation-source": "dist",
+            "autoload": {
+                "psr-4": {
+                    "NFePHP\\NFe\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "LGPL-3.0-or-later",
+                "GPL-3.0-or-later",
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Roberto L. Machado",
+                    "email": "linux.rlm@gmail.com.br",
+                    "homepage": "https://www.nfephp.com.br/",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Gustavo Lidani",
+                    "email": "lidanig0@gmail.com",
+                    "homepage": "https://github.com/lidani",
+                    "role": "Developer"
+                },
+                {
+                    "name": "Comunidade NFePHP",
+                    "homepage": "https://github.com/nfephp-org/sped-nfe/graphs/contributors"
+                }
+            ],
+            "description": "API para geração e comunicação da NFe e NFCe com as SEFAZ autorizadoras.",
+            "homepage": "https://github.com/nfephp-org/sped-nfe",
+            "keywords": [
+                "nfce",
+                "nfe",
+                "nfephp",
+                "sped"
+            ],
+            "support": {
+                "issues": "https://github.com/nfephp-org/sped-nfe/issues",
+                "source": "https://github.com/nfephp-org/sped-nfe/tree/v5.2.5"
+            },
+            "install-path": "../nfephp-org/sped-nfe"
         },
         {
             "name": "paragonie/random_compat",
@@ -654,17 +1051,17 @@
         },
         {
             "name": "phpoffice/phpspreadsheet",
-            "version": "4.3.1",
-            "version_normalized": "4.3.1.0",
+            "version": "5.4.0",
+            "version_normalized": "5.4.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPOffice/PhpSpreadsheet.git",
-                "reference": "d0ac70d610fb62ccad38c2696569ae1ad42acc70"
+                "reference": "48f2fe37d64c2dece0ef71fb2ac55497566782af"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPOffice/PhpSpreadsheet/zipball/d0ac70d610fb62ccad38c2696569ae1ad42acc70",
-                "reference": "d0ac70d610fb62ccad38c2696569ae1ad42acc70",
+                "url": "https://api.github.com/repos/PHPOffice/PhpSpreadsheet/zipball/48f2fe37d64c2dece0ef71fb2ac55497566782af",
+                "reference": "48f2fe37d64c2dece0ef71fb2ac55497566782af",
                 "shasum": ""
             },
             "require": {
@@ -672,6 +1069,7 @@
                 "ext-ctype": "*",
                 "ext-dom": "*",
                 "ext-fileinfo": "*",
+                "ext-filter": "*",
                 "ext-gd": "*",
                 "ext-iconv": "*",
                 "ext-libxml": "*",
@@ -686,15 +1084,14 @@
                 "markbaker/complex": "^3.0",
                 "markbaker/matrix": "^3.0",
                 "php": "^8.1",
-                "psr/http-client": "^1.0",
-                "psr/http-factory": "^1.0",
                 "psr/simple-cache": "^1.0 || ^2.0 || ^3.0"
             },
             "require-dev": {
                 "dealerdirect/phpcodesniffer-composer-installer": "dev-main",
                 "dompdf/dompdf": "^2.0 || ^3.0",
+                "ext-intl": "*",
                 "friendsofphp/php-cs-fixer": "^3.2",
-                "mitoteam/jpgraph": "^10.3",
+                "mitoteam/jpgraph": "^10.5",
                 "mpdf/mpdf": "^8.1.1",
                 "phpcompatibility/php-compatibility": "^9.3",
                 "phpstan/phpstan": "^1.1 || ^2.0",
@@ -706,12 +1103,12 @@
             },
             "suggest": {
                 "dompdf/dompdf": "Option for rendering PDF with PDF Writer",
-                "ext-intl": "PHP Internationalization Functions",
+                "ext-intl": "PHP Internationalization Functions, required for NumberFormat Wizard and StringHelper::setLocale()",
                 "mitoteam/jpgraph": "Option for rendering charts, or including charts with PDF or HTML Writers",
                 "mpdf/mpdf": "Option for rendering PDF with PDF Writer",
                 "tecnickcom/tcpdf": "Option for rendering PDF with PDF Writer"
             },
-            "time": "2025-05-26T18:51:08+00:00",
+            "time": "2026-01-11T04:52:00+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -741,6 +1138,9 @@
                 },
                 {
                     "name": "Adrien Crivelli"
+                },
+                {
+                    "name": "Owen Leibman"
                 }
             ],
             "description": "PHPSpreadsheet - Read, Create and Write Spreadsheet documents in PHP - Spreadsheet engine",
@@ -757,122 +1157,9 @@
             ],
             "support": {
                 "issues": "https://github.com/PHPOffice/PhpSpreadsheet/issues",
-                "source": "https://github.com/PHPOffice/PhpSpreadsheet/tree/4.3.1"
+                "source": "https://github.com/PHPOffice/PhpSpreadsheet/tree/5.4.0"
             },
             "install-path": "../phpoffice/phpspreadsheet"
-        },
-        {
-            "name": "psr/http-client",
-            "version": "1.0.3",
-            "version_normalized": "1.0.3.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/php-fig/http-client.git",
-                "reference": "bb5906edc1c324c9a05aa0873d40117941e5fa90"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/http-client/zipball/bb5906edc1c324c9a05aa0873d40117941e5fa90",
-                "reference": "bb5906edc1c324c9a05aa0873d40117941e5fa90",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^7.0 || ^8.0",
-                "psr/http-message": "^1.0 || ^2.0"
-            },
-            "time": "2023-09-23T14:17:50+00:00",
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "1.0.x-dev"
-                }
-            },
-            "installation-source": "dist",
-            "autoload": {
-                "psr-4": {
-                    "Psr\\Http\\Client\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "PHP-FIG",
-                    "homepage": "https://www.php-fig.org/"
-                }
-            ],
-            "description": "Common interface for HTTP clients",
-            "homepage": "https://github.com/php-fig/http-client",
-            "keywords": [
-                "http",
-                "http-client",
-                "psr",
-                "psr-18"
-            ],
-            "support": {
-                "source": "https://github.com/php-fig/http-client"
-            },
-            "install-path": "../psr/http-client"
-        },
-        {
-            "name": "psr/http-factory",
-            "version": "1.1.0",
-            "version_normalized": "1.1.0.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/php-fig/http-factory.git",
-                "reference": "2b4765fddfe3b508ac62f829e852b1501d3f6e8a"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/http-factory/zipball/2b4765fddfe3b508ac62f829e852b1501d3f6e8a",
-                "reference": "2b4765fddfe3b508ac62f829e852b1501d3f6e8a",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.1",
-                "psr/http-message": "^1.0 || ^2.0"
-            },
-            "time": "2024-04-15T12:06:14+00:00",
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "1.0.x-dev"
-                }
-            },
-            "installation-source": "dist",
-            "autoload": {
-                "psr-4": {
-                    "Psr\\Http\\Message\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "PHP-FIG",
-                    "homepage": "https://www.php-fig.org/"
-                }
-            ],
-            "description": "PSR-17: Common interfaces for PSR-7 HTTP message factories",
-            "keywords": [
-                "factory",
-                "http",
-                "message",
-                "psr",
-                "psr-17",
-                "psr-7",
-                "request",
-                "response"
-            ],
-            "support": {
-                "source": "https://github.com/php-fig/http-factory"
-            },
-            "install-path": "../psr/http-factory"
         },
         {
             "name": "psr/http-message",
@@ -1039,17 +1326,17 @@
         },
         {
             "name": "setasign/fpdi",
-            "version": "v2.6.3",
-            "version_normalized": "2.6.3.0",
+            "version": "v2.6.4",
+            "version_normalized": "2.6.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Setasign/FPDI.git",
-                "reference": "67c31f5e50c93c20579ca9e23035d8c540b51941"
+                "reference": "4b53852fde2734ec6a07e458a085db627c60eada"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Setasign/FPDI/zipball/67c31f5e50c93c20579ca9e23035d8c540b51941",
-                "reference": "67c31f5e50c93c20579ca9e23035d8c540b51941",
+                "url": "https://api.github.com/repos/Setasign/FPDI/zipball/4b53852fde2734ec6a07e458a085db627c60eada",
+                "reference": "4b53852fde2734ec6a07e458a085db627c60eada",
                 "shasum": ""
             },
             "require": {
@@ -1064,12 +1351,12 @@
                 "setasign/fpdf": "~1.8.6",
                 "setasign/tfpdf": "~1.33",
                 "squizlabs/php_codesniffer": "^3.5",
-                "tecnickcom/tcpdf": "^6.2"
+                "tecnickcom/tcpdf": "^6.8"
             },
             "suggest": {
                 "setasign/fpdf": "FPDI will extend this class but as it is also possible to use TCPDF or tFPDF as an alternative. There's no fixed dependency configured."
             },
-            "time": "2025-02-05T13:22:35+00:00",
+            "time": "2025-08-05T09:57:14+00:00",
             "type": "library",
             "installation-source": "dist",
             "autoload": {
@@ -1102,7 +1389,7 @@
             ],
             "support": {
                 "issues": "https://github.com/Setasign/FPDI/issues",
-                "source": "https://github.com/Setasign/FPDI/tree/v2.6.3"
+                "source": "https://github.com/Setasign/FPDI/tree/v2.6.4"
             },
             "funding": [
                 {

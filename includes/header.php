@@ -12,8 +12,8 @@ $email_usuario = isset($_SESSION['email']) ? $_SESSION['email'] : '';
 $foto_perfil = isset($_SESSION['foto_perfil']) && $_SESSION['foto_perfil'] ? $_SESSION['foto_perfil'] : null;
 $letra = $nome_usuario ? mb_substr($nome_usuario, 0, 1, 'UTF-8') : 'U';
 
-// Carregar sistema de notificações
-require_once 'notifications.php';
+// Carregar sistema de notificações (caminho relativo ao diretório do header)
+require_once __DIR__ . '/notifications.php';
 
 // You can override this in specific pages by setting $page_title before including header.php
 ?>
@@ -26,6 +26,12 @@ require_once 'notifications.php';
     </div>
     
     <div class="header-controls">
+        <!-- Botão BI Frota -->
+        <?php if (function_exists('can_access_advanced_reports') && can_access_advanced_reports()): ?>
+        <a href="/sistema-frotas/pages/bi.php" class="header-icon-btn header-bi-btn" title="BI Frota" style="background: var(--bg-tertiary); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; padding: 0; text-decoration: none; flex-shrink: 0;">
+            <img src="/sistema-frotas/bi/bi-icon.png" alt="BI" style="width:100%; height:100%; display:block; object-fit:contain; margin:0; padding:0;" />
+        </a>
+        <?php endif; ?>
         <!-- Botão IA Flutuante -->
         <button class="header-icon-btn" title="IA Notificações" id="iaFabBtn" style="background: var(--bg-tertiary); color: #2563eb; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; padding: 0; position: relative;">
             <img src="/sistema-frotas/IA/ia-icon.png" alt="IA" style="width:100%; height:100%; display:block; object-fit:contain; margin:0; padding:0; pointer-events: none;" />
@@ -38,7 +44,7 @@ require_once 'notifications.php';
         
         <!-- Notificações -->
         <div class="header-icon-wrapper">
-            <button class="header-icon-btn" title="Notificações" id="notificationBtn" onclick="event.preventDefault(); event.stopPropagation();">
+            <button class="header-icon-btn" title="Notificações" id="notificationBtn">
                 <i class="fas fa-bell"></i>
                 <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
             </button>
@@ -61,7 +67,7 @@ require_once 'notifications.php';
         <?php if (!empty($_SESSION['acesso_todas_empresas']) && $_SESSION['acesso_todas_empresas'] === true): ?>
         <!-- Seletor de Empresa (apenas para usuários com acesso global) -->
         <div class="header-icon-wrapper" style="position: relative;">
-            <button class="header-icon-btn" title="Trocar Empresa" id="empresaSelectorBtn" onclick="event.preventDefault(); event.stopPropagation();">
+            <button class="header-icon-btn" title="Trocar Empresa" id="empresaSelectorBtn">
                 <i class="fas fa-building"></i>
             </button>
             
@@ -91,7 +97,7 @@ require_once 'notifications.php';
             </div>
         </div>
         
-        <div class="user-profile" id="userProfileBtn" onclick="event.preventDefault(); event.stopPropagation();">
+        <div class="user-profile" id="userProfileBtn">
             <div class="user-avatar">
                 <?php if ($foto_perfil): ?>
                     <img src="/sistema-frotas/uploads/perfil/<?php echo htmlspecialchars($foto_perfil); ?>" alt="Foto de Perfil" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc;">

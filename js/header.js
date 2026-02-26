@@ -2,31 +2,34 @@
  * Header components (notifications, calendar, etc.) functionality
  */
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar dropdown de notificações
+function initHeader() {
     initNotifications();
-    
-    // Inicializar dropdown de perfil
     initProfileDropdown();
-    
-    // Inicializar seletor de cores
     initColorPalette();
-    
-    // Inicializar seletor de empresa (se existir)
     initEmpresaSelector();
-});
+}
+
+document.addEventListener('DOMContentLoaded', initHeader);
+
+// Se o script for carregado no final da página, o DOM já pode estar pronto
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    setTimeout(initHeader, 0);
+}
 
 /**
  * Inicializar dropdown de notificações
  */
 function initNotifications() {
     const notificationBtn = document.getElementById('notificationBtn');
-    const notificationDropdown = document.getElementById('notificationDropdown');
-    const notificationClearBtn = document.querySelector('.notification-clear-btn');
-    const notificationList = notificationDropdown.querySelector('.notification-list');
     const badge = document.getElementById('notificationBadge');
 
-    if (!notificationBtn || !notificationDropdown) return;
+    if (!notificationBtn) return;
+
+    const notificationDropdown = document.getElementById('notificationDropdown');
+    if (!notificationDropdown) return;
+
+    const notificationClearBtn = notificationDropdown.querySelector('.notification-clear-btn');
+    const notificationList = notificationDropdown.querySelector('.notification-list');
 
     // Carregar notificações no carregamento inicial da página
     carregarNotificacoesIA(false);
@@ -47,6 +50,7 @@ function initNotifications() {
             return res.json();
         })
         .then(data => {
+            if (!notificationList) return;
             notificationList.innerHTML = '';
             let unreadCount = 0;
             
@@ -77,15 +81,21 @@ function initNotifications() {
             
             // Usar o total real de notificações não lidas se disponível
             const totalReal = data.total_real_nao_lidas || unreadCount;
-            badge.textContent = totalReal;
-            badge.style.display = totalReal > 0 ? 'flex' : 'none';
+            if (badge) {
+                badge.textContent = totalReal;
+                badge.style.display = totalReal > 0 ? 'flex' : 'none';
+            }
         })
         .catch(error => {
             console.error('Erro ao carregar notificações:', error);
-            notificationList.innerHTML = '<div style="padding:16px;color:#dc3545">Erro ao carregar notificações. Tente novamente.</div>';
-            badge.textContent = '!';
-            badge.style.display = 'flex';
-            badge.style.backgroundColor = '#dc3545';
+            if (notificationList) {
+                notificationList.innerHTML = '<div style="padding:16px;color:#dc3545">Erro ao carregar notificações. Tente novamente.</div>';
+            }
+            if (badge) {
+                badge.textContent = '!';
+                badge.style.display = 'flex';
+                badge.style.backgroundColor = '#dc3545';
+            }
         });
     }
 
@@ -200,6 +210,8 @@ function initProfileDropdown() {
     profileDropdown.addEventListener('click', function(e) {
         e.stopPropagation();
     });
+    
+    window.__profileDropdownInited = true;
 }
 
 /**

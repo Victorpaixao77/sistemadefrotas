@@ -3,1200 +3,878 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Include configuration and functions first
 require_once '../../includes/config.php';
 require_once '../../includes/functions.php';
-
-// Configure session before starting it
 configure_session();
-
-// Start session
 session_start();
-
-// Check authentication
 require_authentication();
 
-// Set page title
 $page_title = "Gestão de MDF-e";
 ?>
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Gestão de Frotas - <?php echo $page_title; ?></title>
-    
-    <!-- CSS Files -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../../css/styles.css">
     <link rel="stylesheet" href="../../css/theme.css">
     <link rel="stylesheet" href="../../css/responsive.css">
-    
-    <!-- Favicon -->
     <link rel="icon" type="image/png" href="../../logo.png">
-    
-    <!-- DataTables CSS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
-    
     <style>
-        .fiscal-dashboard {
-            padding: 20px;
-        }
-        
-        .fiscal-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .fiscal-card {
-            background: var(--bg-secondary);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            padding: 20px;
-        }
-        
-        .fiscal-card h3 {
-            margin: 0 0 15px 0;
-            color: var(--text-primary);
-            font-size: 1.1rem;
-        }
-        
-        .fiscal-metric {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        
-        .fiscal-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: var(--primary-color);
-        }
-        
-        .fiscal-subtitle {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
-        
-        .document-tabs {
-            display: flex;
-            border-bottom: 1px solid var(--border-color);
-            margin-bottom: 20px;
-        }
-        
-        .document-tab {
-            padding: 10px 20px;
-            border: none;
-            background: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: all 0.3s ease;
-        }
-        
-        .document-tab.active {
-            color: var(--primary-color);
-            border-bottom-color: var(--primary-color);
-        }
-        
-        .document-content {
-            display: none;
-        }
-        
-        .document-content.active {
-            display: block;
-        }
-        
-        .document-list {
-            background: var(--bg-secondary);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            padding: 20px;
-        }
-        
-        .document-item {
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        
-        .document-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        
-        .document-header h4 {
-            margin: 0;
-            color: var(--text-primary);
-        }
-        
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-        
-        .status-success { background: #d4edda; color: #155724; }
-        .status-warning { background: #fff3cd; color: #856404; }
-        .status-danger { background: #f8d7da; color: #721c24; }
-        .status-info { background: #d1ecf1; color: #0c5460; }
-        
-        .document-details p {
-            margin: 5px 0;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-        
-        .document-actions {
-            margin-top: 15px;
-            display: flex;
-            gap: 10px;
-        }
-        
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 0.8rem;
-        }
-        
-        .sefaz-status {
-            text-align: center;
-            padding: 20px;
-        }
-        
-        .status-badge {
-            display: inline-block;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 500;
-        }
-        
-        .status-success { background: #d4edda; color: #155724; }
-        .status-danger { background: #f8d7da; color: #721c24; }
-        .status-warning { background: #fff3cd; color: #856404; }
-        
-        /* Estilos específicos para MDF-e */
-        .cte-selector {
-            max-height: 400px;
-            overflow-y: auto;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 15px;
-            background: var(--bg-secondary);
-        }
-        
-        .cte-item {
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 12px;
-            margin-bottom: 10px;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        
-        .cte-item:hover {
-            border-color: var(--primary-color);
-            box-shadow: 0 2px 8px rgba(0,123,255,0.1);
-        }
-        
-        .cte-item.selected {
-            border-color: var(--primary-color);
-            background: rgba(0,123,255,0.05);
-        }
-        
-        .cte-item .form-check-input:checked {
-            background-color: var(--primary-color);
-            border-color: var(--primary-color);
-        }
-        
-        .cte-details {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 10px;
-            margin-top: 10px;
-            font-size: 0.9rem;
-        }
-        
-        .cte-details span {
-            color: var(--text-secondary);
-        }
-        
-        .cte-details strong {
-            color: var(--text-primary);
-        }
-        
-        .mdfe-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .mdfe-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid var(--border-color);
-        }
-        
-        .mdfe-number {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: var(--primary-color);
-        }
-        
-        .mdfe-status {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-        
-        .status-rascunho { background: #f8f9fa; color: #6c757d; }
-        .status-pendente { background: #fff3cd; color: #856404; }
-        .status-autorizado { background: #d4edda; color: #155724; }
-        .status-rejeitado { background: #f8d7da; color: #721c24; }
-        .status-encerrado { background: #d1ecf1; color: #0c5460; }
-        
-        .mdfe-info {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-        }
-        
-        .info-group h6 {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .info-group p {
-            color: var(--text-primary);
-            margin: 0;
-            font-weight: 500;
-        }
-        
-        .route-info {
-            background: var(--bg-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            padding: 15px;
-            margin-top: 15px;
-        }
-        
-        .route-info h6 {
-            color: var(--text-primary);
-            margin-bottom: 10px;
-            font-size: 1rem;
-        }
-        
-        .route-steps {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        
-        .route-step {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .route-step i {
-            color: var(--primary-color);
-        }
+        .mdfe-table-wrap { overflow-x: auto; }
+        .mdfe-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .mdfe-table th, .mdfe-table td { border: 1px solid var(--border-color); padding: 8px 10px; text-align: left; }
+        .mdfe-table th { background: var(--bg-secondary); font-weight: 600; color: var(--text-secondary); }
+        .mdfe-table tbody tr:hover { background: #dee2e6; }
+        .mdfe-table .col-num { text-align: right; }
+        .mdfe-table .col-vlr { text-align: right; white-space: nowrap; }
+        .mdfe-table .col-chave { font-family: monospace; font-size: 0.75rem; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+        .mdfe-table .col-acoes { white-space: nowrap; }
+        .mdfe-table .col-acoes a, .mdfe-table .col-acoes button { padding: 4px 8px; margin: 0 2px; border: none; background: none; cursor: pointer; color: var(--text-secondary); text-decoration: none; }
+        .mdfe-table .col-acoes a:hover, .mdfe-table .col-acoes button:hover { color: var(--primary-color); }
+        .mdfe-table .situacao-autorizado, .mdfe-table .situacao-encerrado { color: #155724; font-weight: 500; }
+        .mdfe-table .situacao-pendente, .mdfe-table .situacao-rascunho { color: #856404; }
+        .mdfe-table .situacao-cancelado, .mdfe-table .situacao-denegado { color: #721c24; }
+        .document-list { background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color); padding: 20px; }
+        #modalVisualizarMdfeBody dl dt { font-weight: 600; color: #6c757d; }
+        #modalVisualizarMdfeBody dl dd { margin-bottom: 0.5rem; }
+        .cte-selector { max-height: 320px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; background: var(--bg-secondary); }
+        .cte-item { background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 10px; margin-bottom: 8px; cursor: pointer; }
+        .cte-item:hover { border-color: var(--primary-color); }
+        .cte-item.selected { border-color: var(--primary-color); background: rgba(0,123,255,0.05); }
     </style>
 </head>
 <body>
     <div class="app-container">
-        <!-- Sidebar Navigation -->
         <?php include '../../includes/sidebar_pages.php'; ?>
-        
-        <!-- Main Content -->
         <div class="main-content">
-            <!-- Top Header -->
             <?php include '../../includes/header.php'; ?>
-            
-            <!-- Page Content -->
             <div class="dashboard-content">
                 <div class="dashboard-header">
                     <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
-                        <button id="criarMDFEBtn" class="btn-add-widget" onclick="abrirModalCriarMDFE()">
+                        <button type="button" class="btn-add-widget" onclick="abrirModalCriarMDFE()">
                             <i class="fas fa-plus"></i> Criar MDF-e
                         </button>
-                        <button id="voltarNFEBtn" class="btn-add-widget" onclick="window.location.href='nfe.php'">
-                            <i class="fas fa-file-invoice"></i> Gerenciar NF-e
-                        </button>
-                        <button id="voltarCTEBtn" class="btn-add-widget" onclick="window.location.href='cte.php'">
-                            <i class="fas fa-truck"></i> Gerenciar CT-e
-                        </button>
-                        <button id="sincronizarSefazBtn" class="btn-add-widget" onclick="sincronizarSefaz()">
-                            <i class="fas fa-sync"></i> Sincronizar SEFAZ
-                        </button>
                         <div class="view-controls">
-                            <button id="refreshBtn" class="btn-restore-layout" title="Atualizar" onclick="atualizarDados()">
+                            <button type="button" class="btn-restore-layout" title="Atualizar lista" onclick="carregarMDFE()">
                                 <i class="fas fa-sync-alt"></i>
                             </button>
-                            <button id="exportBtn" class="btn-toggle-layout" title="Exportar" onclick="exportarDados()">
+                            <button type="button" class="btn-toggle-layout" title="Exportar" onclick="exportarDados()">
                                 <i class="fas fa-file-export"></i>
                             </button>
                         </div>
                     </div>
                 </div>
-                
-                <!-- KPI Cards Row -->
-                <div class="dashboard-grid">
-                    <div class="dashboard-card">
-                        <div class="card-header">
-                            <h3>Total de MDF-e</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="mdfeTotal">0</span>
-                                <span class="metric-subtitle">Documentos cadastrados</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-card">
-                        <div class="card-header">
-                            <h3>MDF-e Pendentes</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="mdfePendentes">0</span>
-                                <span class="metric-subtitle">Aguardando autorização</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-card">
-                        <div class="card-header">
-                            <h3>MDF-e Autorizados</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="mdfeAutorizados">0</span>
-                                <span class="metric-subtitle">Documentos aprovados</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-card">
-                        <div class="card-header">
-                            <h3>Status SEFAZ</h3>
-                            <button id="refreshSefazBtn" class="btn-sm" style="float: right; padding: 2px 8px; font-size: 12px;">
-                                <i class="fas fa-sync-alt"></i>
-                            </button>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <div id="sefazStatus">
-                                    <span class="status-badge status-warning">
-                                        <i class="fas fa-clock"></i> Verificando...
-                                    </span>
-                                </div>
-                                <span class="metric-subtitle" id="sefazSubtitle">Testando conexão...</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Document Tabs -->
-                <div class="document-tabs">
-                    <button class="document-tab active" data-target="mdfeContent">MDF-e</button>
-                    <button class="document-tab" data-target="nfeContent">NF-e</button>
-                    <button class="document-tab" data-target="cteContent">CT-e</button>
-                </div>
-                
-                <!-- MDF-e Content -->
-                <div id="mdfeContent" class="document-content active">
-                    <div class="document-list">
-                        <h3>MDF-e Recentes</h3>
-                        <div id="mdfeList">
-                            <p>Carregando MDF-e...</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- NF-e Content -->
-                <div id="nfeContent" class="document-content">
-                    <div class="document-list">
-                        <h3>NF-e Recentes</h3>
-                        <div id="nfeList">
-                            <p>Carregando NF-e...</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- CT-e Content -->
-                <div id="cteContent" class="document-content">
-                    <div class="document-list">
-                        <h3>CT-e Recentes</h3>
-                        <div id="cteList">
-                            <p>Carregando CT-e...</p>
-                        </div>
+                <div class="document-list mdfe-table-wrap" style="margin-top: 20px;">
+                    <h3>MDF-e</h3>
+                    <div id="mdfeList">
+                        <p>Carregando MDF-e...</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- Modal para Criar MDF-e -->
-    <div class="modal fade" id="criarMDFEModal" tabindex="-1" aria-labelledby="criarMDFEModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
+
+    <!-- Modal Visualizar MDF-e -->
+    <div class="modal fade" id="modalVisualizarMdfe" tabindex="-1" aria-labelledby="modalVisualizarMdfeLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="criarMDFEModalLabel">📋 Criar MDF-e</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title" id="modalVisualizarMdfeLabel"><i class="fas fa-route"></i> MDF-e</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body" id="modalVisualizarMdfeBody"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Criar MDF-e -->
+    <div class="modal fade" id="criarMDFEModal" tabindex="-1" aria-labelledby="criarMDFEModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="criarMDFEModalLabel"><i class="fas fa-plus"></i> Criar MDF-e</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                 </div>
                 <div class="modal-body">
+                    <p class="text-muted small">Selecione os CT-e autorizados que farão parte desta viagem. O MDF-e será emitido no seu CNPJ (transportadora executora); basta informar a chave dos CT-e.</p>
                     <form id="criarMDFEForm">
-                        <!-- Informações da Viagem -->
-                        <div class="row">
+                        <div class="row mb-3">
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="veiculoMDFE" class="form-label">Veículo Principal</label>
-                                    <select class="form-select" id="veiculoMDFE" name="veiculo_id" required>
-                                        <option value="">Selecione o veículo</option>
-                                        <option value="1">Caminhão 01 - ABC-1234</option>
-                                        <option value="2">Caminhão 02 - DEF-5678</option>
-                                        <option value="3">Carreta 01 - GHI-9012</option>
-                                    </select>
-                                </div>
+                                <label for="veiculoMDFE" class="form-label">Veículo</label>
+                                <select class="form-select" id="veiculoMDFE" name="veiculo_id" required>
+                                    <option value="">Selecione</option>
+                                </select>
                             </div>
                             <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="motoristaMDFE" class="form-label">Motorista Principal</label>
-                                    <select class="form-select" id="motoristaMDFE" name="motorista_id" required>
-                                        <option value="">Selecione o motorista</option>
-                                        <option value="1">João Silva - CNH: 12345678901</option>
-                                        <option value="2">Pedro Santos - CNH: 98765432109</option>
-                                        <option value="3">Carlos Oliveira - CNH: 11122233344</option>
-                                    </select>
-                                </div>
+                                <label for="motoristaMDFE" class="form-label">Motorista</label>
+                                <select class="form-select" id="motoristaMDFE" name="motorista_id" required>
+                                    <option value="">Selecione</option>
+                                </select>
                             </div>
                         </div>
-                        
-                        <!-- Informações da Rota -->
-                        <div class="row">
+                        <div class="row mb-3">
                             <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label for="ufInicio" class="form-label">UF de Início</label>
-                                    <select class="form-select" id="ufInicio" name="uf_inicio" required>
-                                        <option value="">Selecione a UF</option>
-                                        <option value="RS">Rio Grande do Sul</option>
-                                        <option value="SC">Santa Catarina</option>
-                                        <option value="PR">Paraná</option>
-                                        <option value="SP">São Paulo</option>
-                                    </select>
-                                </div>
+                                <label for="ufInicio" class="form-label">UF Início</label>
+                                <select class="form-select" id="ufInicio" name="uf_inicio" required>
+                                    <option value="">Selecione o estado</option>
+                                    <?php
+                                    $ufs = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+                                    foreach ($ufs as $uf) { echo "<option value=\"$uf\">$uf</option>"; }
+                                    ?>
+                                </select>
                             </div>
                             <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label for="ufFim" class="form-label">UF de Fim</label>
-                                    <select class="form-select" id="ufFim" name="uf_fim" required>
-                                        <option value="">Selecione a UF</option>
-                                        <option value="RS">Rio Grande do Sul</option>
-                                        <option value="SC">Santa Catarina</option>
-                                        <option value="PR">Paraná</option>
-                                        <option value="SP">São Paulo</option>
-                                    </select>
-                                </div>
+                                <label for="cidadeCarregamento" class="form-label">Cidade carregamento</label>
+                                <select class="form-select" id="cidadeCarregamento" name="municipio_carregamento" required disabled>
+                                    <option value="">Selecione primeiro o estado</option>
+                                </select>
                             </div>
                             <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label for="tipoViagem" class="form-label">Tipo de Viagem</label>
-                                    <select class="form-select" id="tipoViagem" name="tipo_viagem" required>
-                                        <option value="1">Viagem com CT-e</option>
-                                        <option value="2">Viagem sem CT-e</option>
-                                        <option value="3">Viagem mista</option>
-                                    </select>
-                                </div>
+                                <label for="tipoViagem" class="form-label">Tipo</label>
+                                <select class="form-select" id="tipoViagem" name="tipo_viagem">
+                                    <option value="1">Com CT-e</option>
+                                    <option value="2">Sem CT-e</option>
+                                    <option value="3">Misto</option>
+                                </select>
                             </div>
                         </div>
-                        
-                        <!-- Informações de Percurso -->
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="municipioCarregamento" class="form-label">Município de Carregamento</label>
-                                    <input type="text" class="form-control" id="municipioCarregamento" name="municipio_carregamento" required placeholder="Cidade de início da viagem">
-                                </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="ufFim" class="form-label">UF Fim</label>
+                                <select class="form-select" id="ufFim" name="uf_fim" required>
+                                    <option value="">Selecione o estado</option>
+                                    <?php foreach ($ufs as $uf) { echo "<option value=\"$uf\">$uf</option>"; } ?>
+                                </select>
                             </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="municipioDescarregamento" class="form-label">Município de Descarregamento</label>
-                                    <input type="text" class="form-control" id="municipioDescarregamento" name="municipio_descarregamento" required placeholder="Cidade de fim da viagem">
-                                </div>
+                            <div class="col-md-4">
+                                <label for="cidadeDescarregamento" class="form-label">Cidade descarregamento</label>
+                                <select class="form-select" id="cidadeDescarregamento" name="municipio_descarregamento" required disabled>
+                                    <option value="">Selecione primeiro o estado</option>
+                                </select>
                             </div>
+                            <div class="col-md-4"></div>
                         </div>
-                        
-                        <!-- Seleção de CT-e Autorizados -->
                         <div class="mb-3">
-                            <label class="form-label">
-                                <i class="fas fa-truck"></i> CT-e Autorizados para Manifestar
-                                <small class="text-muted">(Selecione os CT-e autorizados que farão parte desta viagem)</small>
-                            </label>
-                            <div id="cteSelector" class="cte-selector">
-                                <div class="text-center p-3">
-                                    <i class="fas fa-spinner fa-spin"></i>
-                                    <p>Carregando CT-e autorizados...</p>
-                                </div>
+                            <label class="form-label">CT-e autorizados</label>
+                            <div id="cteSelector" class="cte-selector">Carregando CT-e...</div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Peso total (kg)</label>
+                                <input type="number" class="form-control" id="totalPesoMDFE" name="peso_total" step="0.01" min="0" readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Volumes</label>
+                                <input type="number" class="form-control" id="totalVolumesMDFE" name="volumes_total" min="0" readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Qtd CT-e</label>
+                                <input type="number" class="form-control" id="totalCTe" name="total_cte" min="0" readonly>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Valor total</label>
+                                <input type="number" class="form-control" id="valorTotalMDFE" name="valor_total" step="0.01" min="0" readonly>
                             </div>
                         </div>
-                        
-                        <!-- Resumo da Viagem -->
-                        <div class="row">
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label for="totalPesoMDFE" class="form-label">Peso Total (kg)</label>
-                                    <input type="number" class="form-control" id="totalPesoMDFE" name="peso_total" step="0.01" min="0" readonly>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label for="totalVolumesMDFE" class="form-label">Total de Volumes</label>
-                                    <input type="number" class="form-control" id="totalVolumesMDFE" name="volumes_total" min="0" readonly>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label for="totalCTe" class="form-label">Total de CT-e</label>
-                                    <input type="number" class="form-control" id="totalCTe" name="total_cte" min="0" readonly>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="mb-3">
-                                    <label for="valorTotalMDFE" class="form-label">Valor Total</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">R$</span>
-                                        <input type="number" class="form-control" id="valorTotalMDFE" name="valor_total" step="0.01" min="0" readonly>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Observações -->
                         <div class="mb-3">
-                            <label for="observacoesMDFE" class="form-label">Observações (opcional)</label>
-                            <textarea class="form-control" id="observacoesMDFE" name="observacoes" rows="3" placeholder="Informações adicionais sobre a viagem..."></textarea>
+                            <label for="observacoesMDFE" class="form-label">Observações</label>
+                            <textarea class="form-control" id="observacoesMDFE" name="observacoes" rows="2"></textarea>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">❌ Cancelar</button>
-                    <button type="button" class="btn btn-primary" onclick="salvarMDFE()">📋 Criar MDF-e</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnSalvarMDFE" onclick="salvarMDFE()"><i class="fas fa-save"></i> Criar MDF-e</button>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- JavaScript Files -->
+
+    <!-- Modal Erro de Validação (com botão Editar) -->
+    <div class="modal fade" id="modalErroValidacaoMdfe" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title text-danger"><i class="fas fa-exclamation-triangle"></i> Validação antes de emitir</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="modalErroValidacaoMdfeTexto" class="mb-0"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-primary" id="btnEditarAposErro"><i class="fas fa-edit"></i> Editar MDF-e</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editar MDF-e -->
+    <div class="modal fade" id="editarMDFEModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-edit"></i> Editar MDF-e</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editarMdfeId" value="">
+                    <p class="text-muted small">Corrija os dados e salve. Depois tente enviar para a SEFAZ novamente.</p>
+                    <form id="editarMDFEForm">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="veiculoMDFEEdit" class="form-label">Veículo</label>
+                                <select class="form-select" id="veiculoMDFEEdit" name="veiculo_id" required></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="motoristaMDFEEdit" class="form-label">Motorista</label>
+                                <select class="form-select" id="motoristaMDFEEdit" name="motorista_id" required></select>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="ufInicioEdit" class="form-label">UF Início</label>
+                                <select class="form-select" id="ufInicioEdit" name="uf_inicio" required>
+                                    <option value="">Selecione o estado</option>
+                                    <?php $ufs = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO']; foreach ($ufs as $uf) { echo "<option value=\"$uf\">$uf</option>"; } ?>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="cidadeCarregamentoEdit" class="form-label">Cidade carregamento</label>
+                                <select class="form-select" id="cidadeCarregamentoEdit" name="municipio_carregamento" required disabled></select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="tipoViagemEdit" class="form-label">Tipo</label>
+                                <select class="form-select" id="tipoViagemEdit" name="tipo_viagem">
+                                    <option value="1">Com CT-e</option>
+                                    <option value="2">Sem CT-e</option>
+                                    <option value="3">Misto</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="ufFimEdit" class="form-label">UF Fim</label>
+                                <select class="form-select" id="ufFimEdit" name="uf_fim" required>
+                                    <option value="">Selecione o estado</option>
+                                    <?php foreach ($ufs as $uf) { echo "<option value=\"$uf\">$uf</option>"; } ?>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="cidadeDescarregamentoEdit" class="form-label">Cidade descarregamento</label>
+                                <select class="form-select" id="cidadeDescarregamentoEdit" name="municipio_descarregamento" required disabled></select>
+                            </div>
+                            <div class="col-md-4"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">CT-e autorizados</label>
+                            <div id="cteSelectorEdit" class="cte-selector">Carregando...</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="observacoesMDFEEdit" class="form-label">Observações</label>
+                            <textarea class="form-control" id="observacoesMDFEEdit" name="observacoes" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnSalvarEditarMDFE"><i class="fas fa-save"></i> Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Incluir Condutor (troca de motorista durante a viagem) -->
+    <div class="modal fade" id="modalIncluirCondutor" tabindex="-1" aria-labelledby="modalIncluirCondutorLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalIncluirCondutorLabel"><i class="fas fa-user-edit"></i> Incluir / Trocar condutor</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">Use quando houver troca de motorista durante a viagem (revezamento, etc.).</p>
+                    <div class="mb-3">
+                        <label for="condutorMotoristaSelect" class="form-label">Novo condutor</label>
+                        <select class="form-select" id="condutorMotoristaSelect">
+                            <option value="">Carregando...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="salvarIncluirCondutor()"><i class="fas fa-check"></i> Incluir condutor</button>
+                </div>
+            </div>
+        </div>
+    </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
-    
-    <!-- Sistema JavaScript -->
     <script src="../../js/sidebar.js"></script>
     <script src="../../js/theme.js"></script>
-    
-    <!-- Fiscal System JavaScript -->
-    <script src="../assets/js/fiscal.js"></script>
-    
     <script>
-        // Configurar abas de documentos
         document.addEventListener('DOMContentLoaded', function() {
-            const tabs = document.querySelectorAll('.document-tab');
-            const contents = document.querySelectorAll('.document-content');
-            
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const target = tab.getAttribute('data-target');
-                    
-                    // Atualizar abas ativas
-                    tabs.forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    
-                    // Atualizar conteúdo ativo
-                    contents.forEach(content => {
-                        content.classList.remove('active');
-                        if (content.id === target) {
-                            content.classList.add('active');
-                        }
-                    });
-                    
-                    // Carregar dados da aba selecionada
-                    if (target === 'mdfeContent') {
-                        carregarMDFE();
-                    } else if (target === 'nfeContent') {
-                        carregarNFE();
-                    } else if (target === 'cteContent') {
-                        carregarCTE();
-                    }
-                });
-            });
-            
-            // Botão de atualizar
-            document.getElementById('refreshBtn').addEventListener('click', function() {
-                atualizarDados();
-            });
-            
-            // Botão de atualizar SEFAZ
-            document.getElementById('refreshSefazBtn').addEventListener('click', function() {
-                verificarStatusSefaz();
-            });
-            
-            // Carregar dados iniciais
-            carregarDadosIniciais();
             carregarMDFE();
-            verificarStatusSefaz();
+            carregarVeiculosMotoristas();
+            setupEstadoCidadeMdfe();
         });
-        
-        // Função para abrir modal de criar MDF-e
+
+        function setupEstadoCidadeMdfe() {
+            var ufInicio = document.getElementById('ufInicio');
+            var ufFim = document.getElementById('ufFim');
+            var cidadeCarregamento = document.getElementById('cidadeCarregamento');
+            var cidadeDescarregamento = document.getElementById('cidadeDescarregamento');
+            if (ufInicio) {
+                ufInicio.addEventListener('change', function() {
+                    var uf = this.value;
+                    if (uf) {
+                        loadCidadesMdfe(uf, 'cidadeCarregamento');
+                        cidadeCarregamento.disabled = false;
+                    } else {
+                        cidadeCarregamento.innerHTML = '<option value="">Selecione primeiro o estado</option>';
+                        cidadeCarregamento.disabled = true;
+                    }
+                });
+            }
+            if (ufFim) {
+                ufFim.addEventListener('change', function() {
+                    var uf = this.value;
+                    if (uf) {
+                        loadCidadesMdfe(uf, 'cidadeDescarregamento');
+                        cidadeDescarregamento.disabled = false;
+                    } else {
+                        cidadeDescarregamento.innerHTML = '<option value="">Selecione primeiro o estado</option>';
+                        cidadeDescarregamento.disabled = true;
+                    }
+                });
+            }
+        }
+
+        function loadCidadesMdfe(uf, selectId) {
+            var sel = document.getElementById(selectId);
+            if (!sel) return;
+            sel.innerHTML = '<option value="">Carregando...</option>';
+            fetch('../../api/route_actions.php?action=get_cidades&uf=' + encodeURIComponent(uf))
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success && data.data && data.data.length) {
+                        var opts = '<option value="">Selecione a cidade</option>';
+                        data.data.forEach(function(c) {
+                            var nome = (c.nome || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                            opts += '<option value="' + nome + '">' + (c.nome || '') + '</option>';
+                        });
+                        sel.innerHTML = opts;
+                    } else {
+                        sel.innerHTML = '<option value="">Nenhuma cidade encontrada</option>';
+                    }
+                })
+                .catch(function() {
+                    sel.innerHTML = '<option value="">Erro ao carregar cidades</option>';
+                });
+        }
+
         function abrirModalCriarMDFE() {
-            // Carregar CT-e autorizados
-            carregarCTEAutorizados().then(() => {
-                const modal = new bootstrap.Modal(document.getElementById('criarMDFEModal'));
-                modal.show();
+            document.getElementById('cidadeCarregamento').innerHTML = '<option value="">Selecione primeiro o estado</option>';
+            document.getElementById('cidadeCarregamento').disabled = true;
+            document.getElementById('cidadeDescarregamento').innerHTML = '<option value="">Selecione primeiro o estado</option>';
+            document.getElementById('cidadeDescarregamento').disabled = true;
+            carregarCTEAutorizados().then(function() {
+                new bootstrap.Modal(document.getElementById('criarMDFEModal')).show();
             });
         }
-        
+
+        function carregarVeiculosMotoristas() {
+            var v = document.getElementById('veiculoMDFE');
+            var m = document.getElementById('motoristaMDFE');
+            if (!v || !m) return;
+            // Usar mesma API das rotas (get_veiculos) para formato consistente { success, data }
+            fetch('../../api/route_actions.php?action=get_veiculos')
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var list = (d && d.success && d.data) ? d.data : (Array.isArray(d) ? d : []);
+                    if (list.length) {
+                        list.forEach(function(o) {
+                            var opt = document.createElement('option');
+                            opt.value = o.id;
+                            opt.textContent = (o.placa || 'Veículo') + (o.modelo ? ' - ' + o.modelo : '') + (o.marca ? ' ' + o.marca : '');
+                            v.appendChild(opt);
+                        });
+                    } else {
+                        v.innerHTML = '<option value="">Nenhum veículo cadastrado</option>';
+                    }
+                })
+                .catch(function(err) {
+                    if (v) v.innerHTML = '<option value="">Erro ao carregar veículos</option>';
+                });
+            fetch('../../api/motoristas.php?action=list&limit=500')
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    var list = (d && d.success && d.data) ? d.data : [];
+                    if (list.length) {
+                        list.forEach(function(o) {
+                            var opt = document.createElement('option');
+                            opt.value = o.id;
+                            opt.textContent = (o.nome || 'Motorista') + (o.cpf ? ' - ' + o.cpf : '');
+                            m.appendChild(opt);
+                        });
+                    } else {
+                        m.innerHTML = '<option value="">Nenhum motorista cadastrado</option>';
+                    }
+                })
+                .catch(function() {
+                    if (m) m.innerHTML = '<option value="">Erro ao carregar motoristas</option>';
+                });
+        }
+
         function carregarCTEAutorizados() {
-            return fetch('../api/documentos_fiscais_v2.php?action=list&tipo=cte&status=autorizado')
-                .then(response => response.json())
-                .then(data => {
-                    const selector = document.getElementById('cteSelector');
-                    
-                    if (data.success && data.documentos && data.documentos.length > 0) {
-                        let html = '';
-                        data.documentos.forEach(cte => {
-                            const dataFormatada = new Date(cte.data_emissao).toLocaleDateString('pt-BR');
-                            const valor = parseFloat(cte.valor_total || 0).toFixed(2);
-                            const peso = parseFloat(cte.peso_carga || 0).toFixed(2);
-                            
-                            html += `
-                                <div class="cte-item" onclick="toggleCTE(${cte.id}, this)">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="cte_ids[]" value="${cte.id}" id="cte_${cte.id}">
-                                        <label class="form-check-label w-100" for="cte_${cte.id}">
-                                            <div class="d-flex justify-content-between align-items-start">
-                                                <div>
-                                                    <strong>CT-e ${cte.numero_cte.toString().padStart(3, '0')}</strong>
-                                                    <span class="status-badge status-autorizado">Autorizado</span>
-                                                </div>
-                                                <small class="text-muted">${dataFormatada}</small>
-                                            </div>
-                                            <div class="cte-details">
-                                                <span><strong>Origem:</strong> ${cte.origem || 'N/A'}</span>
-                                                <span><strong>Destino:</strong> ${cte.destino || 'N/A'}</span>
-                                                <span><strong>Valor:</strong> R$ ${valor.replace('.', ',')}</span>
-                                                <span><strong>Peso:</strong> ${peso} kg</span>
-                                                <span><strong>Volumes:</strong> ${cte.volumes_carga || 0}</span>
-                                            </div>
-                                        </label>
-                                    </div>
-                                </div>
-                            `;
-                        });
-                        selector.innerHTML = html;
-                    } else {
-                        selector.innerHTML = `
-                            <div class="text-center p-4">
-                                <i class="fas fa-truck fa-3x text-muted mb-3"></i>
-                                <h6>Nenhum CT-e autorizado disponível</h6>
-                                <p class="text-muted">Não há CT-e autorizados disponíveis para manifestar.</p>
-                                <a href="cte.php" class="btn btn-primary btn-sm">
-                                    <i class="fas fa-plus"></i> Criar CT-e
-                                </a>
-                            </div>
-                        `;
+            return fetch('../api/documentos_fiscais_v2.php?action=list&tipo=cte&status=autorizado&limit=100')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var sel = document.getElementById('cteSelector');
+                    if (!data.success || !data.documentos || data.documentos.length === 0) {
+                        sel.innerHTML = '<p class="text-muted mb-0">Nenhum CT-e autorizado. Consulte e autorize CT-e em <a href="cte.php">CT-e</a> primeiro.</p>';
+                        return;
                     }
+                    var html = '';
+                    data.documentos.forEach(function(cte) {
+                        var id = cte.id != null && cte.id !== '' ? Number(cte.id) : (cte.cte_id != null ? Number(cte.cte_id) : null);
+                        if (id == null || isNaN(id) || id <= 0) return;
+                        var dataF = cte.data_emissao ? new Date(cte.data_emissao).toLocaleDateString('pt-BR') : '-';
+                        var valor = parseFloat(cte.valor_total || 0).toFixed(2).replace('.', ',');
+                        var origem = (cte.origem_cidade || cte.origem || 'N/A');
+                        var destino = (cte.destino_cidade || cte.destino || 'N/A');
+                        html += '<div class="cte-item" onclick="toggleCTE(this)">';
+                        html += '<input type="checkbox" name="cte_ids[]" value="' + id + '" style="margin-right:8px" data-numero="' + (cte.numero_cte||'') + '" data-valor="' + (cte.valor_total||0) + '" data-peso="' + (cte.peso_carga||0) + '" data-volumes="' + (cte.volumes_carga||0) + '">';
+                        html += '<strong>CT-e ' + String(cte.numero_cte||'').padStart(6,'0') + '</strong> ' + dataF + ' | ' + origem + ' → ' + destino + ' | R$ ' + valor;
+                        html += '</div>';
+                    });
+                    sel.innerHTML = html;
                 })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    document.getElementById('cteSelector').innerHTML = `
-                        <div class="alert alert-danger">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            Erro ao carregar CT-e autorizados
-                        </div>
-                    `;
+                .catch(function() {
+                    document.getElementById('cteSelector').innerHTML = '<p class="text-danger">Erro ao carregar CT-e.</p>';
                 });
         }
-        
-        function toggleCTE(cteId, element) {
-            const checkbox = element.querySelector('input[type="checkbox"]');
-            checkbox.checked = !checkbox.checked;
-            
-            if (checkbox.checked) {
-                element.classList.add('selected');
-            } else {
-                element.classList.remove('selected');
-            }
-            
-            // Atualizar totais automaticamente
-            atualizarTotaisFormularioMDFE();
+
+        function toggleCTE(el) {
+            var cb = el.querySelector('input[type="checkbox"]');
+            cb.checked = !cb.checked;
+            el.classList.toggle('selected', cb.checked);
+            atualizarTotaisMDFE();
         }
-        
-        function atualizarTotaisFormularioMDFE() {
-            const checkboxes = document.querySelectorAll('input[name="cte_ids[]"]:checked');
-            let pesoTotal = 0;
-            let volumesTotal = 0;
-            let valorTotal = 0;
-            let totalCTe = checkboxes.length;
-            
-            checkboxes.forEach(checkbox => {
-                const cteItem = checkbox.closest('.cte-item');
-                const detalhes = cteItem.querySelector('.cte-details');
-                
-                // Extrair peso
-                const pesoText = detalhes.children[3].textContent;
-                const peso = parseFloat(pesoText.replace('Peso:', '').replace('kg', '').trim());
-                if (!isNaN(peso)) pesoTotal += peso;
-                
-                // Extrair volumes
-                const volumesText = detalhes.children[4].textContent;
-                const volumes = parseInt(volumesText.replace('Volumes:', '').trim());
-                if (!isNaN(volumes)) volumesTotal += volumes;
-                
-                // Extrair valor
-                const valorText = detalhes.children[2].textContent;
-                const valor = parseFloat(valorText.replace('Valor: R$', '').replace(',', '.').trim());
-                if (!isNaN(valor)) valorTotal += valor;
+
+        function atualizarTotaisMDFE() {
+            var cbs = document.querySelectorAll('#criarMDFEForm input[name="cte_ids[]"]:checked');
+            var peso = 0, volumes = 0, valor = 0;
+            cbs.forEach(function(cb) {
+                peso += parseFloat(cb.getAttribute('data-peso') || 0);
+                volumes += parseInt(cb.getAttribute('data-volumes') || 0, 10);
+                valor += parseFloat(cb.getAttribute('data-valor') || 0);
             });
-            
-            // Atualizar campos do formulário
-            document.getElementById('totalPesoMDFE').value = pesoTotal.toFixed(2);
-            document.getElementById('totalVolumesMDFE').value = volumesTotal;
-            document.getElementById('valorTotalMDFE').value = valorTotal.toFixed(2);
-            document.getElementById('totalCTe').value = totalCTe;
+            document.getElementById('totalPesoMDFE').value = peso.toFixed(2);
+            document.getElementById('totalVolumesMDFE').value = volumes;
+            document.getElementById('totalCTe').value = cbs.length;
+            document.getElementById('valorTotalMDFE').value = valor.toFixed(2);
         }
-        
+
         function salvarMDFE() {
-            const form = document.getElementById('criarMDFEForm');
-            
-            if (!form.checkValidity()) {
-                form.reportValidity();
+            var form = document.getElementById('criarMDFEForm');
+            if (!form.checkValidity()) { form.reportValidity(); return; }
+            var cbs = document.querySelectorAll('input[name="cte_ids[]"]:checked');
+            if (cbs.length === 0) {
+                alert('Selecione pelo menos um CT-e.');
                 return;
             }
-            
-            // Verificar se pelo menos um CT-e foi selecionado
-            const cteSelecionados = document.querySelectorAll('input[name="cte_ids[]"]:checked');
-            if (cteSelecionados.length === 0) {
-                alert('❌ Selecione pelo menos um CT-e para manifestar');
-                return;
-            }
-            
-            const formData = new FormData(form);
-            formData.append('action', 'criar_mdfe');
-            
-            // Adicionar CT-e selecionados
-            cteSelecionados.forEach(cte => {
-                formData.append('cte_ids[]', cte.value);
-            });
-            
-            // Mostrar loading
-            const btnSalvar = event.target;
-            const originalText = btnSalvar.innerHTML;
-            btnSalvar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Criando MDF-e...';
-            btnSalvar.disabled = true;
-            
-            fetch('../api/documentos_fiscais_v2.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(`✅ MDF-e criado com sucesso!\n\nNúmero: ${data.numero_mdfe}\nStatus: ${data.status}\nCT-e manifestados: ${cteSelecionados.length}`);
-                    
-                    // Fechar modal
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('criarMDFEModal'));
-                    modal.hide();
-                    
-                    // Limpar formulário
-                    form.reset();
-                    
-                    // Atualizar dados
-                    carregarDadosIniciais();
-                    carregarMDFE();
-                } else {
-                    alert('❌ Erro ao criar MDF-e: ' + (data.error || 'Erro desconhecido'));
-                }
-            })
-            .catch(error => {
-                console.error('Erro:', error);
-                alert('❌ Erro ao criar MDF-e');
-            })
-            .finally(() => {
-                // Restaurar botão
-                btnSalvar.innerHTML = originalText;
-                btnSalvar.disabled = false;
-            });
+            var fd = new FormData(form);
+            fd.append('action', 'criar_mdfe');
+            cbs.forEach(function(cb) { fd.append('cte_ids[]', cb.value); });
+            var btn = document.getElementById('btnSalvarMDFE');
+            var orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Criando...';
+            btn.disabled = true;
+            fetch('../api/documentos_fiscais_v2.php', { method: 'POST', body: fd })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        alert('MDF-e criado: #' + data.numero_mdfe + '. Status: ' + data.status);
+                        bootstrap.Modal.getInstance(document.getElementById('criarMDFEModal')).hide();
+                        form.reset();
+                        carregarMDFE();
+                    } else {
+                        alert('Erro: ' + (data.error || 'Erro desconhecido'));
+                    }
+                })
+                .catch(function() { alert('Erro ao criar MDF-e.'); })
+                .finally(function() { btn.innerHTML = orig; btn.disabled = false; });
         }
-        
+
         function carregarMDFE() {
-            const msg = document.getElementById('mdfeList');
-            msg.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Carregando MDF-e...</div>';
-            
-            fetch('../api/documentos_fiscais_v2.php?action=list&tipo=mdfe&limit=20')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        if (data.documentos && data.documentos.length > 0) {
-                            let html = '';
-                            data.documentos.forEach(doc => {
-                                const statusClass = doc.status === 'autorizado' ? 'autorizado' : 
-                                                  doc.status === 'pendente' ? 'pendente' : 
-                                                  doc.status === 'rejeitado' ? 'rejeitado' : 
-                                                  doc.status === 'encerrado' ? 'encerrado' : 'rascunho';
-                                const statusText = doc.status === 'autorizado' ? 'Autorizado' : 
-                                                 doc.status === 'pendente' ? 'Pendente' : 
-                                                 doc.status === 'rejeitado' ? 'Rejeitado' : 
-                                                 doc.status === 'encerrado' ? 'Encerrado' : 'Rascunho';
-                                const dataFormatada = new Date(doc.data_emissao).toLocaleDateString('pt-BR');
-                                
-                                html += `
-                                    <div class="mdfe-card">
-                                        <div class="mdfe-header">
-                                            <div class="mdfe-number">MDF-e ${doc.numero_mdfe.toString().padStart(3, '0')}</div>
-                                            <div class="mdfe-status status-${statusClass}">${statusText}</div>
-                                        </div>
-                                        <div class="mdfe-info">
-                                            <div class="info-group">
-                                                <h6>Data de Emissão</h6>
-                                                <p>${dataFormatada}</p>
-                                            </div>
-                                            <div class="info-group">
-                                                <h6>UF Início</h6>
-                                                <p>${doc.uf_inicio || 'N/A'}</p>
-                                            </div>
-                                            <div class="info-group">
-                                                <h6>UF Fim</h6>
-                                                <p>${doc.uf_fim || 'N/A'}</p>
-                                            </div>
-                                            <div class="info-group">
-                                                <h6>Peso Total</h6>
-                                                <p>${parseFloat(doc.peso_total || 0).toFixed(2)} kg</p>
-                                            </div>
-                                            <div class="info-group">
-                                                <h6>Volumes</h6>
-                                                <p>${doc.volumes_total || 0}</p>
-                                            </div>
-                                            <div class="info-group">
-                                                <h6>CT-e Manifestados</h6>
-                                                <p>${doc.total_cte || 0}</p>
-                                            </div>
-                                        </div>
-                                        <div class="route-info">
-                                            <h6><i class="fas fa-route"></i> Percurso da Viagem</h6>
-                                            <div class="route-steps">
-                                                <div class="route-step">
-                                                    <i class="fas fa-map-marker-alt"></i>
-                                                    <span>${doc.municipio_carregamento || 'Origem'}</span>
-                                                </div>
-                                                <div class="route-step">
-                                                    <i class="fas fa-arrow-right"></i>
-                                                </div>
-                                                <div class="route-step">
-                                                    <i class="fas fa-flag-checkered"></i>
-                                                    <span>${doc.municipio_descarregamento || 'Destino'}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="mt-3">
-                                            <button onclick="editarMDFE(${doc.id})" class="btn btn-sm btn-outline-primary me-2">
-                                                <i class="fas fa-edit"></i> Editar
-                                            </button>
-                                            ${doc.status === 'rascunho' || doc.status === 'pendente' ? 
-                                                `<button onclick="enviarMDFESefaz(${doc.id})" class="btn btn-sm btn-success me-2">
-                                                    <i class="fas fa-paper-plane"></i> Enviar SEFAZ
-                                                </button>` : ''}
-                                            ${doc.status === 'autorizado' ? 
-                                                `<button onclick="encerrarMDFE(${doc.id})" class="btn btn-sm btn-warning me-2">
-                                                    <i class="fas fa-stop-circle"></i> Encerrar
-                                                </button>` : ''}
-                                            <button onclick="visualizarMDFE(${doc.id})" class="btn btn-sm btn-outline-secondary">
-                                                <i class="fas fa-eye"></i> Visualizar
-                                            </button>
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                            msg.innerHTML = html;
-                        } else {
-                            msg.innerHTML = `
-                                <div class="text-center p-4">
-                                    <i class="fas fa-route fa-3x text-muted mb-3"></i>
-                                    <h6>Nenhum MDF-e criado</h6>
-                                    <p class="text-muted">Clique em "Criar MDF-e" para gerar manifestos de viagem</p>
-                                    <button onclick="abrirModalCriarMDFE()" class="btn btn-primary">
-                                        <i class="fas fa-plus"></i> Criar MDF-e
-                                    </button>
-                                </div>
-                            `;
-                        }
-                    } else {
-                        throw new Error(data.error || 'Erro desconhecido');
-                    }
-                })
-                .catch(error => {
-                    console.error('❌ Erro ao carregar MDF-e:', error);
-                    msg.innerHTML = `
-                        <div class="alert alert-danger">
-                            <strong>❌ Erro ao carregar dados!</strong><br>
-                            ${error.message}
-                        </div>
-                    `;
-                });
-        }
-        
-        function carregarNFE() {
-            const msg = document.getElementById('nfeList');
-            msg.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Carregando NF-e...</div>';
-            
-            fetch('../api/documentos_fiscais_v2.php?action=list&tipo=nfe&limit=10')
-                .then(response => response.json())
-                .then(data => {
+            var el = document.getElementById('mdfeList');
+            el.innerHTML = '<div style="color:#17a2b8;background:#d1ecf1;padding:15px;border-radius:5px;"><strong>Carregando MDF-e...</strong></div>';
+            fetch('../api/documentos_fiscais_v2.php?action=list&tipo=mdfe&limit=100')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
                     if (data.success && data.documentos && data.documentos.length > 0) {
-                        let html = '';
-                        data.documentos.forEach(doc => {
-                            const statusClass = doc.status === 'entregue' ? 'success' : 
-                                              doc.status === 'em_transporte' ? 'warning' : 'info';
-                            const statusText = doc.status === 'entregue' ? 'Entregue' : 
-                                             doc.status === 'em_transporte' ? 'Em Transporte' : 'Recebida';
-                            const dataFormatada = new Date(doc.data_emissao).toLocaleDateString('pt-BR');
-                            
-                            html += `<div class="document-item">
-                                <div class="document-header">
-                                    <h4>NF-e ${doc.numero_nfe.toString().padStart(3, '0')}</h4>
-                                    <span class="status-badge status-${statusClass}">${statusText}</span>
-                                </div>
-                                <div class="document-details">
-                                    <p><strong>Data:</strong> ${dataFormatada}</p>
-                                    <p><strong>Valor:</strong> R$ ${parseFloat(doc.valor_total || 0).toFixed(2).replace('.', ',')}</p>
-                                    <p><strong>Cliente:</strong> ${doc.cliente_razao_social || 'Cliente'}</p>
-                                </div>
-                            </div>`;
+                        var docs = data.documentos;
+                        var html = '<table class="mdfe-table"><thead><tr>';
+                        html += '<th>Mod</th><th>Série</th><th>Número</th><th>Chave</th><th>Emissão</th>';
+                        html += '<th>UF Início</th><th>UF Fim</th><th>Qtd CT-e</th><th>Peso/Vol.</th><th>Situação</th><th class="col-acoes">Ações</th></tr></thead><tbody>';
+                        docs.forEach(function(doc) {
+                            var dataEmissao = doc.data_emissao ? new Date(doc.data_emissao).toLocaleDateString('pt-BR') : '-';
+                            var numero = String(doc.numero_mdfe || '').padStart(9, '0');
+                            var serie = doc.serie_mdfe || '1';
+                            var ufIni = doc.uf_inicio || '-';
+                            var ufFim = doc.uf_fim || '-';
+                            var qtdCte = doc.total_cte != null ? doc.total_cte : (doc.qtd_cte != null ? doc.qtd_cte : '-');
+                            var peso = doc.peso_total != null ? parseFloat(doc.peso_total).toFixed(1) : (doc.peso_total_carga != null ? parseFloat(doc.peso_total_carga).toFixed(1) : '-');
+                            var vol = doc.volumes_total != null ? doc.volumes_total : (doc.qtd_total_volumes != null ? doc.qtd_total_volumes : '-');
+                            var pesoVol = (peso !== '-' ? peso + ' kg' : '') + (vol !== '-' ? ' / ' + vol + ' vol.' : '');
+                            if (!pesoVol) pesoVol = '-';
+                            var st = doc.status || 'pendente';
+                            var stTexto = st === 'autorizado' ? 'Autorizado' : st === 'rascunho' ? 'Rascunho' : st === 'pendente' ? 'Pendente' : st === 'encerrado' ? 'Encerrado' : st === 'cancelado' ? 'Cancelado' : st === 'denegado' ? 'Denegado' : st;
+                            var stClass = st.replace(/_/g, '-');
+                            var encerrado = !!(doc.data_encerramento);
+                            var dataRef = doc.data_autorizacao || doc.data_emissao;
+                            var dentro24h = false;
+                            if (dataRef && (st === 'autorizado' && !encerrado)) {
+                                var t = new Date(dataRef).getTime();
+                                dentro24h = (Date.now() - t) < (24 * 60 * 60 * 1000);
+                            }
+                            html += '<tr>';
+                            html += '<td class="col-num">58</td>';
+                            html += '<td>' + escapeHtml(serie) + '</td>';
+                            html += '<td class="col-num">' + escapeHtml(numero) + '</td>';
+                            html += '<td class="col-chave" title="' + escapeHtml(doc.chave_acesso || '') + '">' + escapeHtml(doc.chave_acesso || '-') + '</td>';
+                            html += '<td>' + dataEmissao + '</td>';
+                            html += '<td>' + escapeHtml(ufIni) + '</td>';
+                            html += '<td>' + escapeHtml(ufFim) + '</td>';
+                            html += '<td class="col-num">' + qtdCte + '</td>';
+                            html += '<td>' + escapeHtml(pesoVol) + '</td>';
+                            html += '<td class="situacao-' + stClass + '">' + escapeHtml(stTexto) + '</td>';
+                            html += '<td class="col-acoes">';
+                            html += '<a href="#" onclick="abrirModalMdfe(' + doc.id + '); return false;" title="Visualizar"><i class="fas fa-eye"></i></a>';
+                            if (st === 'rascunho' || st === 'pendente') {
+                                html += ' <a href="#" onclick="abrirModalEditarMdfe(' + doc.id + '); return false;" title="Editar"><i class="fas fa-edit"></i></a>';
+                                html += ' <a href="#" onclick="enviarMDFESefaz(' + doc.id + '); return false;" title="Enviar SEFAZ"><i class="fas fa-paper-plane"></i></a>';
+                            }
+                            if (st === 'autorizado' && !encerrado) {
+                                if (dentro24h) {
+                                    html += ' <a href="#" onclick="cancelarMDFE(' + doc.id + '); return false;" title="Cancelar MDF-e (até 24h)"><i class="fas fa-times-circle"></i></a>';
+                                }
+                                html += ' <a href="#" onclick="abrirModalIncluirCondutor(' + doc.id + '); return false;" title="Incluir condutor"><i class="fas fa-user-edit"></i></a>';
+                                html += ' <a href="#" onclick="encerrarMDFE(' + doc.id + '); return false;" title="Encerrar MDF-e"><i class="fas fa-stop-circle"></i></a>';
+                            }
+                            html += '</td></tr>';
                         });
-                        msg.innerHTML = html;
+                        html += '</tbody></table>';
+                        el.innerHTML = html;
                     } else {
-                        msg.innerHTML = `
-                            <div class="text-center p-4">
-                                <i class="fas fa-file-invoice fa-2x text-muted mb-2"></i>
-                                <p class="text-muted">Nenhuma NF-e encontrada</p>
-                                <a href="nfe.php" class="btn btn-primary btn-sm">Ver todas NF-e</a>
-                            </div>
-                        `;
+                        el.innerHTML = '<div style="color:#6c757d;background:#f8f9fa;padding:15px;border-radius:5px;"><strong>Nenhum MDF-e</strong><br>Clique em "Criar MDF-e" e selecione CT-e autorizados para gerar o manifesto.</div>';
                     }
                 })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    msg.innerHTML = '<div class="alert alert-danger">Erro ao carregar NF-e</div>';
+                .catch(function(err) {
+                    console.error(err);
+                    el.innerHTML = '<div style="color:#dc3545;background:#f8d7da;padding:15px;border-radius:5px;"><strong>Erro ao carregar dados.</strong></div>';
                 });
         }
-        
-        function carregarCTE() {
-            const msg = document.getElementById('cteList');
-            msg.innerHTML = '<div class="text-center p-3"><i class="fas fa-spinner fa-spin"></i> Carregando CT-e...</div>';
-            
-            fetch('../api/documentos_fiscais_v2.php?action=list&tipo=cte&limit=10')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.documentos && data.documentos.length > 0) {
-                        let html = '';
-                        data.documentos.forEach(doc => {
-                            const statusClass = doc.status === 'autorizado' ? 'success' : 
-                                              doc.status === 'pendente' ? 'warning' : 'info';
-                            const statusText = doc.status === 'autorizado' ? 'Autorizado' : 
-                                             doc.status === 'pendente' ? 'Pendente' : 'Rascunho';
-                            const dataFormatada = new Date(doc.data_emissao).toLocaleDateString('pt-BR');
-                            
-                            html += `<div class="document-item">
-                                <div class="document-header">
-                                    <h4>CT-e ${doc.numero_cte.toString().padStart(3, '0')}</h4>
-                                    <span class="status-badge status-${statusClass}">${statusText}</span>
-                                </div>
-                                <div class="document-details">
-                                    <p><strong>Data:</strong> ${dataFormatada}</p>
-                                    <p><strong>Origem:</strong> ${doc.origem || 'N/A'}</p>
-                                    <p><strong>Destino:</strong> ${doc.destino || 'N/A'}</p>
-                                </div>
-                            </div>`;
-                        });
-                        msg.innerHTML = html;
-                    } else {
-                        msg.innerHTML = `
-                            <div class="text-center p-4">
-                                <i class="fas fa-truck fa-2x text-muted mb-2"></i>
-                                <p class="text-muted">Nenhum CT-e encontrado</p>
-                                <a href="cte.php" class="btn btn-primary btn-sm">Ver todos CT-e</a>
-                            </div>
-                        `;
+
+        function escapeHtml(s) {
+            if (s == null) return '';
+            var div = document.createElement('div');
+            div.textContent = s;
+            return div.innerHTML;
+        }
+
+        function abrirModalMdfe(id) {
+            var modal = new bootstrap.Modal(document.getElementById('modalVisualizarMdfe'));
+            var body = document.getElementById('modalVisualizarMdfeBody');
+            var title = document.getElementById('modalVisualizarMdfeLabel');
+            body.innerHTML = '<p class="text-muted">Carregando...</p>';
+            modal.show();
+            fetch('../api/documentos_fiscais_v2.php?action=get&tipo=mdfe&id=' + id)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success || !data.documento) {
+                        body.innerHTML = '<p class="text-danger">MDF-e não encontrado.</p>';
+                        return;
                     }
+                    var d = data.documento;
+                    var dataEmissao = d.data_emissao ? new Date(d.data_emissao).toLocaleDateString('pt-BR') : '-';
+                    var st = d.status === 'autorizado' ? 'Autorizado' : d.status === 'rascunho' ? 'Rascunho' : d.status === 'pendente' ? 'Pendente' : d.status === 'encerrado' ? 'Encerrado' : d.status || '-';
+                    title.innerHTML = '<i class="fas fa-route"></i> MDF-e ' + (d.numero_mdfe || id);
+                    body.innerHTML = '<dl class="row mb-0">' +
+                        '<dt class="col-sm-4">Número</dt><dd class="col-sm-8">' + escapeHtml(d.numero_mdfe || '-') + '</dd>' +
+                        '<dt class="col-sm-4">Série</dt><dd class="col-sm-8">' + escapeHtml(d.serie_mdfe || '-') + '</dd>' +
+                        '<dt class="col-sm-4">Chave</dt><dd class="col-sm-8"><code class="small">' + escapeHtml(d.chave_acesso || '-') + '</code></dd>' +
+                        '<dt class="col-sm-4">Data emissão</dt><dd class="col-sm-8">' + dataEmissao + '</dd>' +
+                        '<dt class="col-sm-4">UF Início / Fim</dt><dd class="col-sm-8">' + escapeHtml(d.uf_inicio || '-') + ' → ' + escapeHtml(d.uf_fim || '-') + '</dd>' +
+                        '<dt class="col-sm-4">Município carregamento</dt><dd class="col-sm-8">' + escapeHtml(d.municipio_carregamento || '-') + '</dd>' +
+                        '<dt class="col-sm-4">Município descarregamento</dt><dd class="col-sm-8">' + escapeHtml(d.municipio_descarregamento || '-') + '</dd>' +
+                        '<dt class="col-sm-4">CT-e vinculados</dt><dd class="col-sm-8">' + (d.total_cte != null ? d.total_cte : '-') + '</dd>' +
+                        '<dt class="col-sm-4">Status</dt><dd class="col-sm-8">' + escapeHtml(st) + '</dd>' +
+                        '</dl>';
                 })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    msg.innerHTML = '<div class="alert alert-danger">Erro ao carregar CT-e</div>';
-                });
+                .catch(function() { body.innerHTML = '<p class="text-danger">Erro ao carregar dados.</p>'; });
         }
-        
-        function sincronizarSefaz() {
-            const msg = document.getElementById('mdfeList');
-            msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 15px; border-radius: 5px;">' +
-                '<strong>🔄 Sincronizando com SEFAZ...</strong><br>Verificando status dos documentos...</div>';
-            
-            setTimeout(() => {
-                msg.innerHTML = '<div style="color: #28a745; background: #d4edda; padding: 15px; border-radius: 5px;">' +
-                    '<strong>✅ Sincronização concluída!</strong><br>Status atualizado para todos os documentos</div>';
-                
-                // Recarregar dados
-                setTimeout(() => {
-                    carregarMDFE();
-                }, 1000);
-            }, 3000);
-        }
-        
-        function atualizarDados() {
-            carregarDadosIniciais();
-            carregarMDFE();
-        }
-        
-        function exportarDados() {
-            alert('Funcionalidade de exportação será implementada em breve!');
-        }
-        
-        function carregarDadosIniciais() {
-            fetch('../api/documentos_fiscais_v2.php?action=totals')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.totais.mdfe) {
-                        const mdfe = data.totais.mdfe;
-                        document.getElementById('mdfeTotal').textContent = mdfe.total || '0';
-                        document.getElementById('mdfePendentes').textContent = mdfe.pendentes || '0';
-                        document.getElementById('mdfeAutorizados').textContent = mdfe.autorizados || '0';
-                    } else {
-                        // Fallback para dados padrão
-            document.getElementById('mdfeTotal').textContent = '0';
-            document.getElementById('mdfePendentes').textContent = '0';
-            document.getElementById('mdfeAutorizados').textContent = '0';
-                    }
-                })
-                .catch(error => {
-                    console.error('❌ Erro ao carregar totais:', error);
-                    document.getElementById('mdfeTotal').textContent = '0';
-                    document.getElementById('mdfePendentes').textContent = '0';
-                    document.getElementById('mdfeAutorizados').textContent = '0';
-                });
-        }
-        
-        // Funções auxiliares
-        function editarMDFE(id) {
-            alert('Funcionalidade de edição será implementada em breve!');
-        }
-        
+
         function enviarMDFESefaz(id) {
-            if (!confirm('Confirma o envio deste MDF-e para SEFAZ?\n\nEsta operação não pode ser desfeita.')) {
-                return;
+            if (!confirm('Validar e enviar este MDF-e para a SEFAZ?')) return;
+            fetch('../api/documentos_fiscais_v2.php?action=validar_mdfe&id=' + id)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) {
+                        alert('Erro: ' + (data.error || data.message || 'Erro ao validar'));
+                        return;
+                    }
+                    if (!data.valid) {
+                        mostrarErroValidacaoEOferecerEditar(id, data.message || 'MDF-e não está válido para envio.');
+                        return;
+                    }
+                    var fd = new FormData();
+                    fd.append('action', 'enviar_sefaz');
+                    fd.append('id', id);
+                    fd.append('tipo_documento', 'mdfe');
+                    return fetch('../api/documentos_fiscais_v2.php', { method: 'POST', body: fd });
+                })
+                .then(function(r) { return r && r.json ? r.json() : null; })
+                .then(function(data) {
+                    if (!data) return;
+                    if (data.success) {
+                        alert('MDF-e enviado. Status: ' + data.status + (data.protocolo ? ' | Protocolo: ' + data.protocolo : ''));
+                        carregarMDFE();
+                    } else {
+                        mostrarErroValidacaoEOferecerEditar(id, data.error || 'Erro desconhecido');
+                    }
+                })
+                .catch(function() { alert('Erro ao enviar.'); });
+        }
+
+        function mostrarErroValidacaoEOferecerEditar(mdfeId, mensagem) {
+            document.getElementById('modalErroValidacaoMdfeTexto').textContent = mensagem;
+            var btn = document.getElementById('btnEditarAposErro');
+            btn.onclick = function() {
+                bootstrap.Modal.getInstance(document.getElementById('modalErroValidacaoMdfe')).hide();
+                abrirModalEditarMdfe(mdfeId);
+            };
+            new bootstrap.Modal(document.getElementById('modalErroValidacaoMdfe')).show();
+        }
+
+        function abrirModalEditarMdfe(id) {
+            document.getElementById('editarMdfeId').value = id;
+            var modal = document.getElementById('editarMDFEModal');
+            document.getElementById('cteSelectorEdit').innerHTML = 'Carregando...';
+            if (!document.getElementById('veiculoMDFEEdit').options.length) carregarVeiculosMotoristasEdit();
+            fetch('../api/documentos_fiscais_v2.php?action=get&tipo=mdfe&id=' + id)
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (!res.success || !res.documento) { alert('MDF-e não encontrado.'); return; }
+                    var d = res.documento;
+                    document.getElementById('veiculoMDFEEdit').value = d.veiculo_id || '';
+                    document.getElementById('motoristaMDFEEdit').value = d.motorista_id || '';
+                    document.getElementById('ufInicioEdit').value = d.uf_inicio || '';
+                    document.getElementById('ufFimEdit').value = d.uf_fim || '';
+                    document.getElementById('tipoViagemEdit').value = d.tipo_viagem || '1';
+                    document.getElementById('observacoesMDFEEdit').value = d.observacoes || '';
+                    if (d.uf_inicio) loadCidadesMdfe(d.uf_inicio, 'cidadeCarregamentoEdit');
+                    if (d.uf_fim) loadCidadesMdfe(d.uf_fim, 'cidadeDescarregamentoEdit');
+                    setTimeout(function() {
+                        document.getElementById('cidadeCarregamentoEdit').value = d.municipio_carregamento || '';
+                        document.getElementById('cidadeDescarregamentoEdit').value = d.municipio_descarregamento || '';
+                        document.getElementById('cidadeCarregamentoEdit').disabled = false;
+                        document.getElementById('cidadeDescarregamentoEdit').disabled = false;
+                    }, 300);
+                    var linkedIds = (d.cte_ids || []).map(function(x) { return parseInt(x, 10); }).filter(function(x) { return x > 0; });
+                    return fetch('../api/documentos_fiscais_v2.php?action=list&tipo=cte&status=autorizado&limit=100').then(function(r) { return r.json(); }).then(function(cteRes) {
+                        var sel = document.getElementById('cteSelectorEdit');
+                        if (!cteRes || !cteRes.success || !cteRes.documentos) { sel.innerHTML = 'Nenhum CT-e autorizado.'; new bootstrap.Modal(modal).show(); return; }
+                        var html = '';
+                        cteRes.documentos.forEach(function(cte) {
+                            var idCte = cte.id != null ? Number(cte.id) : null;
+                            if (idCte == null || idCte <= 0) return;
+                            var dataF = cte.data_emissao ? new Date(cte.data_emissao).toLocaleDateString('pt-BR') : '-';
+                            var valor = parseFloat(cte.valor_total || 0).toFixed(2).replace('.', ',');
+                            var origem = (cte.origem_cidade || cte.origem || 'N/A');
+                            var destino = (cte.destino_cidade || cte.destino || 'N/A');
+                            var checked = linkedIds.indexOf(idCte) >= 0 ? ' checked' : '';
+                            html += '<div class="cte-item" onclick="toggleCTEEdit(this)">';
+                            html += '<input type="checkbox" name="cte_ids[]" value="' + idCte + '"' + checked + ' style="margin-right:8px" data-numero="' + (cte.numero_cte||'') + '" data-valor="' + (cte.valor_total||0) + '" data-peso="' + (cte.peso_carga||0) + '" data-volumes="' + (cte.volumes_carga||0) + '">';
+                            html += '<strong>CT-e ' + String(cte.numero_cte||'').padStart(6,'0') + '</strong> ' + dataF + ' | ' + origem + ' → ' + destino + ' | R$ ' + valor;
+                            html += '</div>';
+                        });
+                        sel.innerHTML = html || '<p class="text-muted mb-0">Nenhum CT-e autorizado.</p>';
+                        new bootstrap.Modal(modal).show();
+                    });
+                })
+                .catch(function() {
+                    document.getElementById('cteSelectorEdit').innerHTML = 'Erro ao carregar.';
+                    new bootstrap.Modal(modal).show();
+                });
+            var ufIni = document.getElementById('ufInicioEdit');
+            var ufFim = document.getElementById('ufFimEdit');
+            if (!ufIni._editListener) {
+                ufIni._editListener = true;
+                ufIni.addEventListener('change', function() {
+                    var uf = this.value;
+                    if (uf) { loadCidadesMdfe(uf, 'cidadeCarregamentoEdit'); document.getElementById('cidadeCarregamentoEdit').disabled = false; }
+                    else { document.getElementById('cidadeCarregamentoEdit').innerHTML = '<option value="">Selecione primeiro o estado</option>'; document.getElementById('cidadeCarregamentoEdit').disabled = true; }
+                });
             }
-            
-            const formData = new FormData();
-            formData.append('action', 'enviar_sefaz');
-            formData.append('id', id);
-            formData.append('tipo_documento', 'mdfe');
-            
-            fetch('../api/documentos_fiscais_v2.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(`✅ MDF-e enviado para SEFAZ com sucesso!\n\nStatus: ${data.status}\nProtocolo: ${data.protocolo}`);
-                    carregarMDFE();
-                    carregarDadosIniciais();
-                } else {
-                    alert('❌ Erro ao enviar para SEFAZ: ' + (data.error || 'Erro desconhecido'));
-                }
-            })
-            .catch(error => {
-                console.error('Erro:', error);
-                alert('❌ Erro ao enviar para SEFAZ');
+            if (!ufFim._editListener) {
+                ufFim._editListener = true;
+                ufFim.addEventListener('change', function() {
+                    var uf = this.value;
+                    if (uf) { loadCidadesMdfe(uf, 'cidadeDescarregamentoEdit'); document.getElementById('cidadeDescarregamentoEdit').disabled = false; }
+                    else { document.getElementById('cidadeDescarregamentoEdit').innerHTML = '<option value="">Selecione primeiro o estado</option>'; document.getElementById('cidadeDescarregamentoEdit').disabled = true; }
+                });
+            }
+        }
+
+        function carregarVeiculosMotoristasEdit() {
+            fetch('../../api/route_actions.php?action=get_veiculos').then(function(r) { return r.json(); }).then(function(d) {
+                var list = (d && d.success && d.data) ? d.data : [];
+                var v = document.getElementById('veiculoMDFEEdit');
+                v.innerHTML = '<option value="">Selecione</option>';
+                list.forEach(function(o) {
+                    var opt = document.createElement('option');
+                    opt.value = o.id;
+                    opt.textContent = (o.placa || 'Veículo') + (o.modelo ? ' - ' + o.modelo : '');
+                    v.appendChild(opt);
+                });
+            });
+            fetch('../../api/motoristas.php?action=list&limit=500').then(function(r) { return r.json(); }).then(function(d) {
+                var list = (d && d.success && d.data) ? d.data : [];
+                var m = document.getElementById('motoristaMDFEEdit');
+                m.innerHTML = '<option value="">Selecione</option>';
+                list.forEach(function(o) {
+                    var opt = document.createElement('option');
+                    opt.value = o.id;
+                    opt.textContent = (o.nome || 'Motorista') + (o.cpf ? ' - ' + o.cpf : '');
+                    m.appendChild(opt);
+                });
             });
         }
-        
-        function encerrarMDFE(id) {
-            if (!confirm('Confirma o encerramento deste MDF-e?\n\nApós o encerramento, a viagem será considerada finalizada.')) {
-                return;
-            }
-            
-            alert('Funcionalidade de encerramento será implementada em breve!');
+
+        function toggleCTEEdit(el) {
+            var cb = el.querySelector('input[type="checkbox"]');
+            if (cb) { cb.checked = !cb.checked; el.classList.toggle('selected', cb.checked); }
         }
-        
-        function visualizarMDFE(id) {
-            window.open(`../visualizar_mdfe.php?id=${id}`, '_blank');
-        }
-        
-        function verificarStatusSefaz() {
-            const statusElement = document.getElementById('sefazStatus');
-            const subtitleElement = document.getElementById('sefazSubtitle');
-            
-            // Mostrar carregando
-            statusElement.innerHTML = '<span class="status-badge status-warning"><i class="fas fa-clock"></i> Verificando...</span>';
-            subtitleElement.textContent = 'Testando conexão...';
-            
-            // Fazer requisição real para a API
-            fetch('../api/sefaz_status.php?action=status&ambiente=homologacao')
-                .then(response => response.json())
-                .then(data => {
+
+        document.getElementById('btnSalvarEditarMDFE').onclick = function() {
+            var id = document.getElementById('editarMdfeId').value;
+            if (!id) return;
+            var form = document.getElementById('editarMDFEForm');
+            if (!form.checkValidity()) { form.reportValidity(); return; }
+            var cbs = document.querySelectorAll('#cteSelectorEdit input[name="cte_ids[]"]:checked');
+            if (cbs.length === 0) { alert('Selecione pelo menos um CT-e.'); return; }
+            var fd = new FormData(form);
+            fd.append('action', 'update');
+            fd.append('id', id);
+            fd.append('tipo_documento', 'mdfe');
+            cbs.forEach(function(cb) { fd.append('cte_ids[]', cb.value); });
+            var btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+            fetch('../api/documentos_fiscais_v2.php', { method: 'POST', body: fd })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
                     if (data.success) {
-                        const status = data.status_geral;
-                        const texto = data.status_texto;
-                        const cor = data.status_cor;
-                        const tempo = data.detalhes.conexao_basica.tempo;
-                        
-                        // Atualizar status
-                        statusElement.innerHTML = `<span class="status-badge status-${cor}">
-                            <i class="fas fa-${status === 'online' ? 'check-circle' : 'exclamation-triangle'}"></i> 
-                            ${status === 'online' ? 'Online' : 'Offline'}
-                        </span>`;
-                        
-                        subtitleElement.textContent = `${texto} (${tempo}ms)`;
-                        
-                        // Log detalhado no console
-                        console.log('🔍 Status SEFAZ:', data);
-                        
+                        bootstrap.Modal.getInstance(document.getElementById('editarMDFEModal')).hide();
+                        carregarMDFE();
                     } else {
-                        throw new Error(data.error || 'Erro desconhecido');
+                        alert('Erro: ' + (data.error || data.message || ''));
                     }
                 })
-                .catch(error => {
-                    console.error('❌ Erro ao verificar status SEFAZ:', error);
-                    
-                    // Mostrar erro
-                    statusElement.innerHTML = '<span class="status-badge status-danger"><i class="fas fa-exclamation-triangle"></i> Erro</span>';
-                    subtitleElement.textContent = 'Falha na verificação';
+                .catch(function() { alert('Erro ao salvar.'); })
+                .finally(function() { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Salvar'; });
+        };
+
+        function encerrarMDFE(id) {
+            if (!confirm('Encerrar este MDF-e? Após encerrado, a viagem fica finalizada e não é possível cancelar.')) return;
+            var fd = new FormData();
+            fd.append('action', 'encerrar_mdfe');
+            fd.append('id', id);
+            fetch('../api/documentos_fiscais_v2.php', { method: 'POST', body: fd })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        alert(data.message || 'MDF-e encerrado.');
+                        carregarMDFE();
+                    } else {
+                        alert('Erro: ' + (data.error || data.message || ''));
+                    }
+                })
+                .catch(function() { alert('Erro ao encerrar.'); });
+        }
+
+        function cancelarMDFE(id) {
+            if (!confirm('Cancelar este MDF-e? Só é permitido antes da viagem e dentro de 24h da autorização. Esta ação não pode ser desfeita.')) return;
+            var fd = new FormData();
+            fd.append('action', 'cancelar_mdfe');
+            fd.append('id', id);
+            fetch('../api/documentos_fiscais_v2.php', { method: 'POST', body: fd })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        alert(data.message || 'MDF-e cancelado.');
+                        carregarMDFE();
+                    } else {
+                        alert('Erro: ' + (data.error || data.message || ''));
+                    }
+                })
+                .catch(function() { alert('Erro ao cancelar.'); });
+        }
+
+        var mdfeIncluirCondutorId = null;
+        function abrirModalIncluirCondutor(id) {
+            mdfeIncluirCondutorId = id;
+            var modal = document.getElementById('modalIncluirCondutor');
+            var sel = document.getElementById('condutorMotoristaSelect');
+            if (!sel.options || sel.options.length <= 1) {
+                fetch('../../api/motoristas.php?action=list&limit=500').then(function(r) { return r.json(); }).then(function(d) {
+                    var list = (d && d.success && d.data) ? d.data : [];
+                    sel.innerHTML = '<option value="">Selecione o novo condutor</option>';
+                    list.forEach(function(o) {
+                        var opt = document.createElement('option');
+                        opt.value = o.id;
+                        opt.textContent = (o.nome || 'Motorista') + (o.cpf ? ' - ' + o.cpf : '');
+                        sel.appendChild(opt);
+                    });
                 });
+            }
+            new bootstrap.Modal(modal).show();
+        }
+        function salvarIncluirCondutor() {
+            var id = mdfeIncluirCondutorId;
+            var motoristaId = document.getElementById('condutorMotoristaSelect').value;
+            if (!id || !motoristaId) { alert('Selecione o novo condutor.'); return; }
+            var fd = new FormData();
+            fd.append('action', 'incluir_condutor_mdfe');
+            fd.append('id', id);
+            fd.append('motorista_id', motoristaId);
+            fetch('../api/documentos_fiscais_v2.php', { method: 'POST', body: fd })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        bootstrap.Modal.getInstance(document.getElementById('modalIncluirCondutor')).hide();
+                        alert(data.message || 'Condutor incluído.');
+                        carregarMDFE();
+                    } else {
+                        alert('Erro: ' + (data.error || data.message || ''));
+                    }
+                })
+                .catch(function() { alert('Erro ao incluir condutor.'); });
+        }
+
+        function exportarDados() {
+            alert('Exportação em desenvolvimento.');
         }
     </script>
-    
-    <!-- Footer -->
     <?php include '../../includes/footer.php'; ?>
 </body>
 </html>

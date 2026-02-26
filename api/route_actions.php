@@ -96,26 +96,55 @@ try {
             echo json_encode(getMotoristaComissao($id));
             break;
             
+        case 'import_nfe_xml':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                echo json_encode(['success' => false, 'message' => 'Método não permitido']);
+                break;
+            }
+            try {
+                $result = importNFeXml();
+                echo json_encode($result);
+            } catch (Throwable $e) {
+                if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                    error_log('importNFeXml: ' . $e->getMessage());
+                }
+                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            }
+            break;
+            
         case 'save_expenses':
             $data = json_decode(file_get_contents('php://input'), true);
             
             if (!$data) {
-                echo json_encode(['success' => false, 'error' => 'Dados não fornecidos']);
+                echo json_encode(['success' => false, 'message' => 'Dados não fornecidos']);
                 exit;
             }
             
             try {
                 $conn = getConnection();
                 $empresa_id = $_SESSION['empresa_id'];
+                $rota_id = isset($data['rota_id']) ? (int)$data['rota_id'] : 0;
 
-                // Check if expenses already exist for this route
-                $sql = "SELECT id FROM despesas_viagem WHERE rota_id = :rota_id";
+                // Garantir isolamento: rota deve pertencer à empresa do usuário
+                $checkRota = $conn->prepare("SELECT id FROM rotas WHERE id = :rota_id AND empresa_id = :empresa_id LIMIT 1");
+                $checkRota->bindParam(':rota_id', $rota_id, PDO::PARAM_INT);
+                $checkRota->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+                $checkRota->execute();
+                if ($checkRota->rowCount() === 0) {
+                    http_response_code(404);
+                    echo json_encode(['success' => false, 'message' => 'Rota não encontrada']);
+                    exit;
+                }
+
+                // Check if expenses already exist for this route (só da mesma empresa)
+                $sql = "SELECT id FROM despesas_viagem WHERE rota_id = :rota_id AND empresa_id = :empresa_id";
                 $checkStmt = $conn->prepare($sql);
-                $checkStmt->bindParam(':rota_id', $data['rota_id'], PDO::PARAM_INT);
+                $checkStmt->bindParam(':rota_id', $rota_id, PDO::PARAM_INT);
+                $checkStmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
                 $checkStmt->execute();
                 
                 if ($checkStmt->rowCount() > 0) {
-                    // Update existing expenses
+                    // Update existing expenses (sempre com empresa_id)
                     $sql = "UPDATE despesas_viagem SET 
                         descarga = :descarga, 
                         pedagios = :pedagios, 
@@ -125,9 +154,10 @@ try {
                         borracharia = :borracharia, 
                         eletrica_mecanica = :eletrica_mecanica, 
                         adiantamento = :adiantamento
-                        WHERE rota_id = :rota_id";
+                        WHERE rota_id = :rota_id AND empresa_id = :empresa_id";
                         
                     $stmt = $conn->prepare($sql);
+                    $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
                 } else {
                     // Insert new expenses
                     $sql = "INSERT INTO despesas_viagem (
@@ -144,8 +174,7 @@ try {
                     $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
                 }
                 
-                // Bind parameters for both INSERT and UPDATE
-                $stmt->bindParam(':rota_id', $data['rota_id'], PDO::PARAM_INT);
+                $stmt->bindParam(':rota_id', $rota_id, PDO::PARAM_INT);
                 $stmt->bindParam(':descarga', $data['descarga'], PDO::PARAM_STR);
                 $stmt->bindParam(':pedagios', $data['pedagios'], PDO::PARAM_STR);
                 $stmt->bindParam(':caixinha', $data['caixinha'], PDO::PARAM_STR);
@@ -156,12 +185,12 @@ try {
                 $stmt->bindParam(':adiantamento', $data['adiantamento'], PDO::PARAM_STR);
                 
                 if ($stmt->execute()) {
-                    echo json_encode(['success' => true]);
+                    echo json_encode(['success' => true, 'message' => 'Despesas salvas com sucesso']);
                 } else {
                     throw new Exception($stmt->errorInfo()[2]);
                 }
             } catch (Exception $e) {
-                echo json_encode(['success' => false, 'error' => 'Erro ao salvar despesas: ' . $e->getMessage()]);
+                echo json_encode(['success' => false, 'message' => 'Erro ao salvar despesas.', 'error' => $e->getMessage()]);
             }
             break;
             
@@ -177,10 +206,10 @@ try {
                     $stmt->execute();
                     echo json_encode(['success' => true]);
                 } catch (Exception $e) {
-                    echo json_encode(['success' => false, 'error' => 'Erro ao excluir despesas: ' . $e->getMessage()]);
+                    echo json_encode(['success' => false, 'message' => 'Erro ao excluir despesas.', 'error' => $e->getMessage()]);
                 }
             } else {
-                echo json_encode(['success' => false, 'error' => 'ID da rota inválido']);
+                echo json_encode(['success' => false, 'message' => 'ID da rota inválido']);
             }
             exit;
             
@@ -188,7 +217,9 @@ try {
             throw new Exception('Ação inválida');
     }
 } catch (Exception $e) {
-    error_log("Erro na API de rotas: " . $e->getMessage());
+    if (defined('DEBUG_MODE') && DEBUG_MODE) {
+        error_log("Erro na API de rotas: " . $e->getMessage());
+    }
     http_response_code(400);
     echo json_encode([
         'success' => false,
@@ -204,8 +235,9 @@ function addRoute($data) {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
         
-        // Log para debug
-        error_log("Dados recebidos: " . print_r($data, true));
+        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+            error_log("Dados recebidos: " . print_r($data, true));
+        }
         
         // Valida campos obrigatórios
         if (empty($data['motorista_id'])) {
@@ -278,9 +310,10 @@ function addRoute($data) {
             ':fonte' => 'gestor'
         ];
         
-        // Log para debug
-        error_log("SQL: " . $sql);
-        error_log("Parâmetros: " . print_r($params, true));
+        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+            error_log("SQL: " . $sql);
+            error_log("Parâmetros: " . print_r($params, true));
+        }
         
         // Executa a query
         foreach ($params as $key => &$val) {
@@ -296,7 +329,9 @@ function addRoute($data) {
         ];
         
     } catch(PDOException $e) {
-        error_log("Erro em addRoute: " . $e->getMessage());
+        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+            error_log("Erro em addRoute: " . $e->getMessage());
+        }
         throw new Exception('Erro ao adicionar rota: ' . $e->getMessage());
     }
 }
@@ -309,8 +344,9 @@ function updateRoute($id, $data) {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
         
-        // Log para debug
-        error_log("Dados recebidos para atualização: " . print_r($data, true));
+        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+            error_log("Dados recebidos para atualização: " . print_r($data, true));
+        }
         
         // Valida campos obrigatórios
         if (empty($data['motorista_id'])) {
@@ -391,9 +427,10 @@ function updateRoute($id, $data) {
             ':descricao_carga' => $data['descricao_carga'] ?? null
         ];
         
-        // Log para debug
-        error_log("SQL Update: " . $sql);
-        error_log("Parâmetros Update: " . print_r($params, true));
+        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+            error_log("SQL Update: " . $sql);
+            error_log("Parâmetros Update: " . print_r($params, true));
+        }
         
         // Executa a query
         foreach ($params as $key => &$val) {
@@ -408,7 +445,9 @@ function updateRoute($id, $data) {
         ];
         
     } catch(PDOException $e) {
-        error_log("Erro em updateRoute: " . $e->getMessage());
+        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+            error_log("Erro em updateRoute: " . $e->getMessage());
+        }
         throw new Exception('Erro ao atualizar rota: ' . $e->getMessage());
     }
 }
@@ -445,7 +484,9 @@ function deleteRoute($id) {
         ];
         
     } catch(PDOException $e) {
-        error_log("Erro em deleteRoute: " . $e->getMessage());
+        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+            error_log("Erro em deleteRoute: " . $e->getMessage());
+        }
         throw new Exception('Erro ao excluir rota');
     }
 }
@@ -469,7 +510,7 @@ function getMotoristas() {
         ];
         
     } catch(PDOException $e) {
-        error_log("Erro em getMotoristas: " . $e->getMessage());
+        if (defined('DEBUG_MODE') && DEBUG_MODE) { error_log("Erro em getMotoristas: " . $e->getMessage()); }
         throw new Exception('Erro ao buscar motoristas');
     }
 }
@@ -493,7 +534,7 @@ function getVeiculos() {
         ];
         
     } catch(PDOException $e) {
-        error_log("Erro em getVeiculos: " . $e->getMessage());
+        if (defined('DEBUG_MODE') && DEBUG_MODE) { error_log("Erro em getVeiculos: " . $e->getMessage()); }
         throw new Exception('Erro ao buscar veículos');
     }
 }
@@ -517,7 +558,7 @@ function getClientes() {
         ];
         
     } catch(PDOException $e) {
-        error_log("Erro em getClientes: " . $e->getMessage());
+        if (defined('DEBUG_MODE') && DEBUG_MODE) { error_log("Erro em getClientes: " . $e->getMessage()); }
         throw new Exception('Erro ao buscar clientes');
     }
 }
@@ -541,7 +582,7 @@ function getEstados() {
         ];
         
     } catch(PDOException $e) {
-        error_log("Erro em getEstados: " . $e->getMessage());
+        if (defined('DEBUG_MODE') && DEBUG_MODE) { error_log("Erro em getEstados: " . $e->getMessage()); }
         throw new Exception('Erro ao buscar estados');
     }
 }
@@ -566,7 +607,7 @@ function getCidades($uf) {
         ];
         
     } catch(PDOException $e) {
-        error_log("Erro em getCidades: " . $e->getMessage());
+        if (defined('DEBUG_MODE') && DEBUG_MODE) { error_log("Erro em getCidades: " . $e->getMessage()); }
         throw new Exception('Erro ao buscar cidades');
     }
 }
@@ -593,7 +634,212 @@ function getMotoristaComissao($id) {
         ];
         
     } catch(PDOException $e) {
-        error_log("Erro em getMotoristaComissao: " . $e->getMessage());
+        if (defined('DEBUG_MODE') && DEBUG_MODE) { error_log("Erro em getMotoristaComissao: " . $e->getMessage()); }
         throw new Exception('Erro ao buscar comissão do motorista');
     }
+}
+
+/**
+ * Importa XML de NF-e e cria uma rota com os dados extraídos
+ */
+function importNFeXml() {
+    $empresa_id = $_SESSION['empresa_id'];
+    $conn = getConnection();
+    $xmlContent = null;
+    if (!empty($_FILES['xml_file']['tmp_name']) && is_uploaded_file($_FILES['xml_file']['tmp_name'])) {
+        $xmlContent = file_get_contents($_FILES['xml_file']['tmp_name']);
+    } else {
+        $input = file_get_contents('php://input');
+        $json = @json_decode($input, true);
+        if (!empty($json['xml'])) $xmlContent = $json['xml'];
+        elseif (preg_match('/^\s*<\?xml|<nfeProc|<NFe/i', $input)) $xmlContent = $input;
+    }
+    if (empty($xmlContent)) {
+        return ['success' => false, 'message' => 'Nenhum arquivo XML enviado. Envie o arquivo da NF-e.'];
+    }
+
+    // Remover namespace padrão para o SimpleXML encontrar os nós (emit/dest/enderEmit/enderDest)
+    $xmlContent = preg_replace('/\sxmlns=["\'][^"\']*["\']/', '', $xmlContent);
+
+    libxml_use_internal_errors(true);
+    $xml = @simplexml_load_string($xmlContent);
+    if ($xml === false) {
+        $err = libxml_get_last_error();
+        return ['success' => false, 'message' => 'XML inválido: ' . ($err ? $err->message : 'erro')];
+    }
+    $ns = 'http://www.portalfiscal.inf.br/nfe';
+
+    // infNFe: sem namespace (após remoção do xmlns) ou com namespace
+    $infNFe = null;
+    if (isset($xml->NFe->infNFe)) {
+        $infNFe = $xml->NFe->infNFe;
+    } elseif (isset($xml->infNFe)) {
+        $infNFe = $xml->infNFe;
+    }
+    if (!$infNFe) {
+        $root = $xml->children($ns);
+        if (isset($root->NFe)) {
+            $nfeEl = $root->NFe;
+            $infNFe = isset($nfeEl->infNFe) ? $nfeEl->infNFe : $nfeEl->children($ns)->infNFe ?? null;
+        }
+        if (!$infNFe && isset($root->infNFe)) $infNFe = $root->infNFe;
+    }
+    if (!$infNFe) {
+        $xml->registerXPathNamespace('nfe', $ns);
+        $infNFe = $xml->xpath('//nfe:infNFe')[0] ?? $xml->xpath('//infNFe')[0] ?? null;
+    }
+    if (!$infNFe) {
+        return ['success' => false, 'message' => 'XML não contém infNFe (não é uma NF-e reconhecida).'];
+    }
+
+    $inf = $infNFe->children($ns);
+    if (!$inf || !isset($inf->emit)) {
+        $inf = $infNFe;
+    }
+    $ide = $inf->ide ?? null;
+    $emit = $inf->emit ?? null;
+    $enderEmit = ($emit && isset($emit->enderEmit)) ? $emit->enderEmit : null;
+    $dest = $inf->dest ?? null;
+    $enderDest = ($dest && isset($dest->enderDest)) ? $dest->enderDest : null;
+
+    $total = $inf->total->ICMSTot ?? null;
+    $infAdic = $inf->infAdic ?? null;
+    $infCpl = $infAdic && isset($infAdic->infCpl) ? (string)$infAdic->infCpl : '';
+
+    $cMunOrigem = $enderEmit && isset($enderEmit->cMun) ? (string)$enderEmit->cMun : '';
+    $xMunOrigem = $enderEmit && isset($enderEmit->xMun) ? (string)$enderEmit->xMun : '';
+    $ufOrigem = $enderEmit && isset($enderEmit->UF) ? strtoupper((string)$enderEmit->UF) : '';
+    $cMunDestino = $enderDest && isset($enderDest->cMun) ? (string)$enderDest->cMun : '';
+    $xMunDestino = $enderDest && isset($enderDest->xMun) ? (string)$enderDest->xMun : '';
+    $ufDestino = $enderDest && isset($enderDest->UF) ? strtoupper((string)$enderDest->UF) : '';
+
+    if (empty($ufOrigem) || empty($ufDestino)) {
+        return ['success' => false, 'message' => 'Não foi possível identificar origem e/ou destino no XML.'];
+    }
+    $cidade_origem_id = resolveCidadeByIbgeOrNome($conn, $cMunOrigem, $xMunOrigem, $ufOrigem);
+    $cidade_destino_id = resolveCidadeByIbgeOrNome($conn, $cMunDestino, $xMunDestino, $ufDestino);
+    if (!$cidade_origem_id || !$cidade_destino_id) {
+        return ['success' => false, 'message' => 'Cidade não encontrada. Cadastre: ' . $xMunOrigem . '/' . $ufOrigem . ' e ' . $xMunDestino . '/' . $ufDestino];
+    }
+    $data_saida = date('Y-m-d');
+    if ($ide && isset($ide->dhEmi)) {
+        $dh = (string)$ide->dhEmi;
+        if ($dh !== '' && ($ts = strtotime($dh))) $data_saida = date('Y-m-d', $ts);
+    } elseif ($ide && isset($ide->dhSaiEnt)) {
+        $dh = (string)$ide->dhSaiEnt;
+        if ($dh !== '' && ($ts = strtotime($dh))) $data_saida = date('Y-m-d', $ts);
+    }
+
+    $descricao_carga = '';
+    if (isset($inf->det)) {
+        foreach ($inf->det as $det) {
+            $prod = isset($det->prod) ? $det->prod : null;
+            if ($prod) {
+                $xProd = isset($prod->xProd) ? (string)$prod->xProd : '';
+                $qCom = isset($prod->qCom) ? (string)$prod->qCom : '';
+                $uCom = isset($prod->uCom) ? (string)$prod->uCom : '';
+                if ($descricao_carga !== '') $descricao_carga .= '; ';
+                $descricao_carga .= trim($xProd);
+                if ($qCom !== '' && $uCom !== '') $descricao_carga .= ' - ' . $qCom . ' ' . $uCom;
+            }
+        }
+    }
+    if ($descricao_carga === '') $descricao_carga = 'Importado da NF-e';
+    $vNF = 0;
+    if ($total && isset($total->vNF)) $vNF = (float)(string)$total->vNF;
+    $chave = (string)($infNFe->attributes()->Id ?? '');
+    $observacoes = 'Importado da NF-e. ';
+    if (preg_match('/NFe(\d{44})/', $chave, $m)) $observacoes .= 'Chave: ' . $m[1];
+    if ($vNF > 0) $observacoes .= ' Valor NF: R$ ' . number_format($vNF, 2, ',', '.');
+    $motorista_id = null;
+    $veiculo_id = null;
+    $km_saida = null;
+    $km_chegada = null;
+    $distancia_km = null;
+    if (preg_match('/Motorista:\s*([^-]+)\s*-\s*CPF:\s*([\d.\s-]+)/ui', $infCpl, $m)) {
+        $cpf = preg_replace('/\D/', '', trim($m[2]));
+        if (strlen($cpf) >= 11) {
+            $stmt = $conn->prepare("SELECT id FROM motoristas WHERE empresa_id = :e AND REPLACE(REPLACE(REPLACE(cpf,'.',''),'-',''),' ','') = :c LIMIT 1");
+            $stmt->execute([':e' => $empresa_id, ':c' => $cpf]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row) $motorista_id = (int)$row['id'];
+        }
+    }
+    if (preg_match('/Placa:\s*([A-Za-z0-9-]+)/ui', $infCpl, $m)) {
+        $placa = strtoupper(preg_replace('/\s+/', '', trim($m[1])));
+        $stmt = $conn->prepare("SELECT id FROM veiculos WHERE empresa_id = :e AND UPPER(REPLACE(placa,'-','')) = UPPER(REPLACE(:p,'-','')) LIMIT 1");
+        $stmt->execute([':e' => $empresa_id, ':p' => $placa]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) $veiculo_id = (int)$row['id'];
+    }
+    if (preg_match('/\bEI[:\s]*(\d+)/ui', $infCpl, $m)) $km_saida = (int)$m[1];
+    if (preg_match('/\bEF[:\s]*(\d+)/ui', $infCpl, $m)) { $km_chegada = (int)$m[1]; if ($km_saida !== null) $distancia_km = $km_chegada - $km_saida; }
+    if ($km_saida === null && preg_match('/\bKM[:\s]*(\d+)/ui', $infCpl, $m)) $km_saida = (int)$m[1];
+    if (!$motorista_id) {
+        $stmt = $conn->prepare("SELECT id FROM motoristas WHERE empresa_id = :e ORDER BY nome LIMIT 1");
+        $stmt->execute([':e' => $empresa_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $motorista_id = $row ? (int)$row['id'] : null;
+        if ($motorista_id && $infCpl !== '') $observacoes .= ' [Motorista do XML não encontrado no cadastro; usado o primeiro da lista.]';
+    }
+    if (!$veiculo_id) {
+        $stmt = $conn->prepare("SELECT id FROM veiculos WHERE empresa_id = :e ORDER BY placa LIMIT 1");
+        $stmt->execute([':e' => $empresa_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $veiculo_id = $row ? (int)$row['id'] : null;
+        if ($veiculo_id && $infCpl !== '') $observacoes .= ' [Veículo do XML não encontrado no cadastro; usado o primeiro da lista.]';
+    }
+    if (!$motorista_id || !$veiculo_id) {
+        return ['success' => false, 'message' => 'Cadastre ao menos um motorista e um veículo.'];
+    }
+    $stmt = $conn->prepare("SELECT uf FROM cidades WHERE id = :id LIMIT 1");
+    $stmt->execute([':id' => $cidade_origem_id]);
+    $estado_origem = $stmt->fetchColumn() ?: $ufOrigem;
+    $stmt->execute([':id' => $cidade_destino_id]);
+    $estado_destino = $stmt->fetchColumn() ?: $ufDestino;
+    $data = [
+        'motorista_id' => $motorista_id,
+        'veiculo_id' => $veiculo_id,
+        'estado_origem' => $estado_origem,
+        'cidade_origem_id' => $cidade_origem_id,
+        'estado_destino' => $estado_destino,
+        'cidade_destino_id' => $cidade_destino_id,
+        'data_saida' => $data_saida,
+        'data_chegada' => $data_saida,
+        'km_saida' => $km_saida,
+        'km_chegada' => $km_chegada,
+        'distancia_km' => $distancia_km,
+        'observacoes' => $observacoes,
+        'data_rota' => $data_saida,
+        'no_prazo' => 0,
+        'frete' => $vNF > 0 ? $vNF : null,
+        'comissao' => null,
+        'km_vazio' => null,
+        'total_km' => $distancia_km,
+        'percentual_vazio' => null,
+        'eficiencia_viagem' => null,
+        'peso_carga' => null,
+        'descricao_carga' => $descricao_carga,
+    ];
+    return addRoute($data);
+}
+
+function resolveCidadeByIbgeOrNome($conn, $codigoIbge, $nomeCidade, $uf) {
+    if (strlen($codigoIbge) >= 5) {
+        try {
+            $stmt = $conn->prepare("SELECT id FROM cidades WHERE codigo_ibge = :ibge LIMIT 1");
+            $stmt->execute([':ibge' => $codigoIbge]);
+            $id = $stmt->fetchColumn();
+            if ($id) return (int)$id;
+        } catch (Throwable $e) {
+            // coluna codigo_ibge pode não existir
+        }
+    }
+    $nome = trim($nomeCidade);
+    $uf = strtoupper(substr($uf, 0, 2));
+    if ($nome === '' || $uf === '') return null;
+    $stmt = $conn->prepare("SELECT id FROM cidades WHERE UPPER(TRIM(nome)) = UPPER(:nome) AND UPPER(uf) = :uf LIMIT 1");
+    $stmt->execute([':nome' => $nome, ':uf' => $uf]);
+    $id = $stmt->fetchColumn();
+    return $id ? (int)$id : null;
 } 

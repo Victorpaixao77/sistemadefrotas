@@ -10,6 +10,11 @@ require_authentication();
 $conn = getConnection();
 $page_title = "Multas";
 
+$per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
+    $per_page = 10;
+}
+
 // Funções para buscar métricas e multas
 function getMultasKPIs($conn) {
     try {
@@ -71,10 +76,10 @@ function getMultasKPIs($conn) {
     }
 }
 
-function getMultas($conn, $page = 1) {
+function getMultas($conn, $page = 1, $per_page = 10) {
     try {
         $empresa_id = $_SESSION['empresa_id'];
-        $limit = 5;
+        $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
         $offset = ($page - 1) * $limit;
         $sql_count = "SELECT COUNT(*) as total FROM multas WHERE empresa_id = :empresa_id";
         $stmt_count = $conn->prepare($sql_count);
@@ -114,7 +119,7 @@ function getMultas($conn, $page = 1) {
 }
 
 $pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-$resultado = getMultas($conn, $pagina_atual);
+$resultado = getMultas($conn, $pagina_atual, $per_page);
 $multas = $resultado['multas'];
 $total_paginas = $resultado['total_paginas'];
 $kpis = getMultasKPIs($conn);
@@ -210,6 +215,92 @@ $kpis = getMultasKPIs($conn);
                     </div>
                 </div>
                 
+                <!-- Consulta DETRAN (WSDenatran) -->
+                <div class="dashboard-card denatran-consulta-card">
+                    <div class="card-header">
+                        <h3><i class="fas fa-search"></i> Consulta de Multas no DETRAN</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="denatran-desc">Consulte infrações diretamente na base do Denatran (WSDenatran). É necessário certificado cadastrado e CPF do usuário autorizado.</p>
+                        <form id="denatranForm" class="denatran-form">
+                            <!-- Bloco separado: Tipo de consulta -->
+                            <div class="denatran-section denatran-section-tipo">
+                                <h4 class="denatran-section-title">Tipo de consulta</h4>
+                                <div class="denatran-tipo-select-wrap">
+                                    <select id="denatran_tipo" name="tipo" required>
+                                        <option value="cpf">Por CPF (condutor/proprietário)</option>
+                                        <option value="placa">Por Placa do veículo</option>
+                                        <option value="cnpj">Por CNPJ (proprietário)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <!-- Demais campos -->
+                            <div class="denatran-section denatran-section-campos">
+                                <div class="form-grid denatran-grid">
+                                    <div class="form-group" id="denatran_cpf_usuario_group">
+                                        <label for="denatran_cpf_usuario">CPF do usuário (quem consulta) *</label>
+                                        <input type="text" id="denatran_cpf_usuario" name="cpf_usuario" placeholder="000.000.000-00" maxlength="14" required>
+                                        <small class="form-text denatran-cpf-hint">Se já estiver configurado em Configurações do sistema, será preenchido automaticamente.</small>
+                                    </div>
+                                    <div class="form-group denatran-tipo-field" id="denatran_cpf_group">
+                                        <label for="denatran_cpf">CPF do condutor/proprietário</label>
+                                        <input type="text" id="denatran_cpf" name="cpf" placeholder="000.000.000-00" maxlength="14">
+                                    </div>
+                                    <div class="form-group denatran-tipo-field" id="denatran_placa_group" style="display:none;">
+                                        <label for="denatran_placa">Placa do veículo</label>
+                                        <input type="text" id="denatran_placa" name="placa" placeholder="ABC1D23" maxlength="7">
+                                    </div>
+                                    <div class="form-group denatran-tipo-field" id="denatran_exigibilidade_group" style="display:none;">
+                                        <label for="denatran_exigibilidade">Exigibilidade</label>
+                                        <select id="denatran_exigibilidade" name="exigibilidade">
+                                            <option value="T">Todas (T)</option>
+                                            <option value="S">Exigível (S)</option>
+                                            <option value="N">Não exigível (N)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group denatran-tipo-field" id="denatran_cnpj_group" style="display:none;">
+                                        <label for="denatran_cnpj">CNPJ do proprietário</label>
+                                        <input type="text" id="denatran_cnpj" name="cnpj" placeholder="00.000.000/0000-00" maxlength="18">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="denatran_data_inicio">Data início (opcional)</label>
+                                        <input type="date" id="denatran_data_inicio" name="dataInicio">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="denatran_data_fim">Data fim (opcional)</label>
+                                        <input type="date" id="denatran_data_fim" name="dataFim">
+                                    </div>
+                                </div>
+                                <div class="denatran-actions">
+                                    <button type="submit" class="btn-primary" id="denatranConsultarBtn">
+                                        <i class="fas fa-search"></i> Consultar no DETRAN
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                        <div id="denatranResultContainer" class="denatran-result-container" style="display:none;">
+                            <h4 id="denatranResultTitle">Resultado da consulta</h4>
+                            <div id="denatranResultMessage" class="denatran-result-message"></div>
+                            <div class="table-responsive denatran-table-wrap">
+                                <table class="data-table" id="denatranResultTable">
+                                    <thead>
+                                        <tr>
+                                            <th>Auto / AIT</th>
+                                            <th>Placa</th>
+                                            <th>Infração</th>
+                                            <th>Data</th>
+                                            <th>Valor (R$)</th>
+                                            <th>Exigibilidade</th>
+                                            <th>Órgão</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="denatranResultBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Search and Filter -->
                 <div class="filter-section">
                     <div class="search-box">
@@ -217,6 +308,17 @@ $kpis = getMultasKPIs($conn);
                         <i class="fas fa-search"></i>
                     </div>
                     <div class="filter-options">
+                        <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.5rem;">
+                            <span class="filter-label">Por página</span>
+                            <input type="hidden" name="page" value="1">
+                            <select name="per_page" class="filter-per-page" onchange="this.form.submit()">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                        </form>
                         <select id="vehicleFilter">
                             <option value="">Todos os veículos</option>
                         </select>
@@ -297,17 +399,14 @@ $kpis = getMultasKPIs($conn);
                 </div>
 
                 <!-- Paginação -->
+                <?php $total_reg_mul = (int)($resultado['total'] ?? 0); ?>
                 <div class="pagination">
-                    <a href="?page=<?php echo max(1, $pagina_atual - 1); ?>" 
+                    <a href="?page=<?php echo max(1, $pagina_atual - 1); ?>&per_page=<?php echo (int)$per_page; ?>" 
                        class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
                         <i class="fas fa-chevron-left"></i>
                     </a>
-                    
-                    <span class="pagination-info">
-                        Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
-                    </span>
-                    
-                    <a href="?page=<?php echo min($total_paginas, $pagina_atual + 1); ?>" 
+                    <span class="pagination-info">Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?> (<?php echo $total_reg_mul; ?> registros)</span>
+                    <a href="?page=<?php echo min($total_paginas, $pagina_atual + 1); ?>&per_page=<?php echo (int)$per_page; ?>" 
                        class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
                         <i class="fas fa-chevron-right"></i>
                     </a>
@@ -554,6 +653,7 @@ $kpis = getMultasKPIs($conn);
                     <h3>Funcionalidades Principais</h3>
                     <ul>
                         <li><strong>Nova Multa:</strong> Cadastre uma nova infração com informações detalhadas sobre veículo, motorista e tipo de infração.</li>
+                        <li><strong>Consulta DETRAN:</strong> Consulte infrações diretamente na base do Denatran (WSDenatran) por CPF, placa ou CNPJ. Requer certificado cadastrado e configuração em <code>includes/denatran_config.php</code>.</li>
                         <li><strong>Filtros:</strong> Use os filtros para encontrar multas específicas por veículo, motorista ou status.</li>
                         <li><strong>Exportar:</strong> Exporte os dados das multas para análise externa.</li>
                         <li><strong>Relatórios:</strong> Visualize relatórios e estatísticas de multas.</li>

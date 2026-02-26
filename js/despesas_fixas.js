@@ -245,9 +245,15 @@ async function loadPaymentMethods() {
 
 async function loadDespesasData(page = null) {
     try {
-        // Update current page if provided
+        // Update current page if provided; senão usar página da URL para ficar igual ao PHP
         if (page !== null) {
             currentPage = page;
+        } else {
+            const params = new URLSearchParams(window.location.search);
+            const pageFromUrl = parseInt(params.get('page'), 10);
+            if (!isNaN(pageFromUrl) && pageFromUrl >= 1) {
+                currentPage = pageFromUrl;
+            }
         }
         
         // Get filter values
@@ -257,9 +263,11 @@ async function loadDespesasData(page = null) {
         const statusFilter = document.getElementById('statusFilter').value;
         const paymentFilter = document.getElementById('paymentFilter').value;
         
-        // Build URL with filters
+        // Build URL with filters (per_page igual ao select da página)
+        const perPageSelect = document.querySelector('select.filter-per-page');
+        const perPage = perPageSelect ? perPageSelect.value : '10';
         let url = '../api/despesas_fixas.php?action=list';
-        url += `&page=${currentPage}`;
+        url += `&page=${currentPage}&per_page=${perPage}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
         if (vehicleFilter) url += `&veiculo=${encodeURIComponent(vehicleFilter)}`;
         if (tipoFilter) url += `&tipo=${encodeURIComponent(tipoFilter)}`;
@@ -275,9 +283,9 @@ async function loadDespesasData(page = null) {
         
         const data = await response.json();
         
-        // Update table and pagination
+        // Update table and pagination (padrão: "Página X de Y (N registros)")
         updateDespesasTable(data.despesas);
-        updatePagination(data.pagina_atual, data.total_paginas);
+        updatePagination(data.pagina_atual, data.total_paginas, data.total_registros || 0);
         updateKPICards(data.metrics);
         updateCharts(data.charts);
         
@@ -382,8 +390,8 @@ function updateCharts(data) {
     }
 }
 
-// Add pagination update function
-function updatePagination(currentPage, totalPages) {
+// Add pagination update function (padrão igual outras telas: "Página X de Y (N registros)")
+function updatePagination(currentPage, totalPages, totalRegistros) {
     const paginationDiv = document.querySelector('.pagination');
     if (!paginationDiv) return;
     
@@ -391,12 +399,21 @@ function updatePagination(currentPage, totalPages) {
     const nextBtn = paginationDiv.querySelector('a:last-child');
     const pageInfo = paginationDiv.querySelector('.pagination-info');
     
-    // Update page info
-    pageInfo.textContent = `Página ${currentPage} de ${totalPages}`;
+    const total = typeof totalRegistros === 'number' ? totalRegistros : 0;
+    const totalPagesNum = Math.max(1, parseInt(totalPages, 10) || 1);
+    
+    // Update page info: "Página X de Y (N registros)"
+    pageInfo.textContent = `Página ${currentPage} de ${totalPagesNum} (${total} registros)`;
     
     // Update buttons state and href
     prevBtn.classList.toggle('disabled', currentPage <= 1);
-    nextBtn.classList.toggle('disabled', currentPage >= totalPages);
+    nextBtn.classList.toggle('disabled', currentPage >= totalPagesNum);
+    
+    // Atualizar href dos links para manter per_page na URL
+    const perPageSelect = document.querySelector('select.filter-per-page');
+    const perPage = perPageSelect ? perPageSelect.value : '10';
+    prevBtn.href = currentPage > 1 ? `?page=${currentPage - 1}&per_page=${perPage}` : '#';
+    nextBtn.href = currentPage < totalPagesNum ? `?page=${currentPage + 1}&per_page=${perPage}` : '#';
     
     // Remove old event listeners
     prevBtn.replaceWith(prevBtn.cloneNode(true));
@@ -415,7 +432,7 @@ function updatePagination(currentPage, totalPages) {
     
     newNextBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        if (currentPage < totalPages) {
+        if (currentPage < totalPagesNum) {
             loadDespesasData(currentPage + 1);
         }
     });

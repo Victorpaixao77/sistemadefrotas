@@ -138,6 +138,57 @@ try {
             ];
         }
     }
+
+    // Eventos a partir dos Planos de Manutenção (proxima_data = ultima_data + intervalo_dias)
+    $tem_planos = false;
+    try {
+        $r = $conn->query("SHOW TABLES LIKE 'planos_manutencao'");
+        $tem_planos = $r && $r->rowCount() > 0;
+    } catch (Exception $e) {}
+    if ($tem_planos) {
+        $sql_planos = "SELECT p.id, p.veiculo_id, p.intervalo_dias, p.ultima_data,
+                DATE_ADD(p.ultima_data, INTERVAL p.intervalo_dias DAY) as proxima_data,
+                v.placa, v.modelo, v.marca, v.ano,
+                cm.nome as componente_nome, tm.nome as tipo_nome
+                FROM planos_manutencao p
+                JOIN veiculos v ON v.id = p.veiculo_id AND v.empresa_id = p.empresa_id
+                JOIN componentes_manutencao cm ON cm.id = p.componente_id
+                JOIN tipos_manutencao tm ON tm.id = p.tipo_manutencao_id
+                WHERE p.empresa_id = :empresa_id AND p.ativo = 1
+                AND p.intervalo_dias IS NOT NULL AND p.ultima_data IS NOT NULL
+                AND DATE_ADD(p.ultima_data, INTERVAL p.intervalo_dias DAY) >= CURRENT_DATE
+                AND DATE_ADD(p.ultima_data, INTERVAL p.intervalo_dias DAY) <= DATE_ADD(CURRENT_DATE, INTERVAL 90 DAY)";
+        $stmt_planos = $conn->prepare($sql_planos);
+        $stmt_planos->bindParam(':empresa_id', $empresa_id);
+        $stmt_planos->execute();
+        while ($row = $stmt_planos->fetch(PDO::FETCH_ASSOC)) {
+            $proxima = $row['proxima_data'];
+            $dias = (int) (strtotime($proxima) - time()) / 86400;
+            $titulo = 'Plano: ' . $row['placa'] . ' - ' . $row['componente_nome'];
+            $cor = '#f59e0b';
+            if ($dias <= 0) $cor = '#ef4444';
+            elseif ($dias <= 7) $cor = '#ef4444';
+            elseif ($dias <= 15) $cor = '#f59e0b';
+            else $cor = '#3b82f6';
+            $events[] = [
+                'id' => 'plano_' . $row['id'],
+                'title' => $titulo,
+                'start' => $proxima,
+                'end' => $proxima,
+                'allDay' => true,
+                'backgroundColor' => $cor,
+                'borderColor' => $cor,
+                'extendedProps' => [
+                    'category' => 'manutencao',
+                    'description' => 'Preventiva por plano: ' . $row['placa'] . ' - ' . $row['componente_nome'] . ' (' . $row['tipo_nome'] . '). Vence em ' . $proxima,
+                    'veiculo_id' => $row['veiculo_id'],
+                    'placa' => $row['placa'],
+                    'source' => 'plano',
+                    'priority' => $dias <= 7 ? 'high' : ($dias <= 15 ? 'medium' : 'low')
+                ]
+            ];
+        }
+    }
     
     echo json_encode($events);
     

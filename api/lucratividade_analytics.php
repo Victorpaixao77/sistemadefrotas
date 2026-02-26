@@ -22,10 +22,18 @@ $conn = getConnection();
 $mes = isset($_GET['mes']) ? $_GET['mes'] : date('m');
 $ano = isset($_GET['ano']) ? $_GET['ano'] : date('Y');
 $action = isset($_GET['action']) ? $_GET['action'] : 'default';
+$empresa_id = isset($_SESSION['empresa_id']) ? (int)$_SESSION['empresa_id'] : 0;
+// empresa_id na SQL: valor da sessão (int), seguro; :mes e :ano continuam como prepared params
+$eid = $empresa_id;
+
+if ($eid < 1) {
+    echo json_encode(['success' => false, 'message' => 'Sessão inválida (empresa_id).', 'error' => 'empresa_id não definido']);
+    exit;
+}
 
 // Log dos parâmetros recebidos
 error_log("Parâmetros recebidos - mes: " . $mes . ", ano: " . $ano . ", action: " . $action);
-error_log("Empresa ID: " . $_SESSION['empresa_id']);
+error_log("Empresa ID: " . $empresa_id);
 
 try {
     if ($action === 'charts') {
@@ -38,30 +46,28 @@ try {
                     SUM(CASE WHEN tipo = 'frete' THEN valor ELSE 0 END) as fretes,
                     SUM(CASE WHEN tipo != 'frete' THEN valor ELSE 0 END) as despesas
                 FROM (
-                    SELECT data_rota as data, 'frete' as tipo, frete as valor FROM rotas WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    SELECT data_rota as data, 'frete' as tipo, frete as valor FROM rotas WHERE empresa_id = " . $eid . "
                     UNION ALL
                     SELECT created_at as data, 'despesa' as tipo, 
-                           (COALESCE(arla, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
+                           (COALESCE(descarga, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
                             COALESCE(estacionamento, 0) + COALESCE(lavagem, 0) + COALESCE(borracharia, 0) + 
                             COALESCE(eletrica_mecanica, 0) + COALESCE(adiantamento, 0)) as valor 
-                    FROM despesas_viagem WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    FROM despesas_viagem WHERE empresa_id = " . $eid . "
                     UNION ALL
                     SELECT vencimento as data, 'despesa' as tipo, valor FROM despesas_fixas 
-                    WHERE empresa_id = " . $_SESSION['empresa_id'] . " AND status_pagamento_id = 2
+                    WHERE empresa_id = " . $eid . " AND status_pagamento_id = 2
                     UNION ALL
                     SELECT data_vencimento as data, 'despesa' as tipo, valor FROM contas_pagar 
-                    WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    WHERE empresa_id = " . $eid . "
                 ) as dados
                 GROUP BY YEAR(data), MONTH(data)
                 ORDER BY ano, mes
             )
             SELECT * FROM dados
-            WHERE (ano < :ano) OR (ano = :ano AND mes <= :mes)
+            WHERE (ano < :ano1) OR (ano = :ano2 AND mes <= :mes)
             ORDER BY ano, mes
             LIMIT 12
         ";
-        
-        error_log("SQL Fretes vs Despesas: " . $sql_fretes_vs_despesas);
         
         // 2. Distribuição das Despesas
         $sql_distribuicao_despesas = "
@@ -69,25 +75,23 @@ try {
                 tipo,
                 SUM(valor) as total
             FROM (
-                SELECT 'Abastecimento' as tipo, valor_total as valor FROM abastecimentos WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                SELECT 'Abastecimento' as tipo, valor_total as valor FROM abastecimentos WHERE empresa_id = " . $eid . "
                 UNION ALL
-                SELECT 'Comissão' as tipo, comissao as valor FROM rotas WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                SELECT 'Comissão' as tipo, comissao as valor FROM rotas WHERE empresa_id = " . $eid . "
                 UNION ALL
-                SELECT 'Despesa Fixa' as tipo, valor FROM despesas_fixas WHERE empresa_id = " . $_SESSION['empresa_id'] . " AND status_pagamento_id = 2
+                SELECT 'Despesa Fixa' as tipo, valor FROM despesas_fixas WHERE empresa_id = " . $eid . " AND status_pagamento_id = 2
                 UNION ALL
-                SELECT 'Conta a Pagar' as tipo, valor FROM contas_pagar WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                SELECT 'Conta a Pagar' as tipo, valor FROM contas_pagar WHERE empresa_id = " . $eid . "
                 UNION ALL
                 SELECT 'Despesa de Viagem' as tipo, 
-                       (COALESCE(arla, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
+                       (COALESCE(descarga, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
                         COALESCE(estacionamento, 0) + COALESCE(lavagem, 0) + COALESCE(borracharia, 0) + 
                         COALESCE(eletrica_mecanica, 0) + COALESCE(adiantamento, 0)) as valor 
-                FROM despesas_viagem WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                FROM despesas_viagem WHERE empresa_id = " . $eid . "
             ) as despesas
             GROUP BY tipo
             ORDER BY total DESC
         ";
-        
-        error_log("SQL Distribuição Despesas: " . $sql_distribuicao_despesas);
         
         // 3. Evolução da Lucratividade
         $sql_evolucao_lucratividade = "
@@ -97,30 +101,28 @@ try {
                     YEAR(data) as ano,
                     SUM(CASE WHEN tipo = 'frete' THEN valor ELSE -valor END) as lucro
                 FROM (
-                    SELECT data_rota as data, 'frete' as tipo, frete as valor FROM rotas WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    SELECT data_rota as data, 'frete' as tipo, frete as valor FROM rotas WHERE empresa_id = " . $eid . "
                     UNION ALL
                     SELECT created_at as data, 'despesa' as tipo, 
-                           (COALESCE(arla, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
+                           (COALESCE(descarga, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
                             COALESCE(estacionamento, 0) + COALESCE(lavagem, 0) + COALESCE(borracharia, 0) + 
                             COALESCE(eletrica_mecanica, 0) + COALESCE(adiantamento, 0)) as valor 
-                    FROM despesas_viagem WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    FROM despesas_viagem WHERE empresa_id = " . $eid . "
                     UNION ALL
                     SELECT vencimento as data, 'despesa' as tipo, valor FROM despesas_fixas 
-                    WHERE empresa_id = " . $_SESSION['empresa_id'] . " AND status_pagamento_id = 2
+                    WHERE empresa_id = " . $eid . " AND status_pagamento_id = 2
                     UNION ALL
                     SELECT data_vencimento as data, 'despesa' as tipo, valor FROM contas_pagar 
-                    WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    WHERE empresa_id = " . $eid . "
                 ) as dados
                 GROUP BY YEAR(data), MONTH(data)
                 ORDER BY ano, mes
             )
             SELECT * FROM dados
-            WHERE (ano < :ano) OR (ano = :ano AND mes <= :mes)
+            WHERE (ano < :ano1) OR (ano = :ano2 AND mes <= :mes)
             ORDER BY ano, mes
             LIMIT 12
         ";
-        
-        error_log("SQL Evolução Lucratividade: " . $sql_evolucao_lucratividade);
         
         // 4. Composição do Frete
         $sql_composicao_frete = "
@@ -132,34 +134,32 @@ try {
                     SUM(CASE WHEN tipo = 'abastecimento' THEN valor ELSE 0 END) as abastecimentos,
                     SUM(CASE WHEN tipo NOT IN ('comissao', 'abastecimento') THEN valor ELSE 0 END) as outras_despesas
                 FROM (
-                    SELECT data_rota as data, 'comissao' as tipo, comissao as valor FROM rotas WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    SELECT data_rota as data, 'comissao' as tipo, comissao as valor FROM rotas WHERE empresa_id = " . $eid . "
                     UNION ALL
-                    SELECT data_abastecimento as data, 'abastecimento' as tipo, valor_total as valor FROM abastecimentos WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    SELECT data_abastecimento as data, 'abastecimento' as tipo, valor_total as valor FROM abastecimentos WHERE empresa_id = " . $eid . "
                     UNION ALL
                     SELECT created_at as data, 'outra' as tipo, 
                            (COALESCE(descarga, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
                             COALESCE(estacionamento, 0) + COALESCE(lavagem, 0) + COALESCE(borracharia, 0) + 
                             COALESCE(eletrica_mecanica, 0) + COALESCE(adiantamento, 0)) as valor 
-                    FROM despesas_viagem WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    FROM despesas_viagem WHERE empresa_id = " . $eid . "
                     UNION ALL
                     SELECT vencimento as data, 'outra' as tipo, valor FROM despesas_fixas 
-                    WHERE empresa_id = " . $_SESSION['empresa_id'] . " AND status_pagamento_id = 2
+                    WHERE empresa_id = " . $eid . " AND status_pagamento_id = 2
                     UNION ALL
                     SELECT data_vencimento as data, 'outra' as tipo, valor FROM contas_pagar 
-                    WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    WHERE empresa_id = " . $eid . "
                 ) as dados
                 GROUP BY YEAR(data), MONTH(data)
                 ORDER BY ano, mes
             )
             SELECT * FROM dados
-            WHERE (ano < :ano) OR (ano = :ano AND mes <= :mes)
+            WHERE (ano < :ano1) OR (ano = :ano2 AND mes <= :mes)
             ORDER BY ano, mes
             LIMIT 12
         ";
         
-        error_log("SQL Composição Frete: " . $sql_composicao_frete);
-        
-        // 5. Lucro por Veículo
+        // 5. Lucro por Veículo (contas_pagar não entram por veículo se a tabela não tiver veiculo_id)
         $sql_lucro_por_veiculo = "
             WITH dados AS (
                 SELECT 
@@ -174,13 +174,12 @@ try {
                         ELSE 0 
                     END) as despesa_viagem,
                     SUM(CASE WHEN df.id IS NOT NULL THEN df.valor ELSE 0 END) as despesa_fixa,
-                    SUM(CASE WHEN cp.id IS NOT NULL THEN cp.valor ELSE 0 END) as conta_pagar
+                    0 as conta_pagar
                 FROM veiculos v
-                LEFT JOIN rotas r ON r.veiculo_id = v.id AND r.empresa_id = " . $_SESSION['empresa_id'] . "
-                LEFT JOIN despesas_viagem dv ON dv.rota_id = r.id AND dv.empresa_id = " . $_SESSION['empresa_id'] . "
-                LEFT JOIN despesas_fixas df ON df.veiculo_id = v.id AND df.empresa_id = " . $_SESSION['empresa_id'] . " AND df.status_pagamento_id = 2
-                LEFT JOIN contas_pagar cp ON cp.veiculo_id = v.id AND cp.empresa_id = " . $_SESSION['empresa_id'] . "
-                WHERE v.empresa_id = " . $_SESSION['empresa_id'] . "
+                LEFT JOIN rotas r ON r.veiculo_id = v.id AND r.empresa_id = " . $eid . "
+                LEFT JOIN despesas_viagem dv ON dv.rota_id = r.id AND dv.empresa_id = " . $eid . "
+                LEFT JOIN despesas_fixas df ON df.veiculo_id = v.id AND df.empresa_id = " . $eid . " AND df.status_pagamento_id = 2
+                WHERE v.empresa_id = " . $eid . "
                 GROUP BY v.id, v.placa
             )
             SELECT 
@@ -190,8 +189,6 @@ try {
             ORDER BY lucro DESC
         ";
         
-        error_log("SQL Lucro por Veículo: " . $sql_lucro_por_veiculo);
-        
         // 6. Lucro por Dia da Semana
         $sql_lucro_por_dia = "
             WITH dados AS (
@@ -199,19 +196,19 @@ try {
                     DAYOFWEEK(data) as dia_semana,
                     SUM(CASE WHEN tipo = 'frete' THEN valor ELSE -valor END) as lucro
                 FROM (
-                    SELECT data_rota as data, 'frete' as tipo, frete as valor FROM rotas WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    SELECT data_rota as data, 'frete' as tipo, frete as valor FROM rotas WHERE empresa_id = " . $eid . "
                     UNION ALL
                     SELECT created_at as data, 'despesa' as tipo, 
                            (COALESCE(descarga, 0) + COALESCE(pedagios, 0) + COALESCE(caixinha, 0) + 
                             COALESCE(estacionamento, 0) + COALESCE(lavagem, 0) + COALESCE(borracharia, 0) + 
                             COALESCE(eletrica_mecanica, 0) + COALESCE(adiantamento, 0)) as valor 
-                    FROM despesas_viagem WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    FROM despesas_viagem WHERE empresa_id = " . $eid . "
                     UNION ALL
                     SELECT vencimento as data, 'despesa' as tipo, valor FROM despesas_fixas 
-                    WHERE empresa_id = " . $_SESSION['empresa_id'] . " AND status_pagamento_id = 2
+                    WHERE empresa_id = " . $eid . " AND status_pagamento_id = 2
                     UNION ALL
                     SELECT data_vencimento as data, 'despesa' as tipo, valor FROM contas_pagar 
-                    WHERE empresa_id = " . $_SESSION['empresa_id'] . "
+                    WHERE empresa_id = " . $eid . "
                 ) as dados
                 GROUP BY DAYOFWEEK(data)
             )
@@ -230,18 +227,17 @@ try {
             ORDER BY dia_semana
         ";
         
-        error_log("SQL Lucro por Dia: " . $sql_lucro_por_dia);
-        
-        // Executar consultas
+        // Parâmetros para queries 1, 3, 4 (cada nome único: PDO não aceita mesmo nome duas vezes)
         $params = [
             ':mes' => $mes,
-            ':ano' => $ano
+            ':ano1' => $ano,
+            ':ano2' => $ano
         ];
         
         error_log("Parâmetros para consultas: " . print_r($params, true));
         
-        // Verificar se todos os parâmetros necessários estão definidos
-        $required_params = [':mes', ':ano'];
+        // Verificar parâmetros obrigatórios
+        $required_params = [':mes', ':ano1', ':ano2'];
         
         foreach ($required_params as $param) {
             if (!isset($params[$param])) {
@@ -269,10 +265,6 @@ try {
         try {
             error_log("Executando query Distribuição Despesas...");
             $stmt = $conn->prepare($sql_distribuicao_despesas);
-            foreach ($params as $key => $value) {
-                error_log("Binding parameter: " . $key . " = " . $value);
-                $stmt->bindValue($key, $value);
-            }
             $stmt->execute();
             $distribuicao_despesas = $stmt->fetchAll(PDO::FETCH_ASSOC);
             error_log("Resultado Distribuição Despesas: " . print_r($distribuicao_despesas, true));
@@ -314,10 +306,6 @@ try {
         try {
             error_log("Executando query Lucro por Veículo...");
             $stmt = $conn->prepare($sql_lucro_por_veiculo);
-            foreach ($params as $key => $value) {
-                error_log("Binding parameter: " . $key . " = " . $value);
-                $stmt->bindValue($key, $value);
-            }
             $stmt->execute();
             $lucro_por_veiculo = $stmt->fetchAll(PDO::FETCH_ASSOC);
             error_log("Resultado Lucro por Veículo: " . print_r($lucro_por_veiculo, true));
@@ -329,10 +317,6 @@ try {
         try {
             error_log("Executando query Lucro por Dia...");
             $stmt = $conn->prepare($sql_lucro_por_dia);
-            foreach ($params as $key => $value) {
-                error_log("Binding parameter: " . $key . " = " . $value);
-                $stmt->bindValue($key, $value);
-            }
             $stmt->execute();
             $lucro_por_dia = $stmt->fetchAll(PDO::FETCH_ASSOC);
             error_log("Resultado Lucro por Dia: " . print_r($lucro_por_dia, true));
@@ -378,6 +362,7 @@ try {
     error_log("Stack trace: " . $e->getTraceAsString());
     echo json_encode([
         'success' => false,
-        'error' => 'Erro ao processar requisição: ' . $e->getMessage()
+        'message' => 'Erro ao processar requisição.',
+        'error' => $e->getMessage()
     ]);
 } 

@@ -1,506 +1,1767 @@
-[22-Sep-2025 00:58:19 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 22:54:30 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 21
-    [usuario_id] => 21
-    [nome] => victor
-    [email] => victor@rbxsofts.com
-    [empresa_id] => 1
-    [foto_perfil] => 
-    [tipo_usuario] => gestor
-)
-
-[22-Sep-2025 00:58:19 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 21
-    [usuario_id] => 21
-    [nome] => victor
-    [email] => victor@rbxsofts.com
-    [empresa_id] => 1
-    [foto_perfil] => 
-    [tipo_usuario] => gestor
-)
-
-[22-Sep-2025 01:08:49 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => admin
-)
-
-[22-Sep-2025 01:08:50 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => admin
-)
-
-[22-Sep-2025 01:09:04 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 21
-    [usuario_id] => 21
-    [nome] => victor
-    [email] => victor@rbxsofts.com
-    [empresa_id] => 1
-    [foto_perfil] => 
-    [tipo_usuario] => gestor
-)
-
-[22-Sep-2025 01:09:05 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 21
-    [usuario_id] => 21
-    [nome] => victor
-    [email] => victor@rbxsofts.com
-    [empresa_id] => 1
-    [foto_perfil] => 
-    [tipo_usuario] => gestor
-)
-
-[25-Sep-2025 00:36:41 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => admin
-)
-
-[25-Sep-2025 00:36:41 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => admin
-)
-
-[25-Sep-2025 00:36:43 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => admin
-)
-
-[25-Sep-2025 00:36:43 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => admin
-)
-
-[26-Sep-2025 04:39:48 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => admin
-)
-
-[26-Sep-2025 04:39:48 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
-    [tipo_usuario] => admin
-)
-
-[31-Oct-2025 05:23:45 America/Sao_Paulo] Session state in despesas_fixas.php: Array
-(
-    [redirect_url] => /sistema-frotas/pages/lucratividade.php
-    [loggedin] => 1
-    [id] => 20
-    [usuario_id] => 20
-    [nome] => teste3
-    [email] => victorpaixao77@hotmail.com
-    [empresa_id] => 3
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
     [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[31-Oct-2025 05:23:45 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 22:54:30 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
-    [redirect_url] => /sistema-frotas/pages/lucratividade.php
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 20
-    [usuario_id] => 20
-    [nome] => teste3
-    [email] => victorpaixao77@hotmail.com
-    [empresa_id] => 3
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
     [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[07-Nov-2025 19:42:38 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 22:54:33 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 20
-    [usuario_id] => 20
-    [nome] => teste3
-    [email] => victorpaixao77@hotmail.com
-    [empresa_id] => 3
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
     [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[07-Nov-2025 19:42:38 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 22:54:33 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 20
-    [usuario_id] => 20
-    [nome] => teste3
-    [email] => victorpaixao77@hotmail.com
-    [empresa_id] => 3
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
     [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 22:28:25 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 22:54:33 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 22:28:25 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 22:54:34 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 22:52:24 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 22:54:34 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 22:52:24 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 22:54:35 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 22:52:30 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 22:55:23 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 22:52:30 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 22:55:23 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 23:15:11 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 22:57:51 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 23:15:11 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 22:57:51 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 23:29:07 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:03:59 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 23:29:07 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:03:59 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 23:32:57 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:04:39 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 23:32:57 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:04:39 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 23:38:51 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:32 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 23:38:51 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:32 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 23:44:04 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:34 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 23:44:04 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:34 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 23:46:48 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:40 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[11-Nov-2025 23:46:48 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:41 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[12-Nov-2025 00:06:48 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:41 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[12-Nov-2025 00:06:48 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:41 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[12-Nov-2025 00:48:49 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:43 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[12-Nov-2025 00:48:49 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:43 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[12-Nov-2025 07:45:20 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:43 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[12-Nov-2025 07:45:20 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:50 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[12-Nov-2025 07:59:02 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:53 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
 )
 
-[12-Nov-2025 07:59:02 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+[22-Feb-2026 23:05:54 America/Sao_Paulo] Session state in despesas_fixas.php: Array
 (
+    [acesso_todas_empresas] => 
     [loggedin] => 1
-    [id] => 16
-    [usuario_id] => 16
-    [nome] => Victor Hugo Rodrigues da Paixão (Teste)
-    [email] => victor@rbxsoft.com
-    [empresa_id] => 1
-    [foto_perfil] => perfil_16_1747893599.png
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
     [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:05:55 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:05:55 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:05:57 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:05:58 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:05:58 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:05:59 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:03 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:03 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:05 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:05 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:29 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:30 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:40 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:40 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:40 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:41 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:41 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:41 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:42 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:44 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:44 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:44 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:49 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:52 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:53 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:56 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:56 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:58 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:06:58 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:07:06 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:07:06 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:07:18 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:07:18 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:07:34 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:07:34 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:10:14 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:10:14 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:10:15 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:10:15 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:10:19 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:10:19 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:10:23 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:10:23 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:10:29 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[22-Feb-2026 23:10:29 America/Sao_Paulo] Session state in despesas_fixas.php: Array
+(
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[25-Feb-2026 03:01:23 America/Sao_Paulo] Session state in vehicles.php: Array
+(
+    [redirect_url] => /sistema-frotas/fiscal/pages/cte.php
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[25-Feb-2026 03:01:23 America/Sao_Paulo] SQL Query: SELECT v.id, v.placa, v.modelo 
+                   FROM veiculos v
+                   WHERE v.empresa_id = :empresa_id 
+                   ORDER BY v.placa
+[25-Feb-2026 03:01:23 America/Sao_Paulo] empresa_id: 1
+[25-Feb-2026 03:01:23 America/Sao_Paulo] Found vehicles: Array
+(
+    [0] => Array
+        (
+            [id] => 59
+            [placa] => 222-222
+            [modelo] => teste
+        )
+
+    [1] => Array
+        (
+            [id] => 66
+            [placa] => ABC-1234
+            [modelo] => Mercedes-Benz Actros
+        )
+
+    [2] => Array
+        (
+            [id] => 55
+            [placa] => AIF-440
+            [modelo] => Fiorino
+        )
+
+    [3] => Array
+        (
+            [id] => 64
+            [placa] => AQWERTY
+            [modelo] => teste
+        )
+
+    [4] => Array
+        (
+            [id] => 56
+            [placa] => ATM-3588
+            [modelo] => Scania 770
+        )
+
+    [5] => Array
+        (
+            [id] => 68
+            [placa] => DEF-9012
+            [modelo] => Scania R450
+        )
+
+    [6] => Array
+        (
+            [id] => 67
+            [placa] => XYZ-5678
+            [modelo] => Volvo FH
+        )
+
+)
+
+[25-Feb-2026 03:03:15 America/Sao_Paulo] Session state in vehicles.php: Array
+(
+    [redirect_url] => /sistema-frotas/fiscal/pages/cte.php
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[25-Feb-2026 03:03:15 America/Sao_Paulo] SQL Query: SELECT v.id, v.placa, v.modelo 
+                   FROM veiculos v
+                   WHERE v.empresa_id = :empresa_id 
+                   ORDER BY v.placa
+[25-Feb-2026 03:03:15 America/Sao_Paulo] empresa_id: 1
+[25-Feb-2026 03:03:15 America/Sao_Paulo] Found vehicles: Array
+(
+    [0] => Array
+        (
+            [id] => 59
+            [placa] => 222-222
+            [modelo] => teste
+        )
+
+    [1] => Array
+        (
+            [id] => 66
+            [placa] => ABC-1234
+            [modelo] => Mercedes-Benz Actros
+        )
+
+    [2] => Array
+        (
+            [id] => 55
+            [placa] => AIF-440
+            [modelo] => Fiorino
+        )
+
+    [3] => Array
+        (
+            [id] => 64
+            [placa] => AQWERTY
+            [modelo] => teste
+        )
+
+    [4] => Array
+        (
+            [id] => 56
+            [placa] => ATM-3588
+            [modelo] => Scania 770
+        )
+
+    [5] => Array
+        (
+            [id] => 68
+            [placa] => DEF-9012
+            [modelo] => Scania R450
+        )
+
+    [6] => Array
+        (
+            [id] => 67
+            [placa] => XYZ-5678
+            [modelo] => Volvo FH
+        )
+
+)
+
+[25-Feb-2026 03:11:25 America/Sao_Paulo] Session state in vehicles.php: Array
+(
+    [redirect_url] => /sistema-frotas/fiscal/pages/cte.php
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[25-Feb-2026 03:11:25 America/Sao_Paulo] SQL Query: SELECT v.id, v.placa, v.modelo 
+                   FROM veiculos v
+                   WHERE v.empresa_id = :empresa_id 
+                   ORDER BY v.placa
+[25-Feb-2026 03:11:25 America/Sao_Paulo] empresa_id: 1
+[25-Feb-2026 03:11:25 America/Sao_Paulo] Found vehicles: Array
+(
+    [0] => Array
+        (
+            [id] => 59
+            [placa] => 222-222
+            [modelo] => teste
+        )
+
+    [1] => Array
+        (
+            [id] => 66
+            [placa] => ABC-1234
+            [modelo] => Mercedes-Benz Actros
+        )
+
+    [2] => Array
+        (
+            [id] => 55
+            [placa] => AIF-440
+            [modelo] => Fiorino
+        )
+
+    [3] => Array
+        (
+            [id] => 64
+            [placa] => AQWERTY
+            [modelo] => teste
+        )
+
+    [4] => Array
+        (
+            [id] => 56
+            [placa] => ATM-3588
+            [modelo] => Scania 770
+        )
+
+    [5] => Array
+        (
+            [id] => 68
+            [placa] => DEF-9012
+            [modelo] => Scania R450
+        )
+
+    [6] => Array
+        (
+            [id] => 67
+            [placa] => XYZ-5678
+            [modelo] => Volvo FH
+        )
+
+)
+
+[25-Feb-2026 03:11:31 America/Sao_Paulo] Session state in vehicles.php: Array
+(
+    [redirect_url] => /sistema-frotas/fiscal/pages/cte.php
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[25-Feb-2026 03:11:31 America/Sao_Paulo] SQL Query: SELECT v.id, v.placa, v.modelo 
+                   FROM veiculos v
+                   WHERE v.empresa_id = :empresa_id 
+                   ORDER BY v.placa
+[25-Feb-2026 03:11:31 America/Sao_Paulo] empresa_id: 1
+[25-Feb-2026 03:11:31 America/Sao_Paulo] Found vehicles: Array
+(
+    [0] => Array
+        (
+            [id] => 59
+            [placa] => 222-222
+            [modelo] => teste
+        )
+
+    [1] => Array
+        (
+            [id] => 66
+            [placa] => ABC-1234
+            [modelo] => Mercedes-Benz Actros
+        )
+
+    [2] => Array
+        (
+            [id] => 55
+            [placa] => AIF-440
+            [modelo] => Fiorino
+        )
+
+    [3] => Array
+        (
+            [id] => 64
+            [placa] => AQWERTY
+            [modelo] => teste
+        )
+
+    [4] => Array
+        (
+            [id] => 56
+            [placa] => ATM-3588
+            [modelo] => Scania 770
+        )
+
+    [5] => Array
+        (
+            [id] => 68
+            [placa] => DEF-9012
+            [modelo] => Scania R450
+        )
+
+    [6] => Array
+        (
+            [id] => 67
+            [placa] => XYZ-5678
+            [modelo] => Volvo FH
+        )
+
+)
+
+[25-Feb-2026 03:11:34 America/Sao_Paulo] Session state in vehicles.php: Array
+(
+    [redirect_url] => /sistema-frotas/fiscal/pages/cte.php
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[25-Feb-2026 03:11:34 America/Sao_Paulo] SQL Query: SELECT v.id, v.placa, v.modelo 
+                   FROM veiculos v
+                   WHERE v.empresa_id = :empresa_id 
+                   ORDER BY v.placa
+[25-Feb-2026 03:11:34 America/Sao_Paulo] empresa_id: 1
+[25-Feb-2026 03:11:34 America/Sao_Paulo] Found vehicles: Array
+(
+    [0] => Array
+        (
+            [id] => 59
+            [placa] => 222-222
+            [modelo] => teste
+        )
+
+    [1] => Array
+        (
+            [id] => 66
+            [placa] => ABC-1234
+            [modelo] => Mercedes-Benz Actros
+        )
+
+    [2] => Array
+        (
+            [id] => 55
+            [placa] => AIF-440
+            [modelo] => Fiorino
+        )
+
+    [3] => Array
+        (
+            [id] => 64
+            [placa] => AQWERTY
+            [modelo] => teste
+        )
+
+    [4] => Array
+        (
+            [id] => 56
+            [placa] => ATM-3588
+            [modelo] => Scania 770
+        )
+
+    [5] => Array
+        (
+            [id] => 68
+            [placa] => DEF-9012
+            [modelo] => Scania R450
+        )
+
+    [6] => Array
+        (
+            [id] => 67
+            [placa] => XYZ-5678
+            [modelo] => Volvo FH
+        )
+
+)
+
+[25-Feb-2026 03:13:13 America/Sao_Paulo] Session state in vehicles.php: Array
+(
+    [redirect_url] => /sistema-frotas/fiscal/pages/cte.php
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[25-Feb-2026 03:13:13 America/Sao_Paulo] SQL Query: SELECT v.id, v.placa, v.modelo 
+                   FROM veiculos v
+                   WHERE v.empresa_id = :empresa_id 
+                   ORDER BY v.placa
+[25-Feb-2026 03:13:13 America/Sao_Paulo] empresa_id: 1
+[25-Feb-2026 03:13:13 America/Sao_Paulo] Found vehicles: Array
+(
+    [0] => Array
+        (
+            [id] => 59
+            [placa] => 222-222
+            [modelo] => teste
+        )
+
+    [1] => Array
+        (
+            [id] => 66
+            [placa] => ABC-1234
+            [modelo] => Mercedes-Benz Actros
+        )
+
+    [2] => Array
+        (
+            [id] => 55
+            [placa] => AIF-440
+            [modelo] => Fiorino
+        )
+
+    [3] => Array
+        (
+            [id] => 64
+            [placa] => AQWERTY
+            [modelo] => teste
+        )
+
+    [4] => Array
+        (
+            [id] => 56
+            [placa] => ATM-3588
+            [modelo] => Scania 770
+        )
+
+    [5] => Array
+        (
+            [id] => 68
+            [placa] => DEF-9012
+            [modelo] => Scania R450
+        )
+
+    [6] => Array
+        (
+            [id] => 67
+            [placa] => XYZ-5678
+            [modelo] => Volvo FH
+        )
+
+)
+
+[25-Feb-2026 03:13:14 America/Sao_Paulo] Session state in vehicles.php: Array
+(
+    [redirect_url] => /sistema-frotas/fiscal/pages/cte.php
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[25-Feb-2026 03:13:14 America/Sao_Paulo] SQL Query: SELECT v.id, v.placa, v.modelo 
+                   FROM veiculos v
+                   WHERE v.empresa_id = :empresa_id 
+                   ORDER BY v.placa
+[25-Feb-2026 03:13:14 America/Sao_Paulo] empresa_id: 1
+[25-Feb-2026 03:13:14 America/Sao_Paulo] Found vehicles: Array
+(
+    [0] => Array
+        (
+            [id] => 59
+            [placa] => 222-222
+            [modelo] => teste
+        )
+
+    [1] => Array
+        (
+            [id] => 66
+            [placa] => ABC-1234
+            [modelo] => Mercedes-Benz Actros
+        )
+
+    [2] => Array
+        (
+            [id] => 55
+            [placa] => AIF-440
+            [modelo] => Fiorino
+        )
+
+    [3] => Array
+        (
+            [id] => 64
+            [placa] => AQWERTY
+            [modelo] => teste
+        )
+
+    [4] => Array
+        (
+            [id] => 56
+            [placa] => ATM-3588
+            [modelo] => Scania 770
+        )
+
+    [5] => Array
+        (
+            [id] => 68
+            [placa] => DEF-9012
+            [modelo] => Scania R450
+        )
+
+    [6] => Array
+        (
+            [id] => 67
+            [placa] => XYZ-5678
+            [modelo] => Volvo FH
+        )
+
+)
+
+[25-Feb-2026 03:17:51 America/Sao_Paulo] Session state in vehicles.php: Array
+(
+    [redirect_url] => /sistema-frotas/fiscal/pages/cte.php
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[25-Feb-2026 03:17:51 America/Sao_Paulo] SQL Query: SELECT v.id, v.placa, v.modelo 
+                   FROM veiculos v
+                   WHERE v.empresa_id = :empresa_id 
+                   ORDER BY v.placa
+[25-Feb-2026 03:17:51 America/Sao_Paulo] empresa_id: 1
+[25-Feb-2026 03:17:51 America/Sao_Paulo] Found vehicles: Array
+(
+    [0] => Array
+        (
+            [id] => 59
+            [placa] => 222-222
+            [modelo] => teste
+        )
+
+    [1] => Array
+        (
+            [id] => 66
+            [placa] => ABC-1234
+            [modelo] => Mercedes-Benz Actros
+        )
+
+    [2] => Array
+        (
+            [id] => 55
+            [placa] => AIF-440
+            [modelo] => Fiorino
+        )
+
+    [3] => Array
+        (
+            [id] => 64
+            [placa] => AQWERTY
+            [modelo] => teste
+        )
+
+    [4] => Array
+        (
+            [id] => 56
+            [placa] => ATM-3588
+            [modelo] => Scania 770
+        )
+
+    [5] => Array
+        (
+            [id] => 68
+            [placa] => DEF-9012
+            [modelo] => Scania R450
+        )
+
+    [6] => Array
+        (
+            [id] => 67
+            [placa] => XYZ-5678
+            [modelo] => Volvo FH
+        )
+
+)
+
+[25-Feb-2026 03:17:52 America/Sao_Paulo] Session state in vehicles.php: Array
+(
+    [redirect_url] => /sistema-frotas/fiscal/pages/cte.php
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[25-Feb-2026 03:17:52 America/Sao_Paulo] SQL Query: SELECT v.id, v.placa, v.modelo 
+                   FROM veiculos v
+                   WHERE v.empresa_id = :empresa_id 
+                   ORDER BY v.placa
+[25-Feb-2026 03:17:52 America/Sao_Paulo] empresa_id: 1
+[25-Feb-2026 03:17:52 America/Sao_Paulo] Found vehicles: Array
+(
+    [0] => Array
+        (
+            [id] => 59
+            [placa] => 222-222
+            [modelo] => teste
+        )
+
+    [1] => Array
+        (
+            [id] => 66
+            [placa] => ABC-1234
+            [modelo] => Mercedes-Benz Actros
+        )
+
+    [2] => Array
+        (
+            [id] => 55
+            [placa] => AIF-440
+            [modelo] => Fiorino
+        )
+
+    [3] => Array
+        (
+            [id] => 64
+            [placa] => AQWERTY
+            [modelo] => teste
+        )
+
+    [4] => Array
+        (
+            [id] => 56
+            [placa] => ATM-3588
+            [modelo] => Scania 770
+        )
+
+    [5] => Array
+        (
+            [id] => 68
+            [placa] => DEF-9012
+            [modelo] => Scania R450
+        )
+
+    [6] => Array
+        (
+            [id] => 67
+            [placa] => XYZ-5678
+            [modelo] => Volvo FH
+        )
+
+)
+
+[25-Feb-2026 03:17:55 America/Sao_Paulo] Session state in vehicles.php: Array
+(
+    [redirect_url] => /sistema-frotas/fiscal/pages/cte.php
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[25-Feb-2026 03:17:55 America/Sao_Paulo] SQL Query: SELECT v.id, v.placa, v.modelo 
+                   FROM veiculos v
+                   WHERE v.empresa_id = :empresa_id 
+                   ORDER BY v.placa
+[25-Feb-2026 03:17:55 America/Sao_Paulo] empresa_id: 1
+[25-Feb-2026 03:17:55 America/Sao_Paulo] Found vehicles: Array
+(
+    [0] => Array
+        (
+            [id] => 59
+            [placa] => 222-222
+            [modelo] => teste
+        )
+
+    [1] => Array
+        (
+            [id] => 66
+            [placa] => ABC-1234
+            [modelo] => Mercedes-Benz Actros
+        )
+
+    [2] => Array
+        (
+            [id] => 55
+            [placa] => AIF-440
+            [modelo] => Fiorino
+        )
+
+    [3] => Array
+        (
+            [id] => 64
+            [placa] => AQWERTY
+            [modelo] => teste
+        )
+
+    [4] => Array
+        (
+            [id] => 56
+            [placa] => ATM-3588
+            [modelo] => Scania 770
+        )
+
+    [5] => Array
+        (
+            [id] => 68
+            [placa] => DEF-9012
+            [modelo] => Scania R450
+        )
+
+    [6] => Array
+        (
+            [id] => 67
+            [placa] => XYZ-5678
+            [modelo] => Volvo FH
+        )
+
+)
+
+[25-Feb-2026 03:18:33 America/Sao_Paulo] Session state in vehicles.php: Array
+(
+    [redirect_url] => /sistema-frotas/fiscal/pages/cte.php
+    [acesso_todas_empresas] => 
+    [loggedin] => 1
+    [id] => 30
+    [usuario_id] => 30
+    [nome] => Desenvolvimento
+    [email] => Desenvolvimento@frotec.com
+    [foto_perfil] => 
+    [tipo_usuario] => admin
+    [empresa_id] => 1
+)
+
+[25-Feb-2026 03:18:33 America/Sao_Paulo] SQL Query: SELECT v.id, v.placa, v.modelo 
+                   FROM veiculos v
+                   WHERE v.empresa_id = :empresa_id 
+                   ORDER BY v.placa
+[25-Feb-2026 03:18:33 America/Sao_Paulo] empresa_id: 1
+[25-Feb-2026 03:18:33 America/Sao_Paulo] Found vehicles: Array
+(
+    [0] => Array
+        (
+            [id] => 59
+            [placa] => 222-222
+            [modelo] => teste
+        )
+
+    [1] => Array
+        (
+            [id] => 66
+            [placa] => ABC-1234
+            [modelo] => Mercedes-Benz Actros
+        )
+
+    [2] => Array
+        (
+            [id] => 55
+            [placa] => AIF-440
+            [modelo] => Fiorino
+        )
+
+    [3] => Array
+        (
+            [id] => 64
+            [placa] => AQWERTY
+            [modelo] => teste
+        )
+
+    [4] => Array
+        (
+            [id] => 56
+            [placa] => ATM-3588
+            [modelo] => Scania 770
+        )
+
+    [5] => Array
+        (
+            [id] => 68
+            [placa] => DEF-9012
+            [modelo] => Scania R450
+        )
+
+    [6] => Array
+        (
+            [id] => 67
+            [placa] => XYZ-5678
+            [modelo] => Volvo FH
+        )
+
 )
 

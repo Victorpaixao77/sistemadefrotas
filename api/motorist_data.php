@@ -53,9 +53,12 @@ switch ($action) {
         break;
         
     case 'list':
-        // Get optional parameters
-        $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 5;
-        $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
+        // Parâmetros de paginação (por página: 5, 10, 25, 50, 100; padrão 10)
+        $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+        if (!in_array($limit, [5, 10, 25, 50, 100], true)) {
+            $limit = 10;
+        }
         $status = isset($_GET['status']) ? $_GET['status'] : null;
         $search = isset($_GET['search']) ? $_GET['search'] : null;
         $name = isset($_GET['name']) ? $_GET['name'] : null;
@@ -141,7 +144,7 @@ switch ($action) {
  * @param string $search Text search across multiple fields
  * @return array List of motorists and pagination info
  */
-function getMotoristsList($limit = 5, $page = 1, $status = null, $search = null) {
+function getMotoristsList($limit = 10, $page = 1, $status = null, $search = null) {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];

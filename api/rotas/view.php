@@ -1,21 +1,22 @@
 <?php
 require_once '../../includes/config.php';
 require_once '../../includes/functions.php';
+require_once '../../includes/db_connect.php';
 
 // Iniciar sessão
 session_start();
 
 // Verificar se o usuário está logado
-if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
+if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true || !isset($_SESSION['empresa_id'])) {
     http_response_code(401);
-    echo json_encode(['error' => 'Não autorizado']);
+    echo json_encode(['success' => false, 'message' => 'Não autorizado']);
     exit;
 }
 
 // Verificar se o ID da rota foi fornecido
 if (!isset($_GET['id'])) {
     http_response_code(400);
-    echo json_encode(['error' => 'ID da rota não fornecido']);
+    echo json_encode(['success' => false, 'message' => 'ID da rota não fornecido']);
     exit;
 }
 
@@ -44,17 +45,17 @@ try {
     
     if (!$rota) {
         http_response_code(404);
-        echo json_encode(['error' => 'Rota não encontrada']);
+        echo json_encode(['success' => false, 'message' => 'Rota não encontrada']);
         exit;
     }
     
-    // Buscar despesas da viagem
+    // Buscar despesas da viagem (sempre com empresa_id)
     $stmt = $conn->prepare("
         SELECT * FROM despesas_viagem 
-        WHERE rota_id = ? 
+        WHERE rota_id = ? AND empresa_id = ?
         ORDER BY created_at DESC
     ");
-    $stmt->execute([$rota_id]);
+    $stmt->execute([$rota_id, $empresa_id]);
     $despesas = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
     // Adicionar despesas ao resultado
@@ -65,6 +66,6 @@ try {
 } catch (PDOException $e) {
     error_log("Erro ao buscar detalhes da rota: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['error' => 'Erro ao buscar detalhes da rota']);
+    echo json_encode(['success' => false, 'message' => 'Erro ao buscar detalhes da rota']);
 }
 ?> 

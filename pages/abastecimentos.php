@@ -12,12 +12,18 @@ session_start();
 // Set page title
 $page_title = "Abastecimentos";
 
+// Por página: 5, 10, 25, 50, 100 — padrão 10
+$per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
+    $per_page = 10;
+}
+
 // Função para buscar abastecimentos do banco de dados
-function getAbastecimentos($page = 1) {
+function getAbastecimentos($page = 1, $per_page = 10) {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
-        $limit = 5; // Registros por página
+        $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
         $offset = ($page - 1) * $limit;
         
         // Primeiro, conta o total de registros
@@ -53,8 +59,8 @@ function getAbastecimentos($page = 1) {
         
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Log para debug
-        error_log("Dados dos abastecimentos (PHP): " . print_r($result, true));
+        // Log para debug (apenas em desenvolvimento)
+        // error_log("Dados dos abastecimentos (PHP): " . print_r($result, true));
         
         return [
             'abastecimentos' => $result,
@@ -77,7 +83,7 @@ function getAbastecimentos($page = 1) {
 $pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 
 // Buscar abastecimentos com paginação
-$resultado = getAbastecimentos($pagina_atual);
+$resultado = getAbastecimentos($pagina_atual, $per_page);
 $abastecimentos = $resultado['abastecimentos'];
 $total_paginas = $resultado['total_paginas'];
 ?>
@@ -123,13 +129,13 @@ $total_paginas = $resultado['total_paginas'];
                             <i class="fas fa-plus"></i> Novo Abastecimento
                         </button>
                         <div class="view-controls">
-                            <button id="filterBtn" class="btn-restore-layout" title="Filtros">
+                            <button id="filterBtn" class="btn-restore-layout" title="Filtros" aria-label="Abrir filtros por mês e ano">
                                 <i class="fas fa-filter"></i>
                             </button>
-                            <button id="exportBtn" class="btn-toggle-layout" title="Exportar">
+                            <button id="exportBtn" class="btn-toggle-layout" title="Exportar lista em CSV/Excel" aria-label="Exportar lista de abastecimentos em CSV">
                                 <i class="fas fa-file-export"></i>
                             </button>
-                            <button id="helpBtn" class="btn-help" title="Ajuda">
+                            <button id="helpBtn" class="btn-help" title="Ajuda" aria-label="Ajuda sobre abastecimentos">
                                 <i class="fas fa-question-circle"></i>
                             </button>
                         </div>
@@ -194,6 +200,17 @@ $total_paginas = $resultado['total_paginas'];
                         <i class="fas fa-search"></i>
                     </div>
                     <div class="filter-options">
+                        <form method="get" action="" id="formPerPageRefuel" style="display:inline-flex; align-items:center; gap:0.5rem;">
+                            <span class="filter-label">Por página</span>
+                            <input type="hidden" name="page" value="1">
+                            <select id="perPageRefuel" name="per_page" class="filter-per-page" title="Registros por página" onchange="this.form.submit()">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                        </form>
                         <select id="vehicleFilter">
                             <option value="">Todos os veículos</option>
                         </select>
@@ -214,17 +231,21 @@ $total_paginas = $resultado['total_paginas'];
                             <option value="Boleto">Boleto</option>
                             <option value="PIX">PIX</option>
                         </select>
-                        <button type="button" class="btn-restore-layout" id="applyRefuelFilters" title="Aplicar filtros">
+                        <button type="button" class="btn-restore-layout" id="applyRefuelFilters" title="Aplicar filtros" aria-label="Aplicar filtros">
                             <i class="fas fa-filter"></i>
                         </button>
-                        <button type="button" class="btn-restore-layout" id="clearRefuelFilters" title="Limpar filtros">
+                        <button type="button" class="btn-restore-layout" id="clearRefuelFilters" title="Limpar filtros" aria-label="Limpar filtros">
                             <i class="fas fa-undo"></i>
                         </button>
                     </div>
                 </div>
 
                 <!-- Refueling Table -->
-                <div class="data-table-container">
+                <div class="data-table-container" id="refuelTableContainer">
+                    <div class="table-loading" id="refuelTableLoading" aria-live="polite">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <span>Carregando abastecimentos...</span>
+                    </div>
                     <table class="data-table" id="refuelingTable">
                         <thead>
                             <tr>
@@ -286,9 +307,6 @@ $total_paginas = $resultado['total_paginas'];
                                     <td><?php echo number_format($abastecimento['km_atual'], 0, ',', '.'); ?></td>
                                     <td><?php echo htmlspecialchars($abastecimento['forma_pagamento']); ?></td>
                                     <td><?php 
-                                        error_log("Dados da rota para abastecimento ID {$abastecimento['id']}: " . 
-                                                  "Origem: {$abastecimento['cidade_origem_nome']}, " . 
-                                                  "Destino: {$abastecimento['cidade_destino_nome']}");
                                         if (!empty($abastecimento['cidade_origem_nome']) && !empty($abastecimento['cidade_destino_nome'])) {
                                             echo htmlspecialchars($abastecimento['cidade_origem_nome'] . ' → ' . $abastecimento['cidade_destino_nome']);
                                         } else {
@@ -296,15 +314,15 @@ $total_paginas = $resultado['total_paginas'];
                                         }
                                     ?></td>
                                     <td class="actions">
-                                        <button class="btn-icon edit-btn" data-id="<?php echo $abastecimento['id']; ?>" title="Editar">
+                                        <button class="btn-icon edit-btn" data-id="<?php echo $abastecimento['id']; ?>" title="Editar" aria-label="Editar abastecimento">
                                             <i class="fas fa-edit"></i>
                                         </button>
                                         <?php if (!empty($abastecimento['comprovante'])): ?>
-                                            <button class="btn-icon view-comprovante-btn" data-comprovante="<?php echo htmlspecialchars($abastecimento['comprovante']); ?>" title="Ver Comprovante">
+                                            <button class="btn-icon view-comprovante-btn" data-comprovante="<?php echo htmlspecialchars($abastecimento['comprovante']); ?>" title="Ver Comprovante" aria-label="Ver comprovante">
                                                 <i class="fas fa-file-alt"></i>
                                             </button>
                                         <?php endif; ?>
-                                        <button class="btn-icon delete-btn" data-id="<?php echo $abastecimento['id']; ?>" title="Excluir">
+                                        <button class="btn-icon delete-btn" data-id="<?php echo $abastecimento['id']; ?>" title="Excluir" aria-label="Excluir abastecimento">
                                             <i class="fas fa-trash"></i>
                                         </button>
                                     </td>
@@ -320,18 +338,24 @@ $total_paginas = $resultado['total_paginas'];
                 </div>
 
                 <!-- Paginação -->
-                <div class="pagination">
-                    <a href="?page=<?php echo max(1, $pagina_atual - 1); ?>" 
-                       class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
+                <?php
+                $base_params = ['page' => 1, 'per_page' => $per_page];
+                $prev_params = array_merge($base_params, ['page' => max(1, $pagina_atual - 1)]);
+                $next_params = array_merge($base_params, ['page' => min($total_paginas, $pagina_atual + 1)]);
+                ?>
+                <div class="pagination" id="paginationRefuelContainer" data-per-page="<?php echo (int)$per_page; ?>">
+                    <a href="?<?php echo htmlspecialchars(http_build_query($prev_params)); ?>" 
+                       class="pagination-btn pagination-prev <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>"
+                       data-page="<?php echo max(1, $pagina_atual - 1); ?>">
                         <i class="fas fa-chevron-left"></i>
                     </a>
-                    
-                    <span class="pagination-info">
-                        Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
+                    <span class="pagination-info" id="paginationRefuelInfo">
+                        <?php if ($total_paginas > 1): ?>Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?> (<?php echo (int)$resultado['total']; ?> registros)
+                        <?php else: ?><?php echo (int)$resultado['total']; ?> registros<?php endif; ?>
                     </span>
-                    
-                    <a href="?page=<?php echo min($total_paginas, $pagina_atual + 1); ?>" 
-                       class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
+                    <a href="?<?php echo htmlspecialchars(http_build_query($next_params)); ?>" 
+                       class="pagination-btn pagination-next <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>"
+                       data-page="<?php echo min($total_paginas, $pagina_atual + 1); ?>">
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
@@ -653,6 +677,26 @@ $total_paginas = $resultado['total_paginas'];
             </div>
         </div>
     </div>
+
+    <!-- Toast container (notificações) -->
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Modal de confirmação de exclusão -->
+    <div class="modal" id="deleteConfirmModal">
+        <div class="modal-content modal-content-sm">
+            <div class="modal-header">
+                <h2>Excluir abastecimento</h2>
+                <span class="close-modal" id="closeDeleteModal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p id="deleteConfirmMessage">Deseja realmente excluir este abastecimento?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancelDeleteBtn" class="btn-secondary">Cancelar</button>
+                <button type="button" id="confirmDeleteBtn" class="btn-primary btn-danger"><i class="fas fa-trash"></i> Excluir</button>
+            </div>
+        </div>
+    </div>
     
     <!-- JavaScript Files -->
     <script src="../js/theme.js"></script>
@@ -662,8 +706,60 @@ $total_paginas = $resultado['total_paginas'];
         var efficiencyChart = null;
         var currentFilter = null;
         var refuelingCurrentPage = 1;
+        var pendingDeleteId = null;
+
+        function showToast(message, type) {
+            type = type || 'info';
+            var container = document.getElementById('toastContainer');
+            if (!container) return;
+            var toast = document.createElement('div');
+            toast.className = 'toast toast-' + type;
+            toast.setAttribute('role', 'alert');
+            var icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle');
+            toast.innerHTML = '<i class="fas ' + icon + '"></i><span>' + (message || '') + '</span>';
+            container.appendChild(toast);
+            setTimeout(function() {
+                toast.style.opacity = '0';
+                setTimeout(function() { toast.remove(); }, 300);
+            }, 4000);
+        }
 
         document.addEventListener('DOMContentLoaded', function() {
+            // Exportar CSV/Excel
+            var exportBtn = document.getElementById('exportBtn');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', function() {
+                    var params = new URLSearchParams();
+                    var search = document.getElementById('searchRefueling');
+                    if (search && search.value.trim()) params.set('search', search.value.trim());
+                    var v = document.getElementById('vehicleFilter'); if (v && v.value) params.set('veiculo', v.value);
+                    var d = document.getElementById('driverFilter'); if (d && d.value) params.set('motorista', d.value);
+                    var f = document.getElementById('fuelFilter'); if (f && f.value) params.set('combustivel', f.value);
+                    var p = document.getElementById('paymentFilter'); if (p && p.value) params.set('pagamento', p.value);
+                    if (currentFilter) {
+                        var parts = currentFilter.split('-');
+                        if (parts.length === 2) { params.set('year', parts[0]); params.set('month', parts[1]); }
+                    }
+                    window.open('../api/refuel_export.php?' + params.toString(), '_blank');
+                    showToast('Exportação iniciada. O download deve abrir em instantes.', 'info');
+                });
+            }
+
+            // Modal de exclusão
+            var deleteModal = document.getElementById('deleteConfirmModal');
+            function closeDeleteModal() {
+                if (deleteModal) deleteModal.classList.remove('active');
+                pendingDeleteId = null;
+            }
+            document.getElementById('closeDeleteModal').addEventListener('click', closeDeleteModal);
+            document.getElementById('cancelDeleteBtn').addEventListener('click', closeDeleteModal);
+            document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+                if (pendingDeleteId) {
+                    deleteRefuel(pendingDeleteId);
+                    closeDeleteModal();
+                }
+            });
+
             // Inicializa a página
             initializePage();
             
@@ -689,8 +785,14 @@ $total_paginas = $resultado['total_paginas'];
             
             // Load chart data
             loadConsumptionChart().then(() => {
-                // Carrega o gráfico de eficiência apenas depois que o gráfico de consumo for carregado
                 loadEfficiencyChart();
+                // Gráficos definidos em abastecimentos.js (carregado após este script)
+                if (typeof loadAnomaliesChart === 'function') {
+                    loadAnomaliesChart();
+                    loadDriverConsumptionChart();
+                    loadVehicleEfficiencyChart();
+                    loadMonthlyCostChart();
+                }
             });
             
             // Setup button events
@@ -713,6 +815,14 @@ $total_paginas = $resultado['total_paginas'];
                 });
             }
             
+            // Sincronizar select "Por página" com a URL (ex.: link com ?per_page=25)
+            const perPageRefuelEl = document.getElementById('perPageRefuel');
+            const urlParamsInit = new URLSearchParams(window.location.search);
+            const perPageFromUrl = parseInt(urlParamsInit.get('per_page'), 10);
+            if (perPageRefuelEl && !Number.isNaN(perPageFromUrl) && [5, 10, 25, 50, 100].indexOf(perPageFromUrl) >= 0) {
+                perPageRefuelEl.value = String(perPageFromUrl);
+            }
+            
             // Setup table buttons
             setupTableButtons();
         }
@@ -729,12 +839,17 @@ $total_paginas = $resultado['total_paginas'];
                 }
             }
 
+            const perPageSelect = document.getElementById('perPageRefuel');
+            const perPageFromSelect = perPageSelect ? parseInt(perPageSelect.value, 10) : 10;
+            const perPageValid = [5, 10, 25, 50, 100].indexOf(perPageFromSelect) >= 0 ? perPageFromSelect : 10;
+            
             const urlParams = new URLSearchParams(window.location.search);
-            if (parseInt(urlParams.get('page'), 10) !== refuelingCurrentPage) {
-                urlParams.set('page', refuelingCurrentPage);
-                const queryString = urlParams.toString();
-                const newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ''}`;
-                window.history.replaceState({}, '', newUrl);
+            urlParams.set('page', refuelingCurrentPage);
+            urlParams.set('per_page', perPageValid);
+            const isDefault = refuelingCurrentPage === 1 && perPageValid === 10;
+            const desiredSearch = isDefault ? '' : '?' + urlParams.toString();
+            if (window.location.search !== desiredSearch) {
+                window.history.replaceState({}, '', window.location.pathname + desiredSearch);
             }
 
             const searchInput = document.getElementById('searchRefueling');
@@ -749,7 +864,7 @@ $total_paginas = $resultado['total_paginas'];
             const fuelFilter = fuelSelect ? fuelSelect.value : '';
             const paymentFilter = paymentSelect ? paymentSelect.value : '';
             
-            let url = `../api/refuel_data.php?action=list&page=${refuelingCurrentPage}&limit=5`;
+            let url = `../api/refuel_data.php?action=list&page=${refuelingCurrentPage}&limit=${perPageValid}`;
             if (search) url += `&search=${encodeURIComponent(search)}`;
             if (currentFilter) {
                 const [year, month] = currentFilter.split('-');
@@ -774,11 +889,12 @@ $total_paginas = $resultado['total_paginas'];
                             refuelingCurrentPage = data.pagination.page || refuelingCurrentPage;
                             updatePagination(data.pagination);
                             const updatedParams = new URLSearchParams(window.location.search);
-                            if (parseInt(updatedParams.get('page'), 10) !== refuelingCurrentPage) {
-                                updatedParams.set('page', refuelingCurrentPage);
-                                const newQuery = updatedParams.toString();
-                                const newLocation = `${window.location.pathname}${newQuery ? `?${newQuery}` : ''}`;
-                                window.history.replaceState({}, '', newLocation);
+                            updatedParams.set('page', refuelingCurrentPage);
+                            updatedParams.set('per_page', perPageValid);
+                            const isDefaultResp = refuelingCurrentPage === 1 && perPageValid === 10;
+                            const desiredSearchResp = isDefaultResp ? '' : '?' + updatedParams.toString();
+                            if (window.location.search !== desiredSearchResp) {
+                                window.history.replaceState({}, '', window.location.pathname + desiredSearchResp);
                             }
                         }
                     } else {
@@ -786,6 +902,8 @@ $total_paginas = $resultado['total_paginas'];
                     }
                 })
                 .catch(error => {
+                    if (loadingEl) loadingEl.classList.remove('is-visible');
+                    if (containerEl) containerEl.classList.remove('table-loading-visible');
                     console.error('Erro ao carregar dados dos abastecimentos:', error);
                 });
         }
@@ -804,7 +922,7 @@ $total_paginas = $resultado['total_paginas'];
                         <td>${refuel.posto || '-'}</td>
                         <td>${formatNumber(refuel.litros, 1)} L</td>
                         <td>R$ ${formatNumber(refuel.valor_litro, 2)}</td>
-                        <td>R$ ${formatNumber(refuel.valor_total, 2)}</td>
+                        <td>R$ ${formatNumber((parseFloat(refuel.valor_total || 0) + (refuel.inclui_arla == 1 ? parseFloat(refuel.valor_total_arla || 0) : 0)), 2)}</td>
                         <td>
                             ${refuel.inclui_arla == 1 ? 
                                 (() => {
@@ -828,15 +946,15 @@ $total_paginas = $resultado['total_paginas'];
                         <td>${refuel.forma_pagamento || '-'}</td>
                         <td>${refuel.cidade_origem_nome || '-'} → ${refuel.cidade_destino_nome || '-'}</td>
                         <td class="actions">
-                            <button class="btn-icon edit-btn" data-id="${refuel.id}" title="Editar">
+                            <button class="btn-icon edit-btn" data-id="${refuel.id}" title="Editar" aria-label="Editar abastecimento">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <?php if (!empty($abastecimento['comprovante'])): ?>
-                                <button class="btn-icon view-comprovante-btn" data-comprovante="${refuel.comprovante}" title="Ver Comprovante">
+                            ${refuel.comprovante ? `
+                                <button class="btn-icon view-comprovante-btn" data-comprovante="${refuel.comprovante}" title="Ver Comprovante" aria-label="Ver comprovante">
                                     <i class="fas fa-file-alt"></i>
                                 </button>
-                            <?php endif; ?>
-                            <button class="btn-icon delete-btn" data-id="${refuel.id}" title="Excluir">
+                            ` : ''}
+                            <button class="btn-icon delete-btn" data-id="${refuel.id}" title="Excluir" aria-label="Excluir abastecimento">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </td>
@@ -867,8 +985,15 @@ $total_paginas = $resultado['total_paginas'];
             const nextBtn = paginationContainer.querySelector('a:last-child');
             const paginationInfo = paginationContainer.querySelector('.pagination-info');
             
+            const perPageSelect = document.getElementById('perPageRefuel');
+            const perPage = perPageSelect ? parseInt(perPageSelect.value, 10) : 10;
+            const perPageParam = [5, 10, 25, 50, 100].indexOf(perPage) >= 0 ? perPage : 10;
+            
             if (paginationInfo) {
-                paginationInfo.textContent = `Página ${current} de ${totalPages}`;
+                const total = pagination.total || (current * perPageParam);
+                paginationInfo.textContent = totalPages > 1 
+                    ? `Página ${current} de ${totalPages} (${total} registros)` 
+                    : `${total} registros`;
             }
             
             const prevPage = Math.max(1, current - 1);
@@ -877,7 +1002,8 @@ $total_paginas = $resultado['total_paginas'];
             if (prevBtn) {
                 const isDisabled = current <= 1;
                 prevBtn.classList.toggle('disabled', isDisabled);
-                prevBtn.href = `?page=${prevPage}`;
+                prevBtn.href = `?page=${prevPage}&per_page=${perPageParam}`;
+                prevBtn.setAttribute('data-page', prevPage);
                 prevBtn.onclick = function(event) {
                     event.preventDefault();
                     if (isDisabled) return;
@@ -888,7 +1014,8 @@ $total_paginas = $resultado['total_paginas'];
             if (nextBtn) {
                 const isDisabled = current >= totalPages;
                 nextBtn.classList.toggle('disabled', isDisabled);
-                nextBtn.href = `?page=${nextPageValue}`;
+                nextBtn.href = `?page=${nextPageValue}&per_page=${perPageParam}`;
+                nextBtn.setAttribute('data-page', nextPageValue);
                 nextBtn.onclick = function(event) {
                     event.preventDefault();
                     if (isDisabled) return;
@@ -921,6 +1048,19 @@ $total_paginas = $resultado['total_paginas'];
         }
 
         function loadFilterOptions() {
+            var cacheKey = 'abastecimentos_filter_options';
+            var cacheTtl = 5 * 60 * 1000; // 5 minutos
+            try {
+                var cached = sessionStorage.getItem(cacheKey);
+                if (cached) {
+                    var parsed = JSON.parse(cached);
+                    if (parsed && parsed.ts && (Date.now() - parsed.ts < cacheTtl) && parsed.data) {
+                        var data = { success: true, data: parsed.data };
+                        applyFilterOptionsData(data);
+                        return;
+                    }
+                }
+            } catch (e) {}
             fetch('../api/refuel_data.php?action=filter_options', { credentials: 'include' })
                 .then(response => {
                     if (!response.ok) {
@@ -929,8 +1069,20 @@ $total_paginas = $resultado['total_paginas'];
                     return response.json();
                 })
                 .then(data => {
+                    if (data.success && data.data) {
+                        try {
+                            sessionStorage.setItem(cacheKey, JSON.stringify({ data: data.data, ts: Date.now() }));
+                        } catch (e) {}
+                        applyFilterOptionsData(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar opções de filtro:', error);
+                });
+        }
+        
+        function applyFilterOptionsData(data) {
                     if (!data.success || !data.data) return;
-
                     const { vehicles = [], drivers = [] } = data.data;
 
                     const vehicleFilter = document.getElementById('vehicleFilter');
@@ -962,19 +1114,15 @@ $total_paginas = $resultado['total_paginas'];
                             driverFilter.value = currentValue;
                         }
                     }
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar opções de filtro:', error);
-                });
         }
 
         function updateMetricCards(data) {
-            // Atualiza os valores nos cards de métricas
-            document.querySelector('.metric-value').textContent = `R$ ${formatNumber(data.total_gasto, 2)}`;
-            document.querySelectorAll('.metric-value')[1].textContent = `${formatNumber(data.total_litros, 2)}L`;
-            document.querySelectorAll('.metric-value')[2].textContent = `${formatNumber(data.total_abastecimentos)}`;
-            document.querySelectorAll('.metric-value')[3].textContent = `R$ ${formatNumber(data.media_valor_litro, 2)}/L`;
-            document.querySelectorAll('.metric-subtitle')[3].textContent = `${formatNumber(data.media_km_litro, 1)} km/L média`;
+            // Ordem dos cards: 1-Abastecimentos, 2-Litros, 3-Valor, 4-Médias
+            document.querySelectorAll('.metric-value')[0].textContent = formatNumber(data.total_abastecimentos, 0);
+            document.querySelectorAll('.metric-value')[1].textContent = formatNumber(data.total_litros, 2) + ' L';
+            document.querySelectorAll('.metric-value')[2].textContent = 'R$ ' + formatNumber(data.total_gasto, 2);
+            document.querySelectorAll('.metric-value')[3].textContent = 'R$ ' + formatNumber(data.media_valor_litro, 2) + '/L';
+            document.querySelectorAll('.metric-subtitle')[3].textContent = formatNumber(data.media_km_litro, 1) + ' km/L média';
         }
         
         function loadConsumptionChart() {
@@ -1090,7 +1238,6 @@ $total_paginas = $resultado['total_paginas'];
         }
         
         function showDeleteConfirmation(refuelId) {
-            // Load refuel data to show details in confirmation
             fetch(`../api/refuel_data.php?action=get&id=${refuelId}`)
                 .then(response => {
                     if (!response.ok) {
@@ -1104,16 +1251,18 @@ $total_paginas = $resultado['total_paginas'];
                     if (!data.success) {
                         throw new Error(data.error || 'Erro ao carregar dados do abastecimento');
                     }
-                    
                     const refuel = data.data;
-                    
-                    if (confirm(`Deseja realmente excluir o abastecimento do veículo ${refuel.veiculo_placa} realizado em ${formatDate(refuel.data_abastecimento)}?`)) {
-                        deleteRefuel(refuelId);
+                    var msgEl = document.getElementById('deleteConfirmMessage');
+                    if (msgEl) {
+                        msgEl.textContent = 'Deseja realmente excluir o abastecimento do veículo ' + (refuel.veiculo_placa || '') + ' realizado em ' + formatDate(refuel.data_abastecimento) + '?';
                     }
+                    pendingDeleteId = refuelId;
+                    var modal = document.getElementById('deleteConfirmModal');
+                    if (modal) modal.classList.add('active');
                 })
                 .catch(error => {
                     console.error('Error loading refuel data:', error);
-                    alert('Erro ao carregar dados do abastecimento: ' + error.message);
+                    showToast('Erro ao carregar dados do abastecimento: ' + error.message, 'error');
                 });
         }
         
@@ -1134,16 +1283,21 @@ $total_paginas = $resultado['total_paginas'];
                 if (!data.success) {
                     throw new Error(data.error || 'Erro ao excluir abastecimento');
                 }
-                
-                alert(data.message);
+                showToast(data.message || 'Abastecimento excluído.', 'success');
                 loadRefuelingData();
                 loadRefuelingSummary();
                 loadConsumptionChart();
                 loadEfficiencyChart();
+                if (typeof loadAnomaliesChart === 'function') {
+                    loadAnomaliesChart();
+                    loadDriverConsumptionChart();
+                    loadVehicleEfficiencyChart();
+                    loadMonthlyCostChart();
+                }
             })
             .catch(error => {
                 console.error('Error deleting refuel:', error);
-                alert('Erro ao excluir abastecimento: ' + error.message);
+                showToast('Erro ao excluir abastecimento: ' + error.message, 'error');
             });
         }
         
@@ -1181,6 +1335,15 @@ $total_paginas = $resultado['total_paginas'];
             });
             
             document.getElementById('cancelRefuelBtn').addEventListener('click', closeAllModals);
+            
+            // Fechar qualquer modal ao clicar no overlay (fora do .modal-content)
+            document.querySelectorAll('.modal').forEach(function(modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        closeAllModals();
+                    }
+                });
+            });
         }
         
         function showAddRefuelModal() {
@@ -1379,6 +1542,12 @@ $total_paginas = $resultado['total_paginas'];
                 loadRefuelingSummary();
                 loadConsumptionChart();
                 loadEfficiencyChart();
+                if (typeof loadAnomaliesChart === 'function') {
+                    loadAnomaliesChart();
+                    loadDriverConsumptionChart();
+                    loadVehicleEfficiencyChart();
+                    loadMonthlyCostChart();
+                }
                 closeAllModals();
                 updateFilterButtonState();
             });
@@ -1391,6 +1560,12 @@ $total_paginas = $resultado['total_paginas'];
                 loadRefuelingSummary();
                 loadConsumptionChart();
                 loadEfficiencyChart();
+                if (typeof loadAnomaliesChart === 'function') {
+                    loadAnomaliesChart();
+                    loadDriverConsumptionChart();
+                    loadVehicleEfficiencyChart();
+                    loadMonthlyCostChart();
+                }
                 closeAllModals();
                 updateFilterButtonState();
             });
@@ -1540,7 +1715,51 @@ $total_paginas = $resultado['total_paginas'];
     <script src="../js/abastecimentos.js"></script>
     <style>
     /* Estilos adicionais para a página de abastecimentos */
-    /* Removendo estilos dos botões que já estão no styles.css */
+    
+    /* Toast (notificações) */
+    .toast-container {
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-width: 360px;
+    }
+    .toast {
+        padding: 12px 16px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: toastIn 0.3s ease;
+    }
+    .toast-success { background: #d4edda; border-left: 4px solid #28a745; color: #155724; }
+    .toast-error { background: #f8d7da; border-left: 4px solid #dc3545; color: #721c24; }
+    .toast-info { background: #d1ecf1; border-left: 4px solid #17a2b8; color: #0c5460; }
+    @keyframes toastIn {
+        from { opacity: 0; transform: translateX(100%); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    
+    /* Loading da tabela */
+    .table-loading {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 24px;
+        color: var(--text-secondary);
+    }
+    .table-loading.is-visible { display: flex; }
+    .data-table-container.table-loading-visible .data-table { opacity: 0.5; pointer-events: none; }
+    
+    /* Modal pequeno (confirmação) */
+    .modal-content-sm { max-width: 420px; }
+    .btn-danger { background: #dc3545; color: #fff; border-color: #dc3545; }
+    .btn-danger:hover { background: #c82333; color: #fff; }
     
     /* Estilos para a seção de análise */
     .analytics-section {

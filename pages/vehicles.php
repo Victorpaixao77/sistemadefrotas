@@ -1,4 +1,10 @@
 <?php
+// Exibir erros apenas com ?debug=1 (remover em produção se necessário)
+if (!empty($_GET['debug']) && $_GET['debug'] === '1') {
+    ini_set('display_errors', 1);
+    ini_set('display_startup_errors', 1);
+    error_reporting(E_ALL);
+}
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
@@ -15,6 +21,12 @@ require_authentication();
 // Set page title
 $page_title = "Veículos";
 
+// Por página: 5, 10, 25, 50, 100 — padrão 10
+$per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
+    $per_page = 10;
+}
+
 // Inicializar variáveis de estatísticas
 $total_veiculos = 0;
 $veiculos_ativos = 0;
@@ -28,8 +40,10 @@ function formatKm($km) {
 }
 
 // Função para buscar veículos e estatísticas do banco de dados
-function getVehicles($page = 1, $limit = 5) {
+function getVehicles($page = 1, $limit = 10) {
     global $total_veiculos, $veiculos_ativos, $veiculos_manutencao, $quilometragem_total;
+    
+    $page = max(1, (int)$page);
     
     try {
         $conn = getConnection();
@@ -55,6 +69,10 @@ function getVehicles($page = 1, $limit = 5) {
         $veiculos_manutencao = $stats['veiculos_manutencao'] ?? 0;
         $quilometragem_total = $stats['quilometragem_total'] ?? 0;
         
+        // Valida limit (5, 10, 25, 50, 100)
+        if (!in_array($limit, [5, 10, 25, 50, 100], true)) {
+            $limit = 10;
+        }
         // Calcula o offset para a paginação
         $offset = ($page - 1) * $limit;
         
@@ -94,24 +112,30 @@ LIMIT :limit OFFSET :offset";
             'total_pages' => $total_pages,
             'current_page' => $page
         ];
-    } catch(PDOException $e) {
+    } catch (Throwable $e) {
         error_log("Erro ao buscar veículos: " . $e->getMessage());
         return [
             'veiculos' => [],
-            'total_pages' => 0,
+            'total_pages' => 1,
             'current_page' => 1
         ];
     }
 }
 
-// Pegar a página atual da URL ou definir como 1
+// Pegar a página atual da URL ou definir como 1 (garantir int para operações)
 $current_page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-if ($current_page < 1) $current_page = 1;
+$current_page = max(1, $current_page);
 
 // Buscar os veículos com paginação
-$result = getVehicles($current_page);
-$veiculos = $result['veiculos'];
-$total_pages = $result['total_pages'];
+try {
+    $result = getVehicles($current_page, $per_page);
+    $veiculos = $result['veiculos'] ?? [];
+    $total_pages = max(1, (int)($result['total_pages'] ?? 1));
+} catch (Throwable $e) {
+    error_log('vehicles.php getVehicles: ' . $e->getMessage());
+    $veiculos = [];
+    $total_pages = 1;
+}
 ?>
 
 <!DOCTYPE html>
@@ -205,6 +229,20 @@ $total_pages = $result['total_pages'];
     .pagination-info {
         font-size: 0.9rem;
         color: var(--text-color);
+    }
+    
+    .filter-options .filter-label {
+        font-size: 0.9rem;
+        color: var(--text-color);
+        margin-right: 0.25rem;
+    }
+    .filter-options .filter-per-page {
+        padding: 6px 10px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        background: var(--bg-secondary);
+        color: var(--text-color);
+        font-size: 0.9rem;
     }
     
     /* Estilo para os cards de resumo */
@@ -359,14 +397,24 @@ $total_pages = $result['total_pages'];
                     </div>
                 </div>
                 
-                <!-- Search and Filter -->
-                <form class="filter-section" id="vehicleFilterForm" onsubmit="return false;">
+                <!-- Search and Filter (div para não aninhar form "Por página") -->
+                <div class="filter-section" id="vehicleFilterForm">
                     <div class="search-box">
                         <input type="text" id="searchVehicle" placeholder="Buscar veículo, placa ou motorista...">
                         <i class="fas fa-search"></i>
                     </div>
-                    
                     <div class="filter-options">
+                        <form method="get" action="" id="formPerPageVehicles" style="display:inline-flex; align-items:center; gap:0.5rem;">
+                            <span class="filter-label">Por página</span>
+                            <input type="hidden" name="page" value="1">
+                            <select id="perPageVehicles" name="per_page" class="filter-per-page" title="Registros por página" onchange="this.form.submit()">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                        </form>
                         <select id="statusFilter" title="Status do veículo">
                             <option value="">Todos os status</option>
                             <option value="Ativo">Ativo</option>
@@ -388,7 +436,7 @@ $total_pages = $result['total_pages'];
                             <i class="fas fa-undo"></i>
                         </button>
                     </div>
-                </form>
+                </div>
                 
                 <!-- Vehicles List Table -->
                 <div class="data-table-container">
@@ -457,16 +505,18 @@ $total_pages = $result['total_pages'];
                 </div>
 
                 <!-- Pagination -->
-                <div class="pagination" id="vehiclesPagination">
-                    <a href="#" class="pagination-btn disabled" id="prevPageBtn">
+                <?php
+                $current_page_int = (int)$current_page;
+                $total_pages_int = (int)$total_pages;
+                ?>
+                <div class="pagination" id="vehiclesPagination" data-per-page="<?php echo (int)$per_page; ?>">
+                    <a href="?page=<?php echo max(1, $current_page_int - 1); ?>&per_page=<?php echo (int)$per_page; ?>" class="pagination-btn <?php echo $current_page_int <= 1 ? 'disabled' : ''; ?>" id="prevPageBtn">
                         <i class="fas fa-chevron-left"></i>
                     </a>
-                    
                     <span class="pagination-info" id="paginationInfo">
-                        Página <span id="currentPage"><?php echo $current_page; ?></span> de <span id="totalPages"><?php echo $total_pages; ?></span>
+                        Página <span id="currentPage"><?php echo $current_page_int; ?></span> de <span id="totalPages"><?php echo $total_pages_int; ?></span> (<?php echo (int)$total_veiculos; ?> registros)
                     </span>
-                    
-                    <a href="#" class="pagination-btn" id="nextPageBtn">
+                    <a href="?page=<?php echo min($total_pages_int, $current_page_int + 1); ?>&per_page=<?php echo (int)$per_page; ?>" class="pagination-btn <?php echo $current_page_int >= $total_pages_int ? 'disabled' : ''; ?>" id="nextPageBtn">
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>

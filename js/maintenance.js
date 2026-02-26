@@ -12,8 +12,9 @@ document.addEventListener('DOMContentLoaded', function() {
     loadVehicles();
     loadSuppliers();
 
-    // Initialize maintenance charts with debouncing
-    debouncedInitializeCharts();
+    // Charts: only init here if page did NOT already call initializeMaintenanceCharts(data).
+    // manutencoes.php fetches once and calls initializeMaintenanceCharts(data), so we do NOT
+    // call debouncedInitializeCharts() here to avoid double init and page "tremida".
 });
 
 function initializePage() {
@@ -63,6 +64,8 @@ function setupEventListeners() {
                     form.reset();
                 }
                 document.getElementById('modalTitle').textContent = 'Nova Manutenção';
+                var anexosSec = document.getElementById('anexosSection');
+                if (anexosSec) anexosSec.style.display = 'none';
             }
         });
     }
@@ -91,6 +94,40 @@ function setupEventListeners() {
     if (saveMaintenanceBtn) {
         saveMaintenanceBtn.addEventListener('click', saveMaintenance);
     }
+    // Mostrar/ocultar data conclusão e checklist quando status mudar
+    const statusSel = document.getElementById('status_manutencao_id');
+    if (statusSel) {
+        statusSel.addEventListener('change', toggleConclusaoFields);
+    }
+    // Upload anexo
+    const uploadAnexoBtn = document.getElementById('uploadAnexoBtn');
+    if (uploadAnexoBtn) {
+        uploadAnexoBtn.addEventListener('click', uploadAnexo);
+    }
+    // Deletar anexo (delegado no modal)
+    const maintenanceModal = document.getElementById('maintenanceModal');
+    if (maintenanceModal) {
+        maintenanceModal.addEventListener('click', function(e) {
+            var del = e.target.closest('.delete-anexo-btn');
+            if (!del) return;
+            e.preventDefault();
+            var id = del.getAttribute('data-id');
+            if (!id || !confirm('Excluir este anexo?')) return;
+            var fd = new FormData();
+            fd.append('action', 'delete');
+            fd.append('id', id);
+            fetch('../api/manutencao_anexos.php', { method: 'POST', credentials: 'include', body: fd })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        var mid = document.getElementById('manutencaoId') && document.getElementById('manutencaoId').value;
+                        if (mid) loadAnexos(parseInt(mid, 10));
+                    } else {
+                        alert(data.error || 'Erro ao excluir.');
+                    }
+                });
+        });
+    }
 }
 
 function initializeModals() {
@@ -118,29 +155,183 @@ function initializeModals() {
     });
 }
 
+// Delegação: botões da tabela funcionam mesmo após trocar de página (AJAX)
 function setupTableButtons() {
-    // View buttons
-    document.querySelectorAll('.view-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const id = this.dataset.id;
-            viewMaintenance(id);
+    const table = document.getElementById('maintenanceTable');
+    if (!table) return;
+    table.addEventListener('click', function(e) {
+        const btn = e.target.closest('.view-btn');
+        if (btn) { e.preventDefault(); viewMaintenance(btn.dataset.id); return; }
+        const editBtn = e.target.closest('.edit-btn');
+        if (editBtn) { e.preventDefault(); editMaintenance(editBtn.dataset.id); return; }
+        const delBtn = e.target.closest('.delete-btn');
+        if (delBtn) { e.preventDefault(); showDeleteConfirmation(delBtn.dataset.id); return; }
+        const histBtn = e.target.closest('.historico-veiculo-btn');
+        if (histBtn) {
+            e.preventDefault();
+            const veiculoId = histBtn.dataset.veiculoId;
+            const placa = histBtn.dataset.placa || '';
+            if (!veiculoId) return;
+            fetch('../api/manutencoes.php?veiculo_id=' + veiculoId, { credentials: 'include' })
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) return;
+                    const list = data.data || [];
+                    const total = data.total_custo_veiculo || 0;
+                    const custo12m = data.custo_12m != null ? data.custo_12m : total;
+                    const prev = data.total_preventivas != null ? data.total_preventivas : 0;
+                    const corr = data.total_corretivas != null ? data.total_corretivas : 0;
+                    document.getElementById('historicoVeiculoTitulo').textContent = 'Relatório - ' + (placa || 'Veículo');
+                    document.getElementById('historicoVeiculoCusto').textContent = list.length + ' manutenção(ões) no histórico.';
+                    document.getElementById('historicoVeiculoTotal').textContent = 'R$ ' + (total).toFixed(2).replace('.', ',');
+                    document.getElementById('historicoVeiculoCusto12m').textContent = 'R$ ' + (custo12m).toFixed(2).replace('.', ',');
+                    document.getElementById('historicoVeiculoPreventivas').textContent = prev;
+                    document.getElementById('historicoVeiculoCorretivas').textContent = corr;
+                    const tbody = document.getElementById('historicoVeiculoBody');
+                    tbody.innerHTML = list.map(m => '<tr><td>' + (m.data_manutencao ? m.data_manutencao.split('-').reverse().join('/') : '') + '</td><td>' + (m.tipo_nome || '') + '</td><td>' + (m.descricao || '').substring(0, 40) + '</td><td>R$ ' + (parseFloat(m.valor) || 0).toFixed(2).replace('.', ',') + '</td></tr>').join('');
+                    document.getElementById('historicoVeiculoModal').classList.add('active');
+                });
+        }
+    });
+    setupPaginationAjax();
+}
+
+function getPaginationParams() {
+    const form = document.getElementById('formFiltroPeriodo');
+    if (!form) return {};
+    const d = new FormData(form);
+    return {
+        page: 1,
+        per_page: d.get('per_page') || '10',
+        data_inicio: d.get('data_inicio') || '',
+        data_fim: d.get('data_fim') || '',
+        order: d.get('order') || 'data_manutencao',
+        dir: d.get('dir') || 'DESC'
+    };
+}
+
+function buildListUrl(page) {
+    const p = getPaginationParams();
+    const params = new URLSearchParams();
+    params.set('list', '1');
+    params.set('page', String(page));
+    params.set('per_page', p.per_page);
+    if (p.data_inicio) params.set('data_inicio', p.data_inicio);
+    if (p.data_fim) params.set('data_fim', p.data_fim);
+    params.set('order', p.order);
+    params.set('dir', p.dir);
+    return '../api/manutencoes.php?' + params.toString();
+}
+
+function buildPageUrl(page) {
+    const form = document.getElementById('formFiltroPeriodo');
+    if (!form) return '?page=' + page;
+    const d = new FormData(form);
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('per_page', d.get('per_page') || '10');
+    if (d.get('data_inicio')) params.set('data_inicio', d.get('data_inicio'));
+    if (d.get('data_fim')) params.set('data_fim', d.get('data_fim'));
+    params.set('order', d.get('order') || 'data_manutencao');
+    params.set('dir', d.get('dir') || 'DESC');
+    return '?' + params.toString();
+}
+
+function rowHtml(m) {
+    const data = m.data_manutencao ? m.data_manutencao.split('-').reverse().join('/') : '';
+    const placa = (m.veiculo_placa || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const tipo = (m.tipo_nome || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const desc = (m.descricao || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').substring(0, 200);
+    const forn = (m.fornecedor || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const status = (m.status_nome || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const valor = (parseFloat(m.valor) || 0).toFixed(2).replace('.', ',');
+    const custo12m = (parseFloat(m.custo_veiculo_12m) || 0).toFixed(2).replace('.', ',');
+    const vid = parseInt(m.veiculo_id, 10) || 0;
+    return '<tr>' +
+        '<td>' + data + '</td>' +
+        '<td>' + placa + '</td>' +
+        '<td>' + tipo + '</td>' +
+        '<td>' + desc + '</td>' +
+        '<td>' + forn + '</td>' +
+        '<td>' + status + '</td>' +
+        '<td>R$ ' + valor + '</td>' +
+        '<td title="Custo do veículo nos últimos 12 meses">R$ ' + custo12m + '</td>' +
+        '<td class="actions">' +
+        '<button class="btn-icon historico-veiculo-btn" data-veiculo-id="' + vid + '" data-placa="' + placa + '" title="Histórico do veículo"><i class="fas fa-history"></i></button> ' +
+        '<button class="btn-icon view-btn" data-id="' + m.id + '" title="Ver detalhes"><i class="fas fa-eye"></i></button> ' +
+        '<button class="btn-icon edit-btn" data-id="' + m.id + '" title="Editar"><i class="fas fa-edit"></i></button> ' +
+        '<button class="btn-icon delete-btn" data-id="' + m.id + '" title="Excluir"><i class="fas fa-trash"></i></button>' +
+        '</td></tr>';
+}
+
+function updatePaginationUI(data) {
+    const total = data.total || 0;
+    const page = data.pagina_atual || 1;
+    const totalPag = data.total_paginas || 1;
+    const prev = document.querySelector('#paginationContainer .pagination-prev');
+    const next = document.querySelector('#paginationContainer .pagination-next');
+    const info = document.getElementById('paginationInfo');
+    if (info) {
+        info.textContent = totalPag > 1 ? 'Página ' + page + ' de ' + totalPag + ' (' + total + ' registros)' : total + ' registros';
+    }
+    if (prev) {
+        prev.classList.toggle('disabled', page <= 1);
+        prev.setAttribute('data-page', page - 1);
+        prev.href = buildPageUrl(page - 1);
+    }
+    if (next) {
+        next.classList.toggle('disabled', page >= totalPag);
+        next.setAttribute('data-page', page + 1);
+        next.href = buildPageUrl(page + 1);
+    }
+    const container = document.getElementById('paginationContainer');
+    if (container) {
+        container.setAttribute('data-page', page);
+        container.setAttribute('data-total-paginas', totalPag);
+        container.setAttribute('data-total', total);
+    }
+}
+
+function loadPageViaAjax(page) {
+    const tbody = document.getElementById('maintenanceTableBody');
+    if (!tbody) return Promise.resolve();
+    const url = buildListUrl(page);
+    const container = tbody.closest('.data-table-container');
+    if (container) container.classList.add('loading');
+    return fetch(url, { credentials: 'include' })
+        .then(r => r.json())
+        .then(data => {
+            if (container) container.classList.remove('loading');
+            if (!data.success || !data.data) return;
+            tbody.innerHTML = data.data.map(rowHtml).join('');
+            updatePaginationUI(data);
+        })
+        .catch(function() {
+            if (container) container.classList.remove('loading');
+        });
+}
+
+function setupPaginationAjax() {
+    const container = document.getElementById('paginationContainer');
+    if (!container) return;
+    container.addEventListener('click', function(e) {
+        const link = e.target.closest('a.pagination-btn');
+        if (!link || link.classList.contains('disabled')) {
+            if (link) e.preventDefault();
+            return;
+        }
+        e.preventDefault();
+        const page = parseInt(link.getAttribute('data-page'), 10);
+        if (!page || page < 1) return;
+        loadPageViaAjax(page).then(function() {
+            if (typeof history !== 'undefined' && history.pushState) {
+                history.pushState({ page: page }, '', buildPageUrl(page));
+            }
         });
     });
-
-    // Edit buttons
-    document.querySelectorAll('.edit-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const id = this.dataset.id;
-            editMaintenance(id);
-        });
-    });
-
-    // Delete buttons
-    document.querySelectorAll('.delete-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const id = this.dataset.id;
-            showDeleteConfirmation(id);
-        });
+    window.addEventListener('popstate', function(e) {
+        const page = e.state && e.state.page;
+        if (page && page >= 1) loadPageViaAjax(page);
     });
 }
 
@@ -232,9 +423,10 @@ function editMaintenance(id) {
 }
 
 function fillMaintenanceForm(data) {
-    // Preencher campos do formulário
     document.getElementById('manutencaoId').value = data.id;
     document.getElementById('data_manutencao').value = data.data_manutencao;
+    const dc = document.getElementById('data_conclusao');
+    if (dc) dc.value = data.data_conclusao || '';
     document.getElementById('veiculo_id').value = data.veiculo_id;
     document.getElementById('tipo_manutencao_id').value = data.tipo_manutencao_id;
     document.getElementById('componente_id').value = data.componente_id;
@@ -246,8 +438,97 @@ function fillMaintenanceForm(data) {
     document.getElementById('nota_fiscal').value = data.nota_fiscal || '';
     document.getElementById('descricao').value = data.descricao;
     document.getElementById('descricao_servico').value = data.descricao_servico;
-    document.getElementById('observacoes').value = data.observacoes || '';
+    let obs = data.observacoes || '';
+    const checklistMatch = obs.match(/\n?Checklist:\s*(.+?)(?=\n|$)/i);
+    if (checklistMatch) {
+        obs = obs.replace(/\n?Checklist:\s*.+?(?=\n|$)/i, '').trim();
+        const c = checklistMatch[1].toLowerCase();
+        const o = document.getElementById('checklist_oleo');
+        const f = document.getElementById('checklist_filtro');
+        const t = document.getElementById('checklist_teste');
+        if (o) o.checked = c.indexOf('óleo') !== -1;
+        if (f) f.checked = c.indexOf('filtro') !== -1;
+        if (t) t.checked = c.indexOf('teste') !== -1;
+    } else {
+        document.querySelectorAll('#checklist_oleo, #checklist_filtro, #checklist_teste').forEach(function(cb) { if (cb) cb.checked = false; });
+    }
+    document.getElementById('observacoes').value = obs;
     document.getElementById('responsavel_aprovacao').value = data.responsavel_aprovacao;
+    toggleConclusaoFields();
+    var anexosSec = document.getElementById('anexosSection');
+    if (anexosSec) {
+        anexosSec.style.display = 'block';
+        loadAnexos(data.id);
+    }
+}
+
+function toggleConclusaoFields() {
+    const sel = document.getElementById('status_manutencao_id');
+    const wrapDc = document.getElementById('wrap_data_conclusao');
+    const wrapCk = document.getElementById('wrap_checklist');
+    if (!sel || !wrapDc) return;
+    const text = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+    const show = text.toLowerCase().indexOf('conclu') !== -1;
+    wrapDc.style.display = show ? 'block' : 'none';
+    if (wrapCk) wrapCk.style.display = show ? 'block' : 'none';
+    if (show) document.getElementById('data_conclusao').setAttribute('required', 'required');
+    else document.getElementById('data_conclusao').removeAttribute('required');
+}
+
+function loadAnexos(manutencaoId) {
+    if (!manutencaoId) return;
+    fetch('../api/manutencao_anexos.php?manutencao_id=' + manutencaoId, { credentials: 'include' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success && data.data) {
+                renderAnexos(data.data);
+            } else {
+                renderAnexos([]);
+            }
+        })
+        .catch(function() { renderAnexos([]); });
+}
+
+function renderAnexos(list) {
+    var el = document.getElementById('anexosList');
+    if (!el) return;
+    if (!list.length) {
+        el.innerHTML = '<p class="text-muted">Nenhum anexo. Envie NF ou foto acima.</p>';
+        return;
+    }
+    el.innerHTML = list.map(function(a) {
+        return '<div class="anexo-item"><a href="' + (a.url || '') + '" target="_blank" rel="noopener">' + (a.nome_original || 'Anexo') + '</a> ' +
+            '<button type="button" class="btn-icon delete-anexo-btn" data-id="' + a.id + '" title="Excluir"><i class="fas fa-trash"></i></button></div>';
+    }).join('');
+}
+
+function uploadAnexo() {
+    var mid = document.getElementById('manutencaoId') && document.getElementById('manutencaoId').value;
+    var fileInput = document.getElementById('anexoFile');
+    if (!mid || !fileInput || !fileInput.files || !fileInput.files.length) {
+        alert('Salve a manutenção primeiro ou selecione um arquivo.');
+        return;
+    }
+    var fd = new FormData();
+    fd.append('manutencao_id', mid);
+    fd.append('file', fileInput.files[0]);
+    var btn = document.getElementById('uploadAnexoBtn');
+    if (btn) btn.disabled = true;
+    fetch('../api/manutencao_anexos.php', { method: 'POST', credentials: 'include', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (btn) btn.disabled = false;
+            if (data.success) {
+                fileInput.value = '';
+                loadAnexos(parseInt(mid, 10));
+            } else {
+                alert(data.error || 'Erro ao enviar anexo.');
+            }
+        })
+        .catch(function() {
+            if (btn) btn.disabled = false;
+            alert('Erro ao enviar anexo.');
+        });
 }
 
 function saveMaintenance() {
@@ -284,10 +565,29 @@ function saveMaintenance() {
         return;
     }
 
-    // Preparar dados para envio
+    const statusSel = document.getElementById('status_manutencao_id');
+    const statusTexto = statusSel.options[statusSel.selectedIndex] ? statusSel.options[statusSel.selectedIndex].text : '';
+    const isConcluida = statusTexto.toLowerCase().indexOf('conclu') !== -1;
+    if (isConcluida && !document.getElementById('data_conclusao').value.trim()) {
+        alert('Quando o status é Concluída, a Data de Conclusão é obrigatória.');
+        document.getElementById('data_conclusao').focus();
+        return;
+    }
+    let observacoes = document.getElementById('observacoes').value || '';
+    const oleo = document.getElementById('checklist_oleo');
+    const filtro = document.getElementById('checklist_filtro');
+    const teste = document.getElementById('checklist_teste');
+    if (isConcluida && (oleo || filtro || teste)) {
+        const parts = [];
+        if (oleo && oleo.checked) parts.push('Óleo trocado/verificado');
+        if (filtro && filtro.checked) parts.push('Filtro trocado');
+        if (teste && teste.checked) parts.push('Teste realizado');
+        if (parts.length) observacoes = (observacoes ? observacoes + '\n' : '') + 'Checklist: ' + parts.join(', ');
+    }
     const formData = {
         id: document.getElementById('manutencaoId').value,
         data_manutencao: document.getElementById('data_manutencao').value,
+        data_conclusao: document.getElementById('data_conclusao').value || null,
         veiculo_id: document.getElementById('veiculo_id').value,
         tipo_manutencao_id: document.getElementById('tipo_manutencao_id').value,
         componente_id: document.getElementById('componente_id').value,
@@ -299,7 +599,7 @@ function saveMaintenance() {
         nota_fiscal: document.getElementById('nota_fiscal').value,
         descricao: document.getElementById('descricao').value,
         descricao_servico: document.getElementById('descricao_servico').value,
-        observacoes: document.getElementById('observacoes').value,
+        observacoes: observacoes,
         responsavel_aprovacao: document.getElementById('responsavel_aprovacao').value
     };
 
@@ -502,7 +802,7 @@ let isInitializingCharts = false;
 /**
  * Initialize maintenance charts
  */
-async function initializeMaintenanceCharts() {
+async function initializeMaintenanceCharts(preloadedData) {
     // Prevent multiple simultaneous initializations
     if (isInitializingCharts) {
         console.log('Chart initialization already in progress...');
@@ -525,31 +825,32 @@ async function initializeMaintenanceCharts() {
             }
         }
 
-        // Clear any existing canvas contexts
         const canvasIds = ['maintenanceCostsChart', 'maintenanceTypesChart', 'maintenanceStatusChart', 
                           'maintenanceEvolutionChart', 'topVehiclesChart', 'componentsHeatmapChart'];
-        
-        canvasIds.forEach(id => {
-            const canvas = document.getElementById(id);
-            if (canvas) {
-                // Get a fresh context
-                const ctx = canvas.getContext('2d');
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                // Reset the canvas dimensions
-                canvas.width = canvas.offsetWidth;
-                canvas.height = canvas.offsetHeight;
-            }
-        });
-
-        // Add small delay to ensure cleanup is complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Fetch data from server
-        const response = await fetch('../includes/get_maintenance_data.php');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        const anyChartExists = Object.values(charts).some(c => c instanceof Chart);
+        // Só limpa/redimensiona canvas se já existiam gráficos (reinit); na 1ª carga evita reflow/tremida
+        if (anyChartExists) {
+            canvasIds.forEach(id => {
+                const canvas = document.getElementById(id);
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    canvas.width = canvas.offsetWidth;
+                    canvas.height = canvas.offsetHeight;
+                }
+            });
+            await new Promise(resolve => setTimeout(resolve, 50));
         }
-        const data = await response.json();
+
+        // Use preloaded data when provided (e.g. from manutencoes.php) to avoid double fetch and double init
+        let data = preloadedData;
+        if (!data || !data.success) {
+            const response = await fetch('../includes/get_maintenance_data.php');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            data = await response.json();
+        }
         
         // Check if the response indicates an error
         if (!data.success) {
@@ -844,26 +1145,11 @@ async function initializeMaintenanceCharts() {
             });
         }
 
-        // Update KPI values if they exist in the data
-        if (data.mtbf !== undefined) {
-            const mtbfElement = document.querySelector('.dashboard-card:nth-child(5) .metric-value');
-            if (mtbfElement) {
-                mtbfElement.textContent = `${data.mtbf.toFixed(1)} km`;
-            }
-        }
-
-        if (data.mttr !== undefined) {
-            const mttrElement = document.querySelector('.dashboard-card:nth-child(6) .metric-value');
-            if (mttrElement) {
-                mttrElement.textContent = `${data.mttr.toFixed(1)} h`;
-            }
-        }
-
-        if (data.cost_per_km !== undefined) {
-            const costKmElement = document.querySelector('.dashboard-card:nth-child(7) .metric-value');
-            if (costKmElement) {
-                costKmElement.textContent = `R$ ${data.cost_per_km.toFixed(2).replace('.', ',')}`;
-            }
+        // Mostra a seção de gráficos após tudo desenhado (evita tremida)
+        const section = document.getElementById('analyticsSection');
+        if (section && section.classList.contains('charts-pending')) {
+            section.classList.remove('charts-pending');
+            section.classList.add('charts-ready');
         }
 
     } catch (error) {
@@ -871,6 +1157,11 @@ async function initializeMaintenanceCharts() {
         console.error('Stack trace:', error.stack);
         const errorMessage = `Erro ao carregar dados dos gráficos: ${error.message}`;
         alert(errorMessage);
+        const section = document.getElementById('analyticsSection');
+        if (section) {
+            section.classList.remove('charts-pending');
+            section.classList.add('charts-ready');
+        }
     } finally {
         isInitializingCharts = false;
     }

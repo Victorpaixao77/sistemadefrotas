@@ -16,12 +16,31 @@ $empresa_id = $_SESSION['empresa_id'];
 
 // Busca as configurações atuais
 $conn = getConnection();
-$stmt = $conn->prepare('SELECT nome_personalizado, logo_empresa FROM configuracoes WHERE empresa_id = :empresa_id LIMIT 1');
+$stmt = $conn->prepare('SELECT nome_personalizado, logo_empresa, certificado_a1_id FROM configuracoes WHERE empresa_id = :empresa_id LIMIT 1');
 $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
 $stmt->execute();
 $row = $stmt->fetch(PDO::FETCH_ASSOC);
 $nome_personalizado = $row ? $row['nome_personalizado'] : 'Frotec Online';
 $logo_path = $row && $row['logo_empresa'] ? $row['logo_empresa'] : 'logo.png';
+$certificado_atual = null;
+if ($row && !empty($row['certificado_a1_id'])) {
+    try {
+        $stmtCert = $conn->prepare('SELECT nome_certificado, data_vencimento, arquivo_certificado FROM fiscal_certificados_digitais WHERE id = :id AND empresa_id = :empresa_id AND ativo = 1 LIMIT 1');
+        $stmtCert->bindParam(':id', $row['certificado_a1_id'], PDO::PARAM_INT);
+        $stmtCert->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmtCert->execute();
+        $cert = $stmtCert->fetch(PDO::FETCH_ASSOC);
+        if ($cert) {
+            $certificado_atual = [
+                'nome' => $cert['nome_certificado'],
+                'data_vencimento' => $cert['data_vencimento'],
+                'arquivo' => $cert['arquivo_certificado']
+            ];
+        }
+    } catch (Exception $e) {
+        // Evitar que erro de consulta do certificado quebre a tela de configurações
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -274,15 +293,28 @@ $logo_path = $row && $row['logo_empresa'] ? $row['logo_empresa'] : 'logo.png';
                             <h3>Certificado Digital A1</h3>
                         </div>
                         <div class="card-body">
+                            <?php if (!empty($certificado_atual)): ?>
+                                <div class="form-text" style="margin-bottom: 10px;">
+                                    <strong>Certificado atual:</strong>
+                                    <?php echo htmlspecialchars($certificado_atual['nome']); ?>
+                                    <?php if (!empty($certificado_atual['data_vencimento'])): ?>
+                                        - válido até <?php echo date('d/m/Y', strtotime($certificado_atual['data_vencimento'])); ?>
+                                    <?php endif; ?>
+                                    <?php if (!empty($certificado_atual['arquivo'])): ?>
+                                        <br><strong>Arquivo:</strong> <?php echo htmlspecialchars($certificado_atual['arquivo']); ?>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
                             <form id="certificadoForm" enctype="multipart/form-data">
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                                     <div class="form-group">
                                         <label for="nome_certificado">Nome do Certificado</label>
-                                        <input type="text" id="nome_certificado" name="nome_certificado" placeholder="Ex: Certificado Empresa 2025" required>
+                                        <input type="text" id="nome_certificado" name="nome_certificado" placeholder="Ex: Certificado Empresa 2025" value="<?php echo !empty($certificado_atual['nome']) ? htmlspecialchars($certificado_atual['nome']) : ''; ?>" required>
                                     </div>
                                     <div class="form-group">
                                         <label for="data_validade">Data de Validade</label>
-                                        <input type="date" id="data_validade" name="data_validade" required>
+                                        <input type="date" id="data_validade" name="data_validade" value="<?php echo !empty($certificado_atual['data_vencimento']) ? htmlspecialchars($certificado_atual['data_vencimento']) : ''; ?>">
+                                        <small class="form-text">Será preenchida automaticamente a partir do certificado enviado.</small>
                                     </div>
                                 </div>
                                 
@@ -347,6 +379,69 @@ $logo_path = $row && $row['logo_empresa'] ? $row['logo_empresa'] : 'logo.png';
                     </div>
 
                     <div class="dashboard-card">
+                        <div class="card-header" style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: white;">
+                            <h3><i class="fas fa-search"></i> Consulta de Multas (DETRAN)</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="form-text" style="margin-bottom: 1rem;">Configure a integração com o WSDenatran para consultar infrações na base do Denatran. Cadastre o certificado abaixo (igual ao Certificado Digital A1).</p>
+                            <form id="denatranConfigForm">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                    <div class="form-group">
+                                        <label for="denatran_habilitado">Habilitar consulta DETRAN</label>
+                                        <select id="denatran_habilitado" name="habilitado">
+                                            <option value="0">Não</option>
+                                            <option value="1">Sim</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="denatran_base_url">URL do serviço (ambiente)</label>
+                                        <select id="denatran_base_url" name="base_url">
+                                            <option value="https://wsdenatrandes-des07116.apps.dev.serpro">Desenvolvimento</option>
+                                            <option value="https://wsrenavam.hom.denatran.serpro.gov.br">Homologação</option>
+                                            <option value="https://renavam.denatran.serpro.gov.br">Produção</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 15px;">
+                                    <label for="denatran_cpf_usuario">CPF do usuário autorizado (11 dígitos)</label>
+                                    <input type="text" id="denatran_cpf_usuario" name="cpf_usuario" placeholder="000.000.000-00" maxlength="14">
+                                    <small class="form-text">Obrigatório no header da API WSDenatran.</small>
+                                </div>
+                                <button type="submit" class="btn-primary" id="saveDenatranConfigBtn"><i class="fas fa-save"></i> Salvar configuração DETRAN</button>
+                            </form>
+                            <div id="denatranConfigMsg" style="margin-top:10px;"></div>
+
+                            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color, #ddd);">
+                                <h4 style="margin-bottom: 0.75rem; font-size: 1rem;"><i class="fas fa-certificate"></i> Certificado Digital (DETRAN)</h4>
+                                <p id="denatranCertInfo" class="form-text" style="margin-bottom: 1rem; color: var(--text-muted, #666);">Nenhum certificado enviado. Envie um certificado .pfx ou .p12 (igual ao A1).</p>
+                                <form id="denatranCertForm" enctype="multipart/form-data">
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                        <div class="form-group">
+                                            <label for="denatran_nome_certificado">Nome do certificado</label>
+                                            <input type="text" id="denatran_nome_certificado" name="nome_certificado" placeholder="Ex: Certificado DETRAN 2025" value="Certificado DETRAN">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="denatran_data_validade">Data de validade</label>
+                                            <input type="date" id="denatran_data_validade" name="data_validade">
+                                        </div>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 15px;">
+                                        <label for="denatran_arquivo_certificado">Arquivo do certificado (.pfx, .p12)</label>
+                                        <input type="file" id="denatran_arquivo_certificado" name="arquivo_certificado" accept=".pfx,.p12" required>
+                                        <small class="form-text">Formatos aceitos: .pfx, .p12 (máx. 10MB) — igual ao Certificado A1.</small>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 15px;">
+                                        <label for="denatran_senha_certificado">Senha do certificado</label>
+                                        <input type="password" id="denatran_senha_certificado" name="senha_certificado" placeholder="Senha do arquivo .pfx/.p12" required>
+                                    </div>
+                                    <button type="submit" class="btn-primary" id="uploadDenatranCertBtn"><i class="fas fa-upload"></i> Enviar certificado DETRAN</button>
+                                </form>
+                                <div id="denatranCertMsg" style="margin-top:10px;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card">
                         <div class="card-header">
                             <h3>Ambiente do Sistema Fiscal</h3>
                         </div>
@@ -360,7 +455,8 @@ $logo_path = $row && $row['logo_empresa'] ? $row['logo_empresa'] : 'logo.png';
                                     </select>
                                     <small class="form-text">
                                         <strong>Homologação:</strong> Ambiente de testes da SEFAZ<br>
-                                        <strong>Produção:</strong> Ambiente real para emissão de documentos
+                                        <strong>Produção:</strong> Ambiente real para emissão de documentos<br>
+                                        <strong>Esta opção vale para os 3 tipos de documento:</strong> NF-e, CT-e e MDF-e.
                                     </small>
                                 </div>
                                 <div class="form-group">
@@ -973,20 +1069,13 @@ $logo_path = $row && $row['logo_empresa'] ? $row['logo_empresa'] : 'logo.png';
     // Upload do certificado A1
     document.getElementById('certificadoForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        const formData = new FormData(this);
+        const form = this;
+        const nomeCert = document.getElementById('nome_certificado') ? document.getElementById('nome_certificado').value.trim() : '';
+        const formData = new FormData(form);
         formData.append('action', 'upload_certificado');
         
         const msg = document.getElementById('certificadoMsg');
         msg.textContent = '';
-        
-        // Validar data de validade
-        const dataValidade = new Date(document.getElementById('data_validade').value);
-        const hoje = new Date();
-        if (dataValidade <= hoje) {
-            msg.textContent = 'A data de validade deve ser futura.';
-            msg.style.color = 'red';
-            return;
-        }
         
         fetch('../api/configuracoes.php', {
             method: 'POST',
@@ -997,8 +1086,24 @@ $logo_path = $row && $row['logo_empresa'] ? $row['logo_empresa'] : 'logo.png';
             if (res.success) {
                 msg.textContent = 'Certificado enviado com sucesso!';
                 msg.style.color = 'green';
-                // Limpar formulário
-                document.getElementById('certificadoForm').reset();
+                // Limpar apenas senha e arquivo, manter nome e data preenchidos
+                const senha = document.getElementById('senha_certificado');
+                const arquivo = document.getElementById('arquivo_certificado');
+                if (senha) senha.value = '';
+                if (arquivo) arquivo.value = '';
+
+                // Atualizar nome e data de validade no formulário
+                const nomeInput = document.getElementById('nome_certificado');
+                if (nomeInput && nomeCert) {
+                    nomeInput.value = nomeCert;
+                }
+                if (res.data_validade) {
+                    const dt = document.getElementById('data_validade');
+                    if (dt) dt.value = res.data_validade;
+                }
+
+                // Atualizar texto do certificado atual sem precisar recarregar a página
+                const infoDiv = document.querySelector('.dashboard-card .card-body .form-text strong');
             } else {
                 msg.textContent = res.error || 'Erro ao fazer upload do certificado.';
                 msg.style.color = 'red';
@@ -1164,41 +1269,107 @@ $logo_path = $row && $row['logo_empresa'] ? $row['logo_empresa'] : 'logo.png';
     });
 
 
-    // Funções de Teste SEFAZ
+    // Funções de Teste SEFAZ (usam APIs existentes e exibem resultado na própria página)
     function testarSefaz() {
         const msg = document.getElementById('testeSefazMsg');
-        msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 10px; border-radius: 5px;">' +
-            '<strong>🔄 Testando conexão SEFAZ...</strong><br>Redirecionando para o teste...</div>';
-        
-        // Abrir em nova aba
-        window.open('../fiscal/teste_sefaz_curl.php', '_blank');
+        msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 10px; border-radius: 5px;"><strong>🔄 Testando conexão SEFAZ...</strong></div>';
+        fetch('../fiscal/api/sefaz_status.php?action=status&force=true', { credentials: 'include' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    let html = '<div style="background: #d4edda; color: #155724; padding: 12px; border-radius: 5px; margin-top: 8px;">';
+                    html += '<strong>✅ ' + (data.status_texto || 'Conexão SEFAZ') + '</strong><br>';
+                    html += '<small>Status: ' + (data.status_geral || '-') + ' | ' + (data.timestamp || '') + '</small>';
+                    if (data.detalhes && data.detalhes.conexao_basica) {
+                        html += '<br><small>Conexão básica: ' + (data.detalhes.conexao_basica.sucesso ? 'OK' : 'Falha') + ' (' + (data.detalhes.conexao_basica.tempo || '') + ' ms)</small>';
+                    }
+                    if (data.detalhes && data.detalhes.requisicao_soap) {
+                        html += ' | SOAP: ' + (data.detalhes.requisicao_soap.sucesso ? 'OK' : 'Falha');
+                    }
+                    html += '</div>';
+                    msg.innerHTML = html;
+                } else {
+                    msg.innerHTML = '<div style="background: #f8d7da; color: #721c24; padding: 12px; border-radius: 5px;"><strong>❌ Erro:</strong> ' + (data.error || 'Falha na conexão') + '</div>';
+                }
+            })
+            .catch(err => {
+                msg.innerHTML = '<div style="background: #f8d7da; color: #721c24; padding: 12px; border-radius: 5px;"><strong>❌ Erro ao testar:</strong> ' + err.message + '</div>';
+            });
     }
 
     function testarCertificado() {
         const msg = document.getElementById('testeSefazMsg');
-        msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 10px; border-radius: 5px;">' +
-            '<strong>🔐 Testando certificado ICP-Brasil...</strong><br>Redirecionando para o teste...</div>';
-        
-        // Abrir em nova aba
-        window.open('../fiscal/teste_sefaz_icp.php', '_blank');
+        msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 10px; border-radius: 5px;"><strong>🔐 Testando certificado e conexão SEFAZ...</strong></div>';
+        fetch('../fiscal/api/validar_sefaz.php', { credentials: 'include' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    let html = '<div style="background: #d4edda; color: #155724; padding: 12px; border-radius: 5px; margin-top: 8px;">';
+                    html += '<strong>✅ Validação concluída</strong><br>';
+                    if (data.certificado) {
+                        html += '<strong>Certificado:</strong> ' + (data.certificado.valido ? 'Válido' : 'Inválido') + '<br>';
+                        if (data.certificado.info) {
+                            html += '<small>Vencimento: ' + (data.certificado.info.data_vencimento || '-') + '</small><br>';
+                        }
+                        if (data.certificado.detalhes && data.certificado.detalhes.avisos && data.certificado.detalhes.avisos.length) {
+                            html += '<small class="text-warning">' + data.certificado.detalhes.avisos.join('; ') + '</small><br>';
+                        }
+                    }
+                    if (data.conexao_sefaz) {
+                        html += '<strong>SEFAZ:</strong> ' + (data.conexao_sefaz.status_geral || '-') + ' (ambiente: ' + (data.conexao_sefaz.ambiente || '-') + ')</small>';
+                    }
+                    html += '</div>';
+                    msg.innerHTML = html;
+                } else {
+                    msg.innerHTML = '<div style="background: #f8d7da; color: #721c24; padding: 12px; border-radius: 5px;"><strong>❌ Erro:</strong> ' + (data.error || 'Certificado não encontrado ou falha na validação') + '</div>';
+                }
+            })
+            .catch(err => {
+                msg.innerHTML = '<div style="background: #f8d7da; color: #721c24; padding: 12px; border-radius: 5px;"><strong>❌ Erro ao testar:</strong> ' + err.message + '</div>';
+            });
     }
 
     function converterCertificado() {
         const msg = document.getElementById('testeSefazMsg');
-        msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 10px; border-radius: 5px;">' +
-            '<strong>🔄 Convertendo certificado...</strong><br>Redirecionando para o conversor...</div>';
-        
-        // Abrir em nova aba
-        window.open('../fiscal/converter_certificado_icp.php', '_blank');
+        msg.innerHTML = '<div style="background: #e7f3ff; color: #004085; padding: 12px; border-radius: 5px;">' +
+            '<strong>📄 Converter certificado</strong><br>' +
+            'O certificado .pfx/.p12 é processado automaticamente ao ser enviado no bloco <strong>Certificado Digital A1</strong> (acima nesta página). ' +
+            'Não é necessário converter manualmente — faça o upload do arquivo .pfx ou .p12 e informe a senha.</div>';
     }
 
     function diagnosticoSefaz() {
         const msg = document.getElementById('testeSefazMsg');
-        msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 10px; border-radius: 5px;">' +
-            '<strong>🔍 Executando diagnóstico completo...</strong><br>Redirecionando para o diagnóstico...</div>';
-        
-        // Abrir em nova aba
-        window.open('../fiscal/diagnostico_dns_php.php', '_blank');
+        msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 10px; border-radius: 5px;"><strong>🔍 Diagnóstico completo (certificado + SEFAZ)...</strong></div>';
+        Promise.all([
+            fetch('../fiscal/api/validar_sefaz.php', { credentials: 'include' }).then(r => r.json()),
+            fetch('../fiscal/api/sefaz_status.php?action=status&force=true', { credentials: 'include' }).then(r => r.json())
+        ]).then(([dataValidar, dataStatus]) => {
+            let html = '<div style="margin-top: 8px;">';
+            if (dataValidar.success) {
+                html += '<div style="background: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin-bottom: 8px;">';
+                html += '<strong>Certificado:</strong> ' + (dataValidar.certificado && dataValidar.certificado.valido ? 'Válido' : 'Verificar') + '<br>';
+                if (dataValidar.conexao_sefaz) {
+                    html += '<strong>SEFAZ (validar_sefaz):</strong> ' + (dataValidar.conexao_sefaz.status_geral || '-') + '<br>';
+                    if (dataValidar.conexao_sefaz.servicos) {
+                        Object.keys(dataValidar.conexao_sefaz.servicos).forEach(s => {
+                            const r = dataValidar.conexao_sefaz.servicos[s];
+                            html += '<small>' + s.toUpperCase() + ': ' + (r.status || r.mensagem) + '</small><br>';
+                        });
+                    }
+                }
+                html += '</div>';
+            } else {
+                html += '<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin-bottom: 8px;"><strong>Certificado/Validação:</strong> ' + (dataValidar.error || 'Erro') + '</div>';
+            }
+            if (dataStatus.success) {
+                html += '<div style="background: #e7f3ff; color: #004085; padding: 10px; border-radius: 5px;">';
+                html += '<strong>Status SEFAZ (API status):</strong> ' + (dataStatus.status_geral || '-') + ' — ' + (dataStatus.status_texto || '') + '</div>';
+            }
+            html += '</div>';
+            msg.innerHTML = html;
+        }).catch(err => {
+            msg.innerHTML = '<div style="background: #f8d7da; color: #721c24; padding: 12px; border-radius: 5px;"><strong>❌ Erro no diagnóstico:</strong> ' + err.message + '</div>';
+        });
     }
 
     // Funções do Google Maps
@@ -1311,6 +1482,119 @@ $logo_path = $row && $row['logo_empresa'] ? $row['logo_empresa'] : 'logo.png';
             msgDiv.innerHTML = '';
         }, 5000);
     }
+
+    // Consulta de Multas (DETRAN) - carregar configuração e info do certificado
+    function loadDenatranConfig() {
+        const form = document.getElementById('denatranConfigForm');
+        const certInfo = document.getElementById('denatranCertInfo');
+        if (!form) return;
+        fetch('../api/configuracoes.php?action=get_config_denatran', { credentials: 'include' })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success && res.data) {
+                    const d = res.data;
+                    const hab = document.getElementById('denatran_habilitado');
+                    const url = document.getElementById('denatran_base_url');
+                    if (hab) hab.value = d.habilitado ? '1' : '0';
+                    if (url) url.value = d.base_url || url.options[0]?.value || '';
+                    const cpf = document.getElementById('denatran_cpf_usuario');
+                    if (cpf) cpf.value = d.cpf_usuario || '';
+                    if (certInfo) {
+                        if (d.certificado && d.certificado.nome_certificado) {
+                            const val = d.certificado.data_validade ? new Date(d.certificado.data_validade).toLocaleDateString('pt-BR') : '-';
+                            certInfo.innerHTML = 'Certificado atual: <strong>' + (d.certificado.nome_certificado || '') + '</strong>. Validade: ' + val + '.';
+                        } else {
+                            certInfo.textContent = 'Nenhum certificado enviado. Envie um certificado .pfx ou .p12 (igual ao A1).';
+                        }
+                    }
+                }
+            })
+            .catch(() => {});
+    }
+    loadDenatranConfig();
+
+    document.getElementById('denatranConfigForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const msg = document.getElementById('denatranConfigMsg');
+        const btn = document.getElementById('saveDenatranConfigBtn');
+        msg.textContent = '';
+        msg.style.color = '';
+        const payload = {
+            action: 'save_config_denatran',
+            habilitado: document.getElementById('denatran_habilitado').value === '1' ? 1 : 0,
+            base_url: document.getElementById('denatran_base_url').value.trim(),
+            cpf_usuario: document.getElementById('denatran_cpf_usuario').value.trim()
+        };
+        const origText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+        btn.disabled = true;
+        fetch('../api/configuracoes.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            credentials: 'include'
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                msg.textContent = res.message || 'Configuração salva com sucesso!';
+                msg.style.color = 'green';
+            } else {
+                msg.textContent = res.error || 'Erro ao salvar.';
+                msg.style.color = 'red';
+            }
+        })
+        .catch(() => {
+            msg.textContent = 'Erro ao salvar.';
+            msg.style.color = 'red';
+        })
+        .finally(() => {
+            btn.innerHTML = origText;
+            btn.disabled = false;
+        });
+    });
+
+    document.getElementById('denatranCertForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const msg = document.getElementById('denatranCertMsg');
+        const btn = document.getElementById('uploadDenatranCertBtn');
+        const fd = new FormData(this);
+        fd.append('action', 'upload_certificado_denatran');
+        fd.append('nome_certificado', document.getElementById('denatran_nome_certificado').value.trim() || 'Certificado DETRAN');
+        fd.append('data_validade', document.getElementById('denatran_data_validade').value || '');
+        fd.append('senha_certificado', document.getElementById('denatran_senha_certificado').value);
+        const origText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+        btn.disabled = true;
+        msg.textContent = '';
+        msg.style.color = '';
+        fetch('../api/configuracoes.php', {
+            method: 'POST',
+            body: fd,
+            credentials: 'include'
+        })
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                msg.textContent = res.message || 'Certificado enviado com sucesso!';
+                msg.style.color = 'green';
+                document.getElementById('denatran_senha_certificado').value = '';
+                document.getElementById('denatran_arquivo_certificado').value = '';
+                loadDenatranConfig();
+            } else {
+                msg.textContent = res.error || 'Erro ao enviar certificado.';
+                msg.style.color = 'red';
+            }
+        })
+        .catch(() => {
+            msg.textContent = 'Erro ao enviar certificado.';
+            msg.style.color = 'red';
+        })
+        .finally(() => {
+            btn.innerHTML = origText;
+            btn.disabled = false;
+        });
+    });
 
     // Funções de Gamificação e Ranking (configurações apenas)
     function calcularGamificacao() {

@@ -39,7 +39,7 @@ if ($empresa_id) {
 
 // Determinar o caminho base para a logo
 $base_path = '';
-$current_path = $_SERVER['PHP_SELF'];
+$current_path = str_replace('\\', '/', $_SERVER['PHP_SELF'] ?? '');
 
 // Debug para verificar o caminho atual
 // error_log("Sidebar - Caminho atual: " . $current_path);
@@ -61,31 +61,24 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
     $base_path = '';
 }
 ?>
-<script>
-// Apply saved theme preference as early as possible to avoid flicker
-(function() {
-    try {
-        const savedTheme = localStorage.getItem('theme');
-        const isLight = savedTheme === 'light';
-        const root = document.documentElement;
-        if (isLight) {
-            root.classList.add('light-theme');
-            if (document.body) {
-                document.body.classList.add('light-theme');
-            }
-        } else {
-            root.classList.remove('light-theme');
-            if (document.body) {
-                document.body.classList.remove('light-theme');
-            }
-        }
-    } catch (error) {
-        console.warn('Não foi possível aplicar a preferência de tema antes do carregamento:', error);
-    }
-})();
-</script>
 <!-- Sidebar Navigation -->
 <div class="sidebar">
+    <script>
+    (function() {
+        try {
+            const savedTheme = localStorage.getItem('theme');
+            const isLight = savedTheme === 'light';
+            const root = document.documentElement;
+            if (isLight) {
+                root.classList.add('light-theme');
+                if (document.body) document.body.classList.add('light-theme');
+            } else {
+                root.classList.remove('light-theme');
+                if (document.body) document.body.classList.remove('light-theme');
+            }
+        } catch (e) { console.warn('Theme:', e); }
+    })();
+    </script>
     <div class="sidebar-header">
         <div class="sidebar-logo">
             <?php 
@@ -193,11 +186,6 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                         <li>
                             <a href="/sistema-frotas/fiscal/pages/mdfe.php">
                                 <i class="fas fa-file-alt"></i> Gestão de MDF-e
-                            </a>
-                        </li>
-                        <li>
-                            <a href="/sistema-frotas/fiscal/pages/eventos.php">
-                                <i class="fas fa-calendar-alt"></i> Eventos Fiscais
                             </a>
                         </li>
                     </ul>

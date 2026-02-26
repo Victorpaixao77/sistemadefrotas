@@ -1,0 +1,2 @@
+[2026-02-25 02:33:38] CT-e Distribuição DFe (download) não retornou documento {"chave":"51260202910203000493570010005485681011188530","cStat":"215","xMotivo":"Rejeicao: Falha no esquema xml"}
+[2026-02-25 02:33:38] CT-e consulta + download {"chave":"51260202910203000493570010005485681011188530","consulta_ok":true,"cStat":"100","protocolo":"151260906610471","xml_baixado":false,"motivo":"Distribuição DFe não retornou XML (CNPJ pode não ser interessado no CT-e)"}

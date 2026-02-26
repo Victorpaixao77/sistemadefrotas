@@ -252,12 +252,6 @@ $alertas = [];
                                             <span>Gestão de MDF-e</span>
                                         </a>
                                     </div>
-                                    <div class="col-md-3 mb-3">
-                                        <a href="../fiscal/pages/eventos.php" class="btn btn-outline-warning btn-lg w-100 h-100 d-flex flex-column align-items-center justify-content-center">
-                                            <i class="fas fa-calendar-alt fa-3x mb-2"></i>
-                                            <span>Eventos Fiscais</span>
-                                        </a>
-                                    </div>
                                 </div>
                             </div>
                         </div>

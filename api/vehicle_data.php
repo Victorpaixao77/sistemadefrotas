@@ -122,9 +122,12 @@ function getVehiclesList() {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
         
-        // Get pagination parameters
-        $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-        $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 5;
+        // Parâmetros de paginação (por página: 5, 10, 25, 50, 100; padrão 10)
+        $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+        $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+        if (!in_array($limit, [5, 10, 25, 50, 100], true)) {
+            $limit = 10;
+        }
         $offset = ($page - 1) * $limit;
         
         // Get total count

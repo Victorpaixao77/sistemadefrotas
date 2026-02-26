@@ -42,7 +42,11 @@ try {
             $year = isset($_GET['year']) ? $_GET['year'] : date('Y');
             $month = isset($_GET['month']) ? $_GET['month'] : date('m');
             $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-            $limit = 5; // Registros por página
+            $per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+            if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
+                $per_page = 10;
+            }
+            $limit = $per_page;
             $offset = ($page - 1) * $limit;
             
             // Base query for counting total records

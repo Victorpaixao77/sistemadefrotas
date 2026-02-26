@@ -9,13 +9,13 @@ header('Content-Type: application/json');
 
 // Verificar se está logado
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
-    echo json_encode(['success' => false, 'error' => 'Não autorizado']);
+    echo json_encode(['success' => false, 'message' => 'Não autorizado']);
     exit;
 }
 
 // Verificar se tem acesso a todas as empresas
 if (empty($_SESSION['acesso_todas_empresas']) || $_SESSION['acesso_todas_empresas'] !== true) {
-    echo json_encode(['success' => false, 'error' => 'Você não tem permissão para trocar de empresa']);
+    echo json_encode(['success' => false, 'message' => 'Você não tem permissão para trocar de empresa']);
     exit;
 }
 
@@ -36,7 +36,7 @@ if ($action === 'listar') {
             'empresa_atual' => $empresa_atual_id
         ]);
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'Erro ao listar empresas.', 'error' => $e->getMessage()]);
     }
 } elseif ($action === 'trocar' && isset($_POST['empresa_id'])) {
     // Trocar de empresa
@@ -62,13 +62,13 @@ if ($action === 'listar') {
                 'empresa' => $empresa
             ]);
         } else {
-            echo json_encode(['success' => false, 'error' => 'Empresa não encontrada ou inativa']);
+            echo json_encode(['success' => false, 'message' => 'Empresa não encontrada ou inativa']);
         }
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'Erro ao trocar empresa.', 'error' => $e->getMessage()]);
     }
 } else {
-    echo json_encode(['success' => false, 'error' => 'Ação inválida']);
+    echo json_encode(['success' => false, 'message' => 'Ação inválida']);
 }
 ?>
 

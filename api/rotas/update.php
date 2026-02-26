@@ -1,21 +1,22 @@
 <?php
 require_once '../../includes/config.php';
 require_once '../../includes/functions.php';
+require_once '../../includes/db_connect.php';
 
 // Iniciar sessão
 session_start();
 
 // Verificar se o usuário está logado
-if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
+if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true || !isset($_SESSION['empresa_id'])) {
     http_response_code(401);
-    echo json_encode(['error' => 'Não autorizado']);
+    echo json_encode(['success' => false, 'message' => 'Não autorizado']);
     exit;
 }
 
 // Verificar se é uma requisição POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['error' => 'Método não permitido']);
+    echo json_encode(['success' => false, 'message' => 'Método não permitido']);
     exit;
 }
 
@@ -24,7 +25,7 @@ $required_fields = ['id', 'motorista_id', 'veiculo_id', 'cidade_origem_id', 'cid
 foreach ($required_fields as $field) {
     if (!isset($_POST[$field])) {
         http_response_code(400);
-        echo json_encode(['error' => "Campo obrigatório não fornecido: $field"]);
+        echo json_encode(['success' => false, 'message' => "Campo obrigatório não fornecido: $field"]);
         exit;
     }
 }
@@ -44,7 +45,7 @@ try {
     
     if ($stmt->rowCount() === 0) {
         http_response_code(404);
-        echo json_encode(['error' => 'Rota não encontrada ou sem permissão']);
+        echo json_encode(['success' => false, 'message' => 'Rota não encontrada ou sem permissão']);
         exit;
     }
     
@@ -106,12 +107,12 @@ try {
         echo json_encode(['success' => true, 'message' => 'Rota atualizada com sucesso']);
     } else {
         http_response_code(400);
-        echo json_encode(['error' => 'Nenhuma alteração realizada. Verifique os dados enviados.']);
+        echo json_encode(['success' => false, 'message' => 'Nenhuma alteração realizada. Verifique os dados enviados.']);
     }
     
 } catch (PDOException $e) {
     error_log("Erro ao atualizar rota: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['error' => 'Erro ao atualizar rota']);
+    echo json_encode(['success' => false, 'message' => 'Erro ao atualizar rota']);
 }
 ?> 

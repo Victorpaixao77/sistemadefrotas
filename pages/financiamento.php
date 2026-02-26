@@ -19,12 +19,18 @@ $conn = getConnection();
 // Set page title
 $page_title = "Financiamentos";
 
+// Por página: 5, 10, 25, 50, 100 — padrão 10
+$per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
+    $per_page = 10;
+}
+
 // Função para buscar financiamentos do banco de dados
-function getFinanciamentos($page = 1) {
+function getFinanciamentos($page = 1, $per_page = 10) {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
-        $limit = 5; // Registros por página
+        $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
         $offset = ($page - 1) * $limit;
         
         // Primeiro, conta o total de registros
@@ -311,7 +317,7 @@ $mes_filtro = isset($_GET['mes']) ? intval($_GET['mes']) : null;
 $ano_filtro = isset($_GET['ano']) ? intval($_GET['ano']) : null;
 
 // Buscar financiamentos com paginação
-$resultado = getFinanciamentos($pagina_atual);
+$resultado = getFinanciamentos($pagina_atual, $per_page);
 $financiamentos = $resultado['financiamentos'];
 $total_paginas = $resultado['total_paginas'];
 
@@ -473,6 +479,19 @@ error_log("Chart Data: " . print_r($chart_data, true));
                     </div>
                     
                     <div class="filter-options">
+                        <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.5rem;">
+                            <span class="filter-label">Por página</span>
+                            <input type="hidden" name="page" value="1">
+                            <?php if ($mes_filtro) { echo '<input type="hidden" name="mes" value="'.(int)$mes_filtro.'">'; } ?>
+                            <?php if ($ano_filtro) { echo '<input type="hidden" name="ano" value="'.(int)$ano_filtro.'">'; } ?>
+                            <select name="per_page" class="filter-per-page" onchange="this.form.submit()">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                        </form>
                         <select id="statusFilter">
                             <option value="">Todos os status</option>
                             <option value="Em dia">Em dia</option>
@@ -572,22 +591,21 @@ error_log("Chart Data: " . print_r($chart_data, true));
                 </div>
                 
                 <!-- Pagination -->
+                <?php
+                $total_reg_fin = (int)($resultado['total'] ?? 0);
+                $prev_fin = ['page' => max(1, $pagina_atual - 1), 'per_page' => $per_page];
+                $next_fin = ['page' => min($total_paginas, $pagina_atual + 1), 'per_page' => $per_page];
+                if ($mes_filtro) { $prev_fin['mes'] = $mes_filtro; $next_fin['mes'] = $mes_filtro; }
+                if ($ano_filtro) { $prev_fin['ano'] = $ano_filtro; $next_fin['ano'] = $ano_filtro; }
+                ?>
                 <div class="pagination">
-                    <?php if ($total_paginas > 1): ?>
-                        <a href="#" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" 
-                           onclick="return changePage(<?php echo $pagina_atual - 1; ?>)">
-                            <i class="fas fa-chevron-left"></i>
-                        </a>
-                        
-                        <span class="pagination-info">
-                            Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
-                        </span>
-                        
-                        <a href="#" class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>"
-                           onclick="return changePage(<?php echo $pagina_atual + 1; ?>)">
-                            <i class="fas fa-chevron-right"></i>
-                        </a>
-                    <?php endif; ?>
+                    <a href="?<?php echo htmlspecialchars(http_build_query($prev_fin)); ?>" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" id="prevPageFin">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    <span class="pagination-info">Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?> (<?php echo $total_reg_fin; ?> registros)</span>
+                    <a href="?<?php echo htmlspecialchars(http_build_query($next_fin)); ?>" class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>" id="nextPageFin">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
                 </div>
                 
                 <!-- Financing Analytics -->
@@ -993,6 +1011,20 @@ error_log("Chart Data: " . print_r($chart_data, true));
         .pagination-info {
             font-size: 0.9rem;
             color: var(--text-color);
+        }
+
+        .filter-options .filter-label {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            margin-right: 0.25rem;
+        }
+        .filter-options .filter-per-page {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
         }
 
         /* Estilos para os gráficos */

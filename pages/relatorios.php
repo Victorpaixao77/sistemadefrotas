@@ -1113,6 +1113,235 @@ function getReportData($reportType, $month, $year) {
                     ORDER BY custo_total_manutencao DESC
                 ";
                 break;
+
+            // ---- Relatórios Estratégicos (PDF/Excel) ----
+            case 'comparacao_mensal':
+                $prev_month = (int)$month - 1;
+                $prev_year = (int)$year;
+                if ($prev_month < 1) { $prev_month = 12; $prev_year--; }
+                $row_atual = getReportData('lucro_total', (string)$month, (string)$year);
+                $row_ant = getReportData('lucro_total', (string)$prev_month, (string)$prev_year);
+                $r0 = $row_atual[0] ?? [];
+                $r1 = $row_ant[0] ?? [];
+                $meses_pt = [1=>'Jan',2=>'Fev',3=>'Mar',4=>'Abr',5=>'Mai',6=>'Jun',7=>'Jul',8=>'Ago',9=>'Set',10=>'Out',11=>'Nov',12=>'Dez'];
+                $data = [
+                    [
+                        'periodo' => ($meses_pt[(int)$month] ?? $month) . '/' . $year . ' (atual)',
+                        'total_frete' => $r0['total_frete'] ?? 0,
+                        'total_comissao' => $r0['total_comissao'] ?? 0,
+                        'total_despesas_viagem' => $r0['total_despesas_viagem'] ?? 0,
+                        'total_abastecimentos' => $r0['total_abastecimentos'] ?? 0,
+                        'lucro_bruto' => $r0['lucro_bruto'] ?? 0,
+                        'lucro_liquido' => $r0['lucro_liquido'] ?? 0
+                    ],
+                    [
+                        'periodo' => ($meses_pt[$prev_month] ?? $prev_month) . '/' . $prev_year . ' (anterior)',
+                        'total_frete' => $r1['total_frete'] ?? 0,
+                        'total_comissao' => $r1['total_comissao'] ?? 0,
+                        'total_despesas_viagem' => $r1['total_despesas_viagem'] ?? 0,
+                        'total_abastecimentos' => $r1['total_abastecimentos'] ?? 0,
+                        'lucro_bruto' => $r1['lucro_bruto'] ?? 0,
+                        'lucro_liquido' => $r1['lucro_liquido'] ?? 0
+                    ]
+                ];
+                return $data;
+
+            case 'tendencia_6':
+            case 'tendencia_12':
+                $meses = ($reportType === 'tendencia_12') ? 12 : 6;
+                $data = [];
+                $meses_pt = [1=>'Jan',2=>'Fev',3=>'Mar',4=>'Abr',5=>'Mai',6=>'Jun',7=>'Jul',8=>'Ago',9=>'Set',10=>'Out',11=>'Nov',12=>'Dez'];
+                $base = mktime(0, 0, 0, (int)$month, 1, (int)$year);
+                for ($i = $meses - 1; $i >= 0; $i--) {
+                    $t = strtotime("-$i months", $base);
+                    $y = (int)date('Y', $t);
+                    $m = (int)date('n', $t);
+                    $row = getReportData('lucro_total', (string)$m, (string)$y);
+                    $r = $row[0] ?? [];
+                    $data[] = [
+                        'mes_ano' => ($meses_pt[$m] ?? $m) . '/' . $y,
+                        'total_frete' => $r['total_frete'] ?? 0,
+                        'total_comissao' => $r['total_comissao'] ?? 0,
+                        'total_abastecimentos' => $r['total_abastecimentos'] ?? 0,
+                        'lucro_liquido' => $r['lucro_liquido'] ?? 0
+                    ];
+                }
+                return $data;
+
+            case 'margem_veiculo':
+                $sql = "SELECT 
+                        v.placa,
+                        v.modelo,
+                        COALESCE(SUM(r.frete), 0) AS receita_bruta,
+                        (COALESCE(SUM(r.comissao), 0) +
+                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) +
+                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND YEAR(rv.data_saida) = " . intval($year) . " AND MONTH(rv.data_saida) = " . intval($month) . "), 0)) AS custos_variaveis,
+                        (COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0) -
+                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) -
+                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND YEAR(rv.data_saida) = " . intval($year) . " AND MONTH(rv.data_saida) = " . intval($month) . "), 0)) AS margem_operacional,
+                        CASE WHEN COALESCE(SUM(r.frete), 0) > 0 THEN ROUND((COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0) -
+                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) -
+                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND YEAR(rv.data_saida) = " . intval($year) . " AND MONTH(rv.data_saida) = " . intval($month) . "), 0)) / COALESCE(SUM(r.frete), 1) * 100, 2) ELSE 0 END AS percentual_margem
+                        FROM veiculos v
+                        LEFT JOIN rotas r ON r.veiculo_id = v.id AND YEAR(r.data_saida) = :year AND MONTH(r.data_saida) = :month
+                        WHERE v.empresa_id = :empresa_id
+                        GROUP BY v.id, v.placa, v.modelo
+                        HAVING receita_bruta > 0
+                        ORDER BY margem_operacional DESC";
+                break;
+
+            case 'veiculos_prejuizo':
+                $sql = "SELECT 
+                        v.placa,
+                        v.modelo,
+                        COALESCE(SUM(r.frete), 0) AS total_frete,
+                        (COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0) -
+                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) -
+                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND YEAR(rv.data_saida) = " . intval($year) . " AND MONTH(rv.data_saida) = " . intval($month) . "), 0)) AS lucro_liquido
+                        FROM veiculos v
+                        LEFT JOIN rotas r ON r.veiculo_id = v.id AND YEAR(r.data_saida) = :year AND MONTH(r.data_saida) = :month
+                        WHERE v.empresa_id = :empresa_id
+                        GROUP BY v.id, v.placa, v.modelo
+                        HAVING lucro_liquido < 0
+                        ORDER BY lucro_liquido ASC";
+                break;
+
+            case 'ranking':
+                $sql = "SELECT 
+                        v.placa,
+                        v.modelo,
+                        COUNT(DISTINCT r.id) AS quantidade_rotas,
+                        COALESCE(SUM(r.frete), 0) AS total_frete,
+                        (COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0) -
+                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) -
+                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND YEAR(rv.data_saida) = " . intval($year) . " AND MONTH(rv.data_saida) = " . intval($month) . "), 0)) AS lucro_liquido
+                        FROM veiculos v
+                        LEFT JOIN rotas r ON r.veiculo_id = v.id AND YEAR(r.data_saida) = :year AND MONTH(r.data_saida) = :month
+                        WHERE v.empresa_id = :empresa_id
+                        GROUP BY v.id, v.placa, v.modelo
+                        HAVING COALESCE(SUM(r.frete), 0) > 0 OR (SELECT COUNT(*) FROM abastecimentos a WHERE a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . ") > 0
+                        ORDER BY lucro_liquido DESC";
+                break;
+
+            case 'sla_manutencao':
+                $sql = "SELECT 
+                        v.placa,
+                        v.modelo AS veiculo_modelo,
+                        m.data_manutencao,
+                        m.data_conclusao,
+                        DATEDIFF(COALESCE(m.data_conclusao, CURDATE()), m.data_manutencao) AS dias_duracao,
+                        tm.nome AS tipo_manutencao,
+                        sm.nome AS status_manutencao
+                        FROM manutencoes m
+                        JOIN veiculos v ON v.id = m.veiculo_id
+                        JOIN tipos_manutencao tm ON tm.id = m.tipo_manutencao_id
+                        LEFT JOIN status_manutencao sm ON sm.id = m.status_manutencao_id
+                        WHERE v.empresa_id = :empresa_id
+                        AND YEAR(m.data_manutencao) = :year 
+                        AND MONTH(m.data_manutencao) = :month
+                        ORDER BY dias_duracao DESC";
+                break;
+
+            case 'custo_tipo_manutencao':
+                $sql = "SELECT 
+                        tm.nome AS tipo_manutencao,
+                        COUNT(m.id) AS quantidade,
+                        COALESCE(SUM(m.valor), 0) AS total_valor
+                        FROM manutencoes m
+                        JOIN tipos_manutencao tm ON tm.id = m.tipo_manutencao_id
+                        JOIN veiculos v ON v.id = m.veiculo_id
+                        WHERE v.empresa_id = :empresa_id
+                        AND YEAR(m.data_manutencao) = :year 
+                        AND MONTH(m.data_manutencao) = :month
+                        GROUP BY tm.id, tm.nome
+                        ORDER BY total_valor DESC";
+                break;
+
+            case 'desvio_consumo':
+                $conn = getConnection();
+                $empresa_id = $_SESSION['empresa_id'];
+                $stmt = $conn->prepare("
+                    SELECT v.placa, v.modelo,
+                           COALESCE(SUM(a.litros), 0) AS total_litros,
+                           COALESCE(SUM(r.total_km), 0) AS total_km,
+                           CASE WHEN COALESCE(SUM(a.litros), 0) > 0 THEN ROUND(COALESCE(SUM(r.total_km), 0) / SUM(a.litros), 2) ELSE 0 END AS km_por_litro
+                    FROM veiculos v
+                    LEFT JOIN abastecimentos a ON a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = :year_abast AND MONTH(a.data_abastecimento) = :month_abast AND a.status = 'aprovado'
+                    LEFT JOIN rotas r ON r.veiculo_id = v.id AND YEAR(r.data_saida) = :year_rota AND MONTH(r.data_saida) = :month_rota
+                    WHERE v.empresa_id = :empresa_id
+                    GROUP BY v.id, v.placa, v.modelo
+                    HAVING total_litros > 0 AND total_km > 0
+                ");
+                $stmt->bindParam(':year_abast', $year, PDO::PARAM_INT);
+                $stmt->bindParam(':month_abast', $month, PDO::PARAM_INT);
+                $stmt->bindParam(':year_rota', $year, PDO::PARAM_INT);
+                $stmt->bindParam(':month_rota', $month, PDO::PARAM_INT);
+                $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+                $stmt->execute();
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $media_km_litro = 0;
+                $n = count($rows);
+                if ($n > 0) {
+                    $soma = 0;
+                    foreach ($rows as $row) { $soma += (float)($row['km_por_litro'] ?? 0); }
+                    $media_km_litro = $soma / $n;
+                }
+                $data = [];
+                foreach ($rows as $row) {
+                    $km_l = (float)($row['km_por_litro'] ?? 0);
+                    $desvio = $media_km_litro > 0 ? round(($km_l - $media_km_litro) / $media_km_litro * 100, 2) : 0;
+                    $data[] = [
+                        'placa' => $row['placa'],
+                        'modelo' => $row['modelo'],
+                        'total_km' => $row['total_km'],
+                        'total_litros' => $row['total_litros'],
+                        'km_por_litro' => $row['km_por_litro'],
+                        'desvio_percentual' => $desvio . '%',
+                        'situacao' => $desvio < -10 ? 'Abaixo da média' : ($desvio > 10 ? 'Acima da média' : 'Na média')
+                    ];
+                }
+                return $data;
+
+            case 'executivo_resumido':
+                $row = getReportData('lucro_total', $month, $year);
+                $r = $row[0] ?? [];
+                $conn = getConnection();
+                $empresa_id = $_SESSION['empresa_id'];
+                $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM veiculos WHERE empresa_id = :eid AND (status_id = 1 OR status_id IS NULL)");
+                $stmt->execute(['eid' => $empresa_id]);
+                $qtd_veiculos = (int)$stmt->fetch(PDO::FETCH_ASSOC)['total'];
+                $meses_pt = [1=>'Janeiro',2=>'Fevereiro',3=>'Março',4=>'Abril',5=>'Maio',6=>'Junho',7=>'Julho',8=>'Agosto',9=>'Setembro',10=>'Outubro',11=>'Novembro',12=>'Dezembro'];
+                $data = [
+                    [
+                        'indicador' => 'Período',
+                        'valor' => ($meses_pt[(int)$month] ?? $month) . '/' . $year
+                    ],
+                    [
+                        'indicador' => 'Receita total (fretes)',
+                        'valor' => $r['total_frete'] ?? 0
+                    ],
+                    [
+                        'indicador' => 'Comissões',
+                        'valor' => $r['total_comissao'] ?? 0
+                    ],
+                    [
+                        'indicador' => 'Abastecimentos',
+                        'valor' => $r['total_abastecimentos'] ?? 0
+                    ],
+                    [
+                        'indicador' => 'Despesas de viagem',
+                        'valor' => $r['total_despesas_viagem'] ?? 0
+                    ],
+                    [
+                        'indicador' => 'Lucro líquido',
+                        'valor' => $r['lucro_liquido'] ?? 0
+                    ],
+                    [
+                        'indicador' => 'Veículos ativos',
+                        'valor' => $qtd_veiculos
+                    ]
+                ];
+                return $data;
                 
             default:
                 throw new Exception("Tipo de relatório inválido");
@@ -1147,7 +1376,7 @@ function getReportData($reportType, $month, $year) {
         }
         
         // Adicionar empresa_id para relatórios que precisam
-        if (in_array($reportType, ['vida_util_pneus', 'custos_veiculo', 'eficiencia_frota', 'historico_manutencoes', 'analise_preditiva', 'otimizacao_pneus', 'produtividade_motoristas', 'consumo_combustivel', 'custo_por_km', 'rentabilidade_rotas', 'multas_motorista_veiculo', 'ocupacao_frota', 'veiculos_ociosos', 'custos_manutencao_veiculo', 'lucro_veiculo', 'lucro_completo_veiculo'])) {
+        if (in_array($reportType, ['vida_util_pneus', 'custos_veiculo', 'eficiencia_frota', 'historico_manutencoes', 'analise_preditiva', 'otimizacao_pneus', 'produtividade_motoristas', 'consumo_combustivel', 'custo_por_km', 'rentabilidade_rotas', 'multas_motorista_veiculo', 'ocupacao_frota', 'veiculos_ociosos', 'custos_manutencao_veiculo', 'lucro_veiculo', 'lucro_completo_veiculo', 'margem_veiculo', 'veiculos_prejuizo', 'ranking', 'sla_manutencao', 'custo_tipo_manutencao'])) {
             $empresa_id = $_SESSION['empresa_id'];
             $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
             error_log("Parâmetro empresa_id para $reportType: $empresa_id");
@@ -1254,9 +1483,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             unset($row); // Liberar referência
         }
         
+        // Formatação para relatórios estratégicos (valores monetários)
+        $strategicMoneyKeys = [
+            'comparacao_mensal' => ['total_frete', 'total_comissao', 'total_despesas_viagem', 'total_abastecimentos', 'lucro_bruto', 'lucro_liquido'],
+            'tendencia_6' => ['total_frete', 'total_comissao', 'total_abastecimentos', 'lucro_liquido'],
+            'tendencia_12' => ['total_frete', 'total_comissao', 'total_abastecimentos', 'lucro_liquido'],
+            'margem_veiculo' => ['receita_bruta', 'custos_variaveis', 'margem_operacional'],
+            'veiculos_prejuizo' => ['total_frete', 'lucro_liquido'],
+            'ranking' => ['total_frete', 'lucro_liquido'],
+            'custo_tipo_manutencao' => ['total_valor'],
+        ];
+        if (isset($strategicMoneyKeys[$reportType]) && !empty($data)) {
+            foreach ($data as &$row) {
+                foreach ($strategicMoneyKeys[$reportType] as $key) {
+                    if (isset($row[$key]) && is_numeric($row[$key])) {
+                        $row[$key] = 'R$ ' . number_format((float)$row[$key], 2, ',', '.');
+                    }
+                }
+            }
+            unset($row);
+        }
+        if ($reportType === 'executivo_resumido' && !empty($data)) {
+            $moneyIndicators = ['Receita total (fretes)', 'Comissões', 'Abastecimentos', 'Despesas de viagem', 'Lucro líquido'];
+            foreach ($data as &$row) {
+                if (isset($row['indicador']) && in_array($row['indicador'], $moneyIndicators) && is_numeric($row['valor'])) {
+                    $row['valor'] = 'R$ ' . number_format((float)$row['valor'], 2, ',', '.');
+                }
+            }
+            unset($row);
+        }
+        
+        $reportTitles = [
+            'comparacao_mensal' => 'Comparação Mensal (Mês x Mês)',
+            'tendencia_6' => 'Relatório de Tendência (6 meses)',
+            'tendencia_12' => 'Relatório de Tendência (12 meses)',
+            'margem_veiculo' => 'Margem de Contribuição por Veículo',
+            'veiculos_prejuizo' => 'Veículos com Prejuízo',
+            'ranking' => 'Ranking de Veículos',
+            'sla_manutencao' => 'SLA de Manutenção',
+            'custo_tipo_manutencao' => 'Custo por Tipo de Manutenção',
+            'desvio_consumo' => 'Desvio de Consumo',
+            'executivo_resumido' => 'Relatório Executivo Resumido',
+        ];
+        $reportTitle = $reportTitles[$reportType] ?? ucfirst(str_replace('_', ' ', $reportType));
+        
         if ($format === 'pdf') {
             // Gerar HTML para PDF
-            $html = '<h1>Relatório de ' . ucfirst(str_replace('_', ' ', $reportType)) . '</h1>';
+            $html = '<h1>Relatório: ' . htmlspecialchars($reportTitle) . '</h1>';
             $html .= '<p>Período: ' . date('m/Y', mktime(0, 0, 0, $month, 1, $year)) . '</p>';
             
             if (!empty($data)) {
@@ -1397,6 +1670,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .btn-pdf {
             background-color: #dc3545;
             color: white;
+        }
+        
+        .report-actions a.btn-pdf {
+            display: inline-block;
+            padding: 8px 14px;
+            border-radius: 6px;
+            text-decoration: none;
+            color: #fff;
+        }
+        .report-actions a.btn-pdf:hover {
+            filter: brightness(1.1);
+            color: #fff;
         }
         
         .btn-excel {
@@ -1598,19 +1883,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                         </div>
                         
-                        <!-- Relatório de Desempenho -->
-                        <div class="report-card">
-                            <h3>Relatório de Desempenho</h3>
-                            <p>Performance geral dos veículos e motoristas.</p>
-                            <div class="report-actions">
-                                <button class="btn-pdf" onclick="showReportForm('desempenho', 'pdf')">
-                                    <i class="fas fa-file-pdf"></i> PDF
-                                </button>
-                                <button class="btn-excel" onclick="showReportForm('desempenho', 'excel')">
-                                    <i class="fas fa-file-excel"></i> Excel
-                                </button>
-                            </div>
-                        </div>
                     </div>
                 </div>
                 
@@ -2121,6 +2393,106 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             </div>
             
+            <!-- Relatórios Estratégicos (em cima, alinhado com os outros cards) -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-chart-pie"></i> Relatórios Estratégicos
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted" style="margin-bottom: 1rem;">Gere PDF ou Excel por período (mês/ano).</p>
+                            <div class="reports-grid">
+                        <div class="report-card">
+                            <h3>Comparação Mensal (Mês x Mês)</h3>
+                            <p>Receita, custo e lucro mês atual x anterior.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('comparacao_mensal', 'pdf')"><i class="fas fa-file-pdf"></i> PDF</button>
+                                <button class="btn-excel" onclick="showReportForm('comparacao_mensal', 'excel')"><i class="fas fa-file-excel"></i> Excel</button>
+                            </div>
+                        </div>
+                        <div class="report-card">
+                            <h3>Relatório de Tendência (6 ou 12 meses)</h3>
+                            <p>Histórico mensal: receita, custo e lucro. Escolha o mês final no formulário.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('tendencia_6', 'pdf')"><i class="fas fa-file-pdf"></i> PDF 6m</button>
+                                <button class="btn-excel" onclick="showReportForm('tendencia_6', 'excel')"><i class="fas fa-file-excel"></i> Excel 6m</button>
+                                <button class="btn-pdf" onclick="showReportForm('tendencia_12', 'pdf')"><i class="fas fa-file-pdf"></i> PDF 12m</button>
+                                <button class="btn-excel" onclick="showReportForm('tendencia_12', 'excel')"><i class="fas fa-file-excel"></i> Excel 12m</button>
+                            </div>
+                        </div>
+                        <div class="report-card">
+                            <h3>Margem de Contribuição por Veículo</h3>
+                            <p>Receita bruta, custos variáveis, margem operacional e % de margem por veículo.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('margem_veiculo', 'pdf')"><i class="fas fa-file-pdf"></i> PDF</button>
+                                <button class="btn-excel" onclick="showReportForm('margem_veiculo', 'excel')"><i class="fas fa-file-excel"></i> Excel</button>
+                            </div>
+                        </div>
+                        <div class="report-card">
+                            <h3>Veículos com Prejuízo</h3>
+                            <p>Veículos com lucro negativo no período.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('veiculos_prejuizo', 'pdf')"><i class="fas fa-file-pdf"></i> PDF</button>
+                                <button class="btn-excel" onclick="showReportForm('veiculos_prejuizo', 'excel')"><i class="fas fa-file-excel"></i> Excel</button>
+                            </div>
+                        </div>
+                        <div class="report-card">
+                            <h3>Ranking de Veículos</h3>
+                            <p>Ranking de veículos mais lucrativos no mês.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('ranking', 'pdf')"><i class="fas fa-file-pdf"></i> PDF</button>
+                                <button class="btn-excel" onclick="showReportForm('ranking', 'excel')"><i class="fas fa-file-excel"></i> Excel</button>
+                            </div>
+                        </div>
+                        <div class="report-card">
+                            <h3>SLA de Manutenção</h3>
+                            <p>Tempo de duração das manutenções; dias até conclusão.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('sla_manutencao', 'pdf')"><i class="fas fa-file-pdf"></i> PDF</button>
+                                <button class="btn-excel" onclick="showReportForm('sla_manutencao', 'excel')"><i class="fas fa-file-excel"></i> Excel</button>
+                                <a href="manutencoes.php" class="btn-pdf" style="background:#5a6268;"><i class="fas fa-tools"></i> Ver Manutenções</a>
+                            </div>
+                        </div>
+                        <div class="report-card">
+                            <h3>Previsão de Fluxo de Caixa</h3>
+                            <p>Contas a pagar futuras, recebimentos previstos e parcelas de financiamento.</p>
+                            <div class="report-actions">
+                                <span class="btn-excel" style="opacity:0.8; cursor:default;"><i class="fas fa-clock"></i> Em breve</span>
+                            </div>
+                        </div>
+                        <div class="report-card">
+                            <h3>Desvio de Consumo</h3>
+                            <p>Consumo por veículo vs média da frota; acima/abaixo da média.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('desvio_consumo', 'pdf')"><i class="fas fa-file-pdf"></i> PDF</button>
+                                <button class="btn-excel" onclick="showReportForm('desvio_consumo', 'excel')"><i class="fas fa-file-excel"></i> Excel</button>
+                            </div>
+                        </div>
+                        <div class="report-card">
+                            <h3>Custo por Tipo de Manutenção</h3>
+                            <p>Total por categoria (preventiva, corretiva, etc.) e quantidade.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('custo_tipo_manutencao', 'pdf')"><i class="fas fa-file-pdf"></i> PDF</button>
+                                <button class="btn-excel" onclick="showReportForm('custo_tipo_manutencao', 'excel')"><i class="fas fa-file-excel"></i> Excel</button>
+                            </div>
+                        </div>
+                        <div class="report-card">
+                            <h3>Relatório Executivo Resumido (1 página)</h3>
+                            <p>Resumo mensal: receita, custo, lucro e veículos ativos.</p>
+                            <div class="report-actions">
+                                <button class="btn-pdf" onclick="showReportForm('executivo_resumido', 'pdf')"><i class="fas fa-file-pdf"></i> PDF</button>
+                                <button class="btn-excel" onclick="showReportForm('executivo_resumido', 'excel')"><i class="fas fa-file-excel"></i> Excel</button>
+                            </div>
+                        </div>
+                    </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Relatórios Automáticos -->
             <div class="row mt-4">
                 <div class="col-12">
@@ -2163,43 +2535,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Seção de Indicadores de Desempenho -->
-                <div class="dashboard-section">
-                    <h2><i class="fas fa-chart-line"></i> Indicadores de Desempenho</h2>
-                    
-                    <div style="background: var(--bg-secondary); border-radius: 8px; padding: 20px; border: 1px solid var(--border-color); overflow-x: auto; max-width: 100%; width: 100%; box-sizing: border-box;">
-                        <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px; gap: 10px;">
-                            <button onclick="loadPerformanceIndicators()" class="btn-action-indicators" style="padding: 8px 15px; background: #007bff; border: none; border-radius: 4px; cursor: pointer; color: white; white-space: nowrap;">
-                                <i class="fas fa-sync-alt"></i> Atualizar
-                            </button>
-                            <button onclick="exportIndicatorsToExcel()" class="btn-action-indicators" style="padding: 8px 15px; background: #28a745; border: none; border-radius: 4px; cursor: pointer; color: white; white-space: nowrap;">
-                                <i class="fas fa-file-excel"></i> Excel
-                            </button>
-                        </div>
-                        <div id="indicatorsLoading" style="text-align: center; padding: 40px;">
-                            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--text-secondary);"></i>
-                            <p style="margin-top: 15px; color: var(--text-secondary);">Carregando indicadores...</p>
-                        </div>
-                        <div id="indicatorsTableContainer" style="display: none; max-width: 100%; overflow-x: auto; padding: 0;">
-                            <table id="indicatorsTable" class="indicators-table" style="width: 100%; border-collapse: collapse; min-width: 1200px; max-width: none;">
-                                <thead>
-                                    <tr>
-                                        <th style="position: sticky; left: 0; background: var(--bg-tertiary); z-index: 10; padding: 12px; text-align: left; border: 1px solid var(--border-color); border-bottom: 2px solid var(--border-color); font-weight: 600; min-width: 150px;">
-                                            Indicador
-                                        </th>
-                                        <th id="indicatorsTableHeader" style="padding: 12px; text-align: center; border-bottom: 2px solid var(--border-color); font-weight: 600; min-width: 150px;">
-                                            <!-- Cabeçalhos dos meses serão preenchidos via JS -->
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody id="indicatorsTableBody">
-                                    <!-- Conteúdo será preenchido via JavaScript -->
-                                </tbody>
-                            </table>
                         </div>
                     </div>
                 </div>
@@ -2542,605 +2877,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         font-size: 12px;
     }
     
-    /* Estilos para Tabela de Indicadores */
-    .indicators-table {
-        font-size: 0.9rem;
-        table-layout: auto;
-    }
-    
-    .indicators-table th {
-        background: var(--bg-tertiary);
-        color: var(--text-primary);
-        font-weight: 600;
-        padding: 12px 8px;
-        text-align: center;
-        border: 1px solid var(--border-color);
-        white-space: nowrap;
-    }
-    
-    .indicators-table td {
-        padding: 12px 8px;
-        border: 1px solid var(--border-color);
-        text-align: right;
-        background: var(--bg-secondary);
-        white-space: nowrap;
-    }
-    
-    .indicators-table tbody tr:hover {
-        background: var(--bg-tertiary);
-    }
-    
-    .indicators-table tbody tr td:first-child {
-        position: sticky;
-        left: 0;
-        background: var(--bg-secondary);
-        z-index: 5;
-        text-align: left;
-        font-weight: 500;
-        min-width: 150px;
-        max-width: 250px;
-        white-space: nowrap;
-    }
-    
-    .indicators-table tbody tr:hover td:first-child {
-        background: var(--bg-tertiary);
-    }
-    
-    /* Garantir que o container da tabela não ultrapasse a tela */
-    #indicatorsTableContainer {
-        max-width: 100%;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    
-    
-    
-    .indicator-name {
-        font-weight: 500;
-        color: var(--text-primary);
-    }
-    
-    .indicator-help {
-        cursor: help;
-        color: var(--text-secondary);
-        font-size: 0.7rem;
-        opacity: 0.6;
-        transition: opacity 0.2s, color 0.2s;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: normal;
-        position: relative;
-        margin-left: 2px;
-    }
-    
-    .indicator-help:hover {
-        opacity: 1;
-        color: var(--accent-primary);
-    }
-    
-    /* Tooltip customizado */
-    .indicator-help-tooltip {
-        position: absolute;
-        left: 20px;
-        top: 50%;
-        transform: translateY(-50%);
-        background: var(--bg-tertiary);
-        color: var(--text-primary);
-        padding: 8px 12px;
-        border-radius: 6px;
-        font-size: 0.85rem;
-        white-space: nowrap;
-        z-index: 1000;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        border: 1px solid var(--border-color);
-        display: none;
-        max-width: 300px;
-        white-space: normal;
-        line-height: 1.4;
-    }
-    
-    .indicator-help:hover .indicator-help-tooltip,
-    .indicator-help.active .indicator-help-tooltip {
-        display: block;
-    }
-    
-    .cell-value {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 5px;
-        flex-wrap: wrap;
-    }
-    
-    .value-number {
-        font-weight: 600;
-        color: var(--text-primary);
-    }
-    
-    .variation {
-        font-size: 0.85rem;
-        padding: 2px 6px;
-        border-radius: 4px;
-        display: inline-flex;
-        align-items: center;
-        gap: 3px;
-    }
-    
-    .variation.positive {
-        background: rgba(76, 175, 80, 0.1);
-        color: #4caf50;
-    }
-    
-    .variation.negative {
-        background: rgba(244, 67, 54, 0.1);
-        color: #f44336;
-    }
-    
-    .variation.neutral {
-        background: rgba(158, 158, 158, 0.1);
-        color: #9e9e9e;
-    }
-    
-    .btn-action-indicators {
-        transition: all 0.2s ease;
-    }
-    
-    .btn-action-indicators:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    @media print {
-        .btn-action-indicators {
-            display: none;
-        }
-        
-        .indicators-table {
-            font-size: 0.8rem;
-        }
-    }
     </style>
     <script>
-        // Carregar Indicadores de Desempenho - Tabela
-        async function loadPerformanceIndicators() {
-            const loadingDiv = document.getElementById('indicatorsLoading');
-            const containerDiv = document.getElementById('indicatorsTableContainer');
-            
-            try {
-                loadingDiv.style.display = 'block';
-                containerDiv.style.display = 'none';
-                
-                const response = await fetch('../api/performance_indicators.php');
-                const result = await response.json();
-                
-                if (result.success) {
-                    const { historico_mensal } = result.data;
-                    
-                    // Construir tabela
-                    buildIndicatorsTable(historico_mensal);
-                    
-                    loadingDiv.style.display = 'none';
-                    containerDiv.style.display = 'block';
-                } else {
-                    throw new Error(result.error || 'Erro ao carregar dados');
-                }
-            } catch (error) {
-                console.error('Erro ao carregar indicadores:', error);
-                loadingDiv.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: #dc3545;">
-                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem;"></i>
-                        <p style="margin-top: 15px;">Erro ao carregar indicadores. Tente novamente.</p>
-                    </div>
-                `;
-            }
-        }
-        
-        function buildIndicatorsTable(data) {
-            if (!data || data.length === 0) return;
-            
-            const table = document.getElementById('indicatorsTable');
-            if (!table) {
-                console.error('Tabela não encontrada');
-                return;
-            }
-            
-            const thead = table.querySelector('thead');
-            if (!thead) {
-                console.error('Cabeçalho da tabela não encontrado');
-                return;
-            }
-            
-            const tbody = document.getElementById('indicatorsTableBody');
-            if (!tbody) {
-                console.error('Corpo da tabela não encontrado');
-                return;
-            }
-            
-            // Limpar conteúdo anterior
-            tbody.innerHTML = '';
-            
-            // Limpar cabeçalho existente (exceto a primeira coluna)
-            const headerRow = thead.querySelector('tr');
-            if (headerRow) {
-                // Manter apenas a primeira coluna (Indicador)
-                const firstHeader = headerRow.querySelector('th:first-child');
-                headerRow.innerHTML = '';
-                if (firstHeader) {
-                    headerRow.appendChild(firstHeader);
-                } else {
-                    // Criar primeira coluna se não existir
-                    const indicatorHeader = document.createElement('th');
-                    indicatorHeader.style.cssText = 'position: sticky; left: 0; background: var(--bg-tertiary); z-index: 10; padding: 12px; text-align: left; border: 1px solid var(--border-color); border-bottom: 2px solid var(--border-color); font-weight: 600; min-width: 150px;';
-                    indicatorHeader.textContent = 'Indicador';
-                    headerRow.appendChild(indicatorHeader);
-                }
-            }
-            
-            // Criar cabeçalhos dos meses
-            const months = data.map(d => d.mes_nome);
-            months.forEach((month) => {
-                const th = document.createElement('th');
-                th.style.cssText = 'padding: 12px 8px; text-align: center; border: 1px solid var(--border-color); border-bottom: 2px solid var(--border-color); font-weight: 600; min-width: 120px; background: var(--bg-tertiary);';
-                th.textContent = month;
-                if (headerRow) {
-                    headerRow.appendChild(th);
-                }
-            });
-            
-            // Calcular variações e criar linhas de indicadores
-            const indicators = [
-                {
-                    name: 'Veículos Ativos',
-                    desc: 'Quantidade de veículos que realizaram rotas no período',
-                    getValue: (d) => d.quantidade_veiculos_ativos,
-                    format: (v) => formatNumber(v),
-                    type: 'number',
-                    showVariation: true
-                },
-                {
-                    name: 'Rotas Realizadas',
-                    desc: 'Quantidade total de rotas realizadas no período',
-                    getValue: (d) => d.total_rotas,
-                    format: (v) => formatNumber(v),
-                    type: 'number',
-                    showVariation: true
-                },
-                {
-                    name: 'KM Rodados',
-                    desc: 'Total de quilômetros rodados no período',
-                    getValue: (d) => d.total_km_rodados,
-                    format: (v) => formatNumber(v) + ' km',
-                    type: 'number',
-                    showVariation: true
-                },
-                {
-                    name: 'Abastecimentos',
-                    desc: 'Quantidade total de abastecimentos realizados no período',
-                    getValue: (d) => d.total_abastecimentos,
-                    format: (v) => formatNumber(v),
-                    type: 'number',
-                    showVariation: true
-                },
-                {
-                    name: 'Gasto Abastecimentos',
-                    desc: 'Valor total gasto com abastecimentos (incluindo ARLA)',
-                    getValue: (d) => d.total_gasto_abastecimentos,
-                    format: (v) => formatCurrency(v),
-                    type: 'currency',
-                    showVariation: true
-                },
-                {
-                    name: 'Receitas (Fretes)',
-                    desc: 'Valor total de receitas obtidas com fretes',
-                    getValue: (d) => d.total_frete,
-                    format: (v) => formatCurrency(v),
-                    type: 'currency',
-                    showVariation: true
-                },
-                {
-                    name: 'Comissões',
-                    desc: 'Valor total pago em comissões',
-                    getValue: (d) => d.total_comissao,
-                    format: (v) => formatCurrency(v),
-                    type: 'currency',
-                    showVariation: true
-                },
-                {
-                    name: 'Despesas de Viagem',
-                    desc: 'Total de despesas de viagem (pedágios, descarga, etc)',
-                    getValue: (d) => d.total_despesas_viagem,
-                    format: (v) => formatCurrency(v),
-                    type: 'currency',
-                    showVariation: true
-                },
-                {
-                    name: 'Lucro Operacional',
-                    desc: 'Lucro após descontar comissões, abastecimentos e despesas de viagem',
-                    getValue: (d) => d.lucro_operacional,
-                    format: (v) => formatCurrency(v),
-                    type: 'currency',
-                    showVariation: true
-                },
-                {
-                    name: 'Crescimento de Rotas',
-                    desc: 'Crescimento percentual do número de rotas em relação ao período anterior',
-                    getValue: (d, index, allData) => {
-                        if (index === 0) return null;
-                        const prev = allData[index - 1].total_rotas || 0;
-                        const current = d.total_rotas || 0;
-                        if (prev === 0) return current > 0 ? 100 : 0;
-                        return ((current - prev) / prev) * 100;
-                    },
-                    format: (v) => v === null ? '-' : v.toFixed(2) + '%',
-                    type: 'percent',
-                    showVariation: false
-                },
-                {
-                    name: 'Crescimento do Valor',
-                    desc: 'Crescimento percentual do valor de receitas em relação ao período anterior',
-                    getValue: (d, index, allData) => {
-                        if (index === 0) return null;
-                        const prev = allData[index - 1].total_frete || 0;
-                        const current = d.total_frete || 0;
-                        if (prev === 0) return current > 0 ? 100 : 0;
-                        return ((current - prev) / prev) * 100;
-                    },
-                    format: (v) => v === null ? '-' : v.toFixed(2) + '%',
-                    type: 'percent',
-                    showVariation: false
-                },
-                {
-                    name: 'Ticket Médio por Rota',
-                    desc: 'Valor médio de cada rota (receita total / quantidade de rotas)',
-                    getValue: (d) => {
-                        const rotas = d.total_rotas || 0;
-                        const frete = d.total_frete || 0;
-                        return rotas > 0 ? (frete / rotas) : 0;
-                    },
-                    format: (v) => formatCurrency(v),
-                    type: 'currency',
-                    showVariation: true
-                }
-            ];
-            
-            // Criar linhas
-            indicators.forEach(indicator => {
-                const row = document.createElement('tr');
-                const nameCell = document.createElement('td');
-                const helpId = 'help-' + indicator.name.replace(/\s+/g, '-').toLowerCase() + '-' + Math.random().toString(36).substr(2, 9);
-                const escapedDesc = indicator.desc.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                nameCell.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 2px; flex-wrap: nowrap; position: relative;">
-                        <span class="indicator-name" style="flex: 1; min-width: 0;">${indicator.name}</span>
-                        <span class="indicator-help" 
-                              id="${helpId}"
-                              data-desc="${escapedDesc}"
-                              style="cursor: help; flex-shrink: 0; position: relative;"
-                              onmouseenter="showTooltip('${helpId}')"
-                              onmouseleave="hideTooltip('${helpId}')"
-                              onclick="event.stopPropagation(); toggleTooltip('${helpId}'); return false;">(?)</span>
-                    </div>
-                `;
-                row.appendChild(nameCell);
-                
-                // Criar células para cada mês
-                data.forEach((monthData, index) => {
-                    const cell = document.createElement('td');
-                    const value = indicator.getValue(monthData, index, data);
-                    const formattedValue = value === null ? '-' : indicator.format(value);
-                    
-                    // Calcular variação se não for o primeiro mês e se o indicador permitir
-                    let variationHtml = '';
-                    if (index > 0 && indicator.showVariation && value !== null && typeof value === 'number') {
-                        const previousValue = indicator.getValue(data[index - 1], index - 1, data);
-                        if (previousValue !== null && previousValue !== 0 && typeof previousValue === 'number') {
-                            const variation = ((value - previousValue) / Math.abs(previousValue)) * 100;
-                            const variationClass = variation > 0 ? 'positive' : variation < 0 ? 'negative' : 'neutral';
-                            const arrow = variation > 0 ? '↑' : variation < 0 ? '↓' : '';
-                            variationHtml = `
-                                <span class="variation ${variationClass}">
-                                    ${Math.abs(variation).toFixed(2)}%${arrow}
-                                </span>
-                            `;
-                        } else if (previousValue === 0 && value > 0) {
-                            variationHtml = `
-                                <span class="variation positive">
-                                    100%↑
-                                </span>
-                            `;
-                        } else if (previousValue > 0 && value === 0) {
-                            variationHtml = `
-                                <span class="variation negative">
-                                    100%↓
-                                </span>
-                            `;
-                        }
-                    }
-                    
-                    // Para indicadores de crescimento, já mostrar seta baseada no valor
-                    if (!indicator.showVariation && indicator.type === 'percent' && value !== null && typeof value === 'number') {
-                        const variationClass = value > 0 ? 'positive' : value < 0 ? 'negative' : 'neutral';
-                        const arrow = value > 0 ? '↑' : value < 0 ? '↓' : '';
-                        if (value !== 0) {
-                            variationHtml = `
-                                <span class="variation ${variationClass}">
-                                    ${arrow}
-                                </span>
-                            `;
-                        }
-                    }
-                    
-                    cell.innerHTML = `
-                        <div class="cell-value">
-                            <span class="value-number">${formattedValue}</span>
-                            ${variationHtml}
-                        </div>
-                    `;
-                    
-                    // Colorir valores negativos (lucro, crescimento negativo)
-                    if (indicator.name === 'Lucro Operacional' && value < 0) {
-                        cell.querySelector('.value-number').style.color = '#f44336';
-                    }
-                    
-                    row.appendChild(cell);
-                });
-                
-                tbody.appendChild(row);
-            });
-        }
-        
-        function formatCurrency(value) {
-            return 'R$ ' + parseFloat(value).toLocaleString('pt-BR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-        }
-        
-        function formatNumber(value) {
-            return parseFloat(value).toLocaleString('pt-BR', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0
-            });
-        }
-        
-        // Funções para tooltip
-        function showTooltip(elementId) {
-            const element = document.getElementById(elementId);
-            if (!element) return;
-            
-            const desc = element.getAttribute('data-desc');
-            if (!desc) return;
-            
-            // Remover tooltip existente
-            const existingTooltip = element.querySelector('.indicator-help-tooltip');
-            if (existingTooltip) {
-                existingTooltip.remove();
-            }
-            
-            // Criar novo tooltip
-            const tooltip = document.createElement('div');
-            tooltip.className = 'indicator-help-tooltip';
-            tooltip.textContent = desc;
-            element.appendChild(tooltip);
-            element.classList.add('active');
-        }
-        
-        function hideTooltip(elementId) {
-            const element = document.getElementById(elementId);
-            if (!element) return;
-            
-            const tooltip = element.querySelector('.indicator-help-tooltip');
-            if (tooltip && !element.classList.contains('keep-tooltip')) {
-                tooltip.remove();
-            }
-            element.classList.remove('active');
-        }
-        
-        function toggleTooltip(elementId) {
-            const element = document.getElementById(elementId);
-            if (!element) return;
-            
-            const tooltip = element.querySelector('.indicator-help-tooltip');
-            if (tooltip) {
-                element.classList.remove('keep-tooltip');
-                hideTooltip(elementId);
-            } else {
-                element.classList.add('keep-tooltip');
-                showTooltip(elementId);
-            }
-        }
-        
-        function exportIndicatorsToExcel() {
-            const table = document.getElementById('indicatorsTable');
-            if (!table) {
-                alert('Tabela não encontrada. Aguarde o carregamento dos indicadores.');
-                return;
-            }
-            
-            // Criar dados para Excel
-            const data = [];
-            
-            // Cabeçalhos
-            const headers = ['Indicador'];
-            table.querySelectorAll('thead th').forEach((th, index) => {
-                if (index > 0) {
-                    headers.push(th.textContent.trim());
-                }
-            });
-            data.push(headers);
-            
-            // Linhas de dados
-            table.querySelectorAll('tbody tr').forEach(tr => {
-                const row = [];
-                const cells = tr.querySelectorAll('td');
-                cells.forEach((cell, index) => {
-                    if (index === 0) {
-                        // Nome do indicador sem o ícone (?)
-                        const name = cell.querySelector('.indicator-name');
-                        const indicatorName = name ? name.textContent.trim() : cell.textContent.trim();
-                        // Remover o (?) se existir
-                        row.push(indicatorName.replace(/\s*\(\?\)\s*$/, ''));
-                    } else {
-                        // Pegar todo o conteúdo da célula (valor + variação)
-                        const cellValue = cell.querySelector('.cell-value');
-                        if (cellValue) {
-                            // Pegar todos os elementos filhos (valor e variação)
-                            const parts = [];
-                            const valueNumber = cellValue.querySelector('.value-number');
-                            const variation = cellValue.querySelector('.variation');
-                            
-                            if (valueNumber) {
-                                parts.push(valueNumber.textContent.trim());
-                            }
-                            if (variation) {
-                                parts.push(variation.textContent.trim());
-                            }
-                            
-                            row.push(parts.join(' ') || cell.textContent.trim());
-                        } else {
-                            // Se não encontrar cell-value, pegar todo o texto da célula
-                            row.push(cell.textContent.trim());
-                        }
-                    }
-                });
-                data.push(row);
-            });
-            
-            // Converter para CSV com separador ponto-e-vírgula (padrão brasileiro do Excel)
-            const csv = data.map(row => 
-                row.map(cell => {
-                    // Escapar aspas duplas e garantir que valores com vírgula sejam delimitados
-                    const cellStr = String(cell || '').trim();
-                    // Se contém vírgula, ponto-e-vírgula, aspas ou quebra de linha, colocar entre aspas
-                    if (cellStr.includes(',') || cellStr.includes(';') || cellStr.includes('"') || cellStr.includes('\n') || cellStr.includes('\r')) {
-                        return `"${cellStr.replace(/"/g, '""')}"`;
-                    }
-                    return cellStr;
-                }).join(';')  // Usar ponto-e-vírgula como separador
-            ).join('\r\n');  // Usar \r\n para compatibilidade com Excel Windows
-            
-            // Criar arquivo CSV com encoding UTF-8 BOM
-            const BOM = '\uFEFF';
-            const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
-            
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            link.setAttribute('download', `indicadores_desempenho_${new Date().toISOString().split('T')[0]}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        }
-        
-        // Carregar indicadores quando a página carregar
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', loadPerformanceIndicators);
-        } else {
-            loadPerformanceIndicators();
-        }
+        // Indicadores de Desempenho foram movidos para a página BI (bi.php)
+        (function() {
+            // placeholder para evitar erro se algum código antigo chamar
+            window.loadPerformanceIndicators = function() { window.location.href = 'bi.php?visao=geral'; };
+        })();
     </script>
 </body>
 </html> 

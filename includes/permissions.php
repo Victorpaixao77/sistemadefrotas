@@ -210,8 +210,14 @@ function can_view_financial_data() {
  * @return bool
  */
 function can_access_fiscal_system() {
+    // Usuários com acesso a todas as empresas ou admins têm acesso automático
+    $acesso_todas_empresas = $_SESSION['acesso_todas_empresas'] ?? false;
+    if (($acesso_todas_empresas === true || $acesso_todas_empresas == 1) || is_admin()) {
+        return true;
+    }
+    
     $permissions = get_user_granular_permissions();
-    return isset($permissions['pode_acessar_sistema_fiscal']) ? (bool)$permissions['pode_acessar_sistema_fiscal'] : is_admin();
+    return isset($permissions['pode_acessar_sistema_fiscal']) ? (bool)$permissions['pode_acessar_sistema_fiscal'] : false;
 }
 
 /**
@@ -219,8 +225,14 @@ function can_access_fiscal_system() {
  * @return bool
  */
 function can_access_tire_management() {
+    // Usuários com acesso a todas as empresas ou admins têm acesso automático
+    $acesso_todas_empresas = $_SESSION['acesso_todas_empresas'] ?? false;
+    if (($acesso_todas_empresas === true || $acesso_todas_empresas == 1) || is_admin()) {
+        return true;
+    }
+    
     $permissions = get_user_granular_permissions();
-    return isset($permissions['pode_acessar_gestao_pneus']) ? (bool)$permissions['pode_acessar_gestao_pneus'] : is_admin();
+    return isset($permissions['pode_acessar_gestao_pneus']) ? (bool)$permissions['pode_acessar_gestao_pneus'] : false;
 }
 
 

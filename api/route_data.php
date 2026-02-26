@@ -40,9 +40,12 @@ try {
     
     switch ($action) {
         case 'list':
-            // Get pagination parameters
-            $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 5;
-            $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
+            // Parâmetros de paginação (por página: 5, 10, 25, 50, 100; padrão 10)
+            $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+            $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
+            if (!in_array($limit, [5, 10, 25, 50, 100], true)) {
+                $limit = 10;
+            }
             $offset = ($page - 1) * $limit;
             
             // Count total records first
@@ -152,6 +155,18 @@ try {
                 $params[':date'] = $_GET['date'];
             }
             
+            if (!empty($_GET['date_from'])) {
+                $sql .= " AND DATE(r.data_rota) >= :date_from";
+                $count_sql .= " AND DATE(r.data_rota) >= :date_from";
+                $params[':date_from'] = $_GET['date_from'];
+            }
+            
+            if (!empty($_GET['date_to'])) {
+                $sql .= " AND DATE(r.data_rota) <= :date_to";
+                $count_sql .= " AND DATE(r.data_rota) <= :date_to";
+                $params[':date_to'] = $_GET['date_to'];
+            }
+            
             // Get total count
             $stmt_count = $conn->prepare($count_sql);
             foreach ($params as $key => &$val) {
@@ -219,7 +234,17 @@ try {
             break;
             
         case 'summary':
-            $sql = "SELECT 
+            require_once __DIR__ . '/../includes/cache.php';
+            $cache = new CacheManager(__DIR__ . '/../cache/');
+            $cacheKey = 'route_summary_' . $empresa_id;
+            if (!empty($_GET['date_from']) && !empty($_GET['date_to'])) {
+                $cacheKey .= '_d_' . $_GET['date_from'] . '_' . $_GET['date_to'];
+            } else {
+                $cacheKey .= '_30d';
+            }
+            $result = $cache->get($cacheKey);
+            if ($result === null) {
+                $sql = "SELECT 
                     COUNT(*) as total_routes,
                     SUM(CASE WHEN no_prazo = 1 THEN 1 ELSE 0 END) as rotas_no_prazo,
                     SUM(CASE WHEN no_prazo = 0 THEN 1 ELSE 0 END) as rotas_atrasadas,
@@ -229,15 +254,26 @@ try {
                     AVG(NULLIF(percentual_vazio, 0)) as media_percentual_vazio
                 FROM rotas 
                 WHERE empresa_id = :empresa_id
-                AND data_saida >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)";
-            
-            $stmt = $conn->prepare($sql);
-            $stmt->bindValue(':empresa_id', $empresa_id);
-            $stmt->execute();
-            
+                AND status = 'aprovado'";
+                $params_summary = [':empresa_id' => $empresa_id];
+                if (!empty($_GET['date_from']) && !empty($_GET['date_to'])) {
+                    $sql .= " AND DATE(data_saida) >= :date_from AND DATE(data_saida) <= :date_to";
+                    $params_summary[':date_from'] = $_GET['date_from'];
+                    $params_summary[':date_to'] = $_GET['date_to'];
+                } else {
+                    $sql .= " AND data_saida >= DATE_SUB(CURRENT_DATE(), INTERVAL 30 DAY)";
+                }
+                $stmt = $conn->prepare($sql);
+                foreach ($params_summary as $key => $val) {
+                    $stmt->bindValue($key, $val);
+                }
+                $stmt->execute();
+                $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                $cache->set($cacheKey, $result, 120);
+            }
             echo json_encode([
                 'success' => true,
-                'data' => $stmt->fetch(PDO::FETCH_ASSOC)
+                'data' => $result
             ]);
             break;
             
@@ -302,7 +338,9 @@ try {
             throw new Exception('Ação inválida');
     }
 } catch (Exception $e) {
-    error_log("Erro na API de dados de rotas: " . $e->getMessage());
+    if (defined('DEBUG_MODE') && DEBUG_MODE) {
+        error_log("Erro na API de dados de rotas: " . $e->getMessage());
+    }
     http_response_code(400);
     echo json_encode([
         'success' => false,

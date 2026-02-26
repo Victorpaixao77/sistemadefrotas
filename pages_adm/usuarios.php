@@ -12,6 +12,24 @@ if (!isset($_SESSION['admin_id'])) {
 $mensagem = '';
 $tipo_mensagem = '';
 
+// Verificar mensagem de sucesso na URL
+if (isset($_GET['msg'])) {
+    switch ($_GET['msg']) {
+        case 'deleted':
+            $mensagem = "Usuário excluído com sucesso!";
+            $tipo_mensagem = "success";
+            break;
+        case 'created':
+            $mensagem = "Usuário cadastrado com sucesso!";
+            $tipo_mensagem = "success";
+            break;
+        case 'updated':
+            $mensagem = "Usuário atualizado com sucesso!";
+            $tipo_mensagem = "success";
+            break;
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
@@ -25,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     }
 
                     // Obter o ID da empresa_clientes correspondente
-                    $stmt = $pdo->prepare("SELECT id FROM empresa_clientes WHERE empresa_adm_id = ?");
+                    $stmt = $pdo->prepare("SELECT id FROM empresa_clientes WHERE empresa_adm_id = ? LIMIT 1");
                     $stmt->execute([$_POST['empresa_id']]); // Usar empresa_id do formulário
                     $empresa_cliente = $stmt->fetch();
                     
@@ -141,8 +159,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $stmt_permissoes->execute($params_permissoes);
                     }
                     
-                    $mensagem = "Usuário cadastrado com sucesso!";
-                    $tipo_mensagem = "success";
+                    // Redirecionar para evitar reenvio do formulário
+                    header('Location: usuarios.php?msg=created');
+                    exit;
                 } catch (Exception $e) {
                     $mensagem = "Erro ao cadastrar usuário: " . $e->getMessage();
                     $tipo_mensagem = "error";
@@ -159,7 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     }
 
                     // Obter o ID da empresa_clientes correspondente
-                    $stmt = $pdo->prepare("SELECT id FROM empresa_clientes WHERE empresa_adm_id = ?");
+                    $stmt = $pdo->prepare("SELECT id FROM empresa_clientes WHERE empresa_adm_id = ? LIMIT 1");
                     $stmt->execute([$_POST['empresa_id']]); // Usar empresa_id do formulário
                     $empresa_cliente = $stmt->fetch();
                     
@@ -280,8 +299,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $stmt_permissoes->execute($params_permissoes);
                     }
 
-                    $mensagem = "Usuário atualizado com sucesso!";
-                    $tipo_mensagem = "success";
+                    // Redirecionar para evitar reenvio do formulário
+                    header('Location: usuarios.php?msg=updated');
+                    exit;
                 } catch (Exception $e) {
                     $mensagem = "Erro ao atualizar usuário: " . $e->getMessage();
                     $tipo_mensagem = "error";
@@ -290,12 +310,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             case 'delete':
                 try {
+                    // Verificar se o usuário existe antes de excluir
+                    $stmt_check = $pdo->prepare("SELECT id FROM usuarios WHERE id = ?");
+                    $stmt_check->execute([$_POST['id']]);
+                    if (!$stmt_check->fetch()) {
+                        throw new Exception("Usuário não encontrado.");
+                    }
+                    
                     $stmt = $pdo->prepare("DELETE FROM usuarios WHERE id = ?");
                     $stmt->execute([$_POST['id']]);
-                    $mensagem = "Usuário excluído com sucesso!";
-                    $tipo_mensagem = "success";
+                    
+                    // Redirecionar para evitar reenvio do formulário
+                    header('Location: usuarios.php?msg=deleted');
+                    exit;
                 } catch (PDOException $e) {
                     $mensagem = "Erro ao excluir usuário: " . $e->getMessage();
+                    $tipo_mensagem = "error";
+                } catch (Exception $e) {
+                    $mensagem = $e->getMessage();
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -304,35 +336,94 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 // Buscar usuários com informações da empresa (incluindo ocultos para admins)
+// Usar subquery para pegar apenas o registro mais antigo (menor ID) de cada email
 try {
+    // Buscar todos os usuários usando subqueries para evitar duplicação no JOIN
+    // Isso garante que cada usuário apareça apenas uma vez, mesmo se houver múltiplos registros em empresa_clientes
+    // Usar DISTINCT para garantir unicidade
     $stmt = $pdo->query("
-        SELECT u.*, e.razao_social as empresa_nome, e.empresa_adm_id 
+        SELECT DISTINCT
+            u.id, u.nome, u.email, u.senha, u.empresa_id, u.tipo_usuario, 
+            u.status, u.is_admin, u.is_oculto, u.acesso_todas_empresas, u.data_cadastro,
+            COALESCE(
+                (SELECT razao_social FROM empresa_clientes WHERE id = u.empresa_id LIMIT 1),
+                'N/A'
+            ) as empresa_nome,
+            COALESCE(
+                (SELECT empresa_adm_id FROM empresa_clientes WHERE id = u.empresa_id LIMIT 1),
+                NULL
+            ) as empresa_adm_id
         FROM usuarios u 
-        LEFT JOIN empresa_clientes e ON u.empresa_id = e.id 
-        ORDER BY u.is_oculto DESC, u.nome
+        ORDER BY u.is_oculto DESC, u.nome, u.id
     ");
-    $usuarios = $stmt->fetchAll();
+    $todos_usuarios = $stmt->fetchAll();
     
-    // Adicionar empresa_adm_id aos usuários para o JavaScript (caso não tenha vindo do JOIN)
-    foreach ($usuarios as &$usuario) {
-        if (empty($usuario['empresa_adm_id']) && !empty($usuario['empresa_id'])) {
-            $stmt_emp = $pdo->prepare("SELECT empresa_adm_id FROM empresa_clientes WHERE id = ?");
-            $stmt_emp->execute([$usuario['empresa_id']]);
+    // Filtrar apenas duplicados por ID usando array associativo (mais eficiente e seguro)
+    // NÃO filtrar por email - se o banco está correto, todos os usuários devem aparecer
+    $usuarios_por_id = [];
+    foreach ($todos_usuarios as $usuario) {
+        $id = $usuario['id'];
+        // Usar ID como chave do array - garante unicidade automaticamente
+        if (!isset($usuarios_por_id[$id])) {
+            $usuarios_por_id[$id] = $usuario;
+        }
+    }
+    
+    // Converter de volta para array indexado e garantir ordem
+    $usuarios = array_values($usuarios_por_id);
+    
+    // Debug: verificar se há duplicados (remover depois)
+    $ids_finais = array_column($usuarios, 'id');
+    $ids_unicos = array_unique($ids_finais);
+    if (count($ids_finais) !== count($ids_unicos)) {
+        error_log("AVISO: Há IDs duplicados no array usuarios! Total: " . count($ids_finais) . ", Únicos: " . count($ids_unicos));
+    }
+    
+    // Garantir que empresa_adm_id esteja sempre preenchido para todos os usuários
+    // Usar índice numérico para evitar problemas com referências
+    for ($i = 0; $i < count($usuarios); $i++) {
+        // Se empresa_adm_id estiver vazio/null, buscar novamente
+        if (empty($usuarios[$i]['empresa_adm_id']) && !empty($usuarios[$i]['empresa_id'])) {
+            $stmt_emp = $pdo->prepare("SELECT empresa_adm_id FROM empresa_clientes WHERE id = ? LIMIT 1");
+            $stmt_emp->execute([$usuarios[$i]['empresa_id']]);
             $emp = $stmt_emp->fetch();
-            if ($emp) {
-                $usuario['empresa_adm_id'] = $emp['empresa_adm_id'];
+            if ($emp && !empty($emp['empresa_adm_id'])) {
+                $usuarios[$i]['empresa_adm_id'] = $emp['empresa_adm_id'];
+            }
+        }
+        // Se ainda estiver vazio, tentar buscar de outra forma
+        if (empty($usuarios[$i]['empresa_adm_id']) && !empty($usuarios[$i]['empresa_id'])) {
+            $stmt_emp = $pdo->prepare("
+                SELECT ec.empresa_adm_id 
+                FROM empresa_clientes ec 
+                WHERE ec.id = ? 
+                LIMIT 1
+            ");
+            $stmt_emp->execute([$usuarios[$i]['empresa_id']]);
+            $emp = $stmt_emp->fetch(PDO::FETCH_ASSOC);
+            if ($emp && isset($emp['empresa_adm_id']) && !empty($emp['empresa_adm_id'])) {
+                $usuarios[$i]['empresa_adm_id'] = $emp['empresa_adm_id'];
             }
         }
     }
 
     // Buscar empresas para o select
+    // Usar razao_social de empresa_clientes (que é o que aparece na listagem de usuários)
+    // IMPORTANTE: usar empresa_clientes.razao_social, não empresa_adm.razao_social
     $stmt = $pdo->query("
-        SELECT ea.id as empresa_adm_id, ea.razao_social 
-        FROM empresa_adm ea 
-        INNER JOIN empresa_clientes ec ON ea.id = ec.empresa_adm_id 
-        ORDER BY ea.razao_social
+        SELECT DISTINCT
+            ec.empresa_adm_id,
+            ec.razao_social 
+        FROM empresa_clientes ec 
+        WHERE ec.status = 'ativo'
+        ORDER BY ec.razao_social ASC
     ");
     $empresas = $stmt->fetchAll();
+    
+    // Debug: verificar se as empresas estão sendo carregadas corretamente
+    if (empty($empresas)) {
+        error_log("AVISO: Nenhuma empresa encontrada para o select em usuarios.php");
+    }
 } catch (PDOException $e) {
     $mensagem = "Erro ao carregar dados: " . $e->getMessage();
     $tipo_mensagem = "error";
@@ -534,7 +625,16 @@ try {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($usuarios as $usuario): ?>
+                    <?php 
+                    $ids_exibidos = [];
+                    foreach ($usuarios as $usuario): 
+                        // Proteção extra: garantir que cada ID seja exibido apenas uma vez
+                        $id = $usuario['id'];
+                        if (in_array($id, $ids_exibidos)) {
+                            continue; // Pular se já foi exibido
+                        }
+                        $ids_exibidos[] = $id;
+                    ?>
                         <tr>
                             <td><?php echo htmlspecialchars($usuario['nome']); ?></td>
                             <td><?php echo htmlspecialchars($usuario['email']); ?></td>
@@ -571,7 +671,17 @@ try {
                             </td>
                             <td><?php echo date('d/m/Y', strtotime($usuario['data_cadastro'])); ?></td>
                             <td class="actions">
-                                <button class="btn" onclick="showEditModal(<?php echo htmlspecialchars(json_encode($usuario)); ?>)">
+                                <button class="btn" onclick="showEditModal(<?php 
+                                    // Garantir que empresa_adm_id seja sempre um valor válido (não null)
+                                    $usuario_js = $usuario;
+                                    if (empty($usuario_js['empresa_adm_id']) || $usuario_js['empresa_adm_id'] === null) {
+                                        $usuario_js['empresa_adm_id'] = '';
+                                    } else {
+                                        // Garantir que seja string ou número
+                                        $usuario_js['empresa_adm_id'] = (string)$usuario_js['empresa_adm_id'];
+                                    }
+                                    echo htmlspecialchars(json_encode($usuario_js, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)); 
+                                ?>)">
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 <button class="btn btn-danger" onclick="confirmDelete(<?php echo $usuario['id']; ?>)">
@@ -716,16 +826,51 @@ try {
 
         function showEditModal(usuario) {
             document.getElementById('edit_id').value = usuario.id;
-            document.getElementById('edit_nome').value = usuario.nome;
-            document.getElementById('edit_email').value = usuario.email;
-            document.getElementById('edit_empresa_id').value = usuario.empresa_adm_id;
+            document.getElementById('edit_nome').value = usuario.nome || '';
+            document.getElementById('edit_email').value = usuario.email || '';
+            
+            // Definir empresa - garantir que o valor seja válido
+            let empresaAdmId = usuario.empresa_adm_id;
+            if (!empresaAdmId || empresaAdmId === 'null' || empresaAdmId === 'undefined') {
+                // Se empresa_adm_id não estiver disponível, tentar buscar via empresa_id
+                console.warn('empresa_adm_id não encontrado para usuário:', usuario.id);
+                empresaAdmId = '';
+            }
+            
+            // Verificar se o valor existe nas opções do select
+            const selectEmpresa = document.getElementById('edit_empresa_id');
+            
+            // Converter para string para comparação correta
+            empresaAdmId = String(empresaAdmId);
+            
+            // Debug: mostrar valores disponíveis
+            console.log('Buscando empresa_adm_id:', empresaAdmId);
+            console.log('Opções disponíveis:', Array.from(selectEmpresa.options).map(opt => ({value: opt.value, text: opt.text})));
+            
+            // Tentar encontrar a opção (comparação estrita como string)
+            let optionFound = false;
+            for (let i = 0; i < selectEmpresa.options.length; i++) {
+                if (String(selectEmpresa.options[i].value) === empresaAdmId) {
+                    selectEmpresa.selectedIndex = i;
+                    optionFound = true;
+                    console.log('Empresa selecionada:', selectEmpresa.options[i].text);
+                    break;
+                }
+            }
+            
+            if (!optionFound && empresaAdmId) {
+                console.warn('Empresa ID não encontrado nas opções:', empresaAdmId, 'para usuário:', usuario.id);
+                selectEmpresa.value = '';
+            }
+            
             // Mapear o valor para o select
             let tipoUsuario = usuario.tipo_usuario;
             if (tipoUsuario === 'gestor') {
                 tipoUsuario = 'gestor'; // Mantém como gestor para o value
             }
-            document.getElementById('edit_tipo_usuario').value = tipoUsuario;
-            document.getElementById('edit_status').value = usuario.status;
+            document.getElementById('edit_tipo_usuario').value = tipoUsuario || 'gestor';
+            document.getElementById('edit_status').value = usuario.status || 'ativo';
+            
             // Preencher checkboxes
             document.getElementById('edit_is_oculto').checked = usuario.is_oculto == 1;
             document.getElementById('edit_acesso_todas_empresas').checked = usuario.acesso_todas_empresas == 1;

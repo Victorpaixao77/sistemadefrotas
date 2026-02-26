@@ -30,10 +30,27 @@ try {
     $stmt->execute([$empresa_id]);
     $config_fiscal = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // Buscar certificado digital
-    $stmt = $conn->prepare("SELECT * FROM fiscal_certificados_digitais WHERE empresa_id = ? AND ativo = 1 ORDER BY data_vencimento DESC LIMIT 1");
-    $stmt->execute([$empresa_id]);
-    $certificado = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Buscar certificado digital: priorizar o certificado configurado em `configuracoes.certificado_a1_id`
+    $certificado = null;
+    try {
+        $stmtCfg = $conn->prepare("SELECT certificado_a1_id FROM configuracoes WHERE empresa_id = ? LIMIT 1");
+        $stmtCfg->execute([$empresa_id]);
+        $cfg = $stmtCfg->fetch(PDO::FETCH_ASSOC);
+        if ($cfg && !empty($cfg['certificado_a1_id'])) {
+            $stmt = $conn->prepare("SELECT * FROM fiscal_certificados_digitais WHERE empresa_id = ? AND id = ? AND ativo = 1 LIMIT 1");
+            $stmt->execute([$empresa_id, $cfg['certificado_a1_id']]);
+            $certificado = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+    } catch (Exception $e) {
+        // Se der erro ao buscar pela configuração principal, continua com o fallback abaixo
+    }
+    
+    // Fallback: se não houver certificado configurado, usar o mais recente por data de vencimento
+    if (!$certificado) {
+        $stmt = $conn->prepare("SELECT * FROM fiscal_certificados_digitais WHERE empresa_id = ? AND ativo = 1 ORDER BY data_vencimento DESC LIMIT 1");
+        $stmt->execute([$empresa_id]);
+        $certificado = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
     
     if (!$certificado) {
         echo json_encode([

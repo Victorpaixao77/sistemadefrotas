@@ -161,9 +161,9 @@ function buildComissoesQueryParts(array $filters, int $empresa_id): array
     return [$conditions, $params];
 }
 
-function getComissoes(array $filters, int $page, int $empresa_id, PDO $conn): array
+function getComissoes(array $filters, int $page, int $empresa_id, PDO $conn, int $per_page = 10): array
 {
-    $limit = 5;
+    $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
     $offset = ($page - 1) * $limit;
 
     [$conditions, $params] = buildComissoesQueryParts($filters, $empresa_id);
@@ -418,6 +418,10 @@ function getComissoesFilterData(int $empresa_id): array
 }
 
 $pagina_atual = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+$per_page = isset($_GET['per_page']) ? (int) $_GET['per_page'] : 10;
+if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
+    $per_page = 10;
+}
 
 $filters = [
     'mes' => '',
@@ -440,7 +444,7 @@ if (!empty($_GET['veiculo'])) {
 
 $filters['search'] = trim($_GET['search'] ?? '');
 
-$resultado = getComissoes($filters, $pagina_atual, $empresa_id, $conn);
+$resultado = getComissoes($filters, $pagina_atual, $empresa_id, $conn, $per_page);
 $comissoes = $resultado['comissoes'];
 $resumo = $resultado['resumo'];
 $total_paginas = $resultado['total_paginas'];
@@ -705,6 +709,20 @@ function formatarDataRota(?string $data): string
             outline: none;
         }
 
+        .filter-options .filter-label {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            margin-right: 0.25rem;
+        }
+        .filter-options .filter-per-page {
+            padding: 6px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
         .filter-options .btn-restore-layout {
             border: none;
             background: none;
@@ -805,12 +823,21 @@ function formatarDataRota(?string $data): string
                     </div>
                 </div>
 
-                <form class="filter-section" method="GET">
+                <form class="filter-section" method="GET" id="comissoesFilterForm">
+                    <input type="hidden" name="page" id="comissoesFormPage" value="<?php echo $pagina_atual; ?>">
                     <div class="search-box">
                         <input type="text" id="searchCommission" name="search" value="<?php echo htmlspecialchars($_GET['search'] ?? ''); ?>" placeholder="Buscar por motorista, veículo ou data...">
                         <i class="fas fa-search"></i>
                     </div>
                     <div class="filter-options">
+                        <span class="filter-label">Por página</span>
+                        <select name="per_page" class="filter-per-page" onchange="document.getElementById('comissoesFormPage').value=1; this.form.submit();">
+                            <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                            <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                            <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                            <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                            <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                        </select>
                         <select id="mes" name="mes" title="Período">
                             <option value="">Todos os períodos</option>
                             <?php foreach ($periodos as $periodo): ?>
@@ -922,22 +949,19 @@ function formatarDataRota(?string $data): string
                     </table>
                 </div>
 
+                <?php
+                $total_reg_com = (int)($resultado['total'] ?? 0);
+                $params_prev = array_filter(array_merge($filters, ['per_page' => $per_page, 'page' => max(1, $pagina_atual - 1)]));
+                $params_next = array_filter(array_merge($filters, ['per_page' => $per_page, 'page' => min($total_paginas, $pagina_atual + 1)]));
+                ?>
                 <div class="pagination">
-                    <button 
-                        class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" 
-                        id="prevPageBtn"
-                        <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>>
-                        <i class="fas fa-chevron-left"></i>
-                    </button>
-                    <span class="pagination-info">
-                        Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
-                    </span>
-                    <button 
-                        class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>" 
-                        id="nextPageBtn"
-                        <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>>
-                        <i class="fas fa-chevron-right"></i>
-                    </button>
+                    <a href="<?php echo $pagina_atual <= 1 ? '#' : '?' . http_build_query($params_prev); ?>" 
+                       class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" 
+                       id="prevPageBtn"><i class="fas fa-chevron-left"></i></a>
+                    <span class="pagination-info">Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?> (<?php echo $total_reg_com; ?> registros)</span>
+                    <a href="<?php echo $pagina_atual >= $total_paginas ? '#' : '?' . http_build_query($params_next); ?>" 
+                       class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>" 
+                       id="nextPageBtn"><i class="fas fa-chevron-right"></i></a>
                 </div>
 
                 <div class="commission-charts">
@@ -1024,24 +1048,11 @@ function formatarDataRota(?string $data): string
             const currentPage = <?php echo $pagina_atual; ?>;
             const totalPages = <?php echo $total_paginas; ?>;
 
-            if (prevBtn) {
-                prevBtn.addEventListener('click', function () {
-                    if (!prevBtn.disabled && currentPage > 1) {
-                        const params = new URLSearchParams(window.location.search);
-                        params.set('page', currentPage - 1);
-                        window.location.search = params.toString();
-                    }
-                });
+            if (prevBtn && prevBtn.classList.contains('disabled')) {
+                prevBtn.addEventListener('click', function (e) { e.preventDefault(); });
             }
-
-            if (nextBtn) {
-                nextBtn.addEventListener('click', function () {
-                    if (!nextBtn.disabled && currentPage < totalPages) {
-                        const params = new URLSearchParams(window.location.search);
-                        params.set('page', currentPage + 1);
-                        window.location.search = params.toString();
-                    }
-                });
+            if (nextBtn && nextBtn.classList.contains('disabled')) {
+                nextBtn.addEventListener('click', function (e) { e.preventDefault(); });
             }
 
             const exportBtn = document.getElementById('exportCsvBtn');
