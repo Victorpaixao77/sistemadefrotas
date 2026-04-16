@@ -6,6 +6,9 @@ header('Content-Type: application/json');
 // Incluir configurações principais
 require_once dirname(__DIR__, 2) . '/includes/config.php';
 require_once dirname(__DIR__, 2) . '/includes/functions.php';
+require_once dirname(__DIR__, 2) . '/includes/pneu_movimentacoes_helper.php';
+require_once dirname(__DIR__, 2) . '/includes/csrf.php';
+require_once dirname(__DIR__, 2) . '/includes/api_json.php';
 
 // Configurar sessão
 configure_session();
@@ -154,6 +157,7 @@ try {
         echo json_encode(['success' => true, 'eixos' => $eixos]);
         
     } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        api_require_csrf_json();
         // Processar requisições POST
         $input = json_decode(file_get_contents('php://input'), true);
         $post_action = $action; // Usar o action da URL, não do corpo
@@ -290,6 +294,30 @@ try {
                     $stmt->execute([$eixo_id, $pneu_id, $posicao_slot, $slot_id, $empresa_id]);
                 }
                 
+                // Atualizar status do pneu para "em uso" na página Pneus
+                $stmt = $conn->prepare("SELECT id FROM status_pneus WHERE LOWER(TRIM(nome)) IN ('em uso', 'em_uso') LIMIT 1");
+                $stmt->execute();
+                $status_row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($status_row) {
+                    $stmt = $conn->prepare("UPDATE pneus SET status_id = ? WHERE id = ? AND empresa_id = ?");
+                    $stmt->execute([$status_row['id'], $pneu_id, $empresa_id]);
+                }
+                
+                // Histórico único: instalação no veículo
+                $stmt = $conn->prepare("SELECT veiculo_id FROM eixos_veiculos WHERE id = ? AND empresa_id = ?");
+                $stmt->execute([$eixo_id, $empresa_id]);
+                $eixo_row = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($eixo_row) {
+                    pneu_movimentacao_inserir($conn, [
+                        'empresa_id'  => $empresa_id,
+                        'pneu_id'     => (int) $pneu_id,
+                        'tipo'        => 'instalacao',
+                        'veiculo_id'  => (int) $eixo_row['veiculo_id'],
+                        'eixo_id'     => (int) $eixo_id,
+                        'posicao_id'  => $posicao_id ? (int) $posicao_id : null,
+                    ]);
+                }
+                
                 ob_clean();
                 echo json_encode(['success' => true, 'message' => 'Pneu alocado com sucesso']);
                 break;
@@ -303,9 +331,42 @@ try {
                     exit;
                 }
                 
+                // Obter pneu_id e eixo antes de desativar para movimentação e status
+                $stmt = $conn->prepare("SELECT apf.pneu_id, apf.eixo_veiculo_id FROM alocacoes_pneus_flexiveis apf WHERE apf.slot_id = ? AND apf.empresa_id = ? AND apf.ativo = 1 LIMIT 1");
+                $stmt->execute([$slot_id, $empresa_id]);
+                $aloc = $stmt->fetch(PDO::FETCH_ASSOC);
+                $pneu_id_removido = $aloc ? (int)$aloc['pneu_id'] : null;
+                $eixo_veiculo_id = $aloc ? (int)$aloc['eixo_veiculo_id'] : null;
+                
                 // Desativar alocação
                 $stmt = $conn->prepare("UPDATE alocacoes_pneus_flexiveis SET ativo = 0, data_remocao = NOW() WHERE slot_id = ? AND empresa_id = ? AND ativo = 1");
                 $stmt->execute([$slot_id, $empresa_id]);
+                
+                // Atualizar status do pneu para "usado" na página Pneus (quando removido do veículo)
+                if ($pneu_id_removido) {
+                    $stmt = $conn->prepare("SELECT id FROM status_pneus WHERE LOWER(TRIM(nome)) = 'usado' LIMIT 1");
+                    $stmt->execute();
+                    $status_row = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if ($status_row) {
+                        $stmt = $conn->prepare("UPDATE pneus SET status_id = ? WHERE id = ? AND empresa_id = ?");
+                        $stmt->execute([$status_row['id'], $pneu_id_removido, $empresa_id]);
+                    }
+                    // Histórico único: remoção do veículo
+                    if ($eixo_veiculo_id) {
+                        $stmt = $conn->prepare("SELECT veiculo_id FROM eixos_veiculos WHERE id = ? AND empresa_id = ?");
+                        $stmt->execute([$eixo_veiculo_id, $empresa_id]);
+                        $ev = $stmt->fetch(PDO::FETCH_ASSOC);
+                        if ($ev) {
+                            pneu_movimentacao_inserir($conn, [
+                                'empresa_id' => $empresa_id,
+                                'pneu_id'    => $pneu_id_removido,
+                                'tipo'       => 'remocao',
+                                'veiculo_id' => (int) $ev['veiculo_id'],
+                                'eixo_id'    => $eixo_veiculo_id,
+                            ]);
+                        }
+                    }
+                }
                 
                 ob_clean();
                 echo json_encode(['success' => true, 'message' => 'Pneu removido com sucesso']);

@@ -137,10 +137,22 @@ try {
                 }
             }
             
-            if (!empty($_GET['status'])) {
-                $sql .= " AND r.no_prazo = :status";
-                $count_sql .= " AND r.no_prazo = :status";
-                $params[':status'] = $_GET['status'] === 'no_prazo' ? 1 : 0;
+            // Filtro por entrega no prazo / atrasado (parâmetro delivery; status legado)
+            $delivery = isset($_GET['delivery']) ? trim((string) $_GET['delivery']) : '';
+            if ($delivery === '' && !empty($_GET['status'])) {
+                $legacy = trim((string) $_GET['status']);
+                if ($legacy === 'no_prazo') {
+                    $delivery = 'no_prazo';
+                } elseif ($legacy === 'atrasado') {
+                    $delivery = 'atrasado';
+                }
+            }
+            if ($delivery === 'no_prazo') {
+                $sql .= ' AND r.no_prazo = 1';
+                $count_sql .= ' AND r.no_prazo = 1';
+            } elseif ($delivery === 'atrasado') {
+                $sql .= ' AND r.no_prazo = 0';
+                $count_sql .= ' AND r.no_prazo = 0';
             }
             
             if (!empty($_GET['driver'])) {
@@ -175,8 +187,32 @@ try {
             $stmt_count->execute();
             $total = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
             
-            // Ordena por data mais recente e adiciona paginação
-            $sql .= " ORDER BY r.data_rota DESC, r.id DESC LIMIT :limit OFFSET :offset";
+            $sortKey = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'data_rota';
+            $allowedSort = [
+                'data_rota' => 'r.data_rota',
+                'motorista_nome' => 'm.nome',
+                'veiculo_placa' => 'v.placa',
+                'rota' => 'CONCAT(COALESCE(co.nome, ""), " ", COALESCE(cd.nome, ""))',
+                'distancia_km' => 'r.distancia_km',
+                'frete' => 'r.frete',
+                'id' => 'r.id',
+                'data_saida' => 'r.data_saida',
+                'data_chegada' => 'r.data_chegada',
+                'km_saida' => 'r.km_saida',
+                'km_chegada' => 'r.km_chegada',
+                'km_vazio' => 'r.km_vazio',
+                'total_km' => 'r.total_km',
+                'comissao' => 'r.comissao',
+                'eficiencia_viagem' => 'r.eficiencia_viagem',
+                'percentual_vazio' => 'r.percentual_vazio',
+                'peso_carga' => 'r.peso_carga',
+                'descricao_carga' => 'r.descricao_carga',
+                'no_prazo' => 'r.no_prazo',
+            ];
+            $orderCol = $allowedSort[$sortKey] ?? 'r.data_rota';
+            $dir = (isset($_GET['dir']) && strtoupper(trim((string) $_GET['dir'])) === 'ASC') ? 'ASC' : 'DESC';
+
+            $sql .= ' ORDER BY ' . $orderCol . ' ' . $dir . ', r.id DESC LIMIT :limit OFFSET :offset';
             
             $stmt = $conn->prepare($sql);
             foreach ($params as $key => &$val) {

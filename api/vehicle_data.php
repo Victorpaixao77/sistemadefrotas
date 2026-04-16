@@ -5,6 +5,8 @@
 require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
+require_once '../includes/csrf.php';
+require_once '../includes/api_json.php';
 
 // Configure session before starting it
 configure_session();
@@ -40,6 +42,7 @@ switch ($action) {
     case 'add':
         // Process add vehicle request (POST)
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            api_require_csrf_json();
             $data = json_decode(file_get_contents('php://input'), true);
             echo json_encode(addVehicle($data));
         } else {
@@ -51,6 +54,7 @@ switch ($action) {
     case 'update':
         // Process update vehicle request (POST/PUT)
         if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'PUT') {
+            api_require_csrf_json();
             $data = json_decode(file_get_contents('php://input'), true);
             if ($vehicleId) {
                 echo json_encode(updateVehicle($vehicleId, $data));
@@ -68,6 +72,7 @@ switch ($action) {
         // Process delete vehicle request (DELETE)
         if ($_SERVER['REQUEST_METHOD'] === 'DELETE' || 
             ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['_method']) && $_GET['_method'] === 'DELETE')) {
+            api_require_csrf_json();
             if ($vehicleId) {
                 echo json_encode(deleteVehicle($vehicleId));
             } else {
@@ -114,15 +119,15 @@ switch ($action) {
 
 /**
  * Get list of vehicles with optional filtering
+ * GET: page, limit, search (placa/modelo/marca), status (status_id), marca
  * 
- * @return array List of vehicles and pagination info
+ * @return array List of vehicles, pagination and summary
  */
 function getVehiclesList() {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
         
-        // Parâmetros de paginação (por página: 5, 10, 25, 50, 100; padrão 10)
         $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
         if (!in_array($limit, [5, 10, 25, 50, 100], true)) {
@@ -130,14 +135,77 @@ function getVehiclesList() {
         }
         $offset = ($page - 1) * $limit;
         
-        // Get total count
-        $sql_count = "SELECT COUNT(*) as total FROM veiculos WHERE empresa_id = :empresa_id";
-        $stmt_count = $conn->prepare($sql_count);
-        $stmt_count->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        $stmt_count->execute();
-        $total = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
+        $where = ['v.empresa_id = :empresa_id'];
+        $params = [':empresa_id' => $empresa_id];
         
-        // Get vehicles with pagination
+        $search = isset($_GET['search']) ? trim($_GET['search']) : '';
+        if ($search !== '') {
+            // PDO MySQL (prepareds nativos) não reutiliza o mesmo placeholder várias vezes — um bind por ocorrência
+            $like = '%' . $search . '%';
+            $where[] = '(v.placa LIKE :search_placa OR v.modelo LIKE :search_modelo OR v.marca LIKE :search_marca)';
+            $params[':search_placa'] = $like;
+            $params[':search_modelo'] = $like;
+            $params[':search_marca'] = $like;
+        }
+        
+        $status = isset($_GET['status']) ? $_GET['status'] : '';
+        if ($status !== '' && in_array($status, ['1', '2', '3'], true)) {
+            $where[] = 'v.status_id = :status_id';
+            $params[':status_id'] = (int) $status;
+        }
+        
+        $marca = isset($_GET['marca']) ? trim($_GET['marca']) : '';
+        if ($marca !== '') {
+            $where[] = 'v.marca LIKE :marca';
+            $params[':marca'] = '%' . $marca . '%';
+        }
+        
+        $whereClause = implode(' AND ', $where);
+
+        $sortKey = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'placa';
+        $allowedSort = [
+            'placa' => 'v.placa',
+            'modelo' => 'v.modelo',
+            'marca' => 'v.marca',
+            'ano' => 'v.ano',
+            'status_nome' => 's.nome',
+            'cavalo_nome' => 'cv.nome',
+            'carreta_nome' => 'cr.nome',
+            'km_atual' => 'v.km_atual',
+        ];
+        $orderCol = $allowedSort[$sortKey] ?? 'v.placa';
+        $dir = (isset($_GET['dir']) && strtoupper(trim((string) $_GET['dir'])) === 'DESC') ? 'DESC' : 'ASC';
+        
+        // Total filtrado (para paginação)
+        $sql_count = "SELECT COUNT(*) as total FROM veiculos v WHERE $whereClause";
+        $stmt_count = $conn->prepare($sql_count);
+        foreach ($params as $k => $v) {
+            $stmt_count->bindValue($k, $v);
+        }
+        $stmt_count->execute();
+        $total = (int) $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
+        
+        // Summary global (KPIs) – mesmo com filtros, retorna totais da empresa
+        $sql_summary = "SELECT 
+            COUNT(*) as total_veiculos,
+            SUM(CASE WHEN v.status_id = 1 THEN 1 ELSE 0 END) as veiculos_ativos,
+            SUM(CASE WHEN v.status_id = 2 THEN 1 ELSE 0 END) as veiculos_manutencao,
+            COALESCE(SUM(v.km_atual), 0) as quilometragem_total
+            FROM veiculos v 
+            WHERE v.empresa_id = :empresa_id";
+        $stmt_summary = $conn->prepare($sql_summary);
+        $stmt_summary->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt_summary->execute();
+        $summary_row = $stmt_summary->fetch(PDO::FETCH_ASSOC);
+        
+        $summary = [
+            'totalVehicles' => (int) ($summary_row['total_veiculos'] ?? 0),
+            'activeVehicles' => (int) ($summary_row['veiculos_ativos'] ?? 0),
+            'maintenanceVehicles' => (int) ($summary_row['veiculos_manutencao'] ?? 0),
+            'totalMileage' => (float) ($summary_row['quilometragem_total'] ?? 0),
+        ];
+        
+        // Lista com paginação e filtros
         $sql = "SELECT v.*, 
                 s.nome as status_nome, 
                 tc.nome as tipo_combustivel_nome,
@@ -151,32 +219,38 @@ function getVehiclesList() {
                 LEFT JOIN tipos_combustivel tc ON v.tipo_combustivel_id = tc.id 
                 LEFT JOIN tipos_cavalos cv ON v.id_cavalo = cv.id
                 LEFT JOIN tipos_carretas cr ON v.id_carreta = cr.id
-                WHERE v.empresa_id = :empresa_id
-                ORDER BY v.id DESC
+                WHERE $whereClause
+                ORDER BY $orderCol $dir, v.id ASC
                 LIMIT :limit OFFSET :offset";
-                
+        
         $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
         
         $vehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
+        $total_pages = $limit > 0 ? (int) ceil($total / $limit) : 1;
+        
         return [
+            'success' => true,
             'data' => $vehicles,
             'pagination' => [
                 'page' => $page,
                 'limit' => $limit,
                 'total' => $total,
-                'totalPages' => ceil($total / $limit)
-            ]
+                'totalPages' => $total_pages
+            ],
+            'summary' => $summary
         ];
         
     } catch(PDOException $e) {
         error_log("Error in getVehiclesList: " . $e->getMessage());
         http_response_code(500);
-        return ['error' => 'Database error occurred'];
+        return ['success' => false, 'error' => 'Database error occurred'];
     }
 }
 

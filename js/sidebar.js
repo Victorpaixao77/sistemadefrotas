@@ -3,6 +3,16 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
+    var mainContent = document.querySelector('.main-content');
+    if (mainContent) {
+        if (!mainContent.id) {
+            mainContent.id = 'conteudo-principal';
+        }
+        if (!mainContent.hasAttribute('tabindex')) {
+            mainContent.setAttribute('tabindex', '-1');
+        }
+    }
+
     // Initialize sidebar state
     initializeSidebar();
     
@@ -76,73 +86,121 @@ function setupMobileMenu() {
     const sidebar = document.querySelector('.sidebar');
     const sidebarOverlay = document.querySelector('.sidebar-overlay');
     
-    if (mobileMenuToggle && sidebar && sidebarOverlay) {
-        // Open sidebar on toggle click
-        mobileMenuToggle.addEventListener('click', () => {
-            sidebar.classList.add('active');
-            sidebarOverlay.classList.add('active');
-            document.body.style.overflow = 'hidden'; // Prevent scrolling
-        });
-        
-        // Close sidebar when clicking overlay
-        sidebarOverlay.addEventListener('click', () => {
-            sidebar.classList.remove('active');
-            sidebarOverlay.classList.remove('active');
-            document.body.style.overflow = ''; // Enable scrolling
-        });
+    if (!mobileMenuToggle || !sidebar || !sidebarOverlay) {
+        return;
     }
+
+    function setMobileMenuOpen(isOpen) {
+        mobileMenuToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        mobileMenuToggle.setAttribute('aria-label', isOpen ? 'Fechar menu de navegação' : 'Abrir menu de navegação');
+    }
+
+    function closeMobileSidebar(options) {
+        var returnFocus = options && options.returnFocus;
+        if (!sidebar.classList.contains('active')) {
+            return;
+        }
+        sidebar.classList.remove('active');
+        sidebarOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+        setMobileMenuOpen(false);
+        if (returnFocus) {
+            mobileMenuToggle.focus();
+        }
+    }
+
+    function openMobileSidebar() {
+        sidebar.classList.add('active');
+        sidebarOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        setMobileMenuOpen(true);
+    }
+
+    mobileMenuToggle.addEventListener('click', function () {
+        if (sidebar.classList.contains('active')) {
+            closeMobileSidebar({ returnFocus: false });
+        } else {
+            openMobileSidebar();
+        }
+    });
+
+    sidebarOverlay.addEventListener('click', function () {
+        closeMobileSidebar({ returnFocus: true });
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') {
+            return;
+        }
+        if (!sidebar.classList.contains('active')) {
+            return;
+        }
+        e.preventDefault();
+        closeMobileSidebar({ returnFocus: true });
+    });
+
+    sidebar.addEventListener('click', function (e) {
+        var a = e.target.closest('a[href]');
+        if (!a || a.classList.contains('sidebar-dropdown-toggle')) {
+            return;
+        }
+        var href = (a.getAttribute('href') || '').trim();
+        if (href === '#' || href.indexOf('javascript:') === 0) {
+            return;
+        }
+        if (sidebar.classList.contains('active')) {
+            closeMobileSidebar({ returnFocus: false });
+        }
+    });
 }
 
 /**
- * Initialize dropdown menu states from localStorage
+ * Initialize dropdown menu states from localStorage + servidor (data-dropdown-open / .active no submenu)
  */
 function initializeDropdowns() {
     const pathname = (window.location.pathname || '').replace(/\\/g, '/');
-    const isFiscalPage = /\/fiscal\/pages\/(nfe|cte|mdfe|eventos)\.php$/i.test(pathname);
-    
-    // Get saved dropdown states
+    const isFiscalPage = /\/fiscal\/(pages\/(nfe|cte|mdfe|eventos)\.php|index\.php)$/i.test(pathname);
+
     let dropdownStates = {};
-    
     try {
         const savedStates = localStorage.getItem('sidebarDropdowns');
-        
         if (savedStates) {
             dropdownStates = JSON.parse(savedStates);
         }
     } catch (error) {
         console.error('Error parsing saved dropdown states:', error);
     }
-    
-    // Apply saved states (or force open for current section)
+
     const dropdownToggles = document.querySelectorAll('.sidebar-dropdown-toggle');
     const dropdowns = document.querySelectorAll('.sidebar-dropdown');
-    
+
     dropdowns.forEach((dropdown, index) => {
         const parentLink = dropdownToggles[index];
         if (!parentLink) return;
-        
+
         const linkText = (parentLink.querySelector('.sidebar-link-text') && parentLink.querySelector('.sidebar-link-text').textContent) || '';
         const isSistemaFiscal = linkText.indexOf('Sistema Fiscal') !== -1;
-        const shouldOpen = isFiscalPage && isSistemaFiscal ? true : (dropdownStates[index] === true);
-        
+        const hasActiveChild = !!dropdown.querySelector('a.active, .sidebar-dropdown-link.active');
+        const serverOpen = dropdown.getAttribute('data-dropdown-open') === '1';
+        const shouldOpen = serverOpen || hasActiveChild || (isFiscalPage && isSistemaFiscal) || (dropdownStates[index] === true);
+
         if (shouldOpen) {
             dropdown.style.display = 'block';
             parentLink.classList.add('active');
             const icon = parentLink.querySelector('.dropdown-icon');
             if (icon) icon.classList.add('rotate');
         }
-        
-        // Marcar link ativo no submenu quando estiver na página fiscal
+
         if (isFiscalPage && isSistemaFiscal) {
-            dropdown.querySelectorAll('a[href]').forEach(function(a) {
+            dropdown.querySelectorAll('a[href]').forEach(function (a) {
+                if (a.classList.contains('active')) return;
                 const href = (a.getAttribute('href') || '').replace(/^https?:\/\/[^/]*/, '');
-                const hrefPath = href.replace(/^https?:\/\/[^/]*/, '') || href;
-                const match = (pathname === hrefPath || pathname === href) || (pathname.endsWith('cte.php') && href.endsWith('cte.php')) || (pathname.endsWith('nfe.php') && href.endsWith('nfe.php')) || (pathname.endsWith('mdfe.php') && href.endsWith('mdfe.php')) || (pathname.endsWith('eventos.php') && href.endsWith('eventos.php'));
-                a.classList.toggle('active', !!match);
+                const match = (pathname === href) || (pathname.endsWith('cte.php') && href.endsWith('cte.php')) || (pathname.endsWith('nfe.php') && href.endsWith('nfe.php')) || (pathname.endsWith('mdfe.php') && href.endsWith('mdfe.php')) || (pathname.endsWith('eventos.php') && href.endsWith('eventos.php'));
+                if (match) a.classList.add('active');
             });
         }
     });
-    
+
     if (isFiscalPage) {
         saveDropdownStates();
     }

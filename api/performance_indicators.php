@@ -10,6 +10,8 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
 configure_session();
 session_start();
@@ -21,6 +23,9 @@ if (!isset($_SESSION['empresa_id'])) {
 }
 
 $empresa_id = $_SESSION['empresa_id'];
+
+// Valida CSRF apenas para mutações (POST/PUT/PATCH/DELETE).
+api_require_csrf_json();
 $visao = isset($_GET['visao']) ? trim(strtolower($_GET['visao'])) : 'geral';
 if (!in_array($visao, ['geral', 'rotas', 'abastecimento', 'manutencao', 'despesas_viagem', 'despesas_fixas'], true)) {
     $visao = 'geral';
@@ -93,11 +98,11 @@ try {
             }
         }
     } else {
-        $data_inicio = date('Y-m-d', strtotime('-11 months'));
+        $data_inicio = date('Y-m-d', strtotime('-2 months'));
         $data_fim = date('Y-m-d');
     $meses = [];
     $data_formatada = [];
-    for ($i = 11; $i >= 0; $i--) {
+    for ($i = 2; $i >= 0; $i--) {
         $data = date('Y-m', strtotime("-$i months"));
         $meses[] = $data;
             $m = (int)substr($data, 5, 2);
@@ -123,12 +128,12 @@ try {
         }
     }
 
-    $cond_abast = $usar_periodo ? " AND data_abastecimento >= :data_inicio AND data_abastecimento <= :data_fim " : " AND data_abastecimento >= DATE_SUB(NOW(), INTERVAL 12 MONTH) ";
-    $cond_rotas = $usar_periodo ? " AND data_saida >= :data_inicio AND data_saida <= :data_fim " : " AND data_saida >= DATE_SUB(NOW(), INTERVAL 12 MONTH) ";
-    $cond_rotas_r = $usar_periodo ? " AND r.data_saida >= :data_inicio AND r.data_saida <= :data_fim " : " AND r.data_saida >= DATE_SUB(NOW(), INTERVAL 12 MONTH) ";
-    $cond_manut = $usar_periodo ? " AND data_manutencao >= :data_inicio AND data_manutencao <= :data_fim " : " AND data_manutencao >= DATE_SUB(NOW(), INTERVAL 12 MONTH) ";
-    $cond_manut_m = $usar_periodo ? " AND m.data_manutencao >= :data_inicio AND m.data_manutencao <= :data_fim " : " AND m.data_manutencao >= DATE_SUB(NOW(), INTERVAL 12 MONTH) ";
-    $cond_fixas = $usar_periodo ? " AND COALESCE(data_pagamento, vencimento) >= :data_inicio AND COALESCE(data_pagamento, vencimento) <= :data_fim " : " AND COALESCE(data_pagamento, vencimento) >= DATE_SUB(NOW(), INTERVAL 12 MONTH) ";
+    $cond_abast = $usar_periodo ? " AND data_abastecimento >= :data_inicio AND data_abastecimento <= :data_fim " : " AND data_abastecimento >= DATE_SUB(NOW(), INTERVAL 3 MONTH) ";
+    $cond_rotas = $usar_periodo ? " AND data_saida >= :data_inicio AND data_saida <= :data_fim " : " AND data_saida >= DATE_SUB(NOW(), INTERVAL 3 MONTH) ";
+    $cond_rotas_r = $usar_periodo ? " AND r.data_saida >= :data_inicio AND r.data_saida <= :data_fim " : " AND r.data_saida >= DATE_SUB(NOW(), INTERVAL 3 MONTH) ";
+    $cond_manut = $usar_periodo ? " AND data_manutencao >= :data_inicio AND data_manutencao <= :data_fim " : " AND data_manutencao >= DATE_SUB(NOW(), INTERVAL 3 MONTH) ";
+    $cond_manut_m = $usar_periodo ? " AND m.data_manutencao >= :data_inicio AND m.data_manutencao <= :data_fim " : " AND m.data_manutencao >= DATE_SUB(NOW(), INTERVAL 3 MONTH) ";
+    $cond_fixas = $usar_periodo ? " AND COALESCE(data_pagamento, vencimento) >= :data_inicio AND COALESCE(data_pagamento, vencimento) <= :data_fim " : " AND COALESCE(data_pagamento, vencimento) >= DATE_SUB(NOW(), INTERVAL 3 MONTH) ";
 
     // 1. Total de Abastecimentos por mês (incluindo ARLA e litros para consumo KM/L)
     $sql_abastecimentos = "
@@ -189,11 +194,12 @@ try {
         }
     }
     
-    // 3. Despesas de Viagem por mês
+    // 3. Despesas de Viagem por mês (total_despviagem; se zero, soma das rubricas — evita gráficos vazios quando só o detalhe foi lançado)
+    $dvLinha = "CASE WHEN COALESCE(dv.total_despviagem, 0) > 0 THEN dv.total_despviagem ELSE (COALESCE(dv.descarga, 0) + COALESCE(dv.pedagios, 0) + COALESCE(dv.caixinha, 0) + COALESCE(dv.estacionamento, 0) + COALESCE(dv.lavagem, 0) + COALESCE(dv.borracharia, 0) + COALESCE(dv.eletrica_mecanica, 0) + COALESCE(dv.adiantamento, 0)) END";
     $sql_despesas = "
         SELECT 
             DATE_FORMAT(r.data_saida, '%Y-%m') as mes_ano,
-            COALESCE(SUM(dv.total_despviagem), 0) as total_despesas
+            COALESCE(SUM($dvLinha), 0) as total_despesas
         FROM despesas_viagem dv
         INNER JOIN rotas r ON r.id = dv.rota_id
         WHERE r.empresa_id = :empresa_id
@@ -278,22 +284,26 @@ try {
     }
     unset($mes);
     
-    // 5. Quantidade de veículos ativos por mês (veículos que tiveram rotas)
-    foreach ($meses as $mes) {
-        $sql_veiculos_ativos = "
-            SELECT COUNT(DISTINCT v.id) as quantidade
-            FROM veiculos v
-            INNER JOIN rotas r ON r.veiculo_id = v.id
-            WHERE v.empresa_id = :empresa_id
-            AND DATE_FORMAT(r.data_saida, '%Y-%m') = :mes
-        ";
-        $stmt = $conn->prepare($sql_veiculos_ativos);
-        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        $stmt->bindParam(':mes', $mes);
-        $stmt->execute();
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (isset($data_formatada[$mes])) {
-            $data_formatada[$mes]['quantidade_veiculos_ativos'] = (int)($result['quantidade'] ?? 0);
+    // 5. Quantidade de veículos ativos por mês (uma query agregada — evita N round-trips ao banco)
+    $sql_veiculos_por_mes = "
+        SELECT DATE_FORMAT(r.data_saida, '%Y-%m') AS mes_ano,
+               COUNT(DISTINCT v.id) AS quantidade
+        FROM veiculos v
+        INNER JOIN rotas r ON r.veiculo_id = v.id
+        WHERE v.empresa_id = :empresa_id
+        AND r.data_saida >= :data_inicio
+        AND r.data_saida <= :data_fim
+        GROUP BY DATE_FORMAT(r.data_saida, '%Y-%m')
+    ";
+    $stmt = $conn->prepare($sql_veiculos_por_mes);
+    $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+    $stmt->bindValue(':data_inicio', $data_inicio);
+    $stmt->bindValue(':data_fim', $data_fim);
+    $stmt->execute();
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $ma = $row['mes_ano'] ?? '';
+        if ($ma !== '' && isset($data_formatada[$ma])) {
+            $data_formatada[$ma]['quantidade_veiculos_ativos'] = (int)($row['quantidade'] ?? 0);
         }
     }
     
@@ -485,25 +495,51 @@ try {
     }
     unset($v);
     
-    // Consumo por veículo (KM/L) para alertas - período
+    // Consumo por veículo (KM/L): litros agregados em subquery derivada (evita subquery correlacionada por linha)
     $veiculos_consumo = [];
     try {
-        $sub_abast = $usar_periodo
-            ? "(SELECT COALESCE(SUM(a.litros), 0) FROM abastecimentos a WHERE a.veiculo_id = v.id AND a.status = 'aprovado' AND a.data_abastecimento >= :data_inicio AND a.data_abastecimento <= :data_fim)"
-            : "(SELECT COALESCE(SUM(a.litros), 0) FROM abastecimentos a WHERE a.veiculo_id = v.id AND a.status = 'aprovado' AND a.data_abastecimento >= DATE_SUB(NOW(), INTERVAL 12 MONTH))";
-        $cond_consumo_join = $usar_periodo ? " AND r.data_saida >= :data_inicio AND r.data_saida <= :data_fim" : " AND r.data_saida >= DATE_SUB(NOW(), INTERVAL 12 MONTH)";
+        if ($usar_periodo) {
+            $litros_sub = "
+                SELECT veiculo_id, COALESCE(SUM(litros), 0) AS litros_sum
+                FROM abastecimentos
+                WHERE empresa_id = :eid_litros
+                AND status = 'aprovado'
+                AND data_abastecimento >= :d_ini_ab AND data_abastecimento <= :d_fim_ab
+                GROUP BY veiculo_id
+            ";
+            $cond_r_litros = " AND r.data_saida >= :d_ini_r AND r.data_saida <= :d_fim_r ";
+        } else {
+            $litros_sub = "
+                SELECT veiculo_id, COALESCE(SUM(litros), 0) AS litros_sum
+                FROM abastecimentos
+                WHERE empresa_id = :eid_litros
+                AND status = 'aprovado'
+                AND data_abastecimento >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+                GROUP BY veiculo_id
+            ";
+            $cond_r_litros = " AND r.data_saida >= DATE_SUB(NOW(), INTERVAL 12 MONTH) ";
+        }
         $sql_consumo = "
             SELECT v.id, v.placa, v.modelo,
-                COALESCE(SUM(r.distancia_km), 0) as total_km,
-                $sub_abast as total_litros
+                COALESCE(SUM(r.distancia_km), 0) AS total_km,
+                COALESCE(MAX(al.litros_sum), 0) AS total_litros
             FROM veiculos v
-            LEFT JOIN rotas r ON r.veiculo_id = v.id $cond_consumo_join
-            WHERE v.empresa_id = :empresa_id
+            LEFT JOIN rotas r ON r.veiculo_id = v.id {$cond_r_litros}
+            LEFT JOIN ({$litros_sub}) al ON al.veiculo_id = v.id
+            WHERE v.empresa_id = :eid_v
             GROUP BY v.id, v.placa, v.modelo
+            ORDER BY total_km DESC
+            LIMIT 20
         ";
         $stmt = $conn->prepare($sql_consumo);
-        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        if ($usar_periodo) { $stmt->bindValue(':data_inicio', $data_inicio); $stmt->bindValue(':data_fim', $data_fim); }
+        $stmt->bindValue(':eid_v', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindValue(':eid_litros', $empresa_id, PDO::PARAM_INT);
+        if ($usar_periodo) {
+            $stmt->bindValue(':d_ini_ab', $data_inicio);
+            $stmt->bindValue(':d_fim_ab', $data_fim);
+            $stmt->bindValue(':d_ini_r', $data_inicio);
+            $stmt->bindValue(':d_fim_r', $data_fim);
+        }
         $stmt->execute();
         $consumo_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $frota_litros = 0;

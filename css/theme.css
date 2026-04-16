@@ -76,6 +76,23 @@
     background-color: var(--bg-tertiary);
 }
 
+.light-theme .sidebar-nav-item--section-active {
+    background: rgba(59, 130, 246, 0.07);
+}
+
+.light-theme .sidebar-link.active {
+    color: var(--accent-primary);
+    background: rgba(59, 130, 246, 0.12);
+    box-shadow: inset 3px 0 0 var(--accent-primary);
+}
+
+.light-theme .sidebar-dropdown a.active,
+.light-theme .sidebar-dropdown-link.active {
+    color: var(--accent-primary);
+    background: rgba(59, 130, 246, 0.1);
+    box-shadow: inset 2px 0 0 var(--accent-primary);
+}
+
 /* Light theme collapsed sidebar styles */
 .light-theme.sidebar-collapsed .sidebar {
     background-color: var(--bg-sidebar);
@@ -107,6 +124,16 @@ body {
     cursor: pointer;
     overflow: hidden;
     z-index: 1000;
+}
+
+button.theme-toggle {
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    display: block;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .theme-toggle-thumb {

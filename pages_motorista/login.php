@@ -1,18 +1,8 @@
 <?php
 require_once 'config.php';
 
-// Log da sessão para debug
-error_log("=== Página de login ===");
-error_log("Session ID: " . session_id());
-error_log("Session Name: " . session_name());
-error_log("Session Status: " . session_status());
-error_log("Session Data: " . print_r($_SESSION, true));
-error_log("HTTP_REFERER: " . ($_SERVER['HTTP_REFERER'] ?? 'não definido'));
-error_log("HTTP_COOKIE: " . ($_SERVER['HTTP_COOKIE'] ?? 'não definido'));
-
 // Se já estiver logado, redireciona para a página inicial
 if (isset($_SESSION['motorista_id'])) {
-    error_log("Motorista já logado, redirecionando para index.php");
     header('Location: index.php');
     exit;
 }
@@ -20,24 +10,17 @@ if (isset($_SESSION['motorista_id'])) {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    error_log("=== Tentativa de login ===");
-    error_log("POST Data: " . print_r($_POST, true));
-    
     $nome = sanitizar_input($_POST['nome'] ?? '');
     $senha = sanitizar_input($_POST['senha'] ?? '');
     
     if (empty($nome) || empty($senha)) {
         $error = 'Por favor, preencha todos os campos.';
-        error_log("Campos vazios - Nome: " . $nome . ", Senha: " . $senha);
     } else {
         if (login_motorista($nome, $senha)) {
-            error_log("Login bem-sucedido para o motorista: " . $nome);
-            error_log("Session Data após login: " . print_r($_SESSION, true));
             header('Location: index.php');
             exit;
         } else {
-            $error = 'Nome ou senha inválidos.';
-            error_log("Login falhou para o motorista: " . $nome);
+            $error = 'E-mail ou senha inválidos.';
         }
     }
 }
@@ -84,8 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <form method="POST" action="">
                 <div class="mb-3">
-                    <label for="nome" class="form-label">Nome</label>
-                    <input type="text" class="form-control" id="nome" name="nome" required>
+                    <label for="nome" class="form-label">E-mail</label>
+                    <input type="email" class="form-control" id="nome" name="nome" required autocomplete="username" placeholder="mesmo e-mail do cadastro do motorista">
                 </div>
                 
                 <div class="mb-3">

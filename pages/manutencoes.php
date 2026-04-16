@@ -19,6 +19,9 @@ $conn = getConnection();
 // Set page title
 $page_title = "Manutenções";
 
+// Layout moderno (fornc-page); ?classic=1 para o layout anterior
+$is_modern = !isset($_GET['classic']) || (string)$_GET['classic'] !== '1';
+
 // Debug session state
 error_log("Session state in manutencoes.php: " . print_r($_SESSION, true));
 
@@ -220,9 +223,20 @@ function getManutencoes($conn, $page = 1, $opts = []) {
         $offset = ($page - 1) * $per_page;
         $data_inicio = isset($opts['data_inicio']) && $opts['data_inicio'] !== '' ? $opts['data_inicio'] : null;
         $data_fim = isset($opts['data_fim']) && $opts['data_fim'] !== '' ? $opts['data_fim'] : null;
-        $order_by = isset($opts['order_by']) && in_array($opts['order_by'], ['data_manutencao', 'valor', 'veiculo_placa', 'tipo_nome', 'status_nome', 'fornecedor', 'descricao'], true) ? $opts['order_by'] : 'data_manutencao';
+        $allowed_ob = ['data_manutencao', 'valor', 'veiculo_placa', 'tipo_nome', 'status_nome', 'fornecedor', 'descricao', 'custo_12m'];
+        $order_by = isset($opts['order_by']) && in_array($opts['order_by'], $allowed_ob, true) ? $opts['order_by'] : 'data_manutencao';
         $order_dir = isset($opts['order_dir']) && strtoupper($opts['order_dir']) === 'ASC' ? 'ASC' : 'DESC';
-        $cols = ['data_manutencao' => 'm.data_manutencao', 'valor' => 'm.valor', 'veiculo_placa' => 'v.placa', 'tipo_nome' => 'tm.nome', 'status_nome' => 'sm.nome', 'fornecedor' => 'm.fornecedor', 'descricao' => 'm.descricao'];
+        $custo12expr = '(SELECT COALESCE(SUM(m2.valor),0) FROM manutencoes m2 WHERE m2.veiculo_id = m.veiculo_id AND m2.empresa_id = m.empresa_id AND m2.data_manutencao >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH))';
+        $cols = [
+            'data_manutencao' => 'm.data_manutencao',
+            'valor' => 'm.valor',
+            'veiculo_placa' => 'v.placa',
+            'tipo_nome' => 'tm.nome',
+            'status_nome' => 'sm.nome',
+            'fornecedor' => 'm.fornecedor',
+            'descricao' => 'm.descricao',
+            'custo_12m' => $custo12expr,
+        ];
         $order_col = $cols[$order_by] ?? 'm.data_manutencao';
         $where = "m.empresa_id = :empresa_id";
         $params = [':empresa_id' => $empresa_id];
@@ -273,7 +287,8 @@ $per_page = isset($_GET['per_page']) ? max(5, min(100, (int)$_GET['per_page'])) 
 if (!in_array($per_page, [5, 10, 25, 50, 100], true)) $per_page = 10;
 $data_inicio = isset($_GET['data_inicio']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['data_inicio']) ? $_GET['data_inicio'] : '';
 $data_fim = isset($_GET['data_fim']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['data_fim']) ? $_GET['data_fim'] : '';
-$order_by = isset($_GET['order']) && in_array($_GET['order'], ['data_manutencao', 'valor', 'veiculo_placa', 'tipo_nome', 'status_nome', 'fornecedor', 'descricao'], true) ? $_GET['order'] : 'data_manutencao';
+$order_by_allowed = ['data_manutencao', 'valor', 'veiculo_placa', 'tipo_nome', 'status_nome', 'fornecedor', 'descricao', 'custo_12m'];
+$order_by = isset($_GET['order']) && in_array($_GET['order'], $order_by_allowed, true) ? $_GET['order'] : 'data_manutencao';
 $order_dir = isset($_GET['dir']) && strtoupper($_GET['dir']) === 'ASC' ? 'ASC' : 'DESC';
 $opts = ['per_page' => $per_page, 'data_inicio' => $data_inicio ?: null, 'data_fim' => $data_fim ?: null, 'order_by' => $order_by, 'order_dir' => $order_dir];
 
@@ -299,6 +314,9 @@ $resultado = getManutencoes($conn, $pagina_atual, $opts);
 $manutencoes = $resultado['manutencoes'];
 $total_paginas = $resultado['total_paginas'];
 $base_params = array_filter(['page' => $pagina_atual, 'per_page' => $per_page, 'data_inicio' => $data_inicio, 'data_fim' => $data_fim, 'order' => $order_by, 'dir' => $order_dir], function($v) { return $v !== '' && $v !== null; });
+if (!$is_modern) {
+    $base_params['classic'] = '1';
+}
 $export_params = $base_params;
 $export_params['format'] = 'csv';
 
@@ -334,6 +352,71 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="stylesheet" href="../css/maintenance.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <style>
+        body.manutencoes-modern .dashboard-content.fornc-page { padding-top: 8px; overflow-x: auto; }
+        body.manutencoes-modern .dashboard-header { display: none; }
+        body.manutencoes-modern .fornc-page .mann-table-wrap { max-height: min(70vh, 560px); }
+        body.manutencoes-modern .fornc-page .mann-table-wrap .fornc-table thead th {
+            position: sticky; top: 0; z-index: 2;
+            background: var(--forn-table-head);
+            box-shadow: 0 1px 0 var(--border-color);
+        }
+        body.manutencoes-modern .fornc-page #maintenanceTable.fornc-table { min-width: 960px; table-layout: auto; }
+        body.manutencoes-modern #maintenanceTable .mann-sort-link {
+            color: inherit;
+            text-decoration: none;
+            font-weight: inherit;
+        }
+        body.manutencoes-modern #maintenanceTable th.sortable .sort-ind {
+            opacity: 0.45;
+            margin-left: 0.15rem;
+            font-size: 0.65rem;
+        }
+        body.manutencoes-modern #maintenanceTable th.sortable.sorted .sort-ind {
+            opacity: 1;
+            color: var(--accent-primary, #15803d);
+        }
+        body.manutencoes-modern .mann-finance-analytics {
+            margin-top: 0.75rem;
+        }
+        body.manutencoes-modern .mann-finance-analytics .section-header h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0;
+        }
+        body.manutencoes-modern .mann-finance-analytics .analytics-card {
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        body.manutencoes-modern .mann-finance-analytics .analytics-card .card-header {
+            padding: 0.5rem 0.65rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+        }
+        body.manutencoes-modern .mann-finance-analytics .analytics-card .card-header h3 {
+            font-size: 0.78rem;
+            font-weight: 600;
+            margin: 0;
+        }
+        body.manutencoes-modern .mann-finance-analytics .analytics-card .card-body {
+            padding: 0.5rem;
+        }
+        body.manutencoes-modern #secao-alertas-score.fornc-row-alertas {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 0.5rem;
+            margin-top: 0.65rem;
+        }
+        body.manutencoes-modern .mann-analytics-modern .analytics-card:nth-child(1),
+        body.manutencoes-modern .mann-analytics-modern .analytics-card:nth-child(5) {
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            box-shadow: 0 1px 8px rgba(16, 185, 129, 0.12);
+        }
+    </style>
+    <?php endif; ?>
     
     <!-- Chart.js for analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -369,6 +452,32 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                 width: 100% !important;
             }
         }
+
+        /* Modal: Descrição, Descrição do serviço, Observações e Responsável em duas colunas */
+        #maintenanceModal .mann-detalhes-servico-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 14px;
+            align-items: start;
+        }
+        @media (max-width: 640px) {
+            #maintenanceModal .mann-detalhes-servico-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Modal: Campos financeiros (Fornecedor, Valor, Custo Total, Nota Fiscal) em duas colunas */
+        #maintenanceModal .mann-finance-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 14px;
+            align-items: start;
+        }
+        @media (max-width: 640px) {
+            #maintenanceModal .mann-finance-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
     
     <!-- Custom scripts -->
@@ -376,7 +485,7 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
     <script src="../js/sidebar.js"></script>
     <script src="../js/maintenance.js"></script>
 </head>
-<body>
+<body<?php echo $is_modern ? ' class="manutencoes-modern"' : ''; ?>>
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
@@ -387,7 +496,29 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
             <?php include '../includes/header.php'; ?>
             
             <!-- Page Content -->
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <?php if ($is_modern): ?>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Manutenções (mês)</span><span class="val"><?php echo (int)$metricas['total_manutencoes']; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Preventivas</span><span class="val"><?php echo (int)$metricas['total_preventivas']; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Corretivas</span><span class="val"><?php echo (int)$metricas['total_corretivas']; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Custos (mês)</span><span class="val">R$ <?php echo number_format((float)$metricas['total_custos'], 2, ',', '.'); ?></span></div>
+                </div>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">MTBF</span><span class="val"><?php echo number_format((float)$kpis['mtbf'], 1, ',', '.'); ?> km</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">MTTR</span><span class="val"><?php echo number_format((float)$kpis['mttr'], 1, ',', '.'); ?> h</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Custo / KM</span><span class="val">R$ <?php echo number_format((float)$kpis['custo_km'], 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Estimativa próx. mês</span><span class="val"><?php echo ($previsao_proximo_mes !== null && $previsao_proximo_mes > 0) ? ('R$ ' . number_format((float)$previsao_proximo_mes, 2, ',', '.')) : '—'; ?></span></div>
+                </div>
+                <?php if ($impacto_lucro !== null): ?>
+                <p class="fornc-kpi-summary" id="mannKpiImpactoResumo">
+                    <strong>Impacto no lucro (12m):</strong> <?php echo (int)($impacto_lucro['impacto_pct'] ?? 0); ?>% — manutenção sobre lucro bruto.
+                    <?php if (!empty($impacto_lucro['mensagem'])): ?><span class="text-muted"> <?php echo htmlspecialchars($impacto_lucro['mensagem']); ?></span><?php endif; ?>
+                </p>
+                <?php else: ?>
+                <p class="fornc-kpi-summary text-muted">Impacto no lucro: dados de rotas/lucro indisponíveis para o cálculo.</p>
+                <?php endif; ?>
+                <?php else: ?>
                 <div class="dashboard-header">
                     <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
@@ -511,9 +642,10 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                     </div>
                     <?php endif; ?>
                 </div>
+                <?php endif; ?>
 
                 <!-- Seção Alertas + Score + Impacto em uma linha (Alertas menor, Score e Impacto ao lado) -->
-                <div id="secao-alertas-score" class="dashboard-grid alertas-score-row" style="margin-top: 1rem;">
+                <div id="secao-alertas-score" class="<?php echo $is_modern ? 'fornc-row-alertas' : 'dashboard-grid alertas-score-row'; ?>"<?php echo $is_modern ? '' : ' style="margin-top: 1rem;"'; ?>>
                     <!-- Card Alertas (compacto, altura limitada) -->
                     <div class="dashboard-card alertas-card">
                         <div class="card-header">
@@ -560,7 +692,8 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                         </div>
                     </div>
 
-                    <!-- Card Impacto no Lucro -->
+                    <?php if (!$is_modern): ?>
+                    <!-- Card Impacto no Lucro (no layout moderno o resumo vai na faixa KPI) -->
                     <div class="dashboard-card impacto-card">
                         <div class="card-header">
                             <h3><i class="fas fa-chart-line"></i> Impacto no Lucro</h3>
@@ -582,8 +715,81 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                             <?php endif; ?>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
                 
+                <?php if ($is_modern): ?>
+                <div class="fornc-toolbar mann-toolbar-main">
+                    <div class="fornc-search-block">
+                        <label for="searchMaintenance">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" id="searchMaintenance" placeholder="Placa, descrição, fornecedor..." autocomplete="off">
+                        </div>
+                    </div>
+                    <form method="get" action="" id="formFiltroPeriodo" class="fornc-filters-inline">
+                        <div class="fg">
+                            <label for="mannDataInicio">De</label>
+                            <input type="date" id="mannDataInicio" name="data_inicio" value="<?php echo htmlspecialchars($data_inicio); ?>" title="Data inicial" class="filter-date">
+                        </div>
+                        <div class="fg">
+                            <label for="mannDataFim">Até</label>
+                            <input type="date" id="mannDataFim" name="data_fim" value="<?php echo htmlspecialchars($data_fim); ?>" title="Data final" class="filter-date">
+                        </div>
+                        <div class="fg">
+                            <label for="mannPerPage">Por página</label>
+                            <select id="mannPerPage" name="per_page" class="filter-per-page" title="Registros por página" onchange="this.form.submit()">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                        </div>
+                        <input type="hidden" name="order" value="<?php echo htmlspecialchars($order_by); ?>">
+                        <input type="hidden" name="dir" value="<?php echo htmlspecialchars($order_dir); ?>">
+                        <div class="fg">
+                            <label for="vehicleFilter">Veículo</label>
+                            <select id="vehicleFilter">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="maintenanceTypeFilter">Tipo</label>
+                            <select id="maintenanceTypeFilter">
+                                <option value="">Todos</option>
+                                <option value="Preventiva">Preventiva</option>
+                                <option value="Corretiva">Corretiva</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="statusFilter">Status</label>
+                            <select id="statusFilter">
+                                <option value="">Todos</option>
+                                <option value="Agendada">Agendada</option>
+                                <option value="Em andamento">Em andamento</option>
+                                <option value="Concluída">Concluída</option>
+                                <option value="Cancelada">Cancelada</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="supplierFilter">Fornecedor</label>
+                            <select id="supplierFilter">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="fornc-btn fornc-btn--accent" title="Aplicar período na URL"><i class="fas fa-calendar-alt"></i> Período</button>
+                    </form>
+                    <div class="fornc-btn-row">
+                        <button type="button" id="addMaintenanceBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Nova</button>
+                        <a href="planos_manutencao.php" class="fornc-btn fornc-btn--ghost" title="Planos de manutenção"><i class="fas fa-clipboard-list"></i> Planos</a>
+                        <button type="button" class="fornc-btn fornc-btn--accent" id="applyMaintenanceFilters" title="Aplicar filtros na lista"><i class="fas fa-search"></i> Filtrar lista</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="clearMaintenanceFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
+                        <a href="?<?php echo htmlspecialchars(http_build_query($export_params)); ?>" class="fornc-btn fornc-btn--muted" title="Exportar CSV" id="exportBtn"><i class="fas fa-file-export"></i> Exportar</a>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                    </div>
+                </div>
+                <?php else: ?>
                 <!-- Search and Filter -->
                 <div class="filter-section">
                     <div class="search-box">
@@ -603,6 +809,7 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                             <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
                             <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
                         </select>
+                        <input type="hidden" name="classic" value="1">
                         <input type="hidden" name="order" value="<?php echo htmlspecialchars($order_by); ?>">
                         <input type="hidden" name="dir" value="<?php echo htmlspecialchars($order_dir); ?>">
                         <button type="submit" class="btn-restore-layout" title="Filtrar período"><i class="fas fa-filter"></i> Filtrar período</button>
@@ -629,24 +836,33 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                         <button type="button" class="btn-restore-layout" id="clearMaintenanceFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
                     </form>
                 </div>
+                <?php endif; ?>
                 
                 <!-- Maintenance Table -->
-                <div class="data-table-container">
-                    <table class="data-table" id="maintenanceTable">
+                <div class="<?php echo $is_modern ? 'mann-table-wrap fornc-table-wrap' : 'data-table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="maintenanceTable">
                         <thead>
                             <tr>
                                 <?php
-                                $sort_url = function($col) use ($base_params, $order_by, $order_dir) {
+                                $manut_text_cols = ['veiculo_placa', 'tipo_nome', 'descricao', 'fornecedor', 'status_nome'];
+                                $sort_url = function ($col) use ($base_params, $order_by, $order_dir, $manut_text_cols) {
                                     $p = $base_params;
                                     $p['order'] = $col;
-                                    $p['dir'] = ($order_by === $col && $order_dir === 'ASC') ? 'DESC' : 'ASC';
+                                    if ($order_by === $col) {
+                                        $p['dir'] = $order_dir === 'ASC' ? 'DESC' : 'ASC';
+                                    } else {
+                                        $p['dir'] = in_array($col, $manut_text_cols, true) ? 'ASC' : 'DESC';
+                                    }
                                     $p['page'] = 1;
                                     return '?' . http_build_query($p);
                                 };
-                                $th = function($col, $label) use ($sort_url, $order_by, $order_dir) {
+                                $th = function ($col, $label) use ($sort_url, $order_by, $order_dir) {
                                     $url = $sort_url($col);
-                                    $arrow = ($order_by === $col) ? ($order_dir === 'ASC' ? ' ↑' : ' ↓') : '';
-                                    return '<th><a href="' . htmlspecialchars($url) . '" class="sortable">' . htmlspecialchars($label) . $arrow . '</a></th>';
+                                    $ind = ($order_by === $col)
+                                        ? ($order_dir === 'ASC' ? '▲' : '▼')
+                                        : '⇅';
+                                    $cls = 'sortable' . ($order_by === $col ? ' sorted' : '');
+                                    return '<th class="' . $cls . '"><a href="' . htmlspecialchars($url) . '" class="mann-sort-link">' . htmlspecialchars($label) . ' <span class="sort-ind">' . $ind . '</span></a></th>';
                                 };
                                 ?>
                                 <?php echo $th('data_manutencao', 'Data'); ?>
@@ -656,6 +872,7 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                                 <?php echo $th('fornecedor', 'Fornecedor'); ?>
                                 <?php echo $th('status_nome', 'Status'); ?>
                                 <?php echo $th('valor', 'Valor'); ?>
+                                <?php echo $th('custo_12m', 'Custo 12m'); ?>
                                 <th>Ações</th>
                             </tr>
                         </thead>
@@ -694,8 +911,8 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                 <?php
                 $prev_params = $base_params; $prev_params['page'] = $pagina_atual - 1;
                 $next_params = $base_params; $next_params['page'] = $pagina_atual + 1;
-                $export_params = $base_params; $export_params['format'] = 'csv';
                 ?>
+                <?php if ($is_modern): ?><div class="fornc-pagination-bar"><?php endif; ?>
                 <div class="pagination" id="paginationContainer" data-page="<?php echo $pagina_atual; ?>" data-total-paginas="<?php echo $total_paginas; ?>" data-total="<?php echo (int)($resultado['total'] ?? 0); ?>">
                     <a href="?<?php echo htmlspecialchars(http_build_query($prev_params)); ?>" class="pagination-btn pagination-prev <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" data-page="<?php echo $pagina_atual - 1; ?>" aria-label="Página anterior">
                         <i class="fas fa-chevron-left"></i>
@@ -708,11 +925,12 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
+                <?php if ($is_modern): ?></div><?php endif; ?>
 
                 <!-- Analytics Section (oculta até gráficos prontos para evitar tremida) -->
-                <div class="analytics-section charts-pending" id="analyticsSection">
+                <div class="analytics-section charts-pending<?php echo $is_modern ? ' mann-analytics-modern' : ''; ?>" id="analyticsSection">
                     <div class="section-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
-                        <h2>Análise de Manutenções</h2>
+                        <h2><?php echo $is_modern ? 'Análise financeira e operacional' : 'Análise de Manutenções'; ?></h2>
                         <div class="chart-period-selector">
                             <label for="chartPeriod" class="text-muted" style="margin-right: 0.5rem;">Período:</label>
                             <select id="chartPeriod" style="padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid var(--border-color, #ddd); background: var(--bg-primary, #fff);">
@@ -791,8 +1009,8 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
     </div>
     
     <!-- Modal de Manutenção -->
-    <div class="modal" id="maintenanceModal">
-        <div class="modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="maintenanceModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2 id="modalTitle">Nova Manutenção</h2>
                 <button class="close-modal" type="button" aria-label="Fechar">
@@ -885,7 +1103,7 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
 
                     <div class="form-section">
                         <h3>Dados do Serviço</h3>
-                        <div class="form-grid">
+                        <div class="form-grid mann-finance-grid">
                             <div class="form-group">
                                 <label for="fornecedor">Fornecedor</label>
                                 <input type="text" id="fornecedor" name="fornecedor" maxlength="255">
@@ -910,18 +1128,18 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
 
                     <div class="form-section">
                         <h3>Detalhes do Serviço</h3>
-                        <div class="form-grid">
-                            <div class="form-group full-width">
+                        <div class="form-grid mann-detalhes-servico-grid">
+                            <div class="form-group">
                                 <label for="descricao">Descrição*</label>
                                 <textarea id="descricao" name="descricao" rows="3" required></textarea>
                             </div>
 
-                            <div class="form-group full-width">
+                            <div class="form-group">
                                 <label for="descricao_servico">Descrição do Serviço*</label>
                                 <textarea id="descricao_servico" name="descricao_servico" rows="3" required></textarea>
                             </div>
                             
-                            <div class="form-group full-width">
+                            <div class="form-group">
                                 <label for="observacoes">Observações</label>
                                 <textarea id="observacoes" name="observacoes" rows="3"></textarea>
                             </div>
@@ -956,7 +1174,7 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
     </div>
 
     <!-- Modal de Confirmação de Exclusão -->
-    <div class="modal" id="deleteMaintenanceModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="deleteMaintenanceModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Confirmar Exclusão</h2>
@@ -985,8 +1203,8 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
     </div>
 
     <!-- Modal Relatório por veículo (histórico + resumo) -->
-    <div class="modal" id="historicoVeiculoModal">
-        <div class="modal-content relatorio-veiculo-print" style="max-width: 720px;">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="historicoVeiculoModal">
+        <div class="modal-content relatorio-veiculo-print<?php echo $is_modern ? ' fornc-modal--wide' : ''; ?>" style="<?php echo $is_modern ? '' : 'max-width: 720px;'; ?>">
             <div class="modal-header">
                 <h2 id="historicoVeiculoTitulo">Relatório - Veículo</h2>
                 <button type="button" class="close-modal" onclick="document.getElementById('historicoVeiculoModal').classList.remove('active')"><i class="fas fa-times"></i></button>
@@ -999,8 +1217,8 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                     <div><span class="text-muted">Corretivas</span><br><strong id="historicoVeiculoCorretivas">-</strong></div>
                 </div>
                 <p id="historicoVeiculoCusto" class="text-muted"></p>
-                <div class="data-table-container" style="max-height: 360px; overflow-y: auto;">
-                    <table class="data-table">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>" style="max-height: 360px; overflow-y: auto;">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>">
                         <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Valor</th></tr></thead>
                         <tbody id="historicoVeiculoBody"></tbody>
                     </table>
@@ -1013,7 +1231,7 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
     </div>
 
     <!-- Modal de Ajuda -->
-    <div class="modal" id="helpMaintenanceModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpMaintenanceModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Ajuda - Gestão de Manutenções</h2>
@@ -1100,5 +1318,7 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
             }
         });
     </script>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html>

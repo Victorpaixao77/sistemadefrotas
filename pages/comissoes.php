@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/permissions.php';
+require_once '../includes/sf_api_base.php';
 
 configure_session();
 
@@ -12,6 +13,8 @@ if (session_status() === PHP_SESSION_NONE) {
 require_authentication();
 
 $page_title = "Comissões";
+// Layout moderno (fornc-page); ?classic=1 para o layout anterior
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
 $empresa_id = $_SESSION['empresa_id'];
 
 /**
@@ -161,7 +164,7 @@ function buildComissoesQueryParts(array $filters, int $empresa_id): array
     return [$conditions, $params];
 }
 
-function getComissoes(array $filters, int $page, int $empresa_id, PDO $conn, int $per_page = 10): array
+function getComissoes(array $filters, int $page, int $empresa_id, PDO $conn, int $per_page = 10, string $sortKey = 'data_rota', string $sortDir = 'DESC'): array
 {
     $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
     $offset = ($page - 1) * $limit;
@@ -209,8 +212,26 @@ function getComissoes(array $filters, int $page, int $empresa_id, PDO $conn, int
         LEFT JOIN veiculos v ON r.veiculo_id = v.id
         LEFT JOIN motoristas m ON r.motorista_id = m.id
         LEFT JOIN comissoes_pagamentos cp ON cp.rota_id = r.id
-        WHERE {$whereClause}
-        ORDER BY r.data_rota DESC, r.id DESC
+        WHERE {$whereClause}";
+
+    $allowedSort = [
+        'data_rota' => 'r.data_rota',
+        'motorista_nome' => 'm.nome',
+        'veiculo_placa' => 'v.placa',
+        'frete' => 'r.frete',
+        'comissao' => 'r.comissao',
+        'pct_comissao' => '(CASE WHEN r.frete > 0 THEN (r.comissao / r.frete) * 100 ELSE 0 END)',
+        'status_pagamento' => 'COALESCE(cp.status, \'pendente\')',
+        'no_prazo' => 'r.no_prazo',
+    ];
+    if (!isset($allowedSort[$sortKey])) {
+        $sortKey = 'data_rota';
+    }
+    $orderCol = $allowedSort[$sortKey];
+    $dir = ($sortDir === 'ASC') ? 'ASC' : 'DESC';
+
+    $sql .= "
+        ORDER BY " . $orderCol . " " . $dir . ", r.id DESC
         LIMIT :limit OFFSET :offset";
 
     $stmt = $conn->prepare($sql);
@@ -444,7 +465,37 @@ if (!empty($_GET['veiculo'])) {
 
 $filters['search'] = trim($_GET['search'] ?? '');
 
-$resultado = getComissoes($filters, $pagina_atual, $empresa_id, $conn, $per_page);
+$com_sort = isset($_GET['sort']) ? preg_replace('/[^a-z_]/', '', (string) $_GET['sort']) : 'data_rota';
+$com_dir = (isset($_GET['dir']) && strtoupper((string) $_GET['dir']) === 'ASC') ? 'ASC' : 'DESC';
+
+function comissoes_sort_link_url($field, $com_sort, $com_dir, $per_page, $is_modern, array $filters) {
+    $next_dir = 'DESC';
+    if ($com_sort === $field) {
+        $next_dir = $com_dir === 'ASC' ? 'DESC' : 'ASC';
+    } else {
+        $text_like = ['motorista_nome', 'veiculo_placa', 'status_pagamento'];
+        $next_dir = in_array($field, $text_like, true) ? 'ASC' : 'DESC';
+    }
+    $q = array_merge($filters, [
+        'page' => 1,
+        'per_page' => $per_page,
+        'sort' => $field,
+        'dir' => $next_dir,
+    ]);
+    if (!$is_modern) {
+        $q['classic'] = '1';
+    }
+    return '?' . http_build_query($q);
+}
+
+function comissoes_sort_indicator($field, $com_sort, $com_dir) {
+    if ($com_sort !== $field) {
+        return '⇅';
+    }
+    return $com_dir === 'ASC' ? '▲' : '▼';
+}
+
+$resultado = getComissoes($filters, $pagina_atual, $empresa_id, $conn, $per_page, $com_sort, $com_dir);
 $comissoes = $resultado['comissoes'];
 $resumo = $resultado['resumo'];
 $total_paginas = $resultado['total_paginas'];
@@ -498,6 +549,9 @@ function formatarDataRota(?string $data): string
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .commission-charts {
@@ -591,9 +645,30 @@ function formatarDataRota(?string $data): string
             }
         }
 
-        .filter-section.highlight-filter {
+        .filter-section.highlight-filter,
+        .comissoes-fornc-filter.highlight-filter {
             box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
         }
+
+        body.comissoes-modern .dashboard-header { display: none; }
+        body.comissoes-modern .dashboard-content.fornc-page { overflow-x: auto; }
+        body.comissoes-modern table.data-table,
+        body.comissoes-modern table.fornc-table { min-width: 960px; }
+
+        body.comissoes-modern table.fornc-table th.sortable .th-sort-link {
+            color: inherit;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        body.comissoes-modern table.fornc-table th.sortable .th-sort-link:hover {
+            color: var(--accent-primary, #3b82f6);
+        }
+        body.comissoes-modern table.fornc-table th.sortable.sorted .th-sort-link {
+            font-weight: 600;
+        }
+        table.fornc-table .sort-ind { font-size: 0.75rem; opacity: 0.85; }
 
         .modal {
             display: none;
@@ -751,14 +826,91 @@ function formatarDataRota(?string $data): string
 
     </style>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'comissoes-modern' : ''; ?>">
     <div class="app-container">
         <?php include '../includes/sidebar_pages.php'; ?>
 
         <div class="main-content">
             <?php include '../includes/header.php'; ?>
 
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <?php if ($is_modern): ?>
+                <p class="fornc-modern-hint">
+                    Comissões de viagens aprovadas. Use <code>?classic=1</code> para o layout anterior.
+                </p>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Total comissões</span><span class="val">R$ <?php echo number_format($resumo['total_comissao'] ?? 0, 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Pagas</span><span class="val">R$ <?php echo number_format($resumo['total_pago'] ?? 0, 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Pendentes</span><span class="val">R$ <?php echo number_format($resumo['total_pendente'] ?? 0, 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">% pago</span><span class="val"><?php echo number_format($resumo['percentual_pago'] ?? 0, 2, ',', '.'); ?>%</span></div>
+                </div>
+                <p class="fornc-kpi-summary"><?php echo (int) ($resumo['total_viagens'] ?? 0); ?> viagens nos filtros atuais.</p>
+
+                <form method="get" id="comissoesFilterForm" class="comissoes-fornc-filter">
+                    <input type="hidden" name="page" id="comissoesFormPage" value="<?php echo $pagina_atual; ?>">
+                    <div class="fornc-toolbar">
+                        <div class="fornc-search-block">
+                            <label for="searchCommission">Busca rápida</label>
+                            <div class="fornc-search-inner">
+                                <i class="fas fa-search" aria-hidden="true"></i>
+                                <input type="text" id="searchCommission" name="search" value="<?php echo htmlspecialchars($_GET['search'] ?? ''); ?>" placeholder="Motorista, veículo ou data..." autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="fornc-filters-inline">
+                            <div class="fg">
+                                <label for="mes">Período</label>
+                                <select id="mes" name="mes" title="Período">
+                            <option value="">Todos os períodos</option>
+                            <?php foreach ($periodos as $periodo): ?>
+                                <option value="<?php echo htmlspecialchars($periodo); ?>" <?php echo $filters['mes'] === $periodo ? 'selected' : ''; ?>>
+                                    <?php echo date('m/Y', strtotime($periodo . '-01')); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                            </div>
+                            <div class="fg">
+                                <label for="motorista">Motorista</label>
+                                <select id="motorista" name="motorista" title="Motorista">
+                            <option value="">Todos os motoristas</option>
+                            <?php foreach ($motoristas as $motorista): ?>
+                                <option value="<?php echo (int) $motorista['id']; ?>" <?php echo $filters['motorista'] == $motorista['id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($motorista['nome']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                            </div>
+                            <div class="fg">
+                                <label for="veiculo">Veículo</label>
+                                <select id="veiculo" name="veiculo" title="Veículo">
+                            <option value="">Todos os veículos</option>
+                            <?php foreach ($veiculos as $veiculo): ?>
+                                <option value="<?php echo (int) $veiculo['id']; ?>" <?php echo $filters['veiculo'] == $veiculo['id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($veiculo['placa'] . ' - ' . $veiculo['modelo']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                            </div>
+                            <div class="fg">
+                                <label for="per_page_com">Por página</label>
+                                <select name="per_page" id="per_page_com" class="filter-per-page" onchange="document.getElementById('comissoesFormPage').value=1; this.form.submit();">
+                            <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                            <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                            <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                            <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                            <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                        </select>
+                            </div>
+                        </div>
+                        <div class="fornc-btn-row">
+                            <button type="submit" class="fornc-btn fornc-btn--accent" title="Aplicar filtros"><i class="fas fa-search"></i> Pesquisar</button>
+                            <a href="comissoes.php" class="fornc-btn fornc-btn--ghost" title="Limpar filtros"><i class="fas fa-undo"></i></a>
+                            <button type="button" id="filterBtn" class="fornc-btn fornc-btn--ghost" title="Destacar filtros"><i class="fas fa-sliders-h"></i> Opções</button>
+                            <button type="button" id="exportCsvBtn" class="fornc-btn fornc-btn--muted" title="Exportar CSV"><i class="fas fa-file-export"></i> Exportar</button>
+                            <button type="button" id="helpBtn" class="fornc-btn fornc-btn--ghost fornc-btn--icon" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                        </div>
+                    </div>
+                </form>
+                <?php else: ?>
                 <div class="dashboard-header">
                     <h1><?php echo htmlspecialchars($page_title); ?></h1>
                     <div class="dashboard-actions">
@@ -825,6 +977,7 @@ function formatarDataRota(?string $data): string
 
                 <form class="filter-section" method="GET" id="comissoesFilterForm">
                     <input type="hidden" name="page" id="comissoesFormPage" value="<?php echo $pagina_atual; ?>">
+                    <input type="hidden" name="classic" value="1">
                     <div class="search-box">
                         <input type="text" id="searchCommission" name="search" value="<?php echo htmlspecialchars($_GET['search'] ?? ''); ?>" placeholder="Buscar por motorista, veículo ou data...">
                         <i class="fas fa-search"></i>
@@ -865,16 +1018,27 @@ function formatarDataRota(?string $data): string
                         <button type="submit" class="btn-restore-layout" title="Aplicar filtros">
                             <i class="fas fa-filter"></i>
                         </button>
-                        <a href="comissoes.php" class="btn-restore-layout" title="Limpar filtros">
+                        <a href="comissoes.php?classic=1" class="btn-restore-layout" title="Limpar filtros">
                             <i class="fas fa-undo"></i>
                         </a>
                     </div>
                 </form>
+                <?php endif; ?>
 
-                <div class="data-table-container">
-                    <table class="data-table">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>">
                         <thead>
                             <tr>
+                                <?php if ($is_modern): ?>
+                                <th class="sortable<?php echo $com_sort === 'data_rota' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(comissoes_sort_link_url('data_rota', $com_sort, $com_dir, $per_page, $is_modern, $filters)); ?>" class="th-sort-link">Data <span class="sort-ind"><?php echo htmlspecialchars(comissoes_sort_indicator('data_rota', $com_sort, $com_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $com_sort === 'motorista_nome' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(comissoes_sort_link_url('motorista_nome', $com_sort, $com_dir, $per_page, $is_modern, $filters)); ?>" class="th-sort-link">Motorista <span class="sort-ind"><?php echo htmlspecialchars(comissoes_sort_indicator('motorista_nome', $com_sort, $com_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $com_sort === 'veiculo_placa' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(comissoes_sort_link_url('veiculo_placa', $com_sort, $com_dir, $per_page, $is_modern, $filters)); ?>" class="th-sort-link">Veículo <span class="sort-ind"><?php echo htmlspecialchars(comissoes_sort_indicator('veiculo_placa', $com_sort, $com_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $com_sort === 'frete' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(comissoes_sort_link_url('frete', $com_sort, $com_dir, $per_page, $is_modern, $filters)); ?>" class="th-sort-link">Frete <span class="sort-ind"><?php echo htmlspecialchars(comissoes_sort_indicator('frete', $com_sort, $com_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $com_sort === 'comissao' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(comissoes_sort_link_url('comissao', $com_sort, $com_dir, $per_page, $is_modern, $filters)); ?>" class="th-sort-link">Comissão <span class="sort-ind"><?php echo htmlspecialchars(comissoes_sort_indicator('comissao', $com_sort, $com_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $com_sort === 'pct_comissao' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(comissoes_sort_link_url('pct_comissao', $com_sort, $com_dir, $per_page, $is_modern, $filters)); ?>" class="th-sort-link">% Comissão <span class="sort-ind"><?php echo htmlspecialchars(comissoes_sort_indicator('pct_comissao', $com_sort, $com_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $com_sort === 'status_pagamento' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(comissoes_sort_link_url('status_pagamento', $com_sort, $com_dir, $per_page, $is_modern, $filters)); ?>" class="th-sort-link">Status Pagamento <span class="sort-ind"><?php echo htmlspecialchars(comissoes_sort_indicator('status_pagamento', $com_sort, $com_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $com_sort === 'no_prazo' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(comissoes_sort_link_url('no_prazo', $com_sort, $com_dir, $per_page, $is_modern, $filters)); ?>" class="th-sort-link">Prazo <span class="sort-ind"><?php echo htmlspecialchars(comissoes_sort_indicator('no_prazo', $com_sort, $com_dir)); ?></span></a></th>
+                                <?php else: ?>
                                 <th>Data</th>
                                 <th>Motorista</th>
                                 <th>Veículo</th>
@@ -883,6 +1047,7 @@ function formatarDataRota(?string $data): string
                                 <th>% Comissão</th>
                                 <th>Status Pagamento</th>
                                 <th>Prazo</th>
+                                <?php endif; ?>
                                 <th>Ações</th>
                             </tr>
                         </thead>
@@ -953,8 +1118,19 @@ function formatarDataRota(?string $data): string
                 $total_reg_com = (int)($resultado['total'] ?? 0);
                 $params_prev = array_filter(array_merge($filters, ['per_page' => $per_page, 'page' => max(1, $pagina_atual - 1)]));
                 $params_next = array_filter(array_merge($filters, ['per_page' => $per_page, 'page' => min($total_paginas, $pagina_atual + 1)]));
+                if ($com_sort !== 'data_rota' || $com_dir !== 'DESC') {
+                    $params_prev['sort'] = $com_sort;
+                    $params_prev['dir'] = $com_dir;
+                    $params_next['sort'] = $com_sort;
+                    $params_next['dir'] = $com_dir;
+                }
+                if (!$is_modern) {
+                    $params_prev['classic'] = '1';
+                    $params_next['classic'] = '1';
+                }
                 ?>
-                <div class="pagination">
+                <?php if ($is_modern): ?><div class="fornc-pagination-bar"><?php endif; ?>
+                <div class="pagination<?php echo $is_modern ? ' fornc-modern-pagination' : ''; ?>">
                     <a href="<?php echo $pagina_atual <= 1 ? '#' : '?' . http_build_query($params_prev); ?>" 
                        class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" 
                        id="prevPageBtn"><i class="fas fa-chevron-left"></i></a>
@@ -963,6 +1139,7 @@ function formatarDataRota(?string $data): string
                        class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>" 
                        id="nextPageBtn"><i class="fas fa-chevron-right"></i></a>
                 </div>
+                <?php if ($is_modern): ?></div><?php endif; ?>
 
                 <div class="commission-charts">
                     <div class="charts-row">
@@ -1009,7 +1186,7 @@ function formatarDataRota(?string $data): string
                 </div>
 
                 <!-- Help Modal -->
-                <div class="modal" id="helpModal">
+                <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpModal">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h2>Ajuda - Controle de Comissões</h2>
@@ -1037,6 +1214,7 @@ function formatarDataRota(?string $data): string
 
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <?php sf_render_api_scripts(); ?>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
             const statusData = <?php echo json_encode($chartStatusData); ?>;
@@ -1065,7 +1243,7 @@ function formatarDataRota(?string $data): string
             }
 
             const filterBtn = document.getElementById('filterBtn');
-            const filterSection = document.querySelector('.filter-section');
+            const filterSection = document.querySelector('.filter-section') || document.querySelector('.comissoes-fornc-filter');
             if (filterBtn && filterSection) {
                 filterBtn.addEventListener('click', function () {
                     filterSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1108,11 +1286,15 @@ function formatarDataRota(?string $data): string
                 const formData = new FormData();
                 formData.append('action', action);
                 formData.append('rota_id', rotaId);
+                if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+                    formData.append('csrf_token', window.__SF_CSRF__);
+                }
 
-                fetch('../api/commissions_actions.php', {
+                fetch(sfApiUrl('commissions_actions.php'), {
                     method: 'POST',
                     body: formData,
-                    credentials: 'include'
+                    credentials: 'include',
+                    headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -1333,6 +1515,8 @@ function formatarDataRota(?string $data): string
             }, 0);
         });
     </script>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html>
 

@@ -26,6 +26,15 @@ if (!isset($_SESSION['empresa_id'])) {
 $empresa_id = $_SESSION['empresa_id'];
 $conn = getConnection();
 
+// Esta API é a versão antiga e não é usada pelas telas/páginas atuais.
+// Mantemos o arquivo apenas por compatibilidade, mas ele não deve ser utilizado.
+http_response_code(410);
+echo json_encode([
+    'success' => false,
+    'message' => 'API antiga desativada. Use fiscal/api/documentos_fiscais_v2.php.'
+]);
+exit();
+
 // Função para obter próximo número de documento
 function getProximoNumero($tipo_documento, $serie = '1') {
     global $conn, $empresa_id;
@@ -63,7 +72,7 @@ function getProximoNumero($tipo_documento, $serie = '1') {
     }
 }
 
-// Função para gerar chave de acesso (simulada)
+// Função para gerar chave de acesso (arquivo legado)
 function gerarChaveAcesso($tipo_documento, $numero, $serie) {
     $uf = '43'; // RS
     $ano = date('y');

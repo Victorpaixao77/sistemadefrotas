@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/sf_paths.php';
 // Iniciar sessão se ainda não estiver iniciada
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -35,7 +36,7 @@ function require_permission($permission) {
         }
         
         // Se for uma requisição normal, redireciona para a página de acesso negado
-        header('Location: /sistema-frotas/access-denied.php');
+        header('Location: ' . sf_app_url('access-denied.php'));
         exit;
     }
 } 

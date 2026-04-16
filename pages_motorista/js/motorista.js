@@ -39,7 +39,10 @@ async function fetchAPI(endpoint, method = 'GET', data = null) {
     }
     
     try {
-        const response = await fetch(`/sistema-frotas/pages_motorista/api/motorista_api.php?action=${endpoint}`, options);
+        const apiBase = typeof window.__MOTORISTA_API_URL__ === 'string' && window.__MOTORISTA_API_URL__
+            ? window.__MOTORISTA_API_URL__
+            : 'api/motorista_api.php';
+        const response = await fetch(`${apiBase}?action=${endpoint}`, options);
         const result = await response.json();
         
         if (!response.ok) {

@@ -201,6 +201,7 @@ $empresa = getCompanyData();
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales/pt-br.global.min.js"></script>
     
+    <?php require_once __DIR__ . '/../includes/sf_api_base.php'; sf_render_api_scripts(); ?>
     <!-- Calendar Script -->
     <script src="assets/js/calendario.js"></script>
 </body>

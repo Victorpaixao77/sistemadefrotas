@@ -2,6 +2,9 @@
 require_once '../../includes/config.php';
 require_once '../../includes/functions.php';
 require_once '../../includes/db_connect.php';
+require_once '../../includes/csrf.php';
+require_once '../../includes/api_json.php';
+require_once __DIR__ . '/../../includes/bi_cache_invalidate.php';
 
 configure_session();
 if (session_status() === PHP_SESSION_NONE) {
@@ -19,6 +22,9 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_
     echo json_encode(['success' => false, 'message' => 'Não autorizado']);
     exit;
 }
+
+// Protege mutações (POST) com CSRF e retorno JSON padronizado.
+api_require_csrf_json();
 if (!isset($_POST['rota_id'])) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'rota_id não informado']);
@@ -69,6 +75,7 @@ try {
     }
 
     if ($ok) {
+        bi_cache_invalidate_empresa($conn, (int) $empresa_id);
         echo json_encode(['success' => true, 'message' => 'Despesas salvas com sucesso']);
     } else {
         http_response_code(500);

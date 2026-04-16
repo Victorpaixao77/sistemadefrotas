@@ -81,6 +81,7 @@ if ($xml_content === null || $xml_content === '') {
 }
 
 require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../includes/MpdfTempDir.php';
 require_once __DIR__ . '/../includes/DactePdfHelper.php';
 
 $dacte = montarDacteCompletoHtml($xml_content, $cte);
@@ -91,6 +92,7 @@ try {
     $mpdf = new \Mpdf\Mpdf([
         'mode' => 'utf-8',
         'format' => 'A4',
+        'tempDir' => fiscal_mpdf_temp_dir(),
         'margin_left' => 12,
         'margin_right' => 12,
         'margin_top' => 12,
@@ -100,9 +102,15 @@ try {
     $mpdf->WriteHTML($html);
     $pdf_content = $mpdf->Output('', \Mpdf\Output\Destination::STRING_RETURN);
 } catch (Throwable $e) {
+    error_log('download_cte_pdf: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
     header('Content-Type: text/plain; charset=utf-8');
     http_response_code(500);
-    exit('Erro ao gerar PDF.');
+    $hint = ' Verifique permissão de escrita em uploads/mpdf_tmp e extensões PHP (gd, mbstring).';
+    $msg = 'Erro ao gerar PDF.' . $hint;
+    if (defined('DEBUG_MODE') && DEBUG_MODE) {
+        $msg .= ' ' . $e->getMessage();
+    }
+    exit($msg);
 }
 
 $chave = preg_replace('/[^0-9]/', '', $cte['chave_acesso'] ?? $cte['numero_cte'] ?? (string)$id);

@@ -3,6 +3,8 @@ require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 require_once __DIR__ . '/../fiscal/includes/CryptoManager.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
 configure_session();
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -16,6 +18,9 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_
 }
 
 $empresa_id = $_SESSION['empresa_id'];
+
+// Protege mutações (POST/PUT/PATCH/DELETE) com CSRF e retorno JSON padronizado.
+api_require_csrf_json();
 
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -389,7 +394,8 @@ try {
             // Dados fiscais (sobrescrevem se existirem)
             $dados_combinados = array_merge($dados_combinados, [
                 'ambiente_sefaz' => $config_fiscal['ambiente_sefaz'],
-                'codigo_municipio' => $config_fiscal['codigo_municipio']
+                'codigo_municipio' => $config_fiscal['codigo_municipio'],
+                'rntrc' => $config_fiscal['rntrc'] ?? null
             ]);
         } else {
             // Valores padrão se não houver configuração fiscal
@@ -429,6 +435,17 @@ try {
         }
         
         try {
+            $rntrc = isset($input['rntrc']) ? trim((string)$input['rntrc']) : null;
+
+            // Detectar se coluna rntrc existe (para evitar erro caso banco esteja antigo)
+            $hasRntrcCol = false;
+            try {
+                $stmtCol = $conn->query("SHOW COLUMNS FROM fiscal_config_empresa LIKE 'rntrc'");
+                $hasRntrcCol = ($stmtCol && $stmtCol->fetch(PDO::FETCH_ASSOC)) ? true : false;
+            } catch (Throwable $e) {
+                $hasRntrcCol = false;
+            }
+
             // Log para debug
             error_log("DEBUG: Iniciando transação para empresa_id: " . $empresa_id);
             
@@ -502,7 +519,7 @@ try {
             if ($config_exists) {
                 error_log("DEBUG: Configuração fiscal existe, atualizando...");
                 // Atualizar configuração fiscal existente
-                $stmt = $conn->prepare('UPDATE fiscal_config_empresa SET 
+                $sqlUpdate = 'UPDATE fiscal_config_empresa SET 
                     ambiente_sefaz = :ambiente_sefaz,
                     cnpj = :cnpj,
                     razao_social = :razao_social,
@@ -512,26 +529,34 @@ try {
                     cep = :cep,
                     endereco = :endereco,
                     telefone = :telefone,
-                    email = :email,
-                    updated_at = NOW()
-                    WHERE empresa_id = :empresa_id');
+                    email = :email';
+
+                if ($hasRntrcCol) {
+                    $sqlUpdate .= ', rntrc = :rntrc';
+                }
+
+                $sqlUpdate .= ', updated_at = NOW()
+                    WHERE empresa_id = :empresa_id';
+
+                $stmt = $conn->prepare($sqlUpdate);
             } else {
                 error_log("DEBUG: Configuração fiscal não existe, inserindo nova...");
-                // Inserir nova configuração fiscal - SEMPRE usar empresa_id = 1 para evitar problemas de foreign key
-                $stmt = $conn->prepare('INSERT INTO fiscal_config_empresa (
-                    empresa_id, ambiente_sefaz, cnpj, razao_social, nome_fantasia,
-                    inscricao_estadual, codigo_municipio, cep, endereco, telefone, email
-                ) VALUES (
-                    1, :ambiente_sefaz, :cnpj, :razao_social, :nome_fantasia,
-                    :inscricao_estadual, :codigo_municipio, :cep, :endereco, :telefone, :email
-                )');
+                // Mesmo empresa_id da sessão (SELECT acima); valor fixo 1 gerava INSERT duplicado em produção
+                $cols = 'empresa_id, ambiente_sefaz, cnpj, razao_social, nome_fantasia,
+                    inscricao_estadual, codigo_municipio, cep, endereco, telefone, email';
+                $vals = ':empresa_id, :ambiente_sefaz, :cnpj, :razao_social, :nome_fantasia,
+                    :inscricao_estadual, :codigo_municipio, :cep, :endereco, :telefone, :email';
+
+                if ($hasRntrcCol) {
+                    $cols .= ', rntrc';
+                    $vals .= ', :rntrc';
+                }
+
+                $stmt = $conn->prepare('INSERT INTO fiscal_config_empresa (' . $cols . ') VALUES (' . $vals . ')');
             }
             
-            // Bind params
-            if ($config_exists) {
-                // Para UPDATE, incluir empresa_id
-                $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-            }
+            // Bind params (UPDATE e INSERT usam :empresa_id)
+            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
             
             // Preparar valores para bindParam (evitar problemas de referência)
             $ambiente_sefaz = $input['ambiente_sefaz'];
@@ -555,6 +580,9 @@ try {
             $stmt->bindParam(':endereco', $endereco);
             $stmt->bindParam(':telefone', $telefone);
             $stmt->bindParam(':email', $email);
+            if ($hasRntrcCol) {
+                $stmt->bindParam(':rntrc', $rntrc);
+            }
             
             error_log("DEBUG: Executando query fiscal...");
             if ($stmt->execute()) {

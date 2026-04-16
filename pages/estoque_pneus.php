@@ -14,31 +14,48 @@ require_authentication();
 
 // Set page title
 $page_title = "Estoque de Pneus";
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
+$classic_param = $is_modern ? '' : '&classic=1';
 
 // Função para buscar pneus do estoque
-function getEstoquePneus($page = 1) {
+function getEstoquePneus($page = 1, $opts = []) {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
-        $limit = 10; // Registros por página
-        $offset = ($page - 1) * $limit;
+        $per_page = isset($opts['per_page']) ? (int) $opts['per_page'] : 10;
+        $allowed_per = [5, 10, 25, 50, 100];
+        if (!in_array($per_page, $allowed_per)) {
+            $per_page = 10;
+        }
+        $offset = ($page - 1) * $per_page;
         
-        error_log("=== INÍCIO DA BUSCA DE PNEUS ===");
-        error_log("Empresa ID: " . $empresa_id);
-        error_log("Página: " . $page);
-        error_log("Limit: " . $limit);
-        error_log("Offset: " . $offset);
+        $where = ["p.empresa_id = :empresa_id"];
+        $params = [':empresa_id' => $empresa_id];
         
-        // Conta o total de registros
-        $sql_count = "SELECT COUNT(*) as total FROM pneus WHERE empresa_id = :empresa_id";
-        error_log("SQL Count: " . $sql_count);
+        if (!empty($opts['status'])) {
+            $where[] = "p.status_id = :status";
+            $params[':status'] = $opts['status'];
+        }
+        if (isset($opts['disponivel']) && $opts['disponivel'] !== '') {
+            $where[] = "COALESCE(ep.disponivel, 0) = :disponivel";
+            $params[':disponivel'] = (int) $opts['disponivel'];
+        }
+        if (!empty($opts['search'])) {
+            $term = '%' . $opts['search'] . '%';
+            $where[] = "(p.numero_serie LIKE :search1 OR p.marca LIKE :search2 OR p.modelo LIKE :search3 OR p.medida LIKE :search4)";
+            $params[':search1'] = $params[':search2'] = $params[':search3'] = $params[':search4'] = $term;
+        }
+        
+        $where_sql = implode(' AND ', $where);
+        
+        $sql_count = "SELECT COUNT(*) as total FROM pneus p LEFT JOIN estoque_pneus ep ON ep.pneu_id = p.id WHERE $where_sql";
         $stmt_count = $conn->prepare($sql_count);
-        $stmt_count->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        foreach ($params as $k => $v) {
+            $stmt_count->bindValue($k, $v);
+        }
         $stmt_count->execute();
-        $total = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
-        error_log("Total de registros encontrados: " . $total);
+        $total = (int) $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
         
-        // Consulta paginada
         $sql = "SELECT 
                     p.id as pneu_id,
                     p.numero_serie,
@@ -57,47 +74,52 @@ function getEstoquePneus($page = 1) {
                 FROM pneus p
                 LEFT JOIN status_pneus s ON p.status_id = s.id
                 LEFT JOIN estoque_pneus ep ON ep.pneu_id = p.id
-                WHERE p.empresa_id = :empresa_id
+                WHERE $where_sql
                 ORDER BY p.id DESC
                 LIMIT :limit OFFSET :offset";
-        error_log("SQL Principal: " . $sql);
         $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
+        $stmt->bindValue(':limit', $per_page, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
         $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        error_log("Número de pneus retornados: " . count($result));
-        error_log("Dados dos pneus: " . json_encode($result, JSON_PRETTY_PRINT));
-        error_log("=== FIM DA BUSCA DE PNEUS ===");
+        
         return [
             'pneus' => $result,
             'total' => $total,
             'pagina_atual' => $page,
-            'total_paginas' => ceil($total / $limit)
+            'per_page' => $per_page,
+            'total_paginas' => $total > 0 ? (int) ceil($total / $per_page) : 1
         ];
-    } catch(PDOException $e) {
-        error_log("ERRO na busca de pneus: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
+    } catch (PDOException $e) {
+        if (function_exists('error_log')) {
+            error_log('getEstoquePneus: ' . $e->getMessage());
+        }
         return [
             'pneus' => [],
             'total' => 0,
             'pagina_atual' => 1,
+            'per_page' => 10,
             'total_paginas' => 1
         ];
     }
 }
 
-// Pegar a página atual da URL ou definir como 1
+// Pegar parâmetros da URL
 $pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-
-// Buscar pneus com paginação
-$resultado = getEstoquePneus($pagina_atual);
+$per_page = isset($_GET['per_page']) ? (int) $_GET['per_page'] : 10;
+$opts = [
+    'per_page' => $per_page,
+    'status'   => isset($_GET['status']) ? $_GET['status'] : '',
+    'disponivel' => isset($_GET['disponivel']) ? $_GET['disponivel'] : '',
+    'search'   => isset($_GET['search']) ? trim($_GET['search']) : ''
+];
+$resultado = getEstoquePneus($pagina_atual, $opts);
 $pneus = $resultado['pneus'];
 $total_paginas = $resultado['total_paginas'];
-
-error_log("Resultado final - Total de pneus: " . count($pneus));
-error_log("Dados dos pneus: " . json_encode($pneus));
+$per_page = $resultado['per_page'];
 ?>
 
 <!DOCTYPE html>
@@ -112,11 +134,14 @@ error_log("Dados dos pneus: " . json_encode($pneus));
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'estoque-pneus-modern' : ''; ?>">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
@@ -127,10 +152,78 @@ error_log("Dados dos pneus: " . json_encode($pneus));
             <?php include '../includes/header.php'; ?>
             
             <!-- Page Content -->
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <style>
+                    body.estoque-pneus-modern .dashboard-content.fornc-page { overflow-x: auto; }
+                    body.estoque-pneus-modern .dashboard-header { display: none; }
+                    body.estoque-pneus-modern .dashboard-grid { display: none; }
+                    body.estoque-pneus-modern .filter-section { display: none; }
+                </style>
+
+                <?php if ($is_modern): ?>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Total de pneus</span><span class="val"><?php echo (int) $resultado['total']; ?></span></div>
+                </div>
+                <?php endif; ?>
+                <?php if ($is_modern): ?>
+                <div class="fornc-toolbar">
+                    <form method="get" action="estoque_pneus.php" id="estoquePneusSearchForm" class="fornc-search-block">
+                        <label for="searchEstoquePneus">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input
+                                type="text"
+                                id="searchEstoquePneus"
+                                name="search"
+                                value="<?php echo htmlspecialchars($opts['search'] ?? ''); ?>"
+                                placeholder="Buscar (série, marca, modelo...)"
+                                autocomplete="off"
+                            >
+                        </div>
+                        <input type="hidden" name="page" value="1">
+                        <?php if (!empty($opts['status'])): ?>
+                            <input type="hidden" name="status" value="<?php echo htmlspecialchars($opts['status']); ?>">
+                        <?php endif; ?>
+                        <?php if (isset($opts['disponivel']) && $opts['disponivel'] !== ''): ?>
+                            <input type="hidden" name="disponivel" value="<?php echo htmlspecialchars($opts['disponivel']); ?>">
+                        <?php endif; ?>
+                        <?php if (!empty($opts['per_page'])): ?>
+                            <input type="hidden" name="per_page" value="<?php echo (int)$opts['per_page']; ?>">
+                        <?php endif; ?>
+                    </form>
+
+                    <div class="fornc-btn-row">
+                        <button
+                            type="submit"
+                            form="estoquePneusSearchForm"
+                            class="fornc-btn fornc-btn--accent"
+                            title="Pesquisar"
+                        >
+                            <i class="fas fa-search"></i> Pesquisar
+                        </button>
+                        <button id="filterBtn" class="fornc-btn fornc-btn--ghost" title="Filtros" type="button">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button id="exportBtn" class="fornc-btn fornc-btn--muted" title="Exportar" type="button">
+                            <i class="fas fa-file-export"></i>
+                        </button>
+                        <button id="helpBtn" class="fornc-btn fornc-btn--ghost fornc-btn--icon" title="Ajuda" aria-label="Ajuda" type="button">
+                            <i class="fas fa-question-circle"></i>
+                        </button>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="dashboard-header">
                     <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
+                        <form method="get" action="estoque_pneus.php" class="search-form" style="display:flex; gap:8px; align-items:center;">
+                            <input type="hidden" name="page" value="1">
+                            <?php if (!empty($opts['status'])): ?><input type="hidden" name="status" value="<?php echo htmlspecialchars($opts['status']); ?>"><?php endif; ?>
+                            <?php if (isset($opts['disponivel']) && $opts['disponivel'] !== ''): ?><input type="hidden" name="disponivel" value="<?php echo htmlspecialchars($opts['disponivel']); ?>"><?php endif; ?>
+                            <?php if (!empty($opts['per_page'])): ?><input type="hidden" name="per_page" value="<?php echo (int)$opts['per_page']; ?>"><?php endif; ?>
+                            <input type="text" name="search" value="<?php echo htmlspecialchars($opts['search'] ?? ''); ?>" placeholder="Buscar (série, marca, modelo...)">
+                            <button type="submit" class="btn-primary"><i class="fas fa-search"></i></button>
+                        </form>
                         <div class="view-controls">
                             <button id="filterBtn" class="btn-restore-layout" title="Filtros">
                                 <i class="fas fa-filter"></i>
@@ -138,12 +231,13 @@ error_log("Dados dos pneus: " . json_encode($pneus));
                             <button id="exportBtn" class="btn-toggle-layout" title="Exportar">
                                 <i class="fas fa-file-export"></i>
                             </button>
-                            <button id="helpBtn" class="btn-help" title="Ajuda">
+                            <button id="helpBtn" class="btn-help" title="Ajuda" aria-label="Ajuda">
                                 <i class="fas fa-question-circle"></i>
                             </button>
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- KPI Cards Row -->
                 <div class="dashboard-grid mb-4">
@@ -160,9 +254,27 @@ error_log("Dados dos pneus: " . json_encode($pneus));
                     </div>
                 </div>
                 
+                <!-- Filtro Por página (igual abastecimentos) -->
+                <div class="filter-section" style="margin-bottom:1rem;">
+                    <form method="get" action="estoque_pneus.php" id="formPerPageEstoque" style="display:inline-flex; align-items:center; gap:0.5rem;">
+                        <input type="hidden" name="page" value="1">
+                        <?php if (!empty($opts['status'])): ?><input type="hidden" name="status" value="<?php echo htmlspecialchars($opts['status']); ?>"><?php endif; ?>
+                        <?php if (isset($opts['disponivel']) && $opts['disponivel'] !== ''): ?><input type="hidden" name="disponivel" value="<?php echo htmlspecialchars($opts['disponivel']); ?>"><?php endif; ?>
+                        <?php if (!empty($opts['search'])): ?><input type="hidden" name="search" value="<?php echo htmlspecialchars($opts['search']); ?>"><?php endif; ?>
+                        <span class="filter-label">Por página</span>
+                        <select name="per_page" class="filter-per-page" title="Registros por página" onchange="this.form.submit()">
+                            <option value="5"  <?php echo $per_page == 5   ? 'selected' : ''; ?>>5</option>
+                            <option value="10" <?php echo $per_page == 10  ? 'selected' : ''; ?>>10</option>
+                            <option value="25" <?php echo $per_page == 25  ? 'selected' : ''; ?>>25</option>
+                            <option value="50" <?php echo $per_page == 50  ? 'selected' : ''; ?>>50</option>
+                            <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                        </select>
+                    </form>
+                </div>
+                
                 <!-- Table Section -->
-                <div class="table-container">
-                    <table class="data-table">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>">
                         <thead>
                             <tr>
                                 <th>Número de Série</th>
@@ -207,24 +319,48 @@ error_log("Dados dos pneus: " . json_encode($pneus));
                     </table>
                 </div>
                 
-                <!-- Pagination -->
-                <div class="pagination">
-                    <?php if ($total_paginas > 1): ?>
-                        <a href="#" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" 
-                           onclick="return changePage(<?php echo $pagina_atual - 1; ?>)">
-                            <i class="fas fa-chevron-left"></i>
-                        </a>
-                        
-                        <span class="pagination-info">
-                            Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
-                        </span>
-                        
-                        <a href="#" class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>"
-                           onclick="return changePage(<?php echo $pagina_atual + 1; ?>)">
-                            <i class="fas fa-chevron-right"></i>
-                        </a>
-                    <?php endif; ?>
+                <!-- Paginação (igual abastecimentos.php) -->
+                <?php
+                $base_params = ['page' => 1, 'per_page' => $per_page];
+                if (!empty($opts['status'])) $base_params['status'] = $opts['status'];
+                if (isset($opts['disponivel']) && $opts['disponivel'] !== '') $base_params['disponivel'] = $opts['disponivel'];
+                if (!empty($opts['search'])) $base_params['search'] = $opts['search'];
+                $prev_params = array_merge($base_params, ['page' => max(1, $pagina_atual - 1)]);
+                $next_params = array_merge($base_params, ['page' => min($total_paginas, $pagina_atual + 1)]);
+                ?>
+                <?php if ($is_modern): ?>
+                <div class="fornc-pagination-bar">
+                <div class="pagination fornc-modern-pagination">
+                    <a href="estoque_pneus.php?<?php echo htmlspecialchars(http_build_query($prev_params)); ?>"
+                       class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    <span class="pagination-info">
+                        <?php if ($total_paginas > 1): ?>Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?> (<?php echo (int)$resultado['total']; ?> registros)
+                        <?php else: ?><?php echo (int)$resultado['total']; ?> registros<?php endif; ?>
+                    </span>
+                    <a href="estoque_pneus.php?<?php echo htmlspecialchars(http_build_query($next_params)); ?>"
+                       class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
                 </div>
+                </div>
+                <?php else: ?>
+                <div class="pagination">
+                    <a href="estoque_pneus.php?<?php echo htmlspecialchars(http_build_query($prev_params)); ?><?php echo $classic_param; ?>"
+                       class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    <span class="pagination-info">
+                        <?php if ($total_paginas > 1): ?>Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?> (<?php echo (int)$resultado['total']; ?> registros)
+                        <?php else: ?><?php echo (int)$resultado['total']; ?> registros<?php endif; ?>
+                    </span>
+                    <a href="estoque_pneus.php?<?php echo htmlspecialchars(http_build_query($next_params)); ?><?php echo $classic_param; ?>"
+                       class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </div>
+                <?php endif; ?>
             </div>
             
             <!-- Footer -->
@@ -233,30 +369,43 @@ error_log("Dados dos pneus: " . json_encode($pneus));
     </div>
     
     <!-- Filter Modal -->
-    <div id="filterModal" class="modal">
+    <div id="filterModal" class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Filtrar Estoque</h2>
                 <span class="close-modal">&times;</span>
             </div>
             <div class="modal-body">
-                <form id="filterForm">
+                <form id="filterForm" method="get" action="estoque_pneus.php">
+                    <input type="hidden" name="page" value="1">
+                    <input type="hidden" name="per_page" value="<?php echo (int)($resultado['per_page'] ?? 10); ?>">
                     <div class="form-group">
                         <label for="status">Status:</label>
                         <select id="status" name="status">
                             <option value="">Todos</option>
-                            <option value="1">Novo</option>
-                            <option value="2">Usado</option>
-                            <option value="3">Recapado</option>
+                            <?php
+                            try {
+                                $conn = getConnection();
+                                $st = $conn->query("SELECT id, nome FROM status_pneus ORDER BY nome");
+                                while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+                                    $sel = (isset($opts['status']) && $opts['status'] === $row['id']) ? ' selected' : '';
+                                    echo '<option value="' . (int)$row['id'] . '"' . $sel . '>' . htmlspecialchars($row['nome']) . '</option>';
+                                }
+                            } catch (Exception $e) { /* ignore */ }
+                            ?>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="disponivel">Disponibilidade:</label>
                         <select id="disponivel" name="disponivel">
                             <option value="">Todos</option>
-                            <option value="1">Disponível</option>
-                            <option value="0">Indisponível</option>
+                            <option value="1" <?php echo (isset($opts['disponivel']) && $opts['disponivel'] === '1') ? 'selected' : ''; ?>>Disponível</option>
+                            <option value="0" <?php echo (isset($opts['disponivel']) && $opts['disponivel'] === '0') ? 'selected' : ''; ?>>Indisponível</option>
                         </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="filter_search">Buscar:</label>
+                        <input type="text" id="filter_search" name="search" value="<?php echo htmlspecialchars($opts['search'] ?? ''); ?>" placeholder="Série, marca, modelo...">
                     </div>
                     <button type="submit" class="btn-primary">Aplicar Filtros</button>
                 </form>
@@ -265,7 +414,7 @@ error_log("Dados dos pneus: " . json_encode($pneus));
     </div>
     
     <!-- Help Modal -->
-    <div id="helpModal" class="modal">
+    <div id="helpModal" class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Ajuda - Estoque de Pneus</h2>
@@ -289,64 +438,26 @@ error_log("Dados dos pneus: " . json_encode($pneus));
     <!-- JavaScript -->
     <script src="../js/main.js"></script>
     <script>
-        // Função para mudar de página
+        function buildQueryString(overrides) {
+            const params = new URLSearchParams(window.location.search);
+            if (overrides) {
+                Object.keys(overrides).forEach(function(k) { params.set(k, overrides[k]); });
+            }
+            return params.toString();
+        }
         function changePage(page) {
-            window.location.href = 'estoque_pneus.php?page=' + page;
+            const qs = buildQueryString({ page: page });
+            window.location.href = 'estoque_pneus.php' + (qs ? '?' + qs : '');
             return false;
         }
         
-        // Função para aplicar filtros
-        document.getElementById('filterForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const status = document.getElementById('status').value;
-            const disponivel = document.getElementById('disponivel').value;
-            
-            // Fazer requisição AJAX para filtrar os dados
-            fetch(`../api/estoque_pneus.php?action=get_estoque&status=${status}&disponivel=${disponivel}`)
-                .then(response => response.json())
-                .then(data => {
-                    // Atualizar a tabela com os dados filtrados
-                    updateTable(data.pneus);
-                })
-                .catch(error => console.error('Erro ao filtrar dados:', error));
+        // Fechar modal ao clicar fora
+        document.getElementById('filterModal').addEventListener('click', function(e) {
+            if (e.target === this) this.style.display = 'none';
         });
-        
-        // Função para atualizar a tabela
-        function updateTable(pneus) {
-            const tbody = document.querySelector('.data-table tbody');
-            tbody.innerHTML = '';
-            
-            pneus.forEach(pneu => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${pneu.numero_serie}</td>
-                    <td>${pneu.marca}</td>
-                    <td>${pneu.modelo}</td>
-                    <td>${pneu.medida}</td>
-                    <td>
-                        <span class="status-badge status-${pneu.status_nome.toLowerCase()}">
-                            ${pneu.status_nome}
-                        </span>
-                    </td>
-                    <td>
-                        <?php if (isset($pneu['disponivel']) && $pneu['disponivel'] == 1): ?>
-                            <span class="status-badge status-success">Sim</span>
-                        <?php else: ?>
-                            <span class="status-badge status-danger">Não</span>
-                        <?php endif; ?>
-                    </td>
-                    <td class="actions">
-                        <button class="btn-icon view-btn" data-id="${pneu.id || pneu.pneu_id}" title="Ver detalhes">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn-icon edit-btn" data-id="${pneu.id || pneu.pneu_id}" title="Editar">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+        document.querySelector('#filterModal .close-modal').addEventListener('click', function() {
+            document.getElementById('filterModal').style.display = 'none';
+        });
     </script>
     
     <!-- JavaScript Files -->

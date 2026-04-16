@@ -9,6 +9,8 @@
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db_connect.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
 configure_session();
 if (session_status() === PHP_SESSION_NONE) {
@@ -23,6 +25,9 @@ if ($empresa_id <= 0) {
     echo json_encode(['success' => false, 'error' => 'Não autorizado']);
     exit;
 }
+
+// Protege mutações (POST/PUT/PATCH/DELETE) com CSRF e retorno JSON padronizado.
+api_require_csrf_json();
 
 $base_dir = dirname(__DIR__) . '/uploads/manutencao_anexos';
 if (!is_dir($base_dir)) {

@@ -23,15 +23,15 @@ COMMENT='Planos de cobrança por quantidade de veículos';
 
 -- Inserir planos padrão
 INSERT INTO adm_planos (nome, descricao, tipo, limite_veiculos, valor_por_veiculo, valor_maximo, ordem) VALUES
-('Avulso - 1 veículo', 'Plano avulso para 1 veículo', 'avulso', 1, 120.00, 120.00, 1),
-('Avulso - 2 veículos', 'Plano avulso para 2 veículos', 'avulso', 2, 110.00, 220.00, 2),
-('Avulso - 3 veículos', 'Plano avulso para 3 veículos', 'avulso', 3, 100.00, 300.00, 3),
-('Avulso - 4 veículos', 'Plano avulso para 4 veículos', 'avulso', 4, 95.00, 380.00, 4),
-('Básico', 'Plano básico até 5 veículos', 'pacote', 5, 85.00, 425.00, 5),
-('Profissional', 'Plano profissional até 8 veículos', 'pacote', 8, 75.00, 600.00, 6),
-('Empresarial', 'Plano empresarial até 10 veículos', 'pacote', 10, 70.00, 700.00, 7),
-('Frota Avançada', 'Plano para frotas médias até 15 veículos', 'pacote', 15, 65.00, 975.00, 8),
-('Frota Corporativa', 'Plano para grandes frotas (20+ veículos)', 'pacote', NULL, 60.00, NULL, 9);
+('Avulso - 1 veículo', 'Plano avulso para 1 veículo', 'avulso', 1, 90.00, 90.00, 1),
+('Avulso - 2 veículos', 'Plano avulso para 2 veículos', 'avulso', 2, 85.00, 170.00, 2),
+('Avulso - 3 veículos', 'Plano avulso para 3 veículos', 'avulso', 3, 80.00, 240.00, 3),
+('Avulso - 4 veículos', 'Plano avulso para 4 veículos', 'avulso', 4, 75.00, 300.00, 4),
+('Básico', 'Plano básico até 5 veículos', 'pacote', 5, 55.00, 275.00, 5),
+('Profissional', 'Plano profissional até 8 veículos', 'pacote', 8, 50.00, 400.00, 6),
+('Empresarial', 'Plano empresarial até 10 veículos', 'pacote', 10, 48.00, 480.00, 7),
+('Frota Avançada', 'Plano para frotas médias até 15 veículos', 'pacote', 15, 45.00, 675.00, 8),
+('Frota Corporativa', 'Plano para grandes frotas (20+ veículos)', 'pacote', NULL, 42.50, NULL, 9);
 
 -- Adicionar coluna plano_id na tabela empresa_adm (se não existir)
 ALTER TABLE empresa_adm 

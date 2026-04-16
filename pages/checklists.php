@@ -17,6 +17,8 @@ require_authentication();
 
 // Set page title
 $page_title = "Checklists";
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
+$classic_param = $is_modern ? '' : '&classic=1';
 
 // Função para buscar checklists do banco de dados
 function getChecklists($page = 1) {
@@ -119,6 +121,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     <style>
         /* ... existing ... */
         .analytics-section {
@@ -169,16 +174,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 height: 250px;
             }
         }
+
+        body.checklists-modern .dashboard-content.fornc-page { overflow-x: auto; }
     </style>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'checklists-modern' : ''; ?>">
     <div class="app-container">
         <?php include '../includes/sidebar_pages.php'; ?>
         
         <div class="main-content">
             <?php include '../includes/header.php'; ?>
             
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <?php if ($is_modern): ?>
+                <?php else: ?>
                 <div class="dashboard-header">
                     <h1>Checklists de Viagem</h1>
                 </div>
@@ -211,8 +220,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         </button>
                     </div>
                 </div>
-                <div class="table-container">
-                    <table class="data-table">
+                <?php endif; ?>
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>">
                         <thead>
                             <tr>
                                 <th>Data</th>
@@ -244,7 +254,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         </tbody>
                     </table>
                 </div>
-                <div class="pagination">
+                <?php if ($is_modern): ?>
+                <div class="fornc-pagination-bar">
+                    <div class="pagination fornc-modern-pagination">
                     <?php if ($total_paginas > 1): ?>
                         <a href="?page=<?php echo $pagina_atual - 1; ?>" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
                             <i class="fas fa-chevron-left"></i>
@@ -256,7 +268,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             <i class="fas fa-chevron-right"></i>
                         </a>
                     <?php endif; ?>
+                    </div>
                 </div>
+                <?php else: ?>
+                <div class="pagination">
+                    <?php if ($total_paginas > 1): ?>
+                        <a href="?page=<?php echo $pagina_atual - 1; ?><?php echo $classic_param; ?>" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                        <span class="pagination-info">
+                            Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
+                        </span>
+                        <a href="?page=<?php echo $pagina_atual + 1; ?><?php echo $classic_param; ?>" class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    <?php endif; ?>
+                </div>
+                <?php endif; ?>
 
                 <!-- SEÇÃO DE GRÁFICOS E ANÁLISES -->
                 <div class="analytics-section">
@@ -339,8 +367,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     </script>
 
     <!-- Modal de Visualização do Checklist -->
-    <div id="viewChecklistModal" class="modal">
-        <div class="modal-content">
+    <div id="viewChecklistModal" class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2>Detalhes do Checklist</h2>
                 <span class="close-modal">&times;</span>
@@ -590,5 +618,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             });
     });
     </script>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html> 

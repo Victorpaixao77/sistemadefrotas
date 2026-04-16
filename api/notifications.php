@@ -3,6 +3,8 @@ require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 require_once '../includes/notifications.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
 configure_session();
 session_start();
@@ -17,11 +19,20 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_
 }
 
 $empresa_id = $_SESSION['empresa_id'];
-$user_id = $_SESSION['user_id'] ?? null;
+$user_id = $_SESSION['user_id'] ?? $_SESSION['id'] ?? $_SESSION['usuario_id'] ?? null;
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
+
+// Protege mutações (POST/PUT/PATCH/DELETE) com CSRF e retorno JSON padronizado.
+api_require_csrf_json();
 
 try {
     $conn = getConnection();
+    
+    // Sincronizar alertas de CNH vencendo no sino (máx. 1 por dia por usuário)
+    if (in_array($action, ['get_unread', 'get_all', 'get_count'], true) && $user_id) {
+        require_once __DIR__ . '/../includes/sync_cnh_notificacoes.php';
+    }
+    
     $notification = new NotificationManager($conn);
     
     switch ($action) {

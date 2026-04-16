@@ -8,6 +8,8 @@ ini_set('log_errors', 1);
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
 // Configura e inicia a sessão
 configure_session();
@@ -22,6 +24,9 @@ if (!is_logged_in()) {
     echo json_encode(['success' => false, 'message' => 'Usuário não autenticado']);
     exit;
 }
+
+// Protege mutações (POST/PUT/PATCH/DELETE) com CSRF.
+api_require_csrf_json();
 
 try {
     // Verifica o método da requisição

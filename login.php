@@ -1,6 +1,7 @@
 <?php
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
+require_once 'includes/csrf.php';
 
 // Configure session before starting it
 configure_session();
@@ -73,8 +74,8 @@ if (isset($_COOKIE['remember_user']) && !isset($_SESSION['loggedin']) && !isset(
     }
 }
 
-// Clear any existing session data if not properly logged in
-if (!isset($_SESSION['empresa_id'])) {
+// Limpar sessão “órfã” só no GET: no POST preservamos a sessão para validar o CSRF do formulário.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' && !isset($_SESSION['empresa_id'])) {
     session_unset();
     session_destroy();
     session_start();
@@ -105,11 +106,22 @@ if (isset($_COOKIE['saved_login']) && !isset($_SESSION['loggedin'])) {
 }
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = trim($_POST["username"]);
-    $password = trim($_POST["password"]);
+    $username = trim($_POST["username"] ?? '');
+    $password = trim($_POST["password"] ?? '');
     $remember = isset($_POST["remember"]) ? true : false;
-    
-    try {
+
+    $now = time();
+    $_SESSION['login_fail_window'] = $_SESSION['login_fail_window'] ?? $now;
+    if (($now - (int) $_SESSION['login_fail_window']) > 900) {
+        $_SESSION['login_fail_count'] = 0;
+        $_SESSION['login_fail_window'] = $now;
+    }
+    if ((int) ($_SESSION['login_fail_count'] ?? 0) >= 12) {
+        $error = 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.';
+    } elseif (!csrf_token_validate($_POST['csrf_token'] ?? null)) {
+        $error = 'Sessão expirada ou token inválido. Recarregue a página e tente novamente.';
+    } else {
+        try {
         $conn = getConnection();
         
         // Prepare a select statement - buscar usuário com ou sem empresa (para acesso_todas_empresas)
@@ -132,6 +144,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     }
                     // Verify password
                     else if (password_verify($password, $row['senha'])) {
+                        $_SESSION['login_fail_count'] = 0;
                         // Verificar se tem acesso a todas as empresas
                         $tem_acesso_global = !empty($row['acesso_todas_empresas']) && $row['acesso_todas_empresas'] == 1;
                         $_SESSION["acesso_todas_empresas"] = $tem_acesso_global;
@@ -195,6 +208,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         header("location: " . $redirect_url);
                         exit;
                     } else {
+                        $_SESSION['login_fail_count'] = (int) ($_SESSION['login_fail_count'] ?? 0) + 1;
                         // Registrar tentativa de login falha
                         registrarLogAcesso($row["id"], $row["empresa_id"], 'tentativa_login_falha', 'falha', 'Senha inválida');
                         $error = "Senha inválida.";
@@ -207,14 +221,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     } catch (Exception $e) {
                         // Ignorar erro de log se a tabela não existir ainda
                     }
+                    $_SESSION['login_fail_count'] = (int) ($_SESSION['login_fail_count'] ?? 0) + 1;
                     $error = "Usuário não encontrado.";
                 }
             } else {
                 $error = "Oops! Algo deu errado. Por favor, tente novamente mais tarde.";
             }
         }
-    } catch(PDOException $e) {
-        $error = "Erro: " . $e->getMessage();
+        } catch(PDOException $e) {
+            $error = "Erro: " . $e->getMessage();
+        }
     }
 }
 ?>
@@ -538,6 +554,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
 
         <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token_get(), ENT_QUOTES, 'UTF-8'); ?>">
             <div class="form-group">
                 <label for="username">E-mail</label>
                 <input type="email" id="username" name="username" placeholder="Digite seu e-mail" value="<?php echo $saved_username; ?>" required>

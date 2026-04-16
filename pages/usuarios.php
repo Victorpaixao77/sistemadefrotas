@@ -23,7 +23,7 @@ $can_access_lucratividade = $permissions['can_access_lucratividade'];
 // Buscar usuários de motoristas
 $conn = getConnection();
 $stmt = $conn->prepare('
-    SELECT um.*, m.nome as nome_motorista, m.cpf, "motorista" as tipo_usuario_sistema
+    SELECT um.*, m.nome as nome_motorista, m.cpf, m.email AS email_motorista, "motorista" as tipo_usuario_sistema
     FROM usuarios_motoristas um 
     JOIN motoristas m ON um.motorista_id = m.id 
     WHERE um.empresa_id = :empresa_id 
@@ -48,14 +48,14 @@ $usuarios_sistema = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Combinar todos os usuários
 $usuarios = array_merge($usuarios_motoristas, $usuarios_sistema);
 
-// Buscar motoristas disponíveis para cadastro
+// Motoristas sem usuário do app ainda (qualquer disponibilidade — o app não depende do status operacional)
 $stmt = $conn->prepare('
-    SELECT m.* 
-    FROM motoristas m 
-    LEFT JOIN usuarios_motoristas um ON m.id = um.motorista_id 
-    WHERE m.empresa_id = :empresa_id 
-    AND m.disponibilidade_id = 1 
+    SELECT m.*
+    FROM motoristas m
+    LEFT JOIN usuarios_motoristas um ON m.id = um.motorista_id AND um.empresa_id = m.empresa_id
+    WHERE m.empresa_id = :empresa_id
     AND um.id IS NULL
+    ORDER BY m.nome ASC
 ');
 $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
 $stmt->execute();
@@ -261,7 +261,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <thead>
                                         <tr>
                                             <th style="width: 20%; text-align: left; padding: 12px 8px;">Nome</th>
-                                            <th style="width: 18%; text-align: left; padding: 12px 8px;">Email/CPF</th>
+                                            <th style="width: 18%; text-align: left; padding: 12px 8px;">E-mail</th>
                                             <th style="width: 10%; text-align: center; padding: 12px 8px;">Tipo</th>
                                             <th style="width: 15%; text-align: center; padding: 12px 8px;">Permissões</th>
                                             <th style="width: 8%; text-align: center; padding: 12px 8px;">Status</th>
@@ -284,7 +284,8 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                             <td style="padding: 12px 8px; text-align: left; word-wrap: break-word;">
                                                 <?php 
                                                 if ($usuario['tipo_usuario_sistema'] === 'motorista') {
-                                                    echo htmlspecialchars($usuario['cpf']);
+                                                    $em = isset($usuario['email_motorista']) ? trim((string) $usuario['email_motorista']) : '';
+                                                    echo $em !== '' ? htmlspecialchars($em) : '<span class="text-muted">—</span>';
                                                 } else {
                                                     echo htmlspecialchars($usuario['email']);
                                                 }
@@ -369,15 +370,17 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <select id="motorista_id" name="motorista_id" class="form-control" required>
                                         <option value="">Selecione um motorista</option>
                                         <?php foreach ($motoristas_disponiveis as $motorista): ?>
-                                        <option value="<?php echo $motorista['id']; ?>">
+                                        <option value="<?php echo (int) $motorista['id']; ?>" data-email="<?php echo htmlspecialchars($motorista['email'] ?? ''); ?>">
                                             <?php echo htmlspecialchars($motorista['nome'] . ' - ' . $motorista['cpf']); ?>
                                         </option>
                                         <?php endforeach; ?>
                                     </select>
+                                    <small class="text-muted" style="display:block;margin-top:6px;">Lista apenas motoristas <strong>sem</strong> usuário do app; quem já tem acesso aparece na tabela acima.</small>
                                 </div>
                                 <div class="form-group">
-                                    <label for="nome_motorista">Nome de Usuário</label>
-                                    <input type="text" id="nome_motorista" name="nome" class="form-control" required>
+                                    <label for="email_login_motorista_display">E-mail para login no app</label>
+                                    <input type="text" id="email_login_motorista_display" class="form-control" readonly placeholder="Selecione o motorista" autocomplete="off">
+                                    <small id="email_login_motorista_hint" class="text-muted" style="display:block;margin-top:6px;">O acesso no app usa o <strong>e-mail cadastrado no motorista</strong> (não o CPF).</small>
                                 </div>
                                 <div class="form-group">
                                     <label for="senha_motorista">Senha</label>
@@ -546,7 +549,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </div>
                     
                     <div class="form-group">
-                        <label for="edit_nome">Nome</label>
+                        <label for="edit_nome" id="edit_nome_label">Nome</label>
                         <input type="text" id="edit_nome" name="nome" class="form-control" required>
                     </div>
                     
@@ -668,9 +671,35 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <script>
+    function atualizarEmailMotoristaSelecionado() {
+        const sel = document.getElementById('motorista_id');
+        if (!sel) return;
+        const opt = sel.options[sel.selectedIndex];
+        const em = opt ? (opt.getAttribute('data-email') || '').trim() : '';
+        const disp = document.getElementById('email_login_motorista_display');
+        const hint = document.getElementById('email_login_motorista_hint');
+        if (disp) disp.value = em;
+        if (hint) {
+            if (!em) {
+                hint.innerHTML = '<span style="color:#c0392b">Este motorista não tem e-mail cadastrado. Cadastre o e-mail em <strong>Motoristas</strong> antes de criar o acesso.</span>';
+            } else {
+                hint.innerHTML = 'O acesso no app usa o <strong>e-mail cadastrado no motorista</strong> (não o CPF).';
+            }
+        }
+    }
+    document.getElementById('motorista_id').addEventListener('change', atualizarEmailMotoristaSelecionado);
+
     // Validação do formulário de motoristas
     document.getElementById('cadastroMotoristaForm').addEventListener('submit', function(e) {
         e.preventDefault();
+        
+        const sel = document.getElementById('motorista_id');
+        const opt = sel ? sel.options[sel.selectedIndex] : null;
+        const em = opt ? (opt.getAttribute('data-email') || '').trim() : '';
+        if (!sel || !sel.value || !em) {
+            alert('Selecione um motorista que possua e-mail cadastrado em Motoristas.');
+            return;
+        }
         
         const senha = document.getElementById('senha_motorista').value;
         const confirmarSenha = document.getElementById('confirmar_senha_motorista').value;
@@ -793,10 +822,12 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
         if (tipoUsuario === 'motorista') {
             modalTitle.textContent = 'Editar Usuário Motorista';
             editTipo.value = 'motorista';
-            editMotoristaFields.style.display = 'block';
+            editMotoristaFields.style.display = 'none';
             editEmailField.style.display = 'none';
             editTipoUsuarioField.style.display = 'none';
             editPermissionsField.style.display = 'none';
+            document.getElementById('edit_nome_label').textContent = 'E-mail (login do app)';
+            document.getElementById('edit_nome').readOnly = true;
         } else {
             modalTitle.textContent = 'Editar Usuário do Sistema';
             editTipo.value = 'sistema';
@@ -804,6 +835,8 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
             editEmailField.style.display = 'block';
             editTipoUsuarioField.style.display = 'block';
             editPermissionsField.style.display = 'block';
+            document.getElementById('edit_nome_label').textContent = 'Nome';
+            document.getElementById('edit_nome').readOnly = false;
         }
         
         // Buscar dados do usuário
@@ -815,7 +848,11 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
             if (data.success) {
                 const usuario = data.data;
                 document.getElementById('edit_id').value = usuario.id;
-                document.getElementById('edit_nome').value = usuario.nome;
+                if (tipoUsuario === 'motorista') {
+                    document.getElementById('edit_nome').value = usuario.email_motorista || usuario.nome || '';
+                } else {
+                    document.getElementById('edit_nome').value = usuario.nome;
+                }
                 document.getElementById('edit_status').value = usuario.status;
                 
                 if (tipoUsuario === 'sistema') {
@@ -879,7 +916,8 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         });
                     }
                 } else {
-                    document.getElementById('edit_motorista_id').value = usuario.motorista_id || '';
+                    const sel = document.getElementById('edit_motorista_id');
+                    if (sel) sel.value = usuario.motorista_id || '';
                 }
                 
                 modal.style.display = 'block';

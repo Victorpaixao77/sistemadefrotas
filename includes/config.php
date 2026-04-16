@@ -1,5 +1,6 @@
 <?php
 // Configuração da aplicação
+require_once __DIR__ . '/sf_paths.php';
 
 // Configuração da sessão
 function configure_session() {
@@ -17,11 +18,13 @@ function configure_session() {
         session_name('sistema_frotas_session');
         
         // Define parâmetros do cookie da sessão
+        $cookieSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (isset($_SERVER['SERVER_PORT']) && (string) $_SERVER['SERVER_PORT'] === '443');
         session_set_cookie_params([
             'lifetime' => 86400,          // 24 horas
-            'path' => '/sistema-frotas',  // Caminho da aplicação
+            'path' => sf_session_cookie_path(),
             'domain' => '',
-            'secure' => false,            // Define como false para HTTP
+            'secure' => $cookieSecure,
             'httponly' => true,
             'samesite' => 'Lax'
         ]);
@@ -42,22 +45,35 @@ define('DB_NAME', 'sistema_frotas');    // Nome do banco de dados
 
 // Configuração da Aplicação
 define('APP_NAME', 'Sistema de Gestão de Frotas');
-define('APP_VERSION', '1.0.0');
+define('APP_VERSION', '1.0.1');
 define('TIMEZONE', 'America/Sao_Paulo');
 
 // Define o fuso horário padrão
 date_default_timezone_set(TIMEZONE);
 
-// Modo de debug (definir como false em produção)
-define('DEBUG_MODE', true);
+// Modo debug: true apenas se SF_DEBUG=1 ou SF_DEBUG=true (padrão produção: off)
+define('DEBUG_MODE', in_array(strtolower((string) getenv('SF_DEBUG')), ['1', 'true', 'yes'], true));
 
 // Configuração de logs
 ini_set('log_errors', 1);
 // Corrigindo o caminho do error_log para usar caminho absoluto
 $log_path = __DIR__ . '/../logs/php_errors.log';
 ini_set('error_log', $log_path);
-error_reporting(E_ALL);
-ini_set('display_errors', 0); // Desativa a exibição de erros na saída
+if (DEBUG_MODE) {
+    error_reporting(E_ALL);
+} else {
+    error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT & ~E_NOTICE & ~E_WARNING & ~E_USER_NOTICE & ~E_USER_WARNING);
+}
+ini_set('display_errors', 0);
+
+if (!function_exists('sf_log_debug')) {
+    function sf_log_debug(string $message): void
+    {
+        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+            error_log($message);
+        }
+    }
+}
 
 // Garantir que o diretório de logs existe
 $log_dir = dirname($log_path);
@@ -105,7 +121,7 @@ function require_authentication() {
             exit;
         } else {
             // Se for uma requisição de página, redireciona para o login
-            header("location: /sistema-frotas/login.php");
+            header('location: ' . sf_app_url('login.php'));
             exit;
         }
     }

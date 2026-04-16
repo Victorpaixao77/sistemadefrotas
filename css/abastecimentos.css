@@ -1,0 +1,442 @@
+/* Abastecimentos — extraído de pages/abastecimentos.php */
+
+/* Modo moderno (tabela fornc) */
+/* Mesmo padrão visual que fornecedores_moderno (.fornc-table em .fornc-table-wrap) */
+body.abastecimentos-modern .dashboard-content.fornc-page {
+    padding-top: 8px;
+    overflow-x: auto;
+}
+body.abastecimentos-modern .dashboard-header { display: none; }
+body.abastecimentos-modern .fornc-page .fornc-table-wrap.refuel-table-wrap {
+    max-height: min(70vh, 560px);
+}
+body.abastecimentos-modern .fornc-page .fornc-table-wrap.refuel-table-wrap .fornc-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--forn-table-head);
+    box-shadow: 0 1px 0 var(--border-color);
+}
+/* Muitas colunas: largura mínima ~ equivalente à “largura de célula” da tabela de fornecedores (6 cols), com rolagem horizontal no wrap */
+body.abastecimentos-modern .fornc-page #refuelingTable.fornc-table {
+    min-width: 1080px;
+    table-layout: auto;
+}
+/* Coluna ARLA compacta, badge alinhado às outras células da fornc-table */
+body.abastecimentos-modern .fornc-page #refuelingTable .col-arla {
+    width: 3.6rem;
+    max-width: 4.25rem;
+    text-align: center;
+    white-space: nowrap;
+}
+body.abastecimentos-modern .fornc-page #refuelingTable .percentual-arla {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+    display: inline-block;
+    max-width: 100%;
+    line-height: 1.15;
+    vertical-align: middle;
+    border-width: 1px;
+    box-sizing: border-box;
+}
+
+/* Página (toast, analytics, ARLA, ajuda) */
+/* Estilos adicionais para a página de abastecimentos */
+
+/* Toast (notificações) */
+.toast-container {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 360px;
+}
+.toast {
+    padding: 12px 16px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: toastIn 0.3s ease;
+}
+.toast-success { background: #d4edda; border-left: 4px solid #28a745; color: #155724; }
+.toast-error { background: #f8d7da; border-left: 4px solid #dc3545; color: #721c24; }
+.toast-info { background: #d1ecf1; border-left: 4px solid #17a2b8; color: #0c5460; }
+@keyframes toastIn {
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* Loading da tabela */
+.table-loading {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+    color: var(--text-secondary);
+}
+.table-loading.is-visible { display: flex; }
+.data-table-container.table-loading-visible .data-table { opacity: 0.5; pointer-events: none; }
+.refuel-table-wrap.fornc-table-wrap.table-loading-visible .fornc-table { opacity: 0.5; pointer-events: none; }
+
+/* Modal pequeno (confirmação) */
+.modal-content-sm { max-width: 420px; }
+.btn-danger { background: #dc3545; color: #fff; border-color: #dc3545; }
+.btn-danger:hover { background: #c82333; color: #fff; }
+
+/* Estilos para a seção de análise */
+.analytics-section {
+    margin-top: 20px;
+}
+
+/* Estilo para o botão de filtro quando ativo */
+.btn-restore-layout.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.analytics-section .section-header {
+    margin-bottom: 20px;
+}
+
+.analytics-section .section-header h2 {
+    font-size: 1.25rem;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.analytics-card {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    overflow: hidden;
+}
+
+.analytics-card .card-header {
+    padding: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.analytics-card .card-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
+
+.analytics-card .card-body {
+    padding: 15px;
+    height: 400px; /* Altura fixa para os gráficos */
+    position: relative; /* Necessário para o Chart.js */
+}
+
+.search-box {
+    position: relative;
+    flex: 1;
+    max-width: 360px;
+    min-width: 240px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 6px 40px 6px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    box-sizing: border-box;
+}
+
+.search-box i {
+    position: absolute;
+    right: 10px;
+    left: auto;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    pointer-events: none;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+    gap: 15px;
+}
+
+.pagination-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-color);
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.pagination-btn:hover:not(.disabled) {
+    background: var(--bg-tertiary);
+}
+
+.pagination-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.pagination-info {
+    font-size: 0.9rem;
+    color: var(--text-color);
+}
+
+.numeric-input {
+    text-align: right;
+}
+
+/* Estilos para checkbox personalizado */
+.checkbox-group {
+    margin: 15px 0;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--text-primary);
+    user-select: none;
+}
+
+.checkbox-label input[type="checkbox"] {
+    display: none;
+}
+
+.checkmark {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    margin-right: 10px;
+    position: relative;
+    background-color: var(--bg-secondary);
+    transition: all 0.3s ease;
+}
+
+.checkbox-label input[type="checkbox"]:checked + .checkmark {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.checkbox-label input[type="checkbox"]:checked + .checkmark::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.checkbox-label:hover .checkmark {
+    border-color: var(--primary-color);
+}
+
+/* Estilos para campos ARLA */
+#campos_arla {
+    margin-top: 15px;
+    padding: 15px;
+    background-color: var(--bg-tertiary);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+#campos_arla .form-group {
+    margin-bottom: 15px;
+}
+
+#campos_arla .form-group:last-child {
+    margin-bottom: 0;
+}
+
+/* Estilos para informação ARLA na tabela */
+.arla-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 0.875rem;
+    line-height: 1.2;
+}
+
+.arla-info i {
+    margin-bottom: 2px;
+}
+
+.arla-info small {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+/* Porcentagem ARLA na tabela (#refuelingTable): compacto; cores em .percentual-ok / alto / baixo */
+#refuelingTable .percentual-arla {
+    font-weight: 600;
+    font-size: 0.72rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    display: inline-block;
+    text-align: center;
+    max-width: 100%;
+    line-height: 1.15;
+    vertical-align: middle;
+    border-width: 1px;
+    box-sizing: border-box;
+}
+#refuelingTable .col-arla {
+    width: 3.75rem;
+    max-width: 4.5rem;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.percentual-ok {
+    background-color: #28a745 !important;
+    color: #ffffff !important;
+    border: 2px solid #28a745 !important;
+    font-weight: bold !important;
+}
+
+.percentual-alto {
+    background-color: #dc3545 !important;
+    color: #ffffff !important;
+    border: 2px solid #dc3545 !important;
+    font-weight: bold !important;
+}
+
+.percentual-baixo {
+    background-color: #ffc107 !important;
+    color: #000000 !important;
+    border: 2px solid #ffc107 !important;
+    font-weight: bold !important;
+}
+
+#refuelingTable .percentual-arla.percentual-ok,
+#refuelingTable .percentual-arla.percentual-alto,
+#refuelingTable .percentual-arla.percentual-baixo {
+    border-width: 1px !important;
+    font-weight: 600 !important;
+}
+
+/* Estilos para campos de input com validação ARLA */
+#litros_arla.percentual-ok {
+    border-color: #28a745;
+    background-color: #d4edda;
+}
+
+#litros_arla.percentual-alto {
+    border-color: #dc3545;
+    background-color: #f8d7da;
+}
+
+#litros_arla.percentual-baixo {
+    border-color: #ffc107;
+    background-color: #fff3cd;
+}
+
+@media (max-width: 768px) {
+    .analytics-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .analytics-card .card-body {
+        height: 300px;
+    }
+    
+    /* Estilos responsivos para mobile */
+    .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+}
+
+/* Estilos responsivos para mobile */
+.main-content {
+    margin-left: var(--sidebar-width);
+    transition: margin-left var(--transition-speed) ease;
+    width: calc(100% - var(--sidebar-width));
+    min-height: 100vh;
+    background: var(--bg-primary);
+}
+
+.sidebar-collapsed .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+    width: calc(100% - var(--sidebar-collapsed-width));
+}
+
+.dashboard-content {
+    padding: 20px;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+/* Estilos para o modal de ajuda */
+.help-section {
+    margin-bottom: 24px;
+}
+
+.help-section h3 {
+    color: var(--primary-color);
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+}
+
+.help-section p {
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+.help-section ul, .help-section ol {
+    padding-left: 20px;
+    margin-bottom: 12px;
+}
+
+.help-section ul ul, .help-section ol ul {
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.help-section li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.help-section strong {
+    color: var(--text-primary);
+}
+
+/* Ajuste do modal de ajuda (layout clássico; no moderno usa #helpModal.fornc-modal em fornc-modern-page.css) */
+body:not(.abastecimentos-modern) #helpModal .modal-content {
+    max-width: 700px;
+    max-height: 80vh;
+}
+
+body:not(.abastecimentos-modern) #helpModal .modal-body {
+    overflow-y: auto;
+    padding: 20px;
+}

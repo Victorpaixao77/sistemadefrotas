@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/sf_api_base.php';
 // Get the current page name from the URL
 $current_page = basename($_SERVER['PHP_SELF'], '.php');
 // Only set default page title if not already defined
@@ -17,10 +18,10 @@ require_once __DIR__ . '/notifications.php';
 
 // You can override this in specific pages by setting $page_title before including header.php
 ?>
-<header class="top-header">
+<header class="top-header" role="banner">
     <div class="header-left">
-        <button class="mobile-menu-toggle">
-            <i class="fas fa-bars"></i>
+        <button type="button" class="mobile-menu-toggle" id="mobileMenuToggleBtn" aria-label="Abrir menu de navegação" aria-expanded="false" aria-controls="sidebar-nav">
+            <i class="fas fa-bars" aria-hidden="true"></i>
         </button>
         <h1 class="header-title"><?php echo $page_title; ?></h1>
     </div>
@@ -28,24 +29,24 @@ require_once __DIR__ . '/notifications.php';
     <div class="header-controls">
         <!-- Botão BI Frota -->
         <?php if (function_exists('can_access_advanced_reports') && can_access_advanced_reports()): ?>
-        <a href="/sistema-frotas/pages/bi.php" class="header-icon-btn header-bi-btn" title="BI Frota" style="background: var(--bg-tertiary); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; padding: 0; text-decoration: none; flex-shrink: 0;">
-            <img src="/sistema-frotas/bi/bi-icon.png" alt="BI" style="width:100%; height:100%; display:block; object-fit:contain; margin:0; padding:0;" />
+        <a href="<?php echo htmlspecialchars(sf_app_url('pages/bi.php')); ?>" class="header-icon-btn header-bi-btn" title="BI Frota" aria-label="Abrir BI Frota" style="background: var(--bg-tertiary); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; padding: 0; text-decoration: none; flex-shrink: 0;">
+            <img src="<?php echo htmlspecialchars(sf_app_url('bi/bi-icon.png')); ?>" alt="" width="48" height="48" style="width:100%; height:100%; display:block; object-fit:contain; margin:0; padding:0;" />
         </a>
         <?php endif; ?>
         <!-- Botão IA Flutuante -->
-        <button class="header-icon-btn" title="IA Notificações" id="iaFabBtn" style="background: var(--bg-tertiary); color: #2563eb; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; padding: 0; position: relative;">
-            <img src="/sistema-frotas/IA/ia-icon.png" alt="IA" style="width:100%; height:100%; display:block; object-fit:contain; margin:0; padding:0; pointer-events: none;" />
+        <button type="button" class="header-icon-btn" title="IA Notificações" aria-label="Assistente de notificações IA" id="iaFabBtn" style="background: var(--bg-tertiary); color: #2563eb; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; padding: 0; position: relative;">
+            <img src="<?php echo htmlspecialchars(sf_app_url('IA/ia-icon.png')); ?>" alt="" width="48" height="48" style="width:100%; height:100%; display:block; object-fit:contain; margin:0; padding:0; pointer-events: none;" />
             <span class="notification-badge" id="iaNotificationBadge" style="display: none;">0</span>
         </button>
         <!-- Calendário -->
-        <button class="header-icon-btn" title="Calendário" id="calendarBtn" onclick="window.location.href='/sistema-frotas/calendario/'">
-            <i class="fas fa-calendar-alt"></i>
-        </button>
+        <a href="<?php echo htmlspecialchars(sf_app_url('calendario/')); ?>" class="header-icon-btn" title="Calendário" aria-label="Abrir calendário" id="calendarBtn" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-calendar-alt" aria-hidden="true"></i>
+        </a>
         
         <!-- Notificações -->
         <div class="header-icon-wrapper">
-            <button class="header-icon-btn" title="Notificações" id="notificationBtn">
-                <i class="fas fa-bell"></i>
+            <button type="button" class="header-icon-btn" title="Notificações" aria-label="Notificações" aria-expanded="false" aria-haspopup="true" id="notificationBtn">
+                <i class="fas fa-bell" aria-hidden="true"></i>
                 <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
             </button>
             
@@ -67,8 +68,8 @@ require_once __DIR__ . '/notifications.php';
         <?php if (!empty($_SESSION['acesso_todas_empresas']) && $_SESSION['acesso_todas_empresas'] === true): ?>
         <!-- Seletor de Empresa (apenas para usuários com acesso global) -->
         <div class="header-icon-wrapper" style="position: relative;">
-            <button class="header-icon-btn" title="Trocar Empresa" id="empresaSelectorBtn">
-                <i class="fas fa-building"></i>
+            <button type="button" class="header-icon-btn" title="Trocar Empresa" aria-label="Trocar empresa" aria-expanded="false" aria-haspopup="true" id="empresaSelectorBtn">
+                <i class="fas fa-building" aria-hidden="true"></i>
             </button>
             
             <!-- Dropdown de Empresas -->
@@ -87,36 +88,38 @@ require_once __DIR__ . '/notifications.php';
         <?php endif; ?>
         
         <!-- Alternador de tema -->
-        <div class="theme-toggle" id="themeToggle" title="Alternar tema">
-            <div class="theme-toggle-thumb"></div>
-            <div class="theme-toggle-icon sun">
+        <button type="button" class="theme-toggle" id="themeToggle" role="switch" aria-checked="false" title="Alternar tema" aria-label="Alternar entre tema escuro e tema claro">
+            <span class="theme-toggle-thumb" aria-hidden="true"></span>
+            <span class="theme-toggle-icon sun" aria-hidden="true">
                 <i class="fas fa-sun"></i>
-            </div>
-            <div class="theme-toggle-icon moon">
+            </span>
+            <span class="theme-toggle-icon moon" aria-hidden="true">
                 <i class="fas fa-moon"></i>
-            </div>
-        </div>
+            </span>
+        </button>
         
-        <div class="user-profile" id="userProfileBtn">
+        <div class="header-profile-wrapper">
+            <button type="button" class="user-profile" id="userProfileBtn" aria-expanded="false" aria-haspopup="true" aria-controls="profileDropdown" aria-label="<?php echo htmlspecialchars($nome_usuario !== '' ? 'Menu da conta: ' . $nome_usuario : 'Menu da conta', ENT_QUOTES, 'UTF-8'); ?>">
             <div class="user-avatar">
                 <?php if ($foto_perfil): ?>
-                    <img src="/sistema-frotas/uploads/perfil/<?php echo htmlspecialchars($foto_perfil); ?>" alt="Foto de Perfil" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc;">
+                    <img src="<?php echo htmlspecialchars(sf_app_url('uploads/perfil/' . $foto_perfil)); ?>" alt="" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc;">
                 <?php else: ?>
-                    <span><?php echo htmlspecialchars($letra); ?></span>
+                    <span aria-hidden="true"><?php echo htmlspecialchars($letra); ?></span>
                 <?php endif; ?>
             </div>
             <div class="user-info">
                 <div class="user-name"><?php echo htmlspecialchars($nome_usuario); ?></div>
                 <div class="user-role"><?php echo htmlspecialchars($email_usuario); ?></div>
             </div>
-            <i class="fas fa-chevron-down profile-dropdown-icon"></i>
+            <i class="fas fa-chevron-down profile-dropdown-icon" aria-hidden="true"></i>
+            </button>
             
             <!-- Dropdown do Perfil -->
-            <div class="profile-dropdown" id="profileDropdown">
+            <div class="profile-dropdown" id="profileDropdown" aria-label="Opções da conta">
                 <div class="profile-dropdown-header">
                     <div class="profile-dropdown-avatar">
                         <?php if ($foto_perfil): ?>
-                            <img src="/sistema-frotas/uploads/perfil/<?php echo htmlspecialchars($foto_perfil); ?>" alt="Foto de Perfil" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc;">
+                            <img src="<?php echo htmlspecialchars(sf_app_url('uploads/perfil/' . $foto_perfil)); ?>" alt="Foto de Perfil" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc;">
                         <?php else: ?>
                             <span><?php echo htmlspecialchars($letra); ?></span>
                         <?php endif; ?>
@@ -128,15 +131,15 @@ require_once __DIR__ . '/notifications.php';
                 </div>
                 
                 <div class="profile-dropdown-menu">
-                    <a href="/sistema-frotas/pages/perfil.php" class="profile-dropdown-item">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/perfil.php')); ?>" class="profile-dropdown-item">
                         <i class="fas fa-user"></i>
                         <span>Meu Perfil</span>
                     </a>
-                    <a href="/sistema-frotas/pages/usuarios.php" class="profile-dropdown-item">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/usuarios.php')); ?>" class="profile-dropdown-item">
                         <i class="fas fa-users"></i>
                         <span>Usuários</span>
                     </a>
-                    <a href="/sistema-frotas/pages/ia_painel.php" class="profile-dropdown-item">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/ia_painel.php')); ?>" class="profile-dropdown-item">
                         <i class="fas fa-robot"></i>
                         <span>Painel Inteligente (IA)</span>
                     </a>
@@ -196,8 +199,8 @@ require_once __DIR__ . '/notifications.php';
                     
                     <div class="dropdown-divider"></div>
                     
-                    <a href="/sistema-frotas/logout.php" class="profile-dropdown-item text-danger" id="logoutLink">
-                        <i class="fas fa-sign-out-alt"></i>
+                    <a href="<?php echo htmlspecialchars(sf_app_url('logout.php')); ?>" class="profile-dropdown-item text-danger" id="logoutLink">
+                        <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
                         <span>Sair</span>
                     </a>
                 </div>
@@ -323,12 +326,26 @@ require_once __DIR__ . '/notifications.php';
     margin-top: 8px;
 }
 
+.header-profile-wrapper {
+    position: relative;
+}
+
 .user-profile {
     position: relative;
     cursor: pointer;
     padding: 8px;
     border-radius: 8px;
     transition: background-color 0.3s ease;
+}
+
+button.user-profile {
+    border: none;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .user-profile:hover {
@@ -353,7 +370,9 @@ require_once __DIR__ . '/notifications.php';
 </style>
 
 <!-- Inclusão do JS para Personalizar Cores e funcionalidades do header -->
-<script src="/sistema-frotas/js/header.js"></script>
+<?php sf_render_api_scripts(); ?>
+<script src="<?php echo htmlspecialchars(sf_app_url('js/modal_a11y.js')); ?>"></script>
+<script src="<?php echo htmlspecialchars(sf_app_url('js/header.js')); ?>"></script>
 
-<link rel="stylesheet" href="/sistema-frotas/notificacoes/ia_fabicon.css">
-<script src="/sistema-frotas/notificacoes/ia_fabicon.js"></script>
+<link rel="stylesheet" href="<?php echo htmlspecialchars(sf_app_url('notificacoes/ia_fabicon.css')); ?>">
+<script src="<?php echo htmlspecialchars(sf_app_url('notificacoes/ia_fabicon.js')); ?>"></script>

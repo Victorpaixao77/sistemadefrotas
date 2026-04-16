@@ -34,64 +34,59 @@ try {
     configure_session();
     session_start();
     
-    // TEMPORÁRIO: Bypass da autenticação para desenvolvimento
-    // if (!isset($_SESSION['user_id'])) {
-    //     http_response_code(401);
-    //     echo json_encode([
-    //         'success' => false,
-    //         'message' => 'Usuário não autenticado'
-    //     ]);
-    //     exit();
-    // }
-    
     // Obter dados do POST
     $input = json_decode(file_get_contents('php://input'), true);
     $empresa_id = $input['empresa_id'] ?? 1; // Usar empresa_id padrão se não fornecido
     $action = $input['action'] ?? 'get_recent';
     
-    // Simular dados de documentos (por enquanto)
-    // Em produção, isso viria do banco de dados
+    $conn = getConnection();
+    $limit = 20;
+
+    // NF-e
+    $stmtNfe = $conn->prepare("
+        SELECT id, numero_nfe, cliente_razao_social, data_emissao, valor_total, status, protocolo_autorizacao
+        FROM fiscal_nfe_clientes
+        WHERE empresa_id = ?
+        ORDER BY data_emissao DESC, id DESC
+        LIMIT $limit
+    ");
+    $stmtNfe->execute([$empresa_id]);
+    $nfe = $stmtNfe->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    // CT-e
+    $stmtCte = $conn->prepare("
+        SELECT id, numero_cte, origem_cidade, destino_cidade, data_emissao, valor_total, status, protocolo_autorizacao
+        FROM fiscal_cte
+        WHERE empresa_id = ?
+        ORDER BY data_emissao DESC, id DESC
+        LIMIT $limit
+    ");
+    $stmtCte->execute([$empresa_id]);
+    $cte = $stmtCte->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    // MDF-e
+    $stmtMdfe = $conn->prepare("
+        SELECT
+            id,
+            numero_mdfe,
+            tipo_transporte,
+            peso_total_carga,
+            data_emissao,
+            valor_total_carga AS valor_total,
+            status,
+            protocolo_autorizacao
+        FROM fiscal_mdfe
+        WHERE empresa_id = ?
+        ORDER BY data_emissao DESC, id DESC
+        LIMIT $limit
+    ");
+    $stmtMdfe->execute([$empresa_id]);
+    $mdfe = $stmtMdfe->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
     $documents_data = [
-        'nfe' => [
-            [
-                'id' => 1,
-                'numero_nfe' => '001',
-                'cliente_razao_social' => 'Empresa ABC Ltda',
-                'data_emissao' => '2025-08-20',
-                'valor_total' => 1500.00,
-                'status' => 'autorizado'
-            ],
-            [
-                'id' => 2,
-                'numero_nfe' => '002',
-                'cliente_razao_social' => 'Empresa XYZ Ltda',
-                'data_emissao' => '2025-08-21',
-                'valor_total' => 2300.00,
-                'status' => 'pendente'
-            ]
-        ],
-        'cte' => [
-            [
-                'id' => 1,
-                'numero_cte' => '001',
-                'origem_cidade' => 'São Paulo',
-                'destino_cidade' => 'Rio de Janeiro',
-                'data_emissao' => '2025-08-20',
-                'valor_total' => 800.00,
-                'status' => 'autorizado'
-            ]
-        ],
-        'mdfe' => [
-            [
-                'id' => 1,
-                'numero_mdfe' => '001',
-                'tipo_transporte' => 'Rodoviário',
-                'peso_total_carga' => 5000,
-                'data_emissao' => '2025-08-20',
-                'valor_total' => 1200.00,
-                'status' => 'autorizado'
-            ]
-        ]
+        'nfe' => $nfe,
+        'cte' => $cte,
+        'mdfe' => $mdfe,
     ];
     
     // Retornar sucesso

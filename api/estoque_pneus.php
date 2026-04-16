@@ -2,6 +2,8 @@
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
 // Configure session before starting it
 configure_session();
@@ -24,6 +26,9 @@ try {
     echo json_encode(['error' => true, 'message' => 'Erro de conexão com o banco de dados']);
     exit;
 }
+
+// Protege mutações (POST/PUT/PATCH/DELETE) com CSRF.
+api_require_csrf_json();
 
 // Get action from request
 $action = isset($_GET['action']) ? $_GET['action'] : '';

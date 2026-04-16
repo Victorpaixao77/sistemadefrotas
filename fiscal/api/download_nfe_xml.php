@@ -1,10 +1,9 @@
 <?php
 /**
  * Download do XML da NF-e por ID.
- * Retorna o conteúdo do campo xml_nfe ou o arquivo em uploads/nfe_xml/ (xml_path).
- * Não envia HTML em caso de erro (evita download ser salvo como .htm).
+ * Usa a mesma resolução do PDF: banco (xml_nfe) ou Distribuição DFe quando XML vazio
+ * ou sem protocolo (protNFe). Parâmetro opcional atualizar=1 força nova consulta à SEFAZ.
  */
-// Limpar qualquer buffer para não misturar com a resposta de download
 while (ob_get_level()) {
     ob_end_clean();
 }
@@ -40,10 +39,13 @@ try {
     exit('Erro ao conectar.');
 }
 
-// Um único SELECT para não falhar se xml_nfe ou xml_path não existirem
 $row = null;
 try {
-    $stmt = $conn->prepare("SELECT * FROM fiscal_nfe_clientes WHERE id = ? AND empresa_id = ? LIMIT 1");
+    $stmt = $conn->prepare("
+        SELECT id, empresa_id, xml_nfe, chave_acesso, numero_nfe
+        FROM fiscal_nfe_clientes
+        WHERE id = ? AND empresa_id = ? LIMIT 1
+    ");
     $stmt->execute([$id, $empresa_id]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
 } catch (Throwable $e) {
@@ -58,20 +60,16 @@ if (!$row) {
     exit('NF-e não encontrada');
 }
 
-$xml_content = null;
-if (!empty($row['xml_nfe'])) {
-    $xml_content = $row['xml_nfe'];
-} elseif (!empty($row['xml_path'])) {
-    $path = __DIR__ . '/../../uploads/nfe_xml/' . basename($row['xml_path']);
-    if (file_exists($path)) {
-        $xml_content = file_get_contents($path);
-    }
-}
+$forcarSefaz = (string)($_GET['atualizar'] ?? $_POST['atualizar'] ?? '') === '1';
+
+require_once __DIR__ . '/../includes/FiscalNfeXmlParaDownload.php';
+$xml_meta = [];
+$xml_content = fiscal_nfe_obter_xml_para_download($conn, $empresa_id, $id, $row, $forcarSefaz, $xml_meta);
 
 if ($xml_content === null || $xml_content === '') {
     header('Content-Type: text/plain; charset=utf-8');
     http_response_code(404);
-    exit('XML não disponível para esta NF-e.');
+    exit('XML não disponível para esta NF-e. Verifique a chave e o certificado digital da empresa na Distribuição DFe.');
 }
 
 $filename = 'nfe_' . preg_replace('/[^0-9]/', '', $row['chave_acesso'] ?? $row['numero_nfe'] ?? (string)$id) . '.xml';
@@ -79,7 +77,6 @@ if (strlen($filename) < 10) {
     $filename = 'nfe_' . $id . '.xml';
 }
 
-// Garantir que nenhuma saída anterior seja enviada antes do arquivo
 while (ob_get_level()) {
     ob_end_clean();
 }
@@ -87,6 +84,14 @@ while (ob_get_level()) {
 header('Content-Type: application/xml; charset=utf-8');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 header('Content-Length: ' . strlen($xml_content));
-header('Cache-Control: no-cache, must-revalidate');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+if (!empty($xml_meta['source'])) {
+    header('X-Fiscal-Xml-Source: ' . $xml_meta['source']);
+}
+if (!empty($xml_meta['detail']) && defined('DEBUG_MODE') && DEBUG_MODE) {
+    header('X-Fiscal-Xml-Detail: ' . preg_replace('/[\r\n]+/', ' ', substr($xml_meta['detail'], 0, 200)));
+}
 
 echo $xml_content;

@@ -1,6 +1,8 @@
 <?php
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/csrf.php';
+require_once '../includes/api_json.php';
 
 configure_session();
 
@@ -15,6 +17,8 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_
 }
 
 header('Content-Type: application/json');
+
+api_require_csrf_json();
 
 try {
     $conn = getConnection();

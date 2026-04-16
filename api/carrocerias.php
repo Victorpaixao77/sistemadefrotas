@@ -3,6 +3,8 @@
 require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
 // Configure session before starting it
 configure_session();
@@ -17,6 +19,9 @@ header('Content-Type: application/json');
 
 // Ensure the request is authenticated
 require_authentication();
+
+// Protege mutações (POST/PUT/PATCH/DELETE) com CSRF.
+api_require_csrf_json();
 
 try {
     $conn = getConnection();

@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "C:\\Users\\victo\\.gradle\\daemon\\8.14.3\\com.sistemafrotas.motorista.app-debug-67:\\drawable_ic_launcher.xml.flat",
+        "source": "C:\\Users\\victo\\.gradle\\daemon\\8.14.3\\com.sistemafrotas.motorista.app-main-69:\\drawable\\ic_launcher.xml"
+    },
+    {
+        "merged": "com.sistemafrotas.motorista.app-debug-67:/xml_file_paths.xml.flat",
+        "source": "com.sistemafrotas.motorista.app-main-69:/xml/file_paths.xml"
+    },
+    {
+        "merged": "C:\\Users\\victo\\.gradle\\daemon\\8.14.3\\com.sistemafrotas.motorista.app-debug-67:\\drawable_logo_frotec.png.flat",
+        "source": "C:\\Users\\victo\\.gradle\\daemon\\8.14.3\\com.sistemafrotas.motorista.app-main-69:\\drawable\\logo_frotec.png"
+    }
+]

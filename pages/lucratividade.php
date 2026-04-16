@@ -33,7 +33,7 @@ require_authentication();
 require_permission('access_lucratividade');
 
 // Set page title
-$page_title = "Lucratividade - Dashboard Inteligente";
+$page_title = "Lucratividade";
 
 // Obter empresa_id da sessão (já validada pelo require_authentication)
 $empresa_id = $_SESSION['empresa_id'];
@@ -61,6 +61,35 @@ if ($mes < 1 || $mes > 12) {
 }
 if ($ano < 2020 || $ano > 2030) {
     $ano = date('Y');
+}
+
+// Layout moderno (fornc-page); ?classic=1 para o layout anterior
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
+$lucra_qs_params = ['mes' => (int) $mes, 'ano' => (int) $ano];
+$lucra_query_classic = http_build_query(array_merge($lucra_qs_params, ['classic' => '1']));
+$lucra_meses_pt = [1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril', 5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto', 9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'];
+$lucra_periodo_label = ($lucra_meses_pt[(int) $mes] ?? '') . ' de ' . (int) $ano;
+$lucra_query_modern_only = http_build_query($lucra_qs_params);
+$lucra_prev_mes = (int) $mes <= 1 ? 12 : (int) $mes - 1;
+$lucra_prev_ano = (int) $mes <= 1 ? (int) $ano - 1 : (int) $ano;
+$lucra_next_mes = (int) $mes >= 12 ? 1 : (int) $mes + 1;
+$lucra_next_ano = (int) $mes >= 12 ? (int) $ano + 1 : (int) $ano;
+$lucra_nav_params = static function (int $m, int $y) use ($is_modern): array {
+    $p = ['mes' => $m, 'ano' => $y];
+    if (!$is_modern) {
+        $p['classic'] = '1';
+    }
+    return $p;
+};
+$lucra_href_prev = 'lucratividade.php?' . http_build_query($lucra_nav_params($lucra_prev_mes, $lucra_prev_ano));
+$lucra_href_next = 'lucratividade.php?' . http_build_query($lucra_nav_params($lucra_next_mes, $lucra_next_ano));
+
+if (!function_exists('lucratividade_debug_log')) {
+    function lucratividade_debug_log(string $message): void {
+        if (defined('DEBUG_MODE') && DEBUG_MODE) {
+            error_log($message);
+        }
+    }
 }
 
 // Função otimizada para buscar KPIs (nova função do improved)
@@ -203,8 +232,8 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
         $kpis = getKPIsOptimized($conn, $empresa_id, $mes, $ano);
         
         // Debug
-        error_log("DEBUG getIntelligentAlerts - Mês: $mes, Ano: $ano");
-        error_log("DEBUG getIntelligentAlerts - KPIs: " . json_encode($kpis));
+        lucratividade_debug_log("DEBUG getIntelligentAlerts - Mês: $mes, Ano: $ano");
+        lucratividade_debug_log("DEBUG getIntelligentAlerts - KPIs: " . json_encode($kpis));
         
         // Verificar se há dados válidos
         if ($kpis !== null && is_array($kpis)) {
@@ -212,12 +241,12 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
             $receita = isset($kpis['total_frete']) ? floatval($kpis['total_frete']) : 0;
             $abastecimentos = isset($kpis['total_abastecimentos']) ? floatval($kpis['total_abastecimentos']) : 0;
             
-            error_log("DEBUG getIntelligentAlerts - Lucro: $lucro, Receita: $receita, Abastecimentos: $abastecimentos");
+            lucratividade_debug_log("DEBUG getIntelligentAlerts - Lucro: $lucro, Receita: $receita, Abastecimentos: $abastecimentos");
             
             // Alerta de margem baixa ou alta (verificar se receita > 0)
             if ($receita > 0) {
                 $margem = ($lucro / $receita) * 100;
-                error_log("DEBUG getIntelligentAlerts - Margem calculada: $margem%");
+                lucratividade_debug_log("DEBUG getIntelligentAlerts - Margem calculada: $margem%");
                 // Alerta se margem < 10% (incluindo margens negativas)
                 if ($margem < 10) {
                     $alerts[] = [
@@ -226,7 +255,7 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
                         'message' => "Margem de lucro está em " . number_format($margem, 1) . "%. Considere revisar custos.",
                         'icon' => 'fas fa-exclamation-triangle'
                     ];
-                    error_log("DEBUG getIntelligentAlerts - Alerta de margem baixa adicionado (margem: $margem%)");
+                    lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de margem baixa adicionado (margem: $margem%)");
                 } elseif ($margem >= 30) {
                     // Alerta positivo para margem alta
                     $alerts[] = [
@@ -235,10 +264,10 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
                         'message' => "Margem de lucro está em " . number_format($margem, 1) . "%. Parabéns!",
                         'icon' => 'fas fa-check-circle'
                     ];
-                    error_log("DEBUG getIntelligentAlerts - Alerta de margem excelente adicionado (margem: $margem%)");
+                    lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de margem excelente adicionado (margem: $margem%)");
                 }
             } else {
-                error_log("DEBUG getIntelligentAlerts - Receita é zero ou negativa, não é possível calcular margem");
+                lucratividade_debug_log("DEBUG getIntelligentAlerts - Receita é zero ou negativa, não é possível calcular margem");
             }
             
             // Alerta de prejuízo (sempre verificar se lucro < 0)
@@ -249,7 +278,7 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
                     'message' => "O mês está fechando com prejuízo de R$ " . number_format(abs($lucro), 2, ',', '.') . ".",
                     'icon' => 'fas fa-times-circle'
                 ];
-                error_log("DEBUG getIntelligentAlerts - Alerta de prejuízo adicionado");
+                lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de prejuízo adicionado");
             } elseif ($lucro > 0 && $receita > 0) {
                 // Alerta positivo para lucro positivo
                 $alerts[] = [
@@ -258,13 +287,13 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
                     'message' => "O mês está fechando com lucro de R$ " . number_format($lucro, 2, ',', '.') . ".",
                     'icon' => 'fas fa-check-circle'
                 ];
-                error_log("DEBUG getIntelligentAlerts - Alerta de lucro positivo adicionado");
+                lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de lucro positivo adicionado");
             }
             
             // Alerta de alta despesa com combustível (verificar se combustível > 40% da receita)
             if ($receita > 0 && $abastecimentos > 0) {
                 $percentual_combustivel = ($abastecimentos / $receita) * 100;
-                error_log("DEBUG getIntelligentAlerts - Percentual combustível: $percentual_combustivel%");
+                lucratividade_debug_log("DEBUG getIntelligentAlerts - Percentual combustível: $percentual_combustivel%");
                 if ($percentual_combustivel > 40) {
                     $alerts[] = [
                         'type' => 'info',
@@ -272,7 +301,7 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
                         'message' => "Combustível representa " . number_format($percentual_combustivel, 1) . "% da receita.",
                         'icon' => 'fas fa-gas-pump'
                     ];
-                    error_log("DEBUG getIntelligentAlerts - Alerta de alto consumo adicionado");
+                    lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de alto consumo adicionado");
                 } elseif ($percentual_combustivel < 25) {
                     // Alerta positivo para baixo consumo de combustível
                     $alerts[] = [
@@ -281,11 +310,11 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
                         'message' => "Combustível representa apenas " . number_format($percentual_combustivel, 1) . "% da receita. Excelente!",
                         'icon' => 'fas fa-check-circle'
                     ];
-                    error_log("DEBUG getIntelligentAlerts - Alerta de eficiência de combustível adicionado");
+                    lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de eficiência de combustível adicionado");
                 }
             }
         } else {
-            error_log("DEBUG getIntelligentAlerts - KPIs é null ou não é array");
+            lucratividade_debug_log("DEBUG getIntelligentAlerts - KPIs é null ou não é array");
         }
         
         // Buscar dados do mês anterior para comparação
@@ -294,18 +323,18 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
         
         $kpis_anterior = getKPIsOptimized($conn, $empresa_id, $mes_anterior, $ano_anterior);
         
-        error_log("DEBUG getIntelligentAlerts - KPIs anterior: " . json_encode($kpis_anterior));
+        lucratividade_debug_log("DEBUG getIntelligentAlerts - KPIs anterior: " . json_encode($kpis_anterior));
         
         if ($kpis_anterior !== null && is_array($kpis_anterior) && $kpis !== null && is_array($kpis)) {
             $lucro_anterior = isset($kpis_anterior['lucro_liquido']) ? floatval($kpis_anterior['lucro_liquido']) : 0;
             $lucro_atual = isset($kpis['lucro_liquido']) ? floatval($kpis['lucro_liquido']) : 0;
             
-            error_log("DEBUG getIntelligentAlerts - Lucro anterior: $lucro_anterior, Lucro atual: $lucro_atual");
+            lucratividade_debug_log("DEBUG getIntelligentAlerts - Lucro anterior: $lucro_anterior, Lucro atual: $lucro_atual");
             
             // Calcular crescimento apenas se houver lucro anterior diferente de zero
             if ($lucro_anterior != 0) {
                 $crescimento = (($lucro_atual - $lucro_anterior) / abs($lucro_anterior)) * 100;
-                error_log("DEBUG getIntelligentAlerts - Crescimento calculado: $crescimento%");
+                lucratividade_debug_log("DEBUG getIntelligentAlerts - Crescimento calculado: $crescimento%");
                 
                 // Alerta de queda na lucratividade (queda > 20%)
                 if ($crescimento < -20) {
@@ -315,7 +344,7 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
                         'message' => "Lucro caiu " . number_format(abs($crescimento), 1) . "% em relação ao mês anterior.",
                         'icon' => 'fas fa-chart-line'
                     ];
-                    error_log("DEBUG getIntelligentAlerts - Alerta de queda adicionado");
+                    lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de queda adicionado");
                 } elseif ($crescimento > 20) {
                     // Alerta de crescimento positivo
                     $alerts[] = [
@@ -324,7 +353,7 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
                         'message' => "Lucro aumentou " . number_format($crescimento, 1) . "% em relação ao mês anterior!",
                         'icon' => 'fas fa-chart-line'
                     ];
-                    error_log("DEBUG getIntelligentAlerts - Alerta de crescimento adicionado");
+                    lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de crescimento adicionado");
                 }
             } elseif ($lucro_anterior == 0 && $lucro_atual < 0) {
                 // Se mês anterior teve lucro zero e atual tem prejuízo
@@ -334,7 +363,7 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
                     'message' => "Lucro caiu significativamente em relação ao mês anterior.",
                     'icon' => 'fas fa-chart-line'
                 ];
-                error_log("DEBUG getIntelligentAlerts - Alerta de queda (zero para negativo) adicionado");
+                lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de queda (zero para negativo) adicionado");
             } elseif ($lucro_anterior <= 0 && $lucro_atual > 0) {
                 // Se mês anterior teve prejuízo ou zero e atual tem lucro positivo
                 $alerts[] = [
@@ -343,24 +372,24 @@ function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
                     'message' => "Lucro positivo após período negativo. Parabéns pela recuperação!",
                     'icon' => 'fas fa-chart-line'
                 ];
-                error_log("DEBUG getIntelligentAlerts - Alerta de recuperação adicionado");
+                lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de recuperação adicionado");
             }
         } else {
-            error_log("DEBUG getIntelligentAlerts - Não foi possível comparar com mês anterior");
+            lucratividade_debug_log("DEBUG getIntelligentAlerts - Não foi possível comparar com mês anterior");
             if ($kpis_anterior === null) {
-                error_log("DEBUG getIntelligentAlerts - KPIs anterior é null");
+                lucratividade_debug_log("DEBUG getIntelligentAlerts - KPIs anterior é null");
             }
             if ($kpis === null) {
-                error_log("DEBUG getIntelligentAlerts - KPIs atual é null");
+                lucratividade_debug_log("DEBUG getIntelligentAlerts - KPIs atual é null");
             }
         }
         
-        error_log("DEBUG getIntelligentAlerts - Total de alertas: " . count($alerts));
+        lucratividade_debug_log("DEBUG getIntelligentAlerts - Total de alertas: " . count($alerts));
         
         return $alerts;
     } catch (Exception $e) {
         error_log("Erro na função getIntelligentAlerts: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
+        lucratividade_debug_log("Stack trace getIntelligentAlerts: " . $e->getTraceAsString());
         return [];
     }
 }
@@ -374,7 +403,7 @@ function getAdvancedKPIs($conn, $empresa_id, $mes, $ano, $kpis) {
         $receita = isset($kpis['total_frete']) ? floatval($kpis['total_frete']) : 0;
         
         // Debug: Log dos valores recebidos
-        error_log("DEBUG getAdvancedKPIs - Lucro: $lucro, Receita: $receita, Empresa: $empresa_id, Mês: $mes, Ano: $ano");
+        lucratividade_debug_log("DEBUG getAdvancedKPIs - Lucro: $lucro, Receita: $receita, Empresa: $empresa_id, Mês: $mes, Ano: $ano");
         
         // Calcular ROI (assumindo investimento total baseado em financiamentos)
         $investimento_total = 0;
@@ -383,7 +412,7 @@ function getAdvancedKPIs($conn, $empresa_id, $mes, $ano, $kpis) {
             $stmt->execute([$empresa_id]);
             $investimento = $stmt->fetch(PDO::FETCH_ASSOC);
             $investimento_total = floatval($investimento['total'] ?? 0);
-            error_log("DEBUG ROI - Investimento total: $investimento_total");
+            lucratividade_debug_log("DEBUG ROI - Investimento total: $investimento_total");
         } catch (Exception $e) {
             error_log("Erro ao buscar investimento: " . $e->getMessage());
         }
@@ -397,7 +426,7 @@ function getAdvancedKPIs($conn, $empresa_id, $mes, $ano, $kpis) {
             $stmt->execute([$empresa_id, $mes, $ano]);
             $rotas = $stmt->fetch(PDO::FETCH_ASSOC);
             $total_rotas = intval($rotas['total_rotas'] ?? 0);
-            error_log("DEBUG Ticket Médio - Total rotas: $total_rotas");
+            lucratividade_debug_log("DEBUG Ticket Médio - Total rotas: $total_rotas");
         } catch (Exception $e) {
             error_log("Erro ao contar rotas: " . $e->getMessage());
         }
@@ -411,7 +440,7 @@ function getAdvancedKPIs($conn, $empresa_id, $mes, $ano, $kpis) {
             $stmt->execute([$empresa_id, $mes, $ano]);
             $km = $stmt->fetch(PDO::FETCH_ASSOC);
             $total_km = floatval($km['total_km'] ?? 0);
-            error_log("DEBUG Custo KM - Total KM: $total_km");
+            lucratividade_debug_log("DEBUG Custo KM - Total KM: $total_km");
         } catch (Exception $e) {
             error_log("Erro ao calcular km: " . $e->getMessage());
             // Tentar com campo alternativo se houver erro
@@ -441,15 +470,14 @@ function getAdvancedKPIs($conn, $empresa_id, $mes, $ano, $kpis) {
             $stmt->execute([$empresa_id, $mes, $ano]);
             $ocupacao = $stmt->fetch(PDO::FETCH_ASSOC);
             $rotas_com_carga = intval($ocupacao['total_com_carga'] ?? 0);
-            error_log("DEBUG Taxa Ocupação - Rotas com carga: $rotas_com_carga, Total rotas: $total_rotas");
+            lucratividade_debug_log("DEBUG Taxa Ocupação - Rotas com carga: $rotas_com_carga, Total rotas: $total_rotas");
         } catch (Exception $e) {
             error_log("Erro ao calcular ocupação: " . $e->getMessage());
         }
         
         $advanced['taxa_ocupacao'] = $total_rotas > 0 ? ($rotas_com_carga / $total_rotas) * 100 : 0;
         
-        // Log para debug
-        error_log("KPIs Avançados calculados - ROI: " . $advanced['roi'] . ", Ticket: " . $advanced['ticket_medio'] . ", Custo KM: " . $advanced['custo_km'] . ", Margem: " . $advanced['margem_operacional'] . ", Ocupação: " . $advanced['taxa_ocupacao']);
+        lucratividade_debug_log("KPIs Avançados calculados - ROI: " . $advanced['roi'] . ", Ticket: " . $advanced['ticket_medio'] . ", Custo KM: " . $advanced['custo_km'] . ", Margem: " . $advanced['margem_operacional'] . ", Ocupação: " . $advanced['taxa_ocupacao']);
         
         return $advanced;
     } catch (Exception $e) {
@@ -469,7 +497,7 @@ function getRankings($conn, $empresa_id, $mes, $ano) {
     try {
         $rankings = [];
         
-        error_log("DEBUG getRankings - Empresa: $empresa_id, Mês: $mes, Ano: $ano");
+        lucratividade_debug_log("DEBUG getRankings - Empresa: $empresa_id, Mês: $mes, Ano: $ano");
         
         // Top 5 Veículos Mais Rentáveis
         // Lucro = Receita (fretes) - Comissões - Abastecimentos das rotas do mês - Despesas de Viagem - Manutenções do mês
@@ -570,19 +598,7 @@ function getRankings($conn, $empresa_id, $mes, $ano) {
             $empresa_id, $mes, $ano  // WHERE rotas
         ]);
         $rankings['veiculos'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        error_log("DEBUG getRankings - Veículos encontrados: " . count($rankings['veiculos']) . " | Mês: $mes, Ano: $ano, Empresa: $empresa_id");
-        if (!empty($rankings['veiculos'])) {
-            foreach ($rankings['veiculos'] as $idx => $veiculo) {
-                $receita = floatval($veiculo['receita'] ?? 0);
-                $comissao = floatval($veiculo['comissao'] ?? 0);
-                $abast = floatval($veiculo['custo_abastecimento'] ?? 0);
-                $desp_viagem = floatval($veiculo['despesas_viagem'] ?? 0);
-                $manut = floatval($veiculo['custo_manutencao'] ?? 0);
-                $lucro = floatval($veiculo['lucro'] ?? 0);
-                $total_custos = $comissao + $abast + $desp_viagem + $manut;
-                error_log("DEBUG getRankings - Veículo " . ($idx + 1) . ": {$veiculo['placa']} | Receita: R$ $receita | Custos: R$ $total_custos (Com: R$ $comissao, Abast: R$ $abast, Desp: R$ $desp_viagem, Manut: R$ $manut) | Lucro: R$ $lucro");
-            }
-        }
+        lucratividade_debug_log("DEBUG getRankings - Veículos encontrados: " . count($rankings['veiculos']) . " | Mês: $mes, Ano: $ano, Empresa: $empresa_id");
         
         // Top 5 Motoristas Mais Rentáveis
         // Lucro = Receita (fretes) - Comissões - Despesas de Viagem das rotas do motorista
@@ -611,17 +627,7 @@ function getRankings($conn, $empresa_id, $mes, $ano) {
         ");
         $stmt->execute([$empresa_id, $empresa_id, $empresa_id, $mes, $ano]);
         $rankings['motoristas'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        error_log("DEBUG getRankings - Motoristas encontrados: " . count($rankings['motoristas']) . " | Mês: $mes, Ano: $ano, Empresa: $empresa_id");
-        if (!empty($rankings['motoristas'])) {
-            foreach ($rankings['motoristas'] as $idx => $motorista) {
-                $receita = floatval($motorista['receita'] ?? 0);
-                $comissao = floatval($motorista['comissao'] ?? 0);
-                $desp_viagem = floatval($motorista['despesas_viagem'] ?? 0);
-                $lucro = floatval($motorista['lucro'] ?? 0);
-                $total_custos = $comissao + $desp_viagem;
-                error_log("DEBUG getRankings - Motorista " . ($idx + 1) . ": {$motorista['nome']} | Receita: R$ $receita | Custos: R$ $total_custos (Com: R$ $comissao, Desp: R$ $desp_viagem) | Lucro: R$ $lucro");
-            }
-        }
+        lucratividade_debug_log("DEBUG getRankings - Motoristas encontrados: " . count($rankings['motoristas']) . " | Mês: $mes, Ano: $ano, Empresa: $empresa_id");
         
         // Top 5 Clientes Mais Rentáveis (se houver tabela de clientes)
         // Por enquanto, usando rotas sem cliente específico
@@ -655,9 +661,8 @@ function getRankings($conn, $empresa_id, $mes, $ano) {
             error_log("Erro ao buscar tipos de frete: " . $e->getMessage());
             $rankings['tipos_frete'] = [];
         }
-        error_log("DEBUG getRankings - Tipos de frete encontrados: " . count($rankings['tipos_frete']));
-        
-        error_log("DEBUG getRankings - Resultado final: " . json_encode($rankings));
+        lucratividade_debug_log("DEBUG getRankings - Tipos de frete encontrados: " . count($rankings['tipos_frete']));
+        lucratividade_debug_log('DEBUG getRankings - resumo: veículos=' . count($rankings['veiculos']) . ', motoristas=' . count($rankings['motoristas']) . ', tipos_frete=' . count($rankings['tipos_frete']));
         
         return $rankings;
     } catch (Exception $e) {
@@ -681,8 +686,8 @@ try {
         $alerts = [];
     }
     
-    error_log("DEBUG - Alertas finais para mês $mes/$ano: " . count($alerts) . " alertas");
-    error_log("DEBUG - Conteúdo dos alertas: " . json_encode($alerts));
+    lucratividade_debug_log("DEBUG - Alertas finais para mês $mes/$ano: " . count($alerts) . " alertas");
+    lucratividade_debug_log("DEBUG - Conteúdo dos alertas: " . json_encode($alerts));
     
     // Calcular Lucratividade
     $lucro = isset($kpis) && is_array($kpis) && isset($kpis['lucro_liquido']) ? $kpis['lucro_liquido'] : 0;
@@ -694,12 +699,12 @@ try {
     $kpis_anterior = getKPIsOptimized($conn, $empresa_id, $mes_anterior, $ano_anterior);
     
     // Calcular KPIs avançados
-    error_log("DEBUG - KPIs recebidos: " . json_encode($kpis));
+    lucratividade_debug_log("DEBUG - KPIs recebidos: " . json_encode($kpis));
     if (!empty($kpis) && is_array($kpis)) {
         $advanced_kpis = getAdvancedKPIs($conn, $empresa_id, $mes, $ano, $kpis);
-        error_log("DEBUG - KPIs avançados calculados: " . json_encode($advanced_kpis));
+        lucratividade_debug_log("DEBUG - KPIs avançados calculados: " . json_encode($advanced_kpis));
     } else {
-        error_log("DEBUG - KPIs vazios ou inválidos, usando valores padrão");
+        lucratividade_debug_log("DEBUG - KPIs vazios ou inválidos, usando valores padrão");
         $advanced_kpis = [
             'roi' => 0,
             'ticket_medio' => 0,
@@ -975,9 +980,7 @@ GROUP BY DATE_FORMAT(r.data_rota, '%Y-%m')
 
 // Executar a query original como backup
 try {
-    if (DEBUG_MODE) {
-        error_log("Executando query backup KPIs");
-    }
+    lucratividade_debug_log("Executando query backup KPIs");
     
     $stmt = $conn->prepare($sql_kpis);
     $stmt->execute();
@@ -991,9 +994,7 @@ try {
     }
     
 } catch (Exception $e) {
-    if (DEBUG_MODE) {
-        error_log("Erro na query backup KPIs: " . $e->getMessage());
-    }
+    error_log("Erro na query backup KPIs: " . $e->getMessage());
     // Continuar com dados vazios se necessário
 }
 
@@ -1109,95 +1110,68 @@ $sql_lucro_por_dia = "
 
 // Executar cada query individualmente com tratamento de erro adequado
 try {
-    if (DEBUG_MODE) {
-        error_log("Executando query Fretes vs Despesas");
-    }
-    
+    lucratividade_debug_log("Executando query Fretes vs Despesas");
     $stmt = $conn->prepare($sql_fretes_vs_despesas);
     $stmt->execute();
-    
     $fretes_vs_despesas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
-    if (DEBUG_MODE) {
-        error_log("Erro na query Fretes vs Despesas: " . $e->getMessage());
-    }
+    error_log("Erro na query Fretes vs Despesas: " . $e->getMessage());
     $fretes_vs_despesas = [];
 }
 
 try {
-    if (DEBUG_MODE) {
-        error_log("Executando query Distribuição Despesas");
-    }
-    
+    lucratividade_debug_log("Executando query Distribuição Despesas");
     $stmt = $conn->prepare($sql_distribuicao_despesas);
     $stmt->execute();
     $distribuicao_despesas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
-    if (DEBUG_MODE) {
-        error_log("Erro na query Distribuição Despesas: " . $e->getMessage());
-    }
+    error_log("Erro na query Distribuição Despesas: " . $e->getMessage());
     $distribuicao_despesas = [];
 }
 
 try {
-    if (DEBUG_MODE) {
-        error_log("Executando query Evolução Lucratividade");
-    }
-    
+    lucratividade_debug_log("Executando query Evolução Lucratividade");
     $stmt = $conn->prepare($sql_evolucao_lucratividade);
     $stmt->execute();
     $evolucao_lucratividade = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
-    if (DEBUG_MODE) {
-        error_log("Erro na query Evolução Lucratividade: " . $e->getMessage());
-    }
+    error_log("Erro na query Evolução Lucratividade: " . $e->getMessage());
     $evolucao_lucratividade = [];
 }
 
 try {
-    if (DEBUG_MODE) {
-        error_log("Executando query Composição Frete");
-    }
-    
+    lucratividade_debug_log("Executando query Composição Frete");
     $stmt = $conn->prepare($sql_composicao_frete);
     $stmt->execute();
     $composicao_frete = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
-    if (DEBUG_MODE) {
-        error_log("Erro na query Composição Frete: " . $e->getMessage());
-    }
+    error_log("Erro na query Composição Frete: " . $e->getMessage());
     $composicao_frete = [];
 }
 
 try {
-    if (DEBUG_MODE) {
-        error_log("Executando query Lucro por Veículo");
-    }
-    
+    lucratividade_debug_log("Executando query Lucro por Veículo");
     $stmt = $conn->prepare($sql_lucro_por_veiculo);
     $stmt->execute();
     $lucro_por_veiculo = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
-    if (DEBUG_MODE) {
-        error_log("Erro na query Lucro por Veículo: " . $e->getMessage());
-    }
+    error_log("Erro na query Lucro por Veículo: " . $e->getMessage());
     $lucro_por_veiculo = [];
 }
 
 try {
-    if (DEBUG_MODE) {
-        error_log("Executando query Lucro por Dia");
-    }
-    
+    lucratividade_debug_log("Executando query Lucro por Dia");
     $stmt = $conn->prepare($sql_lucro_por_dia);
     $stmt->execute();
     $lucro_por_dia = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
-    if (DEBUG_MODE) {
-        error_log("Erro na query Lucro por Dia: " . $e->getMessage());
-    }
+    error_log("Erro na query Lucro por Dia: " . $e->getMessage());
     $lucro_por_dia = [];
 }
+
+$lucra_receita_kpi = is_array($kpis) ? floatval($kpis['total_frete'] ?? 0) : 0;
+$lucra_margem_kpi = isset($advanced_kpis['margem_operacional']) ? floatval($advanced_kpis['margem_operacional']) : 0;
+$lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_kpis['ticket_medio']) : 0;
 ?>
 
 <!DOCTYPE html>
@@ -1210,6 +1184,9 @@ try {
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
@@ -1225,6 +1202,24 @@ try {
         #profitPerKmGauge {
             max-height: 250px !important;
         }
+
+        .lucra-chart-msg {
+            padding: 0.85rem 1rem;
+            text-align: center;
+            font-size: 0.875rem;
+            line-height: 1.45;
+            border-radius: 8px;
+            margin: 0.5rem 0;
+        }
+        .lucra-chart-msg--load {
+            color: var(--text-muted);
+            background: var(--bg-tertiary, rgba(0, 0, 0, 0.04));
+        }
+        .lucra-chart-msg--err {
+            color: #b91c1c;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+        }
         
         /* Responsividade para telas menores */
         @media (max-width: 768px) {
@@ -1237,7 +1232,7 @@ try {
             }
         }
         
-        /* Estilos para Alertas Inteligentes */
+        /* Alertas */
         .alerts-section {
             margin-bottom: 2rem;
         }
@@ -1555,6 +1550,17 @@ try {
         .exporting .dashboard-actions {
             display: none !important;
         }
+        .modal .close-modal {
+            background: transparent;
+            border: none;
+            padding: 0;
+            margin: 0;
+            font: inherit;
+            line-height: 1;
+            cursor: pointer;
+            color: inherit;
+        }
+
         /* Estilos para Modais */
         .modal {
             display: none;
@@ -1758,15 +1764,148 @@ try {
             color: #155724 !important;
             font-weight: 700;
         }
+
+        /* Reordenar blocos da página (sempre ativo — moderno e clássico) */
+        .lucra-dashboard-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .lucra-dash-block {
+            position: relative;
+        }
+        .lucra-dash-block__body {
+            position: relative;
+        }
+        /* Sortable.js — mesmo padrão do index.php (dashboard) */
+        .sortable-ghost {
+            opacity: 0.45;
+        }
+        #lucraKpiGrid .dashboard-card {
+            cursor: grab;
+        }
+        #lucraKpiGrid .dashboard-card:active {
+            cursor: grabbing;
+        }
+        .lucra-dash-block {
+            cursor: grab;
+        }
+        .lucra-dash-block:active {
+            cursor: grabbing;
+        }
+
+        <?php if ($is_modern): ?>
+        body.lucratividade-modern .dashboard-content.fornc-page {
+            padding-top: 8px;
+        }
+        body.lucratividade-modern .dashboard-header {
+            display: none;
+        }
+        body.lucratividade-modern .dashboard-grid {
+            gap: 0.65rem;
+        }
+        body.lucratividade-modern .sortable-ghost {
+            opacity: 0.45;
+        }
+        body.lucratividade-modern .dashboard-card {
+            border-radius: 10px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            border: 1px solid var(--border-color);
+        }
+        body.lucratividade-modern .analytics-section {
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+        body.lucratividade-modern .analytics-card {
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        body.lucratividade-modern .card.mb-4.fornc-resumo-shell {
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+            background: var(--card-bg, var(--bg-secondary));
+        }
+        body.lucratividade-modern .fornc-table tbody td {
+            text-transform: none;
+            letter-spacing: normal;
+        }
+        body.lucratividade-modern .fornc-table tr.table-success td {
+            background: rgba(25, 135, 84, 0.1);
+            font-weight: 600;
+        }
+        body.lucratividade-modern .fornc-table tr.table-primary td {
+            background: rgba(13, 110, 253, 0.08);
+            font-weight: 600;
+        }
+        body.lucratividade-modern .exporting .fornc-toolbar,
+        body.lucratividade-modern .exporting .fornc-kpi-strip,
+        body.lucratividade-modern .exporting .lucra-period-nav {
+            display: none !important;
+        }
+        @media print {
+            body.lucratividade-modern .fornc-toolbar,
+            body.lucratividade-modern .fornc-kpi-strip,
+            body.lucratividade-modern .lucra-period-nav {
+                display: none !important;
+            }
+        }
+        body.lucratividade-modern .lucra-period-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            align-items: center;
+        }
+        body.lucratividade-modern .dashboard-card--highlight {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04)) !important;
+            border: 1px solid rgba(16, 185, 129, 0.45) !important;
+        }
+        body.lucratividade-modern .dashboard-card--highlight .card-header h3 {
+            color: #15803d;
+        }
+        <?php endif; ?>
     </style>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'lucratividade-modern' : ''; ?>">
     <?php include '../includes/sidebar_pages.php'; ?>
     <div class="main-content">
         <?php include '../includes/header.php'; ?>
-        <div class="dashboard-content">
+        <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+            <?php if ($is_modern): ?>
+            <div class="fornc-kpi-strip" aria-label="Resumo do período">
+                <div class="fornc-kpi-cell<?php echo $lucro >= 0 ? ' is-ok' : ' is-warn'; ?>"><span class="lbl">Lucro líquido</span><span class="val">R$ <?php echo number_format($lucro, 2, ',', '.'); ?></span></div>
+                <div class="fornc-kpi-cell"><span class="lbl">Receita (fretes)</span><span class="val">R$ <?php echo number_format($lucra_receita_kpi, 2, ',', '.'); ?></span></div>
+                <div class="fornc-kpi-cell"><span class="lbl">Margem</span><span class="val"><?php echo number_format($lucra_margem_kpi, 1, ',', '.'); ?>%</span></div>
+                <div class="fornc-kpi-cell"><span class="lbl">Ticket médio / rota</span><span class="val">R$ <?php echo number_format($lucra_ticket_kpi, 2, ',', '.'); ?></span></div>
+            </div>
+
+            <div class="fornc-toolbar">
+                <div class="fornc-search-block" style="flex: 1 1 200px;">
+                    <label for="lucraMesAnoDisplay">Período analisado</label>
+                    <div class="fornc-search-inner">
+                        <i class="fas fa-calendar-alt" aria-hidden="true"></i>
+                        <input type="text" id="lucraMesAnoDisplay" readonly value="<?php echo htmlspecialchars($lucra_periodo_label); ?>" style="cursor: pointer;" title="Clique para alterar o período" role="button" tabindex="0" aria-label="Abrir filtros de período. Período atual: <?php echo htmlspecialchars($lucra_periodo_label); ?>">
+                    </div>
+                </div>
+                <div class="fornc-btn-row lucra-period-nav" aria-label="Navegar período">
+                    <a href="<?php echo htmlspecialchars($lucra_href_prev); ?>" class="fornc-btn fornc-btn--ghost" title="Mês anterior"><i class="fas fa-chevron-left" aria-hidden="true"></i> Anterior</a>
+                    <a href="<?php echo htmlspecialchars($lucra_href_next); ?>" class="fornc-btn fornc-btn--ghost" title="Próximo mês">Próximo <i class="fas fa-chevron-right" aria-hidden="true"></i></a>
+                    <button type="button" id="filterBtn" class="fornc-btn fornc-btn--accent" title="Filtros">
+                        <i class="fas fa-filter" aria-hidden="true"></i> Filtros
+                    </button>
+                    <button type="button" id="exportBtn" class="fornc-btn fornc-btn--muted" title="Exportar">
+                        <i class="fas fa-file-export" aria-hidden="true"></i> Exportar
+                    </button>
+                    <button type="button" id="helpBtn" class="fornc-btn fornc-btn--ghost" title="Ajuda">
+                        <i class="fas fa-question-circle" aria-hidden="true"></i> Ajuda
+                    </button>
+                </div>
+            </div>
+            <?php else: ?>
             <div class="dashboard-header">
-                <h1 class="mb-0"><i class="fas fa-chart-line"></i> <?php echo $page_title; ?></h1>
+                <h1 class="mb-0"><i class="fas fa-chart-line"></i> <?php echo $page_title; ?>
+                    <a href="lucratividade.php?<?php echo htmlspecialchars($lucra_query_modern_only); ?>" class="btn btn-sm btn-outline-secondary ms-2" style="font-size:0.75rem;vertical-align:middle;">Layout moderno</a>
+                </h1>
                 <div class="dashboard-actions">
                     <div class="view-controls">
                         <button id="filterBtn" class="btn-restore-layout" title="Filtros">
@@ -1781,38 +1920,42 @@ try {
                     </div>
                 </div>
             </div>
-            
-            <!-- Alertas Inteligentes (MOVIDO PARA CIMA) -->
+            <?php endif; ?>
+
+            <div id="lucraDashboardStack" class="lucra-dashboard-stack">
             <?php if (!empty($alerts)): ?>
-            <div class="alerts-section mb-4">
-                <div class="section-header">
-                    <h2><i class="fas fa-bell"></i> Alertas Inteligentes</h2>
-                </div>
-                <div class="alerts-grid">
-                    <?php foreach ($alerts as $alert): ?>
-                    <div class="alert-card alert-<?php echo $alert['type']; ?>">
-                        <div class="alert-icon">
-                            <i class="<?php echo $alert['icon']; ?>"></i>
-                        </div>
-                        <div class="alert-content">
-                            <h4><?php echo htmlspecialchars($alert['title']); ?></h4>
-                            <p><?php echo htmlspecialchars($alert['message']); ?></p>
+            <div class="lucra-dash-block" data-lucra-block="alerts">
+                <div class="lucra-dash-block__body">
+                    <div class="alerts-section mb-4">
+                        <div class="alerts-grid">
+                            <?php foreach ($alerts as $alert): ?>
+                            <div class="alert-card alert-<?php echo $alert['type']; ?>">
+                                <div class="alert-icon">
+                                    <i class="<?php echo $alert['icon']; ?>"></i>
+                                </div>
+                                <div class="alert-content">
+                                    <h4><?php echo htmlspecialchars($alert['title']); ?></h4>
+                                    <p><?php echo htmlspecialchars($alert['message']); ?></p>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
-                    <?php endforeach; ?>
                 </div>
             </div>
             <?php endif; ?>
             
             <!-- Dashboard KPIs -->
-            <div class="dashboard-grid mb-4">
-                <div class="dashboard-card" style="background: #e6f9ed; border: 2px solid #2ecc40;">
+            <div class="lucra-dash-block" data-lucra-block="kpis">
+                <div class="lucra-dash-block__body">
+            <div class="dashboard-grid mb-4" id="lucraKpiGrid">
+                <div class="dashboard-card<?php echo $is_modern ? ' dashboard-card--highlight' : ''; ?>" data-card-id="lucra-kpi-lucro"<?php echo $is_modern ? '' : ' style="background: #e6f9ed; border: 2px solid #2ecc40;"'; ?>>
                     <div class="card-header">
-                        <h3 style="color: #218838;">Lucro Líquido</h3>
+                        <h3<?php echo $is_modern ? '' : ' style="color: #218838;"'; ?>>Lucro Líquido</h3>
                     </div>
                     <div class="card-body">
                         <div class="metric">
-                            <span class="metric-value" style="color: #218838; font-size: 2rem; font-weight: bold;">R$ <?= number_format($lucro, 2, ',', '.') ?></span>
+                            <span class="metric-value" style="<?php echo $is_modern ? 'color: #15803d; font-size: 2rem; font-weight: bold;' : 'color: #218838; font-size: 2rem; font-weight: bold;'; ?>">R$ <?= number_format($lucro, 2, ',', '.') ?></span>
                             <span class="metric-subtitle">Lucro do período</span>
                             <?php if (isset($crescimento_lucro)): ?>
                             <div class="metric-trend <?= $crescimento_lucro >= 0 ? 'positive' : 'negative' ?>">
@@ -1823,7 +1966,7 @@ try {
                         </div>
                     </div>
                 </div>
-                <div class="dashboard-card">
+                <div class="dashboard-card" data-card-id="lucra-kpi-frete">
                     <div class="card-header">
                         <h3>Total de Fretes</h3>
                     </div>
@@ -1840,7 +1983,7 @@ try {
                         </div>
                     </div>
                 </div>
-                <div class="dashboard-card">
+                <div class="dashboard-card" data-card-id="lucra-kpi-comissao">
                     <div class="card-header">
                         <h3>Total de Comissões</h3>
                     </div>
@@ -1861,7 +2004,7 @@ try {
                         </div>
                     </div>
                 </div>
-                <div class="dashboard-card">
+                <div class="dashboard-card" data-card-id="lucra-kpi-desp-viagem">
                     <div class="card-header">
                         <h3>Despesas de Viagem</h3>
                     </div>
@@ -1882,7 +2025,7 @@ try {
                         </div>
                     </div>
                 </div>
-                <div class="dashboard-card">
+                <div class="dashboard-card" data-card-id="lucra-kpi-abast">
                     <div class="card-header">
                         <h3>Abastecimentos</h3>
                     </div>
@@ -1899,7 +2042,7 @@ try {
                         </div>
                     </div>
                 </div>
-                <div class="dashboard-card">
+                <div class="dashboard-card" data-card-id="lucra-kpi-fixas">
                     <div class="card-header">
                         <h3>Despesas Fixas</h3>
                     </div>
@@ -1920,7 +2063,7 @@ try {
                         </div>
                     </div>
                 </div>
-                <div class="dashboard-card">
+                <div class="dashboard-card" data-card-id="lucra-kpi-fin">
                     <div class="card-header">
                         <h3>Parcelas de Financiamento</h3>
                     </div>
@@ -1941,7 +2084,7 @@ try {
                         </div>
                     </div>
                 </div>
-                <div class="dashboard-card">
+                <div class="dashboard-card" data-card-id="lucra-kpi-contas">
                     <div class="card-header">
                         <h3>Contas Pagas</h3>
                     </div>
@@ -1962,7 +2105,7 @@ try {
                         </div>
                     </div>
                 </div>
-                <div class="dashboard-card">
+                <div class="dashboard-card" data-card-id="lucra-kpi-manut">
                     <div class="card-header">
                         <h3>Manutenções de Veículos</h3>
                     </div>
@@ -1983,7 +2126,7 @@ try {
                         </div>
                     </div>
                 </div>
-                <div class="dashboard-card">
+                <div class="dashboard-card" data-card-id="lucra-kpi-pneu">
                     <div class="card-header">
                         <h3>Manutenções de Pneus</h3>
                     </div>
@@ -2006,7 +2149,7 @@ try {
                 </div>
                 
                 <!-- Novos KPIs Avançados -->
-                <div class="dashboard-card" style="border-left: 4px solid var(--accent-secondary);">
+                <div class="dashboard-card" data-card-id="lucra-kpi-roi" style="border-left: 4px solid var(--accent-secondary);">
                     <div class="card-header">
                         <h3><i class="fas fa-chart-pie"></i> ROI (Retorno sobre Investimento)</h3>
                     </div>
@@ -2024,7 +2167,7 @@ try {
                     </div>
                 </div>
                 
-                <div class="dashboard-card" style="border-left: 4px solid var(--accent-primary);">
+                <div class="dashboard-card" data-card-id="lucra-kpi-ticket" style="border-left: 4px solid var(--accent-primary);">
                     <div class="card-header">
                         <h3><i class="fas fa-receipt"></i> Ticket Médio por Rota</h3>
                     </div>
@@ -2042,7 +2185,7 @@ try {
                     </div>
                 </div>
                 
-                <div class="dashboard-card" style="border-left: 4px solid var(--accent-warning);">
+                <div class="dashboard-card" data-card-id="lucra-kpi-custo-km" style="border-left: 4px solid var(--accent-warning);">
                     <div class="card-header">
                         <h3><i class="fas fa-road"></i> Custo por Quilômetro</h3>
                     </div>
@@ -2060,7 +2203,7 @@ try {
                     </div>
                 </div>
                 
-                <div class="dashboard-card" style="border-left: 4px solid var(--accent-success);">
+                <div class="dashboard-card" data-card-id="lucra-kpi-margem" style="border-left: 4px solid var(--accent-success);">
                     <div class="card-header">
                         <h3><i class="fas fa-percentage"></i> Margem Operacional</h3>
                     </div>
@@ -2078,7 +2221,7 @@ try {
                     </div>
                 </div>
                 
-                <div class="dashboard-card" style="border-left: 4px solid var(--accent-secondary);">
+                <div class="dashboard-card" data-card-id="lucra-kpi-ocupacao" style="border-left: 4px solid var(--accent-secondary);">
                     <div class="card-header">
                         <h3><i class="fas fa-box"></i> Taxa de Ocupação</h3>
                     </div>
@@ -2096,11 +2239,15 @@ try {
                     </div>
                 </div>
             </div>
+                </div>
+            </div>
             
             <!-- Análises Detalhadas -->
+            <div class="lucra-dash-block" data-lucra-block="analysis">
+                <div class="lucra-dash-block__body">
             <div class="analysis-section">
                 <h2 style="margin-bottom: 20px; color: var(--text-primary);">
-                    <i class="fas fa-chart-bar"></i> Análises Detalhadas
+                    <i class="fas fa-chart-bar"></i> Análises detalhadas
                 </h2>
                 
                 <div class="analysis-grid">
@@ -2219,13 +2366,17 @@ try {
                     <?php endif; ?>
                 </div>
             </div>
+                </div>
+            </div>
             
             <!-- Resumo Financeiro -->
-            <div class="card mb-4">
+            <div class="lucra-dash-block" data-lucra-block="resumo">
+                <div class="lucra-dash-block__body">
+            <div class="card mb-4<?php echo $is_modern ? ' fornc-resumo-shell' : ''; ?>">
                 <div class="card-body">
                     <h4 class="card-title mb-3"><i class="fas fa-table"></i> Resumo Financeiro</h4>
-                    <div class="table-responsive">
-                        <table class="table table-bordered">
+                    <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'table-responsive'; ?>">
+                        <table class="<?php echo $is_modern ? 'fornc-table' : 'table table-bordered'; ?>">
                             <thead>
                                 <tr>
                                     <th>Item</th>
@@ -2420,8 +2571,12 @@ try {
                     </div>
                 </div>
             </div>
+                </div>
+            </div>
 
             <!-- Gráficos de Análise -->
+            <div class="lucra-dash-block" data-lucra-block="charts_main">
+                <div class="lucra-dash-block__body">
             <div class="analytics-section">
                 <div class="section-header">
                     <h2>Análise de Lucratividade</h2>
@@ -2464,8 +2619,12 @@ try {
                     </div>
                 </div>
             </div>
+                </div>
+            </div>
 
             <!-- Gráficos de Análise Avançada -->
+            <div class="lucra-dash-block" data-lucra-block="charts_advanced">
+                <div class="lucra-dash-block__body">
             <div class="analytics-section">
                 <div class="section-header">
                     <h2>Análise de Lucratividade Avançada</h2>
@@ -2508,8 +2667,12 @@ try {
                     </div>
                 </div>
             </div>
+                </div>
+            </div>
             
             <!-- Novos Gráficos Avançados -->
+            <div class="lucra-dash-block" data-lucra-block="charts_flow">
+                <div class="lucra-dash-block__body">
             <div class="analytics-section">
                 <div class="section-header">
                     <h2>Análise de Fluxo Financeiro</h2>
@@ -2556,7 +2719,10 @@ try {
                     </div>
                 </div>
             </div>
-            
+                </div>
+            </div>
+            </div><!-- /#lucraDashboardStack -->
+
             <!-- Resumo Financeiro Detalhado -->
             <div class="financial-summary mb-4">
                 <!-- Seção removida conforme solicitado -->
@@ -2566,6 +2732,104 @@ try {
     </div>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script>
+    window.LUCRA_EMPRESA_ID = <?php echo (int) $empresa_id; ?>;
+    (function () {
+        document.addEventListener('DOMContentLoaded', function () {
+            var emp = window.LUCRA_EMPRESA_ID;
+
+            var stack = document.getElementById('lucraDashboardStack');
+            if (stack) {
+                var stackKey = 'lucratividade_dash_order_' + emp;
+                function getStackBlocks() {
+                    var out = [];
+                    for (var i = 0; i < stack.children.length; i++) {
+                        var el = stack.children[i];
+                        if (el.classList && el.classList.contains('lucra-dash-block')) {
+                            out.push(el);
+                        }
+                    }
+                    return out;
+                }
+                function restoreStackOrder() {
+                    var raw = localStorage.getItem(stackKey);
+                    if (!raw) return;
+                    var order;
+                    try { order = JSON.parse(raw); } catch (e) { return; }
+                    if (!Array.isArray(order)) return;
+                    var blocks = getStackBlocks();
+                    var map = {};
+                    blocks.forEach(function (b) {
+                        var id = b.getAttribute('data-lucra-block');
+                        if (id) map[id] = b;
+                    });
+                    var extras = [].slice.call(stack.children).filter(function (el) {
+                        return !el.classList.contains('lucra-dash-block');
+                    });
+                    blocks.forEach(function (b) {
+                        if (b.parentNode === stack) stack.removeChild(b);
+                    });
+                    order.forEach(function (id) {
+                        if (map[id]) stack.appendChild(map[id]);
+                    });
+                    Object.keys(map).forEach(function (id) {
+                        if (order.indexOf(id) === -1 && map[id]) stack.appendChild(map[id]);
+                    });
+                    extras.forEach(function (n) { stack.appendChild(n); });
+                }
+                function saveStackOrder() {
+                    var ids = getStackBlocks().map(function (b) { return b.getAttribute('data-lucra-block'); }).filter(Boolean);
+                    try { localStorage.setItem(stackKey, JSON.stringify(ids)); } catch (e) { /* ignore */ }
+                }
+                restoreStackOrder();
+                if (typeof Sortable !== 'undefined') {
+                    new Sortable(stack, {
+                        animation: 150,
+                        ghostClass: 'sortable-ghost',
+                        draggable: '.lucra-dash-block',
+                        filter: 'input, textarea, button, select, option, a, canvas, label',
+                        preventOnFilter: true,
+                        onEnd: saveStackOrder
+                    });
+                }
+            }
+
+            var kpiGrid = document.getElementById('lucraKpiGrid');
+            if (kpiGrid && typeof Sortable !== 'undefined') {
+                var kpiKey = 'lucratividade_kpi_layout_' + emp;
+                var savedKpi = localStorage.getItem(kpiKey);
+                if (savedKpi) {
+                    try {
+                        var layout = JSON.parse(savedKpi);
+                        if (Array.isArray(layout)) {
+                            layout.forEach(function (item) {
+                                if (!item || !item.id) return;
+                                var card = kpiGrid.querySelector('[data-card-id="' + item.id + '"]');
+                                if (card) kpiGrid.appendChild(card);
+                            });
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+                new Sortable(kpiGrid, {
+                    animation: 150,
+                    ghostClass: 'sortable-ghost',
+                    filter: 'input, textarea, button, select, option, a, label',
+                    preventOnFilter: true,
+                    onEnd: function () {
+                        var cards = kpiGrid.querySelectorAll('.dashboard-card');
+                        var layout = [];
+                        for (var i = 0; i < cards.length; i++) {
+                            var id = cards[i].getAttribute('data-card-id');
+                            if (id) layout.push({ id: id, order: i });
+                        }
+                        try { localStorage.setItem(kpiKey, JSON.stringify(layout)); } catch (e) { /* ignore */ }
+                    }
+                });
+            }
+        });
+    })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     
@@ -2574,11 +2838,11 @@ try {
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <!-- Filter Modal -->
-    <div class="modal" id="filterModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="filterModal" role="dialog" aria-modal="true" aria-labelledby="filterModalTitle" aria-hidden="true">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Filtros</h2>
-                <span class="close-modal">&times;</span>
+                <h2 id="filterModalTitle">Filtros</h2>
+                <button type="button" class="close-modal" aria-label="Fechar">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-grid">
@@ -2596,62 +2860,116 @@ try {
     </div>
 
     <script>
-    // Elementos do DOM
-    const filterBtn = document.getElementById('filterBtn');
-    const filterModal = document.getElementById('filterModal');
-    const closeBtn = filterModal.querySelector('.close-modal');
-    const filterMonth = document.getElementById('filterMonth');
-    const clearFilterBtn = document.getElementById('clearFilterBtn');
-    const applyFilterBtn = document.getElementById('applyFilterBtn');
+    const lucraClassic = <?php echo $is_modern ? 'false' : 'true'; ?>;
+    const lucraClassicQs = lucraClassic ? '&classic=1' : '';
 
-    // Definir valor inicial do filtro
-    const urlParams = new URLSearchParams(window.location.search);
-    const mes = urlParams.get('mes');
-    const ano = urlParams.get('ano');
-    if (mes && ano) {
-        filterMonth.value = `${ano}-${mes.padStart(2, '0')}`;
-    } else {
-        const currentDate = new Date();
-        filterMonth.value = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+    function lucraFetchJson(response, chartName) {
+        if (!response.ok) {
+            throw new Error(chartName + ': HTTP ' + response.status);
+        }
+        return response.json();
     }
 
-    // Abrir modal
-    filterBtn.addEventListener('click', () => {
-        filterModal.style.display = 'block';
-    });
-
-    // Fechar modal
-    closeBtn.addEventListener('click', () => {
-        filterModal.style.display = 'none';
-    });
-
-    // Fechar modal ao clicar fora
-    window.addEventListener('click', (e) => {
-        if (e.target === filterModal) {
-            filterModal.style.display = 'none';
+    function lucraOpenModal(el) {
+        if (!el) return;
+        el.style.display = 'flex';
+        el.setAttribute('aria-hidden', 'false');
+        el.classList.add('active');
+        const focusMonth = el.querySelector('#filterMonth');
+        const toFocus = focusMonth || el.querySelector('button, [href], input, select, textarea');
+        if (toFocus) {
+            try { toFocus.focus(); } catch (e) { /* ignore */ }
         }
-    });
+    }
+    function lucraCloseModal(el) {
+        if (!el) return;
+        el.style.display = 'none';
+        el.setAttribute('aria-hidden', 'true');
+        el.classList.remove('active');
+    }
 
-    // Limpar filtro
-    clearFilterBtn.addEventListener('click', () => {
-        filterMonth.value = '';
-        window.location.href = window.location.pathname;
-    });
+    document.addEventListener('DOMContentLoaded', function() {
+        const filterBtn = document.getElementById('filterBtn');
+        const filterModal = document.getElementById('filterModal');
+        const filterMonth = document.getElementById('filterMonth');
+        const clearFilterBtn = document.getElementById('clearFilterBtn');
+        const applyFilterBtn = document.getElementById('applyFilterBtn');
+        const helpBtn = document.getElementById('helpBtn');
+        const helpModal = document.getElementById('helpLucratividadeModal');
+        const lucraPeriodField = document.getElementById('lucraMesAnoDisplay');
 
-    // Aplicar filtro
-    applyFilterBtn.addEventListener('click', () => {
-        const monthYear = filterMonth.value;
-        if (monthYear) {
-            const [year, month] = monthYear.split('-');
-            window.location.href = `?mes=${month}&ano=${year}`;
-        } else {
-            window.location.href = window.location.pathname;
+        if (filterMonth) {
+            const urlParamsInit = new URLSearchParams(window.location.search);
+            const mesInit = urlParamsInit.get('mes');
+            const anoInit = urlParamsInit.get('ano');
+            if (mesInit && anoInit) {
+                filterMonth.value = `${anoInit}-${mesInit.padStart(2, '0')}`;
+            } else {
+                const currentDate = new Date();
+                filterMonth.value = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+            }
+        }
+
+        if (filterBtn && filterModal) {
+            filterBtn.addEventListener('click', function() { lucraOpenModal(filterModal); });
+        }
+        if (lucraPeriodField && filterModal) {
+            lucraPeriodField.addEventListener('click', function() { lucraOpenModal(filterModal); });
+            lucraPeriodField.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    lucraOpenModal(filterModal);
+                }
+            });
+        }
+        if (helpBtn && helpModal) {
+            helpBtn.addEventListener('click', function() { lucraOpenModal(helpModal); });
+        }
+
+        document.querySelectorAll('.modal .close-modal').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                lucraCloseModal(btn.closest('.modal'));
+            });
+        });
+        document.querySelectorAll('.modal').forEach(function(m) {
+            m.addEventListener('click', function(e) {
+                if (e.target === m) lucraCloseModal(m);
+            });
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key !== 'Escape') return;
+            document.querySelectorAll('.modal').forEach(function(m) {
+                var d = window.getComputedStyle(m).display;
+                if (d === 'flex' || d === 'block') lucraCloseModal(m);
+            });
+        });
+
+        if (clearFilterBtn && filterMonth) {
+            clearFilterBtn.addEventListener('click', function() {
+                filterMonth.value = '';
+                window.location.href = lucraClassic ? (window.location.pathname + '?classic=1') : window.location.pathname;
+            });
+        }
+        if (applyFilterBtn && filterMonth) {
+            applyFilterBtn.addEventListener('click', function() {
+                var monthYear = filterMonth.value;
+                if (monthYear) {
+                    var parts = monthYear.split('-');
+                    var year = parts[0];
+                    var month = parts[1];
+                    window.location.href = '?mes=' + month + '&ano=' + year + lucraClassicQs;
+                } else {
+                    window.location.href = lucraClassic ? (window.location.pathname + '?classic=1') : window.location.pathname;
+                }
+            });
         }
     });
 
     // Configuração do gráfico de custo por KM
     document.addEventListener('DOMContentLoaded', function() {
-        const costPerKmCtx = document.getElementById('costPerKmChart').getContext('2d');
+        const costPerKmEl = document.getElementById('costPerKmChart');
+        if (!costPerKmEl) return;
+        const costPerKmCtx = costPerKmEl.getContext('2d');
         
         // Função para formatar valores em reais
         const formatCurrency = (value) => {
@@ -2674,7 +2992,7 @@ try {
         
         // Carregar dados do gráfico de custo por KM
         fetch(costPerKmUrl)
-            .then(response => response.json())
+            .then(function(response) { return lucraFetchJson(response, 'Custo por KM'); })
             .then(data => {
                 new Chart(costPerKmCtx, {
                     type: 'line',
@@ -2716,12 +3034,13 @@ try {
             })
             .catch(error => {
                 console.error('Erro ao carregar dados do gráfico de custo por KM:', error);
-                costPerKmCtx.canvas.parentNode.innerHTML = '<div class="alert alert-danger">Erro ao carregar dados do gráfico</div>';
+                costPerKmCtx.canvas.parentNode.innerHTML = '<p class="lucra-chart-msg lucra-chart-msg--err" role="alert">Não foi possível carregar o gráfico de custo por KM. Verifique a conexão ou tente outro período.</p>';
             });
     });
 
     // Configuração do gráfico de eficiência operacional
     document.addEventListener('DOMContentLoaded', function() {
+        if (!document.getElementById('profitPerKmGauge') || !document.getElementById('profitPerKmLine')) return;
         // Registrar o plugin datalabels
         Chart.register(ChartDataLabels);
         
@@ -2746,7 +3065,7 @@ try {
         
         // Carregar dados do gráfico de eficiência operacional
         fetch(profitPerKmUrl)
-            .then(response => response.json())
+            .then(function(response) { return lucraFetchJson(response, 'Eficiência operacional'); })
             .then(data => {
                 // Mostrar aviso se há dados de exemplo
                 if (data.warning) {
@@ -2858,13 +3177,18 @@ try {
             })
             .catch(error => {
                 console.error('Erro ao carregar dados de eficiência operacional:', error);
-                document.getElementById('profitPerKmGauge').parentNode.innerHTML = '<div class="alert alert-danger">Erro ao carregar dados do gráfico gauge</div>';
-                document.getElementById('profitPerKmLine').parentNode.innerHTML = '<div class="alert alert-danger">Erro ao carregar dados do gráfico de linha</div>';
+                var g = document.getElementById('profitPerKmGauge');
+                var l = document.getElementById('profitPerKmLine');
+                var msg = '<p class="lucra-chart-msg lucra-chart-msg--err" role="alert">Não foi possível carregar os gráficos de eficiência operacional.</p>';
+                if (g && g.parentNode) g.parentNode.innerHTML = msg;
+                if (l && l.parentNode) l.parentNode.innerHTML = msg;
             });
     });
 
     // Configuração do gráfico de projeção de lucro
     document.addEventListener('DOMContentLoaded', function() {
+        const profitForecastEl = document.getElementById('profitForecastChart');
+        if (!profitForecastEl) return;
         // Função para formatar valores em reais
         const formatCurrency = (value) => {
             return new Intl.NumberFormat('pt-BR', {
@@ -2875,7 +3199,7 @@ try {
         
         // Carregar dados do gráfico de projeção
         fetch('../api/profit_forecast_analytics.php')
-            .then(response => response.json())
+            .then(function(response) { return lucraFetchJson(response, 'Projeção de lucro'); })
             .then(data => {
                 // Mostrar aviso se há dados de exemplo
                 if (data.warning) {
@@ -2894,10 +3218,10 @@ try {
                         <h5><i class="fas fa-exclamation-triangle"></i> ${data.warning}</h5>
                         ${suggestionsHtml}
                     `;
-                    document.getElementById('profitForecastChart').parentNode.parentNode.insertBefore(warningDiv, document.getElementById('profitForecastChart').parentNode);
+                    profitForecastEl.parentNode.parentNode.insertBefore(warningDiv, profitForecastEl.parentNode);
                 }
                 
-                const ctx = document.getElementById('profitForecastChart').getContext('2d');
+                const ctx = profitForecastEl.getContext('2d');
                 new Chart(ctx, {
                     type: 'line',
                     data: data,
@@ -2938,7 +3262,9 @@ try {
             })
             .catch(error => {
                 console.error('Erro ao carregar dados de projeção:', error);
-                document.getElementById('profitForecastChart').parentNode.innerHTML = '<div class="alert alert-danger">Erro ao carregar dados do gráfico de projeção</div>';
+                if (profitForecastEl.parentNode) {
+                    profitForecastEl.parentNode.innerHTML = '<p class="lucra-chart-msg lucra-chart-msg--err" role="alert">Não foi possível carregar a projeção de lucro.</p>';
+                }
             });
     });
 
@@ -2964,7 +3290,7 @@ try {
         const evolucaoCtx = document.getElementById('evolucaoLucratividadeChart');
         if (evolucaoCtx) {
             fetch(`../api/evolucao_lucratividade.php${apiParams}`)
-                .then(response => response.json())
+                .then(function(response) { return lucraFetchJson(response, 'Evolução da lucratividade'); })
                 .then(data => {
                     new Chart(evolucaoCtx, {
                         type: 'line',
@@ -3013,34 +3339,7 @@ try {
                 })
                 .catch(error => {
                     console.error('Erro ao carregar dados de evolução:', error);
-                    // Criar gráfico com dados vazios
-                    new Chart(evolucaoCtx, {
-                        type: 'line',
-                        data: {
-                            labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
-                            datasets: [{
-                                label: 'Lucro Líquido',
-                                data: [0, 0, 0, 0, 0, 0],
-                                borderColor: '#28a745',
-                                backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                                tension: 0.4,
-                                fill: true
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'top',
-                                },
-                                title: {
-                                    display: true,
-                                    text: 'Evolução da Lucratividade'
-                                }
-                            }
-                        }
-                    });
+                    evolucaoCtx.parentNode.innerHTML = '<p class="lucra-chart-msg lucra-chart-msg--err" role="alert">Não foi possível carregar a evolução da lucratividade.</p>';
                 });
         }
         
@@ -3048,7 +3347,7 @@ try {
         const distribuicaoCtx = document.getElementById('distribuicaoCustosChart');
         if (distribuicaoCtx) {
             fetch(`../api/distribuicao_custos.php${apiParams}`)
-                .then(response => response.json())
+                .then(function(response) { return lucraFetchJson(response, 'Distribuição de custos'); })
                 .then(data => {
                     new Chart(distribuicaoCtx, {
                         type: 'doughnut',
@@ -3094,37 +3393,7 @@ try {
                 })
                 .catch(error => {
                     console.error('Erro ao carregar dados de distribuição:', error);
-                    // Criar gráfico com dados vazios
-                    new Chart(distribuicaoCtx, {
-                        type: 'doughnut',
-                        data: {
-                            labels: ['Combustível', 'Manutenções', 'Despesas Fixas', 'Comissões'],
-                            datasets: [{
-                                data: [0, 0, 0, 0],
-                                backgroundColor: [
-                                    '#ff6384',
-                                    '#36a2eb',
-                                    '#ffce56',
-                                    '#4bc0c0'
-                                ],
-                                borderWidth: 2,
-                                borderColor: '#fff'
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'bottom',
-                                },
-                                title: {
-                                    display: true,
-                                    text: 'Distribuição de Custos'
-                                }
-                            }
-                        }
-                    });
+                    distribuicaoCtx.parentNode.innerHTML = '<p class="lucra-chart-msg lucra-chart-msg--err" role="alert">Não foi possível carregar a distribuição de custos.</p>';
                 });
         }
         
@@ -3132,7 +3401,7 @@ try {
         const margemCtx = document.getElementById('margemTipoFreteChart');
         if (margemCtx) {
             fetch(`../api/margem_tipo_frete.php${apiParams}`)
-                .then(response => response.json())
+                .then(function(response) { return lucraFetchJson(response, 'Margem por tipo de frete'); })
                 .then(data => {
                     new Chart(margemCtx, {
                         type: 'bar',
@@ -3182,52 +3451,7 @@ try {
                 })
                 .catch(error => {
                     console.error('Erro ao carregar dados de margem:', error);
-                    // Criar gráfico com dados vazios
-                    new Chart(margemCtx, {
-                        type: 'bar',
-                        data: {
-                            labels: ['Frete Local', 'Frete Regional', 'Frete Interestadual'],
-                            datasets: [{
-                                label: 'Margem de Lucro (%)',
-                                data: [0, 0, 0],
-                                backgroundColor: [
-                                    'rgba(255, 99, 132, 0.8)',
-                                    'rgba(54, 162, 235, 0.8)',
-                                    'rgba(255, 205, 86, 0.8)'
-                                ],
-                                borderColor: [
-                                    'rgba(255, 99, 132, 1)',
-                                    'rgba(54, 162, 235, 1)',
-                                    'rgba(255, 205, 86, 1)'
-                                ],
-                                borderWidth: 1
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'top',
-                                },
-                                title: {
-                                    display: true,
-                                    text: 'Margem por Tipo de Frete'
-                                }
-                            },
-                            scales: {
-                                y: {
-                                    beginAtZero: true,
-                                    max: 100,
-                                    ticks: {
-                                        callback: function(value) {
-                                            return value + '%';
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    });
+                    margemCtx.parentNode.innerHTML = '<p class="lucra-chart-msg lucra-chart-msg--err" role="alert">Não foi possível carregar a margem por tipo de frete.</p>';
                 });
         }
         
@@ -3235,7 +3459,7 @@ try {
         const projecaoCtx = document.getElementById('projecaoLucroChart');
         if (projecaoCtx) {
             fetch(`../api/projecao_lucro.php${apiParams}`)
-                .then(response => response.json())
+                .then(function(response) { return lucraFetchJson(response, 'Projeção de lucro (avançado)'); })
                 .then(data => {
                     new Chart(projecaoCtx, {
                         type: 'line',
@@ -3293,38 +3517,7 @@ try {
                 })
                 .catch(error => {
                     console.error('Erro ao carregar dados de projeção:', error);
-                    // Criar gráfico com dados vazios
-                    new Chart(projecaoCtx, {
-                        type: 'line',
-                        data: {
-                            labels: ['Mês Atual', 'Próximo Mês', '2º Mês', '3º Mês'],
-                            datasets: [{
-                                label: 'Projeção de Lucro',
-                                data: [0, 0, 0, 0],
-                                borderColor: '#28a745',
-                                backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                                tension: 0.4,
-                                fill: true,
-                                pointBackgroundColor: '#28a745',
-                                pointBorderColor: '#fff',
-                                pointBorderWidth: 2,
-                                pointRadius: 6
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            plugins: {
-                                legend: {
-                                    position: 'top',
-                                },
-                                title: {
-                                    display: true,
-                                    text: 'Projeção de Lucro (Próximos 3 meses)'
-                                }
-                            }
-                        }
-                    });
+                    projecaoCtx.parentNode.innerHTML = '<p class="lucra-chart-msg lucra-chart-msg--err" role="alert">Não foi possível carregar a projeção de lucro (avançado).</p>';
                 });
         }
         
@@ -3525,74 +3718,6 @@ try {
     </script>
     
     <script>
-        // Função para configurar botão de ajuda
-        function setupHelpButton() {
-            const helpBtn = document.getElementById('helpBtn');
-            if (helpBtn) {
-                helpBtn.addEventListener('click', function() {
-                    const helpModal = document.getElementById('helpLucratividadeModal');
-                    if (helpModal) {
-                        helpModal.style.display = 'flex';
-                    }
-                });
-            }
-
-            // Close modal functionality for help modal
-            document.querySelectorAll('.close-modal').forEach(button => {
-                button.addEventListener('click', function() {
-                    const modal = this.closest('.modal');
-                    if (modal) {
-                        modal.style.display = 'none';
-                    }
-                });
-            });
-
-            // Close modal when clicking outside
-            document.querySelectorAll('.modal').forEach(modal => {
-                modal.addEventListener('click', function(event) {
-                    if (event.target === this) {
-                        this.style.display = 'none';
-                    }
-                });
-            });
-        }
-
-        // Função para fechar modal específico
-        function closeModal(modalId) {
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.style.display = 'none';
-            }
-        }
-        
-        // Configurar modal de ajuda quando o DOM estiver carregado
-        document.addEventListener('DOMContentLoaded', function() {
-            const helpBtn = document.getElementById('helpBtn');
-            const helpModal = document.getElementById('helpLucratividadeModal');
-            const helpClose = helpModal?.querySelector('.close-modal');
-            
-            if (helpBtn && helpModal) {
-                helpBtn.addEventListener('click', function() {
-                    helpModal.style.display = 'flex';
-                });
-            }
-            
-            if (helpClose) {
-                helpClose.addEventListener('click', function() {
-                    helpModal.style.display = 'none';
-                });
-            }
-            
-            // Fechar modal ao clicar fora
-            if (helpModal) {
-                window.addEventListener('click', function(event) {
-                    if (event.target === helpModal) {
-                        helpModal.style.display = 'none';
-                    }
-                });
-            }
-        });
-
         // Função para exportar PDF da tela
         function exportToPDF() {
             // Mostrar loading
@@ -3617,10 +3742,12 @@ try {
                     scrollX: 0,
                     scrollY: 0,
                     ignoreElements: function(element) {
-                        // Ignorar modais e elementos de navegação
-                        return element.classList.contains('modal') || 
+                        return element.classList.contains('modal') ||
                                element.classList.contains('sidebar') ||
-                               element.classList.contains('dashboard-actions');
+                               element.classList.contains('dashboard-actions') ||
+                               element.classList.contains('fornc-toolbar') ||
+                               element.classList.contains('fornc-kpi-strip') ||
+                               element.classList.contains('lucra-period-nav');
                     }
                 };
 
@@ -3689,11 +3816,7 @@ try {
             }, 500); // Aguardar 500ms para aplicar estilos
         }
 
-        // Inicializar botão de ajuda quando o DOM estiver carregado
         document.addEventListener('DOMContentLoaded', function() {
-            // Setup help button
-            setupHelpButton();
-            
             // Setup export button
             const exportBtn = document.getElementById('exportBtn');
             if (exportBtn) {
@@ -3979,11 +4102,11 @@ try {
     </script>
     
     <!-- Modal de Ajuda -->
-    <div class="modal" id="helpLucratividadeModal">
-        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpLucratividadeModal" role="dialog" aria-modal="true" aria-labelledby="helpLucratividadeTitle" aria-hidden="true">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>"<?php echo $is_modern ? '' : ' style="max-width: 800px; max-height: 90vh; overflow-y: auto;"'; ?>>
             <div class="modal-header">
-                <h2><i class="fas fa-question-circle"></i> Ajuda - Análise de Lucratividade</h2>
-                <span class="close-modal">&times;</span>
+                <h2 id="helpLucratividadeTitle"><i class="fas fa-question-circle" aria-hidden="true"></i> Ajuda - Análise de Lucratividade</h2>
+                <button type="button" class="close-modal" aria-label="Fechar">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="help-section">
@@ -3995,7 +4118,10 @@ try {
                     <h3>Funcionalidades Principais</h3>
                     <ul>
                         <li><strong>KPIs Financeiros:</strong> Visualize indicadores-chave como receita, despesas, lucro e margem.</li>
-                        <li><strong>Alertas Inteligentes:</strong> Receba notificações sobre tendências e anomalias financeiras.</li>
+                        <li><strong>Faixa de resumo (layout moderno):</strong> Lucro, receita, margem e ticket médio do período selecionado.</li>
+                        <li><strong>Reordenar:</strong> Como no dashboard inicial, arraste os <strong>cards de KPI</strong> e os <strong>blocos grandes</strong> (gráficos, tabelas). A ordem fica salva neste navegador (por empresa).</li>
+                        <li><strong>Navegação:</strong> Use Anterior/Próximo ou clique no período para abrir o filtro de mês/ano. <kbd>Esc</kbd> fecha modais.</li>
+                        <li><strong>Alertas:</strong> Avisos sobre tendências e situações que merecem atenção no período.</li>
                         <li><strong>Análise de Tendências:</strong> Acompanhe a evolução dos resultados ao longo do tempo.</li>
                         <li><strong>Relatórios Detalhados:</strong> Acesse análises profundas de cada componente financeiro.</li>
                     </ul>
@@ -4027,7 +4153,7 @@ try {
                     <h3>Dicas Úteis</h3>
                     <ul>
                         <li>Monitore regularmente os KPIs para identificar tendências.</li>
-                        <li>Analise os alertas inteligentes para tomar ações preventivas.</li>
+                        <li>Analise os alertas para tomar ações preventivas.</li>
                         <li>Compare períodos diferentes para entender sazonalidades.</li>
                         <li>Use os gráficos para apresentações e relatórios.</li>
                         <li>Configure metas baseadas nos dados históricos.</li>
@@ -4037,5 +4163,7 @@ try {
             </div>
         </div>
     </div>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html> 

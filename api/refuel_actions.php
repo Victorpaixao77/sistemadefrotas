@@ -4,6 +4,9 @@
 require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
+require_once '../includes/csrf.php';
+require_once '../includes/api_json.php';
+require_once __DIR__ . '/../includes/bi_cache_invalidate.php';
 
 // Configura a sessão antes de iniciá-la
 configure_session();
@@ -31,12 +34,20 @@ if (!$empresa_id) {
     exit;
 }
 
-// Get the action from POST or GET
+// action: FormData POST, ou query (?action=) em POST com corpo JSON
 $action = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $action = isset($_POST['action']) ? $_POST['action'] : '';
+    $action = !empty($_POST['action']) ? $_POST['action'] : (isset($_GET['action']) ? $_GET['action'] : '');
 } else {
     $action = isset($_GET['action']) ? $_GET['action'] : '';
+}
+
+$mutating_actions = ['add', 'edit', 'delete', 'create', 'update'];
+if (in_array($action, $mutating_actions, true)) {
+    if ($action === 'delete' && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        api_json_method_not_allowed('Use POST para excluir.');
+    }
+    api_require_csrf_json();
 }
 
 // Log the request data for debugging
@@ -165,6 +176,7 @@ try {
             
             $stmt->execute();
             
+            bi_cache_invalidate_empresa($conn, (int) $empresa_id);
             echo json_encode([
                 'success' => true,
                 'message' => 'Abastecimento registrado com sucesso',
@@ -285,6 +297,7 @@ try {
             
             $stmt->execute();
             
+            bi_cache_invalidate_empresa($conn, (int) $empresa_id);
             echo json_encode([
                 'success' => true,
                 'message' => 'Abastecimento atualizado com sucesso'
@@ -292,8 +305,8 @@ try {
             break;
             
         case 'delete':
-            // Obtém o ID do abastecimento
-            $id = isset($_GET['id']) ? $_GET['id'] : null;
+            // Obtém o ID do abastecimento (somente POST + CSRF)
+            $id = isset($_POST['id']) ? $_POST['id'] : null;
             if (!$id) {
                 throw new Exception('ID do abastecimento não fornecido');
             }
@@ -306,6 +319,7 @@ try {
             $stmt->bindValue(':empresa_id', $empresa_id);
             $stmt->execute();
             
+            bi_cache_invalidate_empresa($conn, (int) $empresa_id);
             echo json_encode([
                 'success' => true,
                 'message' => 'Abastecimento excluído com sucesso'
@@ -557,6 +571,7 @@ try {
 
                 $stmt->execute();
 
+                bi_cache_invalidate_empresa($conn, (int) $empresa_id);
                 echo json_encode([
                     'success' => true,
                     'message' => 'Abastecimento registrado com sucesso',
@@ -651,6 +666,7 @@ try {
 
                 $stmt->execute();
 
+                bi_cache_invalidate_empresa($conn, (int) $empresa_id);
                 echo json_encode([
                     'success' => true,
                     'message' => 'Abastecimento atualizado com sucesso'

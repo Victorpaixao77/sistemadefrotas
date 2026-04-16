@@ -391,7 +391,7 @@ class CalendarManager {
     
     async loadCNHEvents() {
         try {
-            const response = await fetch('/sistema-frotas/calendario/api/calendario_cnh.php');
+            const response = await fetch('api/calendario_cnh.php');
             if (response.ok) {
                 const data = await response.json();
                 return data.map(event => ({
@@ -412,7 +412,7 @@ class CalendarManager {
     
     async loadMultasEvents() {
         try {
-            const response = await fetch('/sistema-frotas/calendario/api/calendario_multas.php');
+            const response = await fetch('api/calendario_multas.php');
             if (response.ok) {
                 const data = await response.json();
                 return data.map(event => ({
@@ -433,7 +433,7 @@ class CalendarManager {
     
     async loadContasEvents() {
         try {
-            const response = await fetch('/sistema-frotas/calendario/api/calendario_contas.php');
+            const response = await fetch('api/calendario_contas.php');
             if (response.ok) {
                 const data = await response.json();
                 return data.map(event => ({
@@ -454,7 +454,7 @@ class CalendarManager {
     
     async loadFinanciamentoEvents() {
         try {
-            const response = await fetch('/sistema-frotas/calendario/api/calendario_financiamento.php');
+            const response = await fetch('api/calendario_financiamento.php');
             if (response.ok) {
                 const data = await response.json();
                 return data.map(event => ({
@@ -475,7 +475,7 @@ class CalendarManager {
     
     async loadManutencaoEvents() {
         try {
-            const response = await fetch('/sistema-frotas/calendario/api/calendario_manutencao.php');
+            const response = await fetch('api/calendario_manutencao.php');
             if (response.ok) {
                 const data = await response.json();
                 return data.map(event => ({
@@ -496,7 +496,7 @@ class CalendarManager {
     
     async loadPersonalEvents() {
         try {
-            const response = await fetch('/sistema-frotas/calendario/api/calendario_personal.php');
+            const response = await fetch('api/calendario_personal.php');
             if (response.ok) {
                 const data = await response.json();
                 console.log('Dados brutos da API:', data);
@@ -665,7 +665,7 @@ class CalendarManager {
             postData.append(key, value);
         }
         
-        const response = await fetch('/sistema-frotas/calendario/api/calendario_create_simples.php', {
+        const response = await fetch('api/calendario_create_simples.php', {
             method: 'POST',
             body: postData
         });
@@ -678,7 +678,7 @@ class CalendarManager {
     }
     
     async updateEvent(formData) {
-                    const response = await fetch('/sistema-frotas/calendario/api/calendario_update.php', {
+                    const response = await fetch('api/calendario_update.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -709,7 +709,7 @@ class CalendarManager {
             });
             
             if (confirmed.isConfirmed) {
-                const response = await fetch('/sistema-frotas/calendario/api/calendario_delete.php', {
+                const response = await fetch('api/calendario_delete.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -739,7 +739,7 @@ class CalendarManager {
                 end: event.end ? this.formatDateTimeLocal(event.end) : null
             };
             
-            await fetch('/sistema-frotas/calendario/api/calendario_update_date.php', {
+            await fetch('api/calendario_update_date.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

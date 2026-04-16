@@ -8,6 +8,8 @@ configure_session();
 session_start();
 require_authentication();
 $page_title = "Rotas";
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
+$classic_param = $is_modern ? '' : '&classic=1';
 function getRotasPendentes($page = 1) {
     try {
         $conn = getConnection();
@@ -81,16 +83,70 @@ $counts = getDashboardCounts();
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
+    <style>
+        body.rotas-motoristas-modern .dashboard-content.fornc-page { overflow-x: auto; }
+    </style>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'rotas-motoristas-modern' : ''; ?>">
     <div class="app-container">
         <?php include '../includes/sidebar_pages.php'; ?>
         <div class="main-content">
             <?php include '../includes/header.php'; ?>
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <?php if ($is_modern): ?>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Pendentes</span><span class="val"><?php echo $counts['pendentes']; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Aceitas</span><span class="val"><?php echo $counts['aceitas']; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Rejeitadas</span><span class="val"><?php echo $counts['rejeitadas']; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Total</span><span class="val"><?php echo $counts['total']; ?></span></div>
+                </div>
+                <div class="fornc-toolbar">
+                    <div class="fornc-search-block">
+                        <label for="searchRoute">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" id="searchRoute" placeholder="Buscar rota..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="fornc-filters-inline">
+                        <div class="fg">
+                            <label for="statusFilter">Status</label>
+                            <select id="statusFilter">
+                                <option value="">Todos os status</option>
+                                <option value="pendente">Pendentes</option>
+                                <option value="aprovado">Aceitas</option>
+                                <option value="rejeitado">Rejeitadas</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="driverFilter">Motorista</label>
+                            <select id="driverFilter">
+                                <option value="">Todos os motoristas</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="vehicleFilter">Veículo</label>
+                            <select id="vehicleFilter">
+                                <option value="">Todos os veículos</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="fornc-btn-row">
+                        <button type="button" id="applyRouteFilters" class="fornc-btn fornc-btn--accent" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" id="clearRouteFilters" class="fornc-btn fornc-btn--ghost" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="dashboard-header">
                     <h1>Gestão de Rotas Pendentes</h1>
                 </div>
@@ -138,8 +194,9 @@ $counts = getDashboardCounts();
                         </button>
                     </div>
                 </div>
-                <div class="table-container">
-                    <table class="data-table">
+                <?php endif; ?>
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>">
                         <thead>
                             <tr>
                                 <th>Data</th>
@@ -194,19 +251,37 @@ $counts = getDashboardCounts();
                         </tbody>
                     </table>
                 </div>
+                <?php if ($is_modern): ?>
+                <div class="fornc-pagination-bar">
+                    <div class="pagination fornc-modern-pagination">
+                        <?php if ($total_paginas > 1): ?>
+                            <a href="?page=<?php echo $pagina_atual - 1; ?>" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
+                                <i class="fas fa-chevron-left"></i>
+                            </a>
+                            <span class="pagination-info">
+                                Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
+                            </span>
+                            <a href="?page=<?php echo $pagina_atual + 1; ?>" class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="pagination">
                     <?php if ($total_paginas > 1): ?>
-                        <a href="?page=<?php echo $pagina_atual - 1; ?>" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
+                        <a href="?page=<?php echo $pagina_atual - 1; ?><?php echo $classic_param; ?>" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
                             <i class="fas fa-chevron-left"></i>
                         </a>
                         <span class="pagination-info">
                             Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
                         </span>
-                        <a href="?page=<?php echo $pagina_atual + 1; ?>" class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
+                        <a href="?page=<?php echo $pagina_atual + 1; ?><?php echo $classic_param; ?>" class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
                             <i class="fas fa-chevron-right"></i>
                         </a>
                     <?php endif; ?>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -644,8 +719,8 @@ $counts = getDashboardCounts();
     </script>
 
     <!-- Modal de Visualização -->
-    <div id="viewModal" class="modal">
-        <div class="modal-content">
+    <div id="viewModal" class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2 id="viewModalTitle">Detalhes da Rota</h2>
                 <span class="close-modal">&times;</span>
@@ -686,8 +761,8 @@ $counts = getDashboardCounts();
     </div>
 
     <!-- Modal de Edição -->
-    <div id="editModal" class="modal">
-        <div class="modal-content">
+    <div id="editModal" class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2>Editar Rota</h2>
                 <span class="close-modal">&times;</span>
@@ -828,8 +903,8 @@ $counts = getDashboardCounts();
     </div>
 
     <!-- Expenses Modal -->
-    <div class="modal" id="expensesModal">
-        <div class="modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="expensesModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2>Despesas de Viagem</h2>
                 <span class="close-modal">&times;</span>

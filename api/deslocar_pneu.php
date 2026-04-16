@@ -1,12 +1,18 @@
 <?php
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/pneu_movimentacoes_helper.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
 header('Content-Type: application/json');
 
 configure_session();
 session_start();
 require_authentication();
+
+// Protege mutações (POST) com CSRF e retorno JSON padronizado.
+api_require_csrf_json();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'error' => 'Método não permitido']);
@@ -85,6 +91,14 @@ try {
             WHERE pneu_id = :pneu_id');
         $stmt->bindParam(':pneu_id', $pneu_id);
         $stmt->execute();
+
+        // Histórico único: remoção do veículo (modelo eixo_pneus)
+        pneu_movimentacao_inserir($conn, [
+            'empresa_id'  => $empresa_id,
+            'pneu_id'     => (int) $pneu_id,
+            'tipo'        => 'remocao',
+            'veiculo_id'  => (int) $eixo_pneu['veiculo_id'],
+        ]);
 
         // Confirma a transação
         $conn->commit();

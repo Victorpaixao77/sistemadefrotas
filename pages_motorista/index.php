@@ -3,18 +3,8 @@ require_once 'config.php';
 require_once 'functions.php';
 require_once 'db.php';
 
-// Log da sessão para debug
-error_log("=== Página inicial ===");
-error_log("Session ID: " . session_id());
-error_log("Session Name: " . session_name());
-error_log("Session Status: " . session_status());
-error_log("Session Data: " . print_r($_SESSION, true));
-error_log("HTTP_REFERER: " . ($_SERVER['HTTP_REFERER'] ?? 'não definido'));
-error_log("HTTP_COOKIE: " . ($_SERVER['HTTP_COOKIE'] ?? 'não definido'));
-
 // Verifica se o motorista está logado
 if (!isset($_SESSION['motorista_id'])) {
-    error_log("Motorista não logado, redirecionando para login.php");
     header('Location: login.php');
     exit;
 }
@@ -33,18 +23,11 @@ $rotas_pendentes = count(obter_rotas_pendentes($motorista_id));
 $abastecimentos_pendentes = count(obter_abastecimentos_pendentes($motorista_id));
 $checklists_pendentes = count(obter_checklists_pendentes($motorista_id));
 
-// Log dos contadores
-error_log("Contadores:");
-error_log("rotas_pendentes: " . $rotas_pendentes);
-error_log("abastecimentos_pendentes: " . $abastecimentos_pendentes);
-error_log("checklists_pendentes: " . $checklists_pendentes);
-
 // Verifica se o motorista está logado
 validar_sessao_motorista();
 
 // Buscar dados do motorista
 $conn = getConnection();
-error_log('Iniciando busca de dados para empresa_id: ' . $empresa_id . ' e motorista_id: ' . $motorista_id);
 
 // Buscar dados do motorista
 $stmt = $conn->prepare('
@@ -57,8 +40,6 @@ $stmt->bindParam(':motorista_id', $motorista_id, PDO::PARAM_INT);
 $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
 $stmt->execute();
 $motorista = $stmt->fetch(PDO::FETCH_ASSOC);
-
-error_log('Dados do motorista encontrados: ' . print_r($motorista, true));
 
 // Buscar rotas do dia
 $stmt = $conn->prepare('

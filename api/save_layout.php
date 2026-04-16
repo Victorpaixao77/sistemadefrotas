@@ -5,6 +5,8 @@
 session_start();
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/csrf.php';
+require_once '../includes/api_json.php';
 
 // Set content type to JSON
 header('Content-Type: application/json');
@@ -18,10 +20,11 @@ header('Content-Type: application/json');
 
 // Check if it's a POST request
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['error' => 'Method not allowed']);
-    exit;
+    api_json_method_not_allowed('Method not allowed');
 }
+
+// Protege mutações com CSRF e retorno JSON padronizado.
+api_require_csrf_json();
 
 // Get JSON data from request
 $json = file_get_contents('php://input');
@@ -29,9 +32,7 @@ $data = json_decode($json, true);
 
 // Validate data
 if (!$data || !isset($data['layout']) || !is_array($data['layout'])) {
-    http_response_code(400);
-    echo json_encode(['error' => 'Invalid data format']);
-    exit;
+    api_json_error('Invalid data format', 400, 'invalid_payload');
 }
 
 // In a real implementation, this would save the layout to a database

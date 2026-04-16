@@ -34,44 +34,29 @@ try {
     configure_session();
     session_start();
     
-    // TEMPORÁRIO: Bypass da autenticação para desenvolvimento
-    // if (!isset($_SESSION['user_id'])) {
-    //     http_response_code(401);
-    //     echo json_encode([
-    //         'success' => false,
-    //         'message' => 'Usuário não autenticado'
-    //     ]);
-    //     exit();
-    // }
-    
-    // Obter dados do POST
-    $input = json_decode(file_get_contents('php://input'), true);
-    $empresa_id = $input['empresa_id'] ?? 1; // Usar empresa_id padrão se não fornecido
-    $action = $input['action'] ?? 'list';
+    $empresa_id = $_SESSION['empresa_id'];
+    $action = $_POST['action'] ?? $_GET['action'] ?? 'list';
     
     switch ($action) {
         case 'list':
-            // Simular lista de MDF-e
-            $mdfe_list = [
-                [
-                    'id' => 1,
-                    'numero_mdfe' => '001',
-                    'tipo_transporte' => 'Rodoviário',
-                    'peso_total_carga' => 5000,
-                    'data_emissao' => '2025-08-20',
-                    'valor_total' => 1200.00,
-                    'status' => 'autorizado'
-                ],
-                [
-                    'id' => 2,
-                    'numero_mdfe' => '002',
-                    'tipo_transporte' => 'Rodoviário',
-                    'peso_total_carga' => 8000,
-                    'data_emissao' => '2025-08-21',
-                    'valor_total' => 1800.00,
-                    'status' => 'pendente'
-                ]
-            ];
+            $conn = getConnection();
+            $limit = isset($_POST['limit']) ? (int)$_POST['limit'] : 20;
+            $stmt = $conn->prepare("
+                SELECT
+                    id,
+                    numero_mdfe,
+                    tipo_transporte,
+                    peso_total_carga,
+                    data_emissao,
+                    valor_total_carga AS valor_total,
+                    status
+                FROM fiscal_mdfe
+                WHERE empresa_id = ?
+                ORDER BY data_emissao DESC, id DESC
+                LIMIT ?
+            ");
+            $stmt->execute([$empresa_id, $limit]);
+            $mdfe_list = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
             echo json_encode([
                 'success' => true,
@@ -82,14 +67,77 @@ try {
             break;
             
         case 'emitir':
-            // Simular emissão de MDF-e
+            $conn = getConnection();
+
+            $numero_mdfe = $_POST['numero_mdfe'] ?? '';
+            $serie_mdfe = $_POST['serie_mdfe'] ?? '1';
+            $data_emissao = $_POST['data_emissao'] ?? date('Y-m-d');
+            $tipo_transporte = $_POST['tipo_transporte'] ?? 'rodoviario';
+            $peso_total_carga = $_POST['peso_total_carga'] ?? 0.00;
+            $qtd_total_volumes = $_POST['qtd_total_volumes'] ?? 0;
+            $motorista_id = $_POST['motorista_id'] ?? null;
+            $veiculo_id = $_POST['veiculo_id'] ?? null;
+            $observacoes = $_POST['observacoes'] ?? '';
+            $cte_ids = $_POST['cte_ids'] ?? null;
+
+            if ($numero_mdfe === '') {
+                throw new Exception('numero_mdfe é obrigatório');
+            }
+            if ($qtd_total_volumes === '' || (int)$qtd_total_volumes <= 0) {
+                $qtd_total_volumes = 0;
+            }
+
+            $valor_total_carga = 0.00;
+            if (is_array($cte_ids) && !empty($cte_ids)) {
+                $placeholders = str_repeat('?,', count($cte_ids) - 1) . '?';
+                $stmtCte = $conn->prepare("
+                    SELECT COALESCE(SUM(valor_total), 0) AS total
+                    FROM fiscal_cte
+                    WHERE empresa_id = ? AND id IN ($placeholders)
+                ");
+                // params: empresa_id first, then ids
+                $params = array_merge([$empresa_id], array_map('intval', $cte_ids));
+                $stmtCte->execute($params);
+                $rowTotal = $stmtCte->fetch(PDO::FETCH_ASSOC);
+                $valor_total_carga = (float)($rowTotal['total'] ?? 0);
+            } elseif (isset($_POST['valor_total_carga'])) {
+                $valor_total_carga = (float)$_POST['valor_total_carga'];
+            }
+
+            $stmt = $conn->prepare("
+                INSERT INTO fiscal_mdfe (
+                    empresa_id, numero_mdfe, serie_mdfe, chave_acesso, data_emissao,
+                    tipo_transporte, protocolo_autorizacao, status,
+                    valor_total_carga, peso_total_carga, qtd_total_volumes, qtd_total_peso,
+                    motorista_id, veiculo_id, observacoes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            $stmt->execute([
+                $empresa_id,
+                $numero_mdfe,
+                $serie_mdfe,
+                null,
+                $data_emissao,
+                $tipo_transporte,
+                null,
+                'pendente',
+                (float)$valor_total_carga,
+                (float)$peso_total_carga,
+                (int)$qtd_total_volumes,
+                (float)$peso_total_carga,
+                $motorista_id !== '' ? (int)$motorista_id : null,
+                $veiculo_id !== '' ? (int)$veiculo_id : null,
+                $observacoes
+            ]);
+
+            $mdfe_id = (int)$conn->lastInsertId();
             echo json_encode([
                 'success' => true,
-                'message' => 'MDF-e emitido com sucesso',
+                'message' => 'MDF-e criado com sucesso (rascunho/pendente).',
                 'data' => [
-                    'id' => rand(100, 999),
-                    'numero_mdfe' => '003',
-                    'status' => 'pendente'
+                    'id' => $mdfe_id,
+                    'numero_mdfe' => $numero_mdfe,
+                    'status' => 'pendente',
                 ]
             ]);
             break;

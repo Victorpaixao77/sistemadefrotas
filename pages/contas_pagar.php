@@ -3,6 +3,7 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
+require_once '../includes/sf_api_base.php';
 
 // Configure session before starting it
 configure_session();
@@ -12,6 +13,9 @@ session_start();
 
 // Set page title
 $page_title = "Contas a Pagar";
+
+// Layout moderno (fornc-page); ?classic=1 para o layout anterior
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
 
 // Por página: 5, 10, 25, 50, 100 — padrão 10
 $per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
@@ -23,12 +27,27 @@ if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
 $conn = getConnection();
 
 // Função para buscar contas com paginação
-function getContasPagar($page = 1, $per_page = 10) {
+function getContasPagar($page = 1, $per_page = 10, $sort_field = 'data_vencimento', $sort_dir = 'DESC') {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
         $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
         $offset = ($page - 1) * $limit;
+
+        $allowedSort = [
+            'data_vencimento' => 'cp.data_vencimento',
+            'descricao' => 'cp.descricao',
+            'valor' => 'cp.valor',
+            'status_nome' => 's.nome',
+            'fornecedor' => 'cp.fornecedor',
+            'forma_pagamento_nome' => 'fp.nome',
+            'banco_nome' => 'b.nome',
+        ];
+        if (!isset($allowedSort[$sort_field])) {
+            $sort_field = 'data_vencimento';
+        }
+        $orderCol = $allowedSort[$sort_field];
+        $dir = ($sort_dir === 'ASC') ? 'ASC' : 'DESC';
         
         // Primeiro, conta o total de registros
         $sql_count = "SELECT COUNT(*) as total FROM contas_pagar WHERE empresa_id = :empresa_id";
@@ -47,7 +66,7 @@ function getContasPagar($page = 1, $per_page = 10) {
         LEFT JOIN formas_pagamento fp ON cp.forma_pagamento_id = fp.id
         LEFT JOIN bancos b ON cp.banco_id = b.id
         WHERE cp.empresa_id = :empresa_id
-        ORDER BY cp.data_vencimento DESC, cp.id DESC
+        ORDER BY " . $orderCol . " " . $dir . ", cp.id DESC
         LIMIT :limit OFFSET :offset";
         
         $stmt = $conn->prepare($sql);
@@ -75,11 +94,36 @@ function getContasPagar($page = 1, $per_page = 10) {
     }
 }
 
+function contas_pagar_sort_link_url($field, $cp_sort, $cp_dir, $per_page, $is_modern) {
+    $next_dir = 'DESC';
+    if ($cp_sort === $field) {
+        $next_dir = $cp_dir === 'ASC' ? 'DESC' : 'ASC';
+    } else {
+        $text_like = ['descricao', 'status_nome', 'fornecedor', 'forma_pagamento_nome', 'banco_nome'];
+        $next_dir = in_array($field, $text_like, true) ? 'ASC' : 'DESC';
+    }
+    $q = ['page' => 1, 'per_page' => $per_page, 'sort' => $field, 'dir' => $next_dir];
+    if (!$is_modern) {
+        $q['classic'] = '1';
+    }
+    return '?' . http_build_query($q);
+}
+
+function contas_pagar_sort_indicator($field, $cp_sort, $cp_dir) {
+    if ($cp_sort !== $field) {
+        return '⇅';
+    }
+    return $cp_dir === 'ASC' ? '▲' : '▼';
+}
+
 // Pegar a página atual da URL ou definir como 1
 $pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 
+$cp_sort = isset($_GET['sort']) ? preg_replace('/[^a-z_]/', '', (string) $_GET['sort']) : 'data_vencimento';
+$cp_dir = (isset($_GET['dir']) && strtoupper((string) $_GET['dir']) === 'ASC') ? 'ASC' : 'DESC';
+
 // Buscar contas com paginação
-$resultado = getContasPagar($pagina_atual, $per_page);
+$resultado = getContasPagar($pagina_atual, $per_page, $cp_sort, $cp_dir);
 $contas = $resultado['contas'];
 $total_paginas = $resultado['total_paginas'];
 
@@ -141,6 +185,9 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
@@ -199,9 +246,95 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             color: var(--text-primary);
             font-size: 0.9rem;
         }
+
+        .fornecedor-search-wrap {
+            position: relative;
+            max-width: 100%;
+        }
+        #fornecedor_search {
+            width: 100%;
+        }
+        .fornecedor-dropdown {
+            display: none;
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 100%;
+            z-index: 3000;
+            max-height: 220px;
+            overflow-y: auto;
+            margin: 4px 0 0;
+            padding: 0;
+            list-style: none;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+        }
+        .fornecedor-dropdown li {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+        .fornecedor-dropdown li:last-child { border-bottom: none; }
+        .fornecedor-dropdown li:hover {
+            background: var(--bg-tertiary);
+        }
+        .fornecedor-dropdown .fd-doc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+        .fornecedor-sem-check {
+            margin: 0.35rem 0 0.5rem;
+            font-weight: normal;
+            font-size: 0.9rem;
+        }
+        .fornecedor-sem-check input { margin-right: 0.35rem; }
+
+        body.contas-pagar-modern #contasTable.fornc-table th.sortable .th-sort-link {
+            color: inherit;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        body.contas-pagar-modern #contasTable.fornc-table th.sortable .th-sort-link:hover {
+            color: var(--accent-primary, #3b82f6);
+        }
+        body.contas-pagar-modern #contasTable.fornc-table th.sortable.sorted .th-sort-link {
+            font-weight: 600;
+        }
+        #contasTable .sort-ind { font-size: 0.75rem; opacity: 0.85; }
+
+        /* Modal financeiro: deixa os campos em 2 colunas (desktop) */
+        #contaModal .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 14px;
+            margin-bottom: 4px;
+        }
+        @media (max-width: 640px) {
+            #contaModal .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        body.contas-pagar-modern .dashboard-header {
+            display: none;
+        }
+        body.contas-pagar-modern .dashboard-content.fornc-page {
+            overflow-x: auto;
+        }
+        body:not(.contas-pagar-modern) #helpModal.fornc-modal .modal-content {
+            max-width: 700px;
+        }
+        body.contas-pagar-modern #contasTable.fornc-table {
+            min-width: 960px;
+        }
     </style>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'contas-pagar-modern' : ''; ?>">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
@@ -212,7 +345,77 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <?php include '../includes/header.php'; ?>
             
             <!-- Page Content -->
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <?php if ($is_modern): ?>
+                <p class="fornc-modern-hint">
+                    Contas a pagar com fornecedores e vencimentos. Use <strong>Ajuda</strong> para dicas ou <code>?classic=1</code> para o layout anterior.
+                </p>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Total a pagar</span><span class="val" id="totalPagar">R$ <?php echo number_format($kpis['total_pagar'] ?? 0, 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Contas vencidas</span><span class="val" id="contasVencidas"><?php echo (int) ($kpis['contas_vencidas'] ?? 0); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">A vencer (7 dias)</span><span class="val" id="contasVencer"><?php echo (int) ($kpis['contas_vencer'] ?? 0); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Pagas (mês)</span><span class="val" id="contasPagas"><?php echo (int) ($kpis['contas_pagas'] ?? 0); ?></span></div>
+                </div>
+                <p class="fornc-kpi-summary" id="contasKpiSummary">Indicadores conforme filtros de período (modal Opções).</p>
+
+                <div class="fornc-toolbar">
+                    <div class="fornc-search-block">
+                        <label for="searchConta">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" id="searchConta" placeholder="Buscar conta..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="fornc-filters-inline">
+                        <div class="fg">
+                            <label for="statusFilter">Status</label>
+                            <select id="statusFilter">
+                            <option value="">Todos os status</option>
+                            <option value="Pendente">Pendente</option>
+                            <option value="Vencida">Vencida</option>
+                            <option value="Paga">Paga</option>
+                            <option value="Cancelada">Cancelada</option>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="categoriaFilter">Categoria</label>
+                            <select id="categoriaFilter">
+                            <option value="">Todas as categorias</option>
+                            <option value="Fornecedores">Fornecedores</option>
+                            <option value="Serviços">Serviços</option>
+                            <option value="Manutenção">Manutenção</option>
+                            <option value="Combustível">Combustível</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="mesFilter">Mês/ano (lista)</label>
+                            <input type="month" id="mesFilter" placeholder="Filtrar por mês">
+                        </div>
+                        <div class="fg">
+                            <label for="per_page_contas">Por página</label>
+                            <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.35rem;">
+                                <input type="hidden" name="page" value="1">
+                                <select name="per_page" id="per_page_contas" class="filter-per-page" onchange="this.form.submit()">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="fornc-btn-row">
+                        <button type="button" id="addContaBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Nova conta</button>
+                        <button type="button" class="fornc-btn fornc-btn--accent" id="applyAccountsFilters" title="Aplicar filtros na lista"><i class="fas fa-search"></i> Pesquisar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn" title="Filtros (período KPI)"><i class="fas fa-sliders-h"></i> Opções</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="clearAccountsFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
+                        <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar"><i class="fas fa-file-export"></i> Exportar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="dashboard-header">
                     <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
@@ -295,6 +498,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.5rem;">
                             <span class="filter-label">Por página</span>
                             <input type="hidden" name="page" value="1">
+                            <input type="hidden" name="classic" value="1">
                             <select name="per_page" class="filter-per-page" onchange="this.form.submit()">
                                 <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
                                 <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
@@ -330,12 +534,22 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </button>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- Accounts Table -->
-                <div class="data-table-container">
-                    <table class="data-table" id="contasTable">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="contasTable">
                         <thead>
                             <tr>
+                                <?php if ($is_modern): ?>
+                                <th class="sortable<?php echo $cp_sort === 'data_vencimento' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(contas_pagar_sort_link_url('data_vencimento', $cp_sort, $cp_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Vencimento <span class="sort-ind"><?php echo htmlspecialchars(contas_pagar_sort_indicator('data_vencimento', $cp_sort, $cp_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $cp_sort === 'descricao' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(contas_pagar_sort_link_url('descricao', $cp_sort, $cp_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Descrição <span class="sort-ind"><?php echo htmlspecialchars(contas_pagar_sort_indicator('descricao', $cp_sort, $cp_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $cp_sort === 'valor' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(contas_pagar_sort_link_url('valor', $cp_sort, $cp_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Valor <span class="sort-ind"><?php echo htmlspecialchars(contas_pagar_sort_indicator('valor', $cp_sort, $cp_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $cp_sort === 'status_nome' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(contas_pagar_sort_link_url('status_nome', $cp_sort, $cp_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Status <span class="sort-ind"><?php echo htmlspecialchars(contas_pagar_sort_indicator('status_nome', $cp_sort, $cp_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $cp_sort === 'fornecedor' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(contas_pagar_sort_link_url('fornecedor', $cp_sort, $cp_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Fornecedor <span class="sort-ind"><?php echo htmlspecialchars(contas_pagar_sort_indicator('fornecedor', $cp_sort, $cp_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $cp_sort === 'forma_pagamento_nome' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(contas_pagar_sort_link_url('forma_pagamento_nome', $cp_sort, $cp_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Forma Pagto <span class="sort-ind"><?php echo htmlspecialchars(contas_pagar_sort_indicator('forma_pagamento_nome', $cp_sort, $cp_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $cp_sort === 'banco_nome' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(contas_pagar_sort_link_url('banco_nome', $cp_sort, $cp_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Banco <span class="sort-ind"><?php echo htmlspecialchars(contas_pagar_sort_indicator('banco_nome', $cp_sort, $cp_dir)); ?></span></a></th>
+                                <?php else: ?>
                                 <th>Vencimento</th>
                                 <th>Descrição</th>
                                 <th>Valor</th>
@@ -343,6 +557,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <th>Fornecedor</th>
                                 <th>Forma Pagto</th>
                                 <th>Banco</th>
+                                <?php endif; ?>
                                 <th>Ações</th>
                             </tr>
                         </thead>
@@ -384,9 +599,20 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <?php
                 $prev_params = ['page' => max(1, $pagina_atual - 1), 'per_page' => $per_page];
                 $next_params = ['page' => min($total_paginas, $pagina_atual + 1), 'per_page' => $per_page];
+                if ($cp_sort !== 'data_vencimento' || $cp_dir !== 'DESC') {
+                    $prev_params['sort'] = $cp_sort;
+                    $prev_params['dir'] = $cp_dir;
+                    $next_params['sort'] = $cp_sort;
+                    $next_params['dir'] = $cp_dir;
+                }
+                if (!$is_modern) {
+                    $prev_params['classic'] = '1';
+                    $next_params['classic'] = '1';
+                }
                 $total_reg = (int)($resultado['total'] ?? 0);
                 ?>
-                <div class="pagination">
+                <?php if ($is_modern): ?><div class="fornc-pagination-bar"><?php endif; ?>
+                <div class="pagination<?php echo $is_modern ? ' fornc-modern-pagination' : ''; ?>">
                     <a href="?<?php echo htmlspecialchars(http_build_query($prev_params)); ?>" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" id="prevPage">
                         <i class="fas fa-chevron-left"></i>
                     </a>
@@ -395,6 +621,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
+                <?php if ($is_modern): ?></div><?php endif; ?>
                 
                 <!-- Financial Analytics -->
                 <div class="analytics-section">
@@ -430,8 +657,8 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
     
     <!-- Add/Edit Account Modal -->
-    <div class="modal" id="contaModal">
-        <div class="modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="contaModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2 id="modalTitle">Adicionar Conta</h2>
                 <span class="close-modal">&times;</span>
@@ -442,9 +669,22 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <input type="hidden" id="empresa_id" name="empresa_id" value="<?php echo $_SESSION['empresa_id']; ?>">
                     
                     <div class="form-grid">
-                        <div class="form-group">
-                            <label for="fornecedor">Fornecedor*</label>
-                            <input type="text" id="fornecedor" name="fornecedor" required>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label for="fornecedor_search">Fornecedor</label>
+                            <label class="fornecedor-sem-check">
+                                <input type="checkbox" id="sem_fornecedor" name="sem_fornecedor" value="1">
+                                Sem fornecedor (despesa avulsa — ex.: imposto, taxa)
+                            </label>
+                            <input type="hidden" id="fornecedor_id" name="fornecedor_id" value="">
+                            <input type="hidden" id="fornecedor" name="fornecedor" value="">
+                            <div class="fornecedor-search-wrap" id="fornecedorSearchWrap">
+                                <input type="text" id="fornecedor_search" name="fornecedor_search" placeholder="Digite para buscar no cadastro de fornecedores..." autocomplete="off">
+                                <ul id="fornecedorDropdown" class="fornecedor-dropdown" role="listbox"></ul>
+                            </div>
+                            <small style="display:block;margin-top:0.35rem;color:var(--text-secondary);font-size:0.85rem;">
+                                Você pode digitar um nome manualmente (sem vínculo) ou escolher um cadastro. 
+                                <a href="fornecedores_moderno.php" target="_blank" rel="noopener">Cadastrar fornecedores</a>
+                            </small>
                         </div>
                         
                         <div class="form-group">
@@ -537,7 +777,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
     
     <!-- Help Modal -->
-    <div class="modal" id="helpModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Ajuda - Contas a Pagar</h2>
@@ -550,7 +790,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <ul>
                         <li>Controle de contas pendentes e pagas</li>
                         <li>Acompanhamento de vencimentos</li>
-                        <li>Gestão de fornecedores</li>
+                        <li><strong>Fornecedor:</strong> busque no cadastro, digite um nome livre ou marque &quot;Sem fornecedor&quot;</li>
                         <li>Análise financeira através de gráficos</li>
                     </ul>
                 </div>
@@ -582,7 +822,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </div>
     
     <!-- Filter Modal -->
-    <div class="modal" id="filterModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="filterModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Filtros</h2>
@@ -591,8 +831,8 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <div class="modal-body">
                 <form id="filterForm">
                     <div class="form-group">
-                        <label for="mesFilter">Período</label>
-                        <input type="month" id="mesFilter" name="mes" class="form-control">
+                        <label for="mesFilterModal">Período (KPIs e gráficos)</label>
+                        <input type="month" id="mesFilterModal" name="mes" class="form-control">
                     </div>
                 </form>
             </div>
@@ -606,6 +846,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <!-- JavaScript Files -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <?php sf_render_api_scripts(); ?>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             initializePage();
@@ -634,6 +875,163 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             document.getElementById('helpBtn').addEventListener('click', function() {
                 document.getElementById('helpModal').style.display = 'block';
             });
+
+            setupFornecedorContaPagar();
+        }
+
+        let fornecedoresCpCache = [];
+        let fornecedorSearchDebounce = null;
+
+        function setupFornecedorContaPagar() {
+            const sem = document.getElementById('sem_fornecedor');
+            const search = document.getElementById('fornecedor_search');
+            const dd = document.getElementById('fornecedorDropdown');
+            if (sem) {
+                sem.addEventListener('change', toggleSemFornecedorCp);
+            }
+            if (search) {
+                search.addEventListener('input', function () {
+                    document.getElementById('fornecedor_id').value = '';
+                    document.getElementById('fornecedor').value = '';
+                    clearTimeout(fornecedorSearchDebounce);
+                    fornecedorSearchDebounce = setTimeout(filterFornecedorDropdown, 200);
+                });
+                search.addEventListener('focus', function () {
+                    loadFornecedoresCp().then(() => filterFornecedorDropdown());
+                });
+            }
+            document.addEventListener('click', function (e) {
+                if (dd && !e.target.closest('.fornecedor-search-wrap')) {
+                    dd.style.display = 'none';
+                }
+            });
+        }
+
+        function toggleSemFornecedorCp() {
+            const sem = document.getElementById('sem_fornecedor').checked;
+            const search = document.getElementById('fornecedor_search');
+            const dd = document.getElementById('fornecedorDropdown');
+            if (sem) {
+                if (search) {
+                    search.value = '';
+                    search.disabled = true;
+                }
+                document.getElementById('fornecedor_id').value = '';
+                document.getElementById('fornecedor').value = '';
+                if (dd) {
+                    dd.innerHTML = '';
+                    dd.style.display = 'none';
+                }
+            } else if (search) {
+                search.disabled = false;
+            }
+        }
+
+        function loadFornecedoresCp() {
+            if (fornecedoresCpCache.length) {
+                return Promise.resolve();
+            }
+            return fetch(sfApiUrl('fornecedores.php?action=list&situacao=all&all=1'), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.success) {
+                        fornecedoresCpCache = data.fornecedores || [];
+                    }
+                })
+                .catch(function () {});
+        }
+
+        function cpOnlyDigits(s) {
+            return String(s || '').replace(/\D/g, '');
+        }
+
+        function filterFornecedorDropdown() {
+            const search = document.getElementById('fornecedor_search');
+            const dd = document.getElementById('fornecedorDropdown');
+            if (!search || !dd || document.getElementById('sem_fornecedor').checked) {
+                return;
+            }
+            const q = search.value.trim().toLowerCase();
+            loadFornecedoresCp().then(function () {
+                const list = fornecedoresCpCache.filter(function (f) {
+                    if (!q) {
+                        return true;
+                    }
+                    const doc = f.tipo === 'J' ? cpOnlyDigits(f.cnpj) : cpOnlyDigits(f.cpf);
+                    const hay = [f.nome, doc, f.cidade, f.uf].filter(Boolean).join(' ').toLowerCase();
+                    return hay.indexOf(q) !== -1;
+                }).slice(0, 50);
+
+                if (list.length === 0) {
+                    dd.innerHTML = '<li style="cursor:default;color:var(--text-secondary);">Nenhum cadastro encontrado. Você pode digitar o nome manualmente ou cadastrar em Fornecedores.</li>';
+                    dd.style.display = 'block';
+                    return;
+                }
+                dd.innerHTML = '';
+                list.forEach(function (f) {
+                    const doc = f.tipo === 'J' ? cpOnlyDigits(f.cnpj) : cpOnlyDigits(f.cpf);
+                    const dl = f.tipo === 'J' ? 'CNPJ' : 'CPF';
+                    const li = document.createElement('li');
+                    li.className = 'fd-item';
+                    li.innerHTML = '<strong>' + escapeHtmlCp(f.nome) + '</strong><span class="fd-doc">' + dl + ': ' + (doc || '—') + '</span>';
+                    li.addEventListener('click', function () {
+                        selectFornecedorCp(parseInt(String(f.id), 10), f.nome);
+                    });
+                    dd.appendChild(li);
+                });
+                dd.style.display = 'block';
+            });
+        }
+
+        function escapeHtmlCp(s) {
+            var d = document.createElement('div');
+            d.textContent = s == null ? '' : String(s);
+            return d.innerHTML;
+        }
+
+        function selectFornecedorCp(id, nome) {
+            document.getElementById('fornecedor_id').value = String(id);
+            document.getElementById('fornecedor').value = nome;
+            document.getElementById('fornecedor_search').value = nome;
+            document.getElementById('fornecedorDropdown').style.display = 'none';
+        }
+
+        function resetFornecedorContaForm() {
+            const sem = document.getElementById('sem_fornecedor');
+            if (sem) {
+                sem.checked = false;
+            }
+            document.getElementById('fornecedor_id').value = '';
+            document.getElementById('fornecedor').value = '';
+            const search = document.getElementById('fornecedor_search');
+            if (search) {
+                search.value = '';
+                search.disabled = false;
+            }
+            const dd = document.getElementById('fornecedorDropdown');
+            if (dd) {
+                dd.innerHTML = '';
+                dd.style.display = 'none';
+            }
+        }
+
+        function syncFornecedorBeforeSave() {
+            if (document.getElementById('sem_fornecedor').checked) {
+                document.getElementById('fornecedor_id').value = '';
+                document.getElementById('fornecedor').value = 'Sem fornecedor';
+                return true;
+            }
+            const fid = document.getElementById('fornecedor_id').value;
+            if (fid) {
+                return true;
+            }
+            const manual = document.getElementById('fornecedor_search').value.trim();
+            if (!manual) {
+                alert('Selecione um fornecedor na lista, digite um nome ou marque "Sem fornecedor".');
+                return false;
+            }
+            document.getElementById('fornecedor').value = manual;
+            return true;
         }
         
         function setupTableButtons() {
@@ -649,7 +1047,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             document.querySelectorAll('.view-receipt-btn').forEach(button => {
                 button.addEventListener('click', function() {
                     const contaId = this.getAttribute('data-id');
-                    fetch(`../api/contas_pagar_actions.php?action=get&id=${contaId}`)
+                    fetch(sfApiUrl(`contas_pagar_actions.php?action=get&id=${contaId}`))
                         .then(response => response.json())
                         .then(result => {
                             if (result.success && result.data.recibo_arquivo) {
@@ -704,7 +1102,8 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             const searchInput = document.getElementById('searchConta');
             const statusFilterSelect = document.getElementById('statusFilter');
             const categoriaFilterSelect = document.getElementById('categoriaFilter');
-            const mesFilter = document.getElementById('mesFilter');
+            const mesFilterToolbar = document.getElementById('mesFilter');
+            const mesFilterModal = document.getElementById('mesFilterModal');
             const applyFiltersTopBtn = document.getElementById('applyAccountsFilters');
             const clearFiltersTopBtn = document.getElementById('clearAccountsFilters');
 
@@ -720,8 +1119,8 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 categoriaFilterSelect.addEventListener('change', filterContas);
             }
 
-            if (mesFilter) {
-                mesFilter.addEventListener('change', filterContas);
+            if (mesFilterToolbar) {
+                mesFilterToolbar.addEventListener('change', filterContas);
             }
 
             if (applyFiltersTopBtn) {
@@ -733,7 +1132,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     if (searchInput) searchInput.value = '';
                     if (statusFilterSelect) statusFilterSelect.value = '';
                     if (categoriaFilterSelect) categoriaFilterSelect.value = '';
-                    if (mesFilter) mesFilter.value = '';
+                    if (mesFilterToolbar) mesFilterToolbar.value = '';
                     filterContas();
                 });
             }
@@ -744,14 +1143,14 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             const applyFiltersBtn = document.getElementById('applyFiltersBtn');
             const clearFiltersBtn = document.getElementById('clearFiltersBtn');
 
-            if (!filterBtn || !filterModal || !closeFilterBtn || !applyFiltersBtn || !clearFiltersBtn || !mesFilter) {
+            if (!filterBtn || !filterModal || !closeFilterBtn || !applyFiltersBtn || !clearFiltersBtn || !mesFilterModal) {
                 console.error('Elementos do modal de filtro não encontrados:', {
                     filterBtn: !!filterBtn,
                     filterModal: !!filterModal,
                     closeFilterBtn: !!closeFilterBtn,
                     applyFiltersBtn: !!applyFiltersBtn,
                     clearFiltersBtn: !!clearFiltersBtn,
-                    mesFilter: !!mesFilter
+                    mesFilterModal: !!mesFilterModal
                 });
                 return;
             }
@@ -762,8 +1161,9 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             console.log('Filtro atual da URL:', mes);
             
             if (mes) {
-                mesFilter.value = mes;
-                console.log('Filtro carregado no input:', mesFilter.value);
+                mesFilterModal.value = mes;
+                if (mesFilterToolbar) mesFilterToolbar.value = mes;
+                console.log('Filtro carregado no input:', mesFilterModal.value);
             }
 
             // Mostrar modal ao clicar no botão de filtro
@@ -788,7 +1188,8 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             // Aplicar filtros
             applyFiltersBtn.addEventListener('click', () => {
-                const mes = mesFilter.value;
+                const mes = mesFilterModal.value;
+                if (mesFilterToolbar) mesFilterToolbar.value = mes;
                 console.log('Aplicando filtro - mês selecionado:', mes);
                 
                 let url = window.location.pathname;
@@ -812,7 +1213,8 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             // Limpar filtros
             clearFiltersBtn.addEventListener('click', () => {
                 console.log('Limpando filtros');
-                mesFilter.value = '';
+                mesFilterModal.value = '';
+                if (mesFilterToolbar) mesFilterToolbar.value = '';
                 
                 // Atualizar URL sem recarregar a página
                 window.history.pushState({}, '', window.location.pathname);
@@ -830,23 +1232,34 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
         function setupPagination() {
             const prevPage = document.getElementById('prevPage');
             const nextPage = document.getElementById('nextPage');
-            
-            prevPage.addEventListener('click', function() {
-                if (!this.disabled) {
-                    const currentPage = <?php echo $pagina_atual; ?>;
-                    if (currentPage > 1) {
-                        window.location.href = `?page=${currentPage - 1}`;
-                    }
+            if (!prevPage || !nextPage) return;
+            const contasPerPage = <?php echo (int) $per_page; ?>;
+            const contasClassic = <?php echo $is_modern ? 'false' : 'true'; ?>;
+            const contasSortField = <?php echo json_encode($cp_sort, JSON_UNESCAPED_UNICODE); ?>;
+            const contasSortDir = <?php echo json_encode($cp_dir, JSON_UNESCAPED_UNICODE); ?>;
+            function contasBuildPageUrl(page) {
+                let q = 'page=' + page + '&per_page=' + contasPerPage;
+                if (contasClassic) q += '&classic=1';
+                if (contasSortField !== 'data_vencimento' || contasSortDir !== 'DESC') {
+                    q += '&sort=' + encodeURIComponent(contasSortField) + '&dir=' + encodeURIComponent(contasSortDir);
+                }
+                return '?' + q;
+            }
+            prevPage.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (this.classList.contains('disabled')) return;
+                const currentPage = <?php echo (int) $pagina_atual; ?>;
+                if (currentPage > 1) {
+                    window.location.href = contasBuildPageUrl(currentPage - 1);
                 }
             });
-            
-            nextPage.addEventListener('click', function() {
-                if (!this.disabled) {
-                    const currentPage = <?php echo $pagina_atual; ?>;
-                    const totalPages = <?php echo $total_paginas; ?>;
-                    if (currentPage < totalPages) {
-                        window.location.href = `?page=${currentPage + 1}`;
-                    }
+            nextPage.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (this.classList.contains('disabled')) return;
+                const currentPage = <?php echo (int) $pagina_atual; ?>;
+                const totalPages = <?php echo (int) $total_paginas; ?>;
+                if (currentPage < totalPages) {
+                    window.location.href = contasBuildPageUrl(currentPage + 1);
                 }
             });
         }
@@ -860,7 +1273,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             const searchText = searchInput ? searchInput.value.toLowerCase() : '';
             const statusFilter = statusSelect ? statusSelect.value : '';
             const categoriaFilter = categoriaSelect ? categoriaSelect.value : '';
-            const mesFilter = mesInput ? mesInput.value : '';
+            const mesFilterVal = mesInput ? mesInput.value : '';
             
             const tableRows = document.querySelectorAll('#contasTable tbody tr');
             
@@ -873,7 +1286,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 const matchesSearch = descricao.includes(searchText);
                 const matchesStatus = statusFilter === '' || status === statusFilter;
                 const matchesCategoria = categoriaFilter === '' || categoria === categoriaFilter;
-                const matchesMes = mesFilter === '' || vencimento.includes(mesFilter);
+                const matchesMes = mesFilterVal === '' || vencimento.includes(mesFilterVal);
                 
                 if (matchesSearch && matchesStatus && matchesCategoria && matchesMes) {
                     row.style.display = '';
@@ -898,7 +1311,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         function updateKPIs(mes) {
             // Construir URL para buscar KPIs
-            let url = '../api/contas_pagar_analytics.php?action=kpis';
+            let url = sfApiUrl('contas_pagar_analytics.php?action=kpis');
             if (mes) {
                 url += `&mes=${mes}`;
             }
@@ -927,7 +1340,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         function updateCharts(mes) {
             // Construir URL para buscar dados dos gráficos
-            let url = '../api/contas_pagar_analytics.php?action=charts';
+            let url = sfApiUrl('contas_pagar_analytics.php?action=charts');
             if (mes) {
                 url += `&mes=${mes}`;
             }
@@ -972,6 +1385,8 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             document.getElementById('modalTitle').textContent = 'Adicionar Conta';
             document.getElementById('contaForm').reset();
             document.getElementById('id').value = '';
+            resetFornecedorContaForm();
+            fornecedoresCpCache = [];
             document.getElementById('contaModal').style.display = 'block';
         }
         
@@ -984,10 +1399,16 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         function saveConta() {
             const form = document.getElementById('contaForm');
+            if (!syncFornecedorBeforeSave()) {
+                return;
+            }
             const formData = new FormData(form);
+            if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+                formData.append('csrf_token', window.__SF_CSRF__);
+            }
             
-            // Validar campos obrigatórios
-            const requiredFields = ['fornecedor', 'descricao', 'valor', 'data_vencimento', 'status_id'];
+            // Validar campos obrigatórios (fornecedor é resolvido em syncFornecedorBeforeSave / hidden fornecedor)
+            const requiredFields = ['descricao', 'valor', 'data_vencimento', 'status_id'];
             for (const field of requiredFields) {
                 if (!formData.get(field)) {
                     alert(`Por favor, preencha o campo ${field}`);
@@ -1002,7 +1423,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             const action = formData.get('id') ? 'update' : 'add';
             console.log('Salvando conta:', action);
             
-            fetch(`../api/contas_pagar_actions.php?action=${action}`, {
+            fetch(sfApiUrl(`contas_pagar_actions.php?action=${action}`), {
                 method: 'POST',
                 body: formData
             })
@@ -1022,13 +1443,23 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
         
         function showEditContaModal(id) {
-            fetch(`../api/contas_pagar_actions.php?action=get&id=${id}`)
+            fetch(sfApiUrl(`contas_pagar_actions.php?action=get&id=${id}`))
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
                         const conta = data.data;
+                        document.getElementById('modalTitle').textContent = 'Editar Conta';
                         document.getElementById('id').value = conta.id;
-                        document.getElementById('fornecedor').value = conta.fornecedor;
+                        const nomeF = (conta.fornecedor || '').trim();
+                        const isSem = !nomeF || nomeF === 'Sem fornecedor';
+                        document.getElementById('sem_fornecedor').checked = isSem;
+                        document.getElementById('fornecedor_id').value = conta.fornecedor_id ? String(conta.fornecedor_id) : '';
+                        document.getElementById('fornecedor').value = conta.fornecedor || '';
+                        const fs = document.getElementById('fornecedor_search');
+                        if (fs) {
+                            fs.value = isSem ? '' : nomeF;
+                            fs.disabled = isSem;
+                        }
                         document.getElementById('descricao').value = conta.descricao;
                         document.getElementById('valor').value = conta.valor;
                         document.getElementById('data_vencimento').value = conta.data_vencimento;
@@ -1073,8 +1504,15 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         function deleteConta(contaId) {
             if (confirm('Tem certeza que deseja excluir esta conta?')) {
-                fetch(`../api/contas_pagar_actions.php?action=delete&id=${contaId}`, {
-                    method: 'POST'
+                const fd = new FormData();
+                fd.append('id', String(contaId));
+                if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+                    fd.append('csrf_token', window.__SF_CSRF__);
+                }
+                fetch(sfApiUrl('contas_pagar_actions.php?action=delete'), {
+                    method: 'POST',
+                    body: fd,
+                    credentials: 'same-origin'
                 })
                 .then(response => response.json())
                 .then(result => {
@@ -1092,7 +1530,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
         
         function showContaDetails(contaId) {
-            fetch(`../api/contas_pagar_actions.php?action=get&id=${contaId}`)
+            fetch(sfApiUrl(`contas_pagar_actions.php?action=get&id=${contaId}`))
                 .then(response => response.json())
                 .then(result => {
                     if (result.success) {
@@ -1289,5 +1727,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             });
         }
     </script>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html> 

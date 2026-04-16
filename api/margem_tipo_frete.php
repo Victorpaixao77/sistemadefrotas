@@ -55,8 +55,7 @@ try {
     FROM rotas r
     LEFT JOIN empresa_clientes ec ON r.empresa_id = ec.empresa_adm_id
     WHERE r.empresa_id = :empresa_id
-      AND MONTH(r.data_rota) = :mes
-      AND YEAR(r.data_rota) = :ano
+      AND ((MONTH(r.data_rota) = :mes AND YEAR(r.data_rota) = :ano) OR (MONTH(r.data_saida) = :mes AND YEAR(r.data_saida) = :ano))
       AND r.estado_destino IS NOT NULL
     GROUP BY 
         CASE 

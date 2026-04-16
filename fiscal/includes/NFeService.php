@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/db_connect.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/CryptoManager.php';
+require_once __DIR__ . '/FiscalPhpExtensions.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 use NFePHP\NFe\Tools;
@@ -11,6 +12,12 @@ use NFePHP\Common\Certificate;
 
 class NFeService
 {
+    /** Tipos de manifestação do destinatário (tpEvento oficial) */
+    public const MANIFEST_CIENCIA = 210210;
+    public const MANIFEST_CONFIRMACAO = 210200;
+    public const MANIFEST_DESCONHECIMENTO = 210220;
+    public const MANIFEST_NAO_REALIZADA = 210240;
+
     /** @var Tools */
     private $tools;
 
@@ -51,19 +58,28 @@ class NFeService
                 return ['success' => false, 'message' => 'Retorno SEFAZ inválido: ' . ($err ? $err->message : 'erro ao ler XML')];
             }
 
-            // Registrar namespace padrão da NF-e
+            // Registrar namespace padrão da NF-e (SOAP pode envolver o retorno)
             $xml->registerXPathNamespace('nfe', 'http://www.portalfiscal.inf.br/nfe');
-            $ret = $xml->xpath('//nfe:retConsSitNFe')[0] ?? $xml;
+            $ret = $xml->xpath('//nfe:retConsSitNFe')[0] ?? null;
+            if (!$ret) {
+                $local = $xml->xpath('//*[local-name()="retConsSitNFe"]');
+                $ret = $local[0] ?? null;
+            }
+            if (!$ret) {
+                return ['success' => false, 'message' => 'retConsSitNFe não encontrado no XML da SEFAZ'];
+            }
 
-            $cStat = isset($ret->cStat) ? (string)$ret->cStat : null;
-            $xMotivo = isset($ret->xMotivo) ? (string)$ret->xMotivo : 'Sem motivo';
+            $cStatRet = isset($ret->cStat) ? (string)$ret->cStat : '';
+            $xMotivoRet = isset($ret->xMotivo) ? (string)$ret->xMotivo : 'Sem motivo';
 
-            // 100/150 = autorizado, 101/155 = cancelado
-            if ($cStat != '100' && $cStat != '150' && $cStat != '101' && $cStat != '155') {
+            // No retConsSitNFe o cStat do *serviço* costuma ser 138 ("Documento localizado"), não 100.
+            // 100/101/150/155 referem-se ao protocolo em infProt, não ao envelope da consulta.
+            $cStatRetNum = $cStatRet !== '' ? (int)$cStatRet : 0;
+            if ($cStatRetNum >= 200) {
                 return [
                     'success' => false,
-                    'message' => "SEFAZ retornou $cStat - $xMotivo",
-                    'data' => json_decode(json_encode($ret), true)
+                    'message' => "SEFAZ retornou $cStatRet - $xMotivoRet",
+                    'data' => json_decode(json_encode($ret), true),
                 ];
             }
 
@@ -72,27 +88,41 @@ class NFeService
             $infProt = $protNFe && isset($protNFe->infProt) ? $protNFe->infProt : null;
 
             if (!$infProt) {
-                // fallback: tenta achar infProt via XPath
                 $infProtNode = $xml->xpath('//nfe:protNFe/nfe:infProt')[0] ?? null;
                 if ($infProtNode) {
                     $infProt = $infProtNode;
                 }
             }
+            if (!$infProt) {
+                $infLocal = $xml->xpath('//*[local-name()="protNFe"]/*[local-name()="infProt"]');
+                $infProt = $infLocal[0] ?? null;
+            }
 
             if (!$infProt) {
                 return [
                     'success' => false,
-                    'message' => 'ProtNFe não encontrado no retorno da SEFAZ',
-                    'data' => json_decode(json_encode($ret), true)
+                    'message' => 'ProtNFe não encontrado no retorno da SEFAZ (cStat da consulta: ' . $cStatRet . ' - ' . $xMotivoRet . ')',
+                    'data' => json_decode(json_encode($ret), true),
+                ];
+            }
+
+            $cStatDoc = isset($infProt->cStat) ? (string)$infProt->cStat : '';
+            $xMotivoDoc = isset($infProt->xMotivo) ? (string)$infProt->xMotivo : $xMotivoRet;
+            // Situação do documento: autorizado / cancelado / denegado etc.
+            if (!in_array($cStatDoc, ['100', '150', '101', '155'], true)) {
+                return [
+                    'success' => false,
+                    'message' => "SEFAZ (documento): $cStatDoc - $xMotivoDoc",
+                    'data' => json_decode(json_encode($infProt), true),
                 ];
             }
 
             $dados = [
                 'chave_acesso' => isset($infProt->chNFe) ? (string)$infProt->chNFe : $chave,
-                'numero_nfe' => null, // A consulta de protocolo nem sempre traz o número da NF
+                'numero_nfe' => null,
                 'protocolo' => isset($infProt->nProt) ? (string)$infProt->nProt : null,
-                'cStat' => isset($infProt->cStat) ? (string)$infProt->cStat : $cStat,
-                'xMotivo' => isset($infProt->xMotivo) ? (string)$infProt->xMotivo : $xMotivo,
+                'cStat' => $cStatDoc,
+                'xMotivo' => $xMotivoDoc,
             ];
 
             return [
@@ -161,9 +191,7 @@ class NFeService
             $xMotivo = (string)($ret->xMotivo ?? $ret->xpath('.//*[local-name()="xMotivo"]')[0] ?? '');
             // 138 = documento localizado com conteúdo no docZip
             if ($cStat !== '138') {
-                if (defined('DEBUG_MODE') && DEBUG_MODE) {
-                    error_log("NFeService::baixarXmlPorChave SEFAZ retornou: $cStat - $xMotivo");
-                }
+                error_log("NFeService::baixarXmlPorChave chave={$chave} cStat={$cStat} xMotivo={$xMotivo}");
                 return null;
             }
 
@@ -198,9 +226,7 @@ class NFeService
 
             return null;
         } catch (Throwable $e) {
-            if (defined('DEBUG_MODE') && DEBUG_MODE) {
-                error_log('NFeService::baixarXmlPorChave: ' . $e->getMessage());
-            }
+            error_log('NFeService::baixarXmlPorChave: ' . $e->getMessage());
             return null;
         }
     }
@@ -331,6 +357,8 @@ class NFeService
 
     private function bootstrapTools(): void
     {
+        fiscal_require_soap_for_sefaz();
+
         $conn = getConnection();
 
         // Buscar config fiscal
@@ -412,6 +440,345 @@ class NFeService
 
         $this->tools = new Tools($configJson, $certificate);
         $this->tools->model('55');
+    }
+
+    /**
+     * Cancelamento de NF-e (emitente). Exige certificado do CNPJ emitente da nota.
+     */
+    public function enviarCancelamentoNFe(string $chave, string $xJust, string $nProt): array
+    {
+        try {
+            $chave = preg_replace('/\D/', '', $chave);
+            if (strlen($chave) !== 44) {
+                return ['success' => false, 'message' => 'Chave da NF-e inválida (44 dígitos).'];
+            }
+            $xJust = trim($xJust);
+            if ($xJust === '') {
+                return ['success' => false, 'message' => 'Justificativa é obrigatória no cancelamento.'];
+            }
+            if ($nProt === '' || $nProt === '0') {
+                return ['success' => false, 'message' => 'Protocolo de autorização (nProt) é obrigatório no cancelamento.'];
+            }
+
+            $xmlRet = $this->tools->sefazCancela($chave, $xJust, $nProt);
+            $parsed = self::parseRetornoEventoNFe($xmlRet);
+            $msg = $parsed['evento_aceito']
+                ? ($parsed['xMotivo_evento'] ?: 'Cancelamento homologado pela SEFAZ.')
+                : ($parsed['xMotivo_evento'] ?: $parsed['xMotivo_lote'] ?: 'SEFAZ não homologou o cancelamento.');
+
+            return array_merge([
+                'success' => (bool)($parsed['evento_aceito'] ?? false),
+                'message' => $msg,
+                'response_xml' => $xmlRet,
+            ], $parsed);
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage(), 'response_xml' => null];
+        }
+    }
+
+    /**
+     * Carta de Correção (emitente).
+     */
+    public function enviarCartaCorrecaoNFe(string $chave, string $xCorrecao, int $nSeqEvento = 1): array
+    {
+        try {
+            $chave = preg_replace('/\D/', '', $chave);
+            if (strlen($chave) !== 44) {
+                return ['success' => false, 'message' => 'Chave da NF-e inválida (44 dígitos).'];
+            }
+            if (trim($xCorrecao) === '') {
+                return ['success' => false, 'message' => 'Texto da correção é obrigatório.'];
+            }
+
+            $xmlRet = $this->tools->sefazCCe($chave, $xCorrecao, $nSeqEvento);
+            $parsed = self::parseRetornoEventoNFe($xmlRet);
+            $msg = $parsed['evento_aceito']
+                ? ($parsed['xMotivo_evento'] ?: 'CC-e homologada pela SEFAZ.')
+                : ($parsed['xMotivo_evento'] ?: $parsed['xMotivo_lote'] ?: 'SEFAZ não homologou a CC-e.');
+
+            return array_merge([
+                'success' => (bool)($parsed['evento_aceito'] ?? false),
+                'message' => $msg,
+                'response_xml' => $xmlRet,
+            ], $parsed);
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage(), 'response_xml' => null];
+        }
+    }
+
+    /**
+     * Inutilização de numeração (emitente).
+     */
+    public function inutilizarNumeracao(
+        int $nSerie,
+        int $nIni,
+        int $nFin,
+        string $xJust,
+        ?int $tpAmb = null,
+        ?string $ano = null
+    ): array {
+        try {
+            if ($nIni < 1 || $nFin < 1 || trim($xJust) === '') {
+                return ['success' => false, 'message' => 'Série, faixa de numeração e justificativa são obrigatórios.'];
+            }
+
+            $xmlRet = $this->tools->sefazInutiliza($nSerie, $nIni, $nFin, $xJust, $tpAmb, $ano);
+            $parsed = self::parseRetornoInutilizacao($xmlRet);
+            $msg = $parsed['inutil_aceita']
+                ? ($parsed['xMotivo'] ?: 'Inutilização homologada pela SEFAZ.')
+                : ($parsed['xMotivo'] ?: 'SEFAZ não homologou a inutilização.');
+
+            return array_merge([
+                'success' => (bool)($parsed['inutil_aceita'] ?? false),
+                'message' => $msg,
+                'response_xml' => $xmlRet,
+            ], $parsed);
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage(), 'response_xml' => null];
+        }
+    }
+
+    /**
+     * Manifestação do destinatário (certificado do destinatário da NF-e).
+     *
+     * @param int $tpEvento Uma das constantes MANIFEST_* ou Tools::EVT_*
+     */
+    public function manifestarDestinatario(
+        string $chave,
+        int $tpEvento,
+        string $xJust = '',
+        int $nSeqEvento = 1
+    ): array {
+        try {
+            $chave = preg_replace('/\D/', '', $chave);
+            if (strlen($chave) !== 44) {
+                return ['success' => false, 'message' => 'Chave da NF-e inválida (44 dígitos).'];
+            }
+            if ($tpEvento === self::MANIFEST_NAO_REALIZADA && trim($xJust) === '') {
+                return ['success' => false, 'message' => 'Justificativa é obrigatória para operação não realizada.'];
+            }
+
+            $xmlRet = $this->tools->sefazManifesta($chave, $tpEvento, $xJust, $nSeqEvento);
+            $parsed = self::parseRetornoEventoNFe($xmlRet);
+            $msg = $parsed['evento_aceito']
+                ? ($parsed['xMotivo_evento'] ?: 'Manifestação registrada pela SEFAZ.')
+                : ($parsed['xMotivo_evento'] ?: $parsed['xMotivo_lote'] ?: 'SEFAZ não homologou a manifestação.');
+
+            return array_merge([
+                'success' => (bool)($parsed['evento_aceito'] ?? false),
+                'message' => $msg,
+                'response_xml' => $xmlRet,
+            ], $parsed);
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage(), 'response_xml' => null];
+        }
+    }
+
+    /**
+     * Interpreta retorno de evento (retEnvEvento / envEvento).
+     *
+     * @return array{cStat_lote:?string,xMotivo_lote:?string,cStat_evento:?string,xMotivo_evento:?string,protocolo_evento:?string,evento_aceito:bool}
+     */
+    public static function parseRetornoEventoNFe(?string $xmlRet): array
+    {
+        $out = [
+            'cStat_lote' => null,
+            'xMotivo_lote' => null,
+            'cStat_evento' => null,
+            'xMotivo_evento' => null,
+            'protocolo_evento' => null,
+            'evento_aceito' => false,
+        ];
+        if ($xmlRet === null || $xmlRet === '') {
+            return $out;
+        }
+
+        libxml_use_internal_errors(true);
+        $sx = @simplexml_load_string($xmlRet);
+        if ($sx === false) {
+            return $out;
+        }
+
+        $nodes = $sx->xpath('//*[local-name()="retEnvEvento"]');
+        $ret = ($nodes && isset($nodes[0])) ? $nodes[0] : $sx;
+
+        $out['cStat_lote'] = isset($ret->cStat) ? (string)$ret->cStat : null;
+        $out['xMotivo_lote'] = isset($ret->xMotivo) ? (string)$ret->xMotivo : null;
+
+        $infEvNodes = $sx->xpath('//*[local-name()="infEvento"]');
+        if ($infEvNodes && isset($infEvNodes[0])) {
+            $inf = $infEvNodes[0];
+            $out['cStat_evento'] = isset($inf->cStat) ? (string)$inf->cStat : null;
+            $out['xMotivo_evento'] = isset($inf->xMotivo) ? (string)$inf->xMotivo : null;
+            if (isset($inf->nProt)) {
+                $out['protocolo_evento'] = (string)$inf->nProt;
+            }
+        }
+
+        $cLote = $out['cStat_lote'];
+        $cEv = $out['cStat_evento'];
+        // 128 = lote processado; 135/136 = evento vinculado / registrado
+        $out['evento_aceito'] = ($cLote === '128' || $cLote === '134')
+            && ($cEv === '135' || $cEv === '136');
+        // Fallback: alguns retornos trazem só infEvento homologado
+        if (!$out['evento_aceito'] && ($cEv === '135' || $cEv === '136')) {
+            $out['evento_aceito'] = true;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array{cStat:?string,xMotivo:?string,inutil_aceita:bool,nProt_inut:?string}
+     */
+    public static function parseRetornoInutilizacao(?string $xmlRet): array
+    {
+        $out = [
+            'cStat' => null,
+            'xMotivo' => null,
+            'inutil_aceita' => false,
+            'nProt_inut' => null,
+        ];
+        if ($xmlRet === null || $xmlRet === '') {
+            return $out;
+        }
+
+        libxml_use_internal_errors(true);
+        $sx = @simplexml_load_string($xmlRet);
+        if ($sx === false) {
+            return $out;
+        }
+
+        $nodes = $sx->xpath('//*[local-name()="retInutNFe"]');
+        $ret = ($nodes && isset($nodes[0])) ? $nodes[0] : $sx;
+
+        $infNodes = $sx->xpath('//*[local-name()="infInut"]');
+        $inf = ($infNodes && isset($infNodes[0])) ? $infNodes[0] : null;
+
+        $out['cStat'] = isset($ret->cStat) ? (string)$ret->cStat : null;
+        $out['xMotivo'] = isset($ret->xMotivo) ? (string)$ret->xMotivo : null;
+        if ($inf && isset($inf->cStat)) {
+            $out['cStat'] = (string)$inf->cStat;
+        }
+        if ($inf && isset($inf->xMotivo)) {
+            $out['xMotivo'] = (string)$inf->xMotivo;
+        }
+        if ($inf && isset($inf->nProt)) {
+            $out['nProt_inut'] = (string)$inf->nProt;
+        }
+
+        // 102 = inutilização homologada
+        $cs = $out['cStat'];
+        $out['inutil_aceita'] = ($cs === '102');
+
+        return $out;
+    }
+
+    /**
+     * Assina o XML da NF-e e envia em lote síncrono (1 nota, indSinc=1).
+     * Retorna XML assinado e resultado do parse do retorno SEFAZ.
+     */
+    public function emitirNFeAutorizacao(string $xmlNfe): array
+    {
+        try {
+            $signed = $this->tools->signNFe($xmlNfe);
+            $idLote = str_pad((string) random_int(1, 999999999999999), 15, '0', STR_PAD_LEFT);
+            $xmls = [];
+            $resp = $this->tools->sefazEnviaLote([$signed], $idLote, 1, false, $xmls);
+
+            return self::parseRetornoEnvioNfe($resp, $signed);
+        } catch (Throwable $e) {
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+                'response_xml' => null,
+                'xml_signed' => null,
+                'chave' => null,
+                'protocolo' => null,
+            ];
+        }
+    }
+
+    /**
+     * Interpreta retorno do envio (retEnviNFe / protNFe).
+     *
+     * @return array{
+     *   success:bool,
+     *   message:string,
+     *   cStat_lote:?string,
+     *   cStat_prot:?string,
+     *   chave:?string,
+     *   protocolo:?string,
+     *   xMotivo:?string,
+     *   response_xml:?string,
+     *   xml_signed:?string
+     * }
+     */
+    public static function parseRetornoEnvioNfe(?string $responseSoap, ?string $xmlSigned = null): array
+    {
+        $out = [
+            'success' => false,
+            'message' => 'Resposta SEFAZ vazia ou inválida.',
+            'cStat_lote' => null,
+            'cStat_prot' => null,
+            'chave' => null,
+            'protocolo' => null,
+            'xMotivo' => null,
+            'response_xml' => $responseSoap,
+            'xml_signed' => $xmlSigned,
+        ];
+
+        if ($responseSoap === null || $responseSoap === '') {
+            return $out;
+        }
+
+        libxml_use_internal_errors(true);
+        $sx = @simplexml_load_string($responseSoap);
+        if ($sx === false) {
+            return $out;
+        }
+
+        $retNodes = $sx->xpath('//*[local-name()="retEnviNFe"]');
+        $ret = ($retNodes && isset($retNodes[0])) ? $retNodes[0] : null;
+        if (!$ret) {
+            $out['message'] = 'retEnviNFe não encontrado na resposta.';
+            return $out;
+        }
+
+        $out['cStat_lote'] = isset($ret->cStat) ? (string)$ret->cStat : null;
+        $out['xMotivo'] = isset($ret->xMotivo) ? (string)$ret->xMotivo : null;
+
+        $protNodes = $sx->xpath('//*[local-name()="protNFe"]//*[local-name()="infProt"]');
+        if ($protNodes && isset($protNodes[0])) {
+            $inf = $protNodes[0];
+            $out['cStat_prot'] = isset($inf->cStat) ? (string)$inf->cStat : null;
+            $out['chave'] = isset($inf->chNFe) ? (string)$inf->chNFe : null;
+            $out['protocolo'] = isset($inf->nProt) ? (string)$inf->nProt : null;
+            if (isset($inf->xMotivo)) {
+                $out['xMotivo'] = (string)$inf->xMotivo;
+            }
+        }
+
+        $cLote = $out['cStat_lote'];
+        $cProt = $out['cStat_prot'];
+
+        // 104 = Lote processado (síncrono); 100 = Autorizado o uso da NF-e
+        if ($cLote === '104' && $cProt === '100') {
+            $out['success'] = true;
+            $out['message'] = $out['xMotivo'] ?: 'NF-e autorizada.';
+            return $out;
+        }
+
+        // Lote recebido, processamento assíncrono (consultar recibo)
+        if ($cLote === '103') {
+            $out['message'] = 'Lote recebido (processamento assíncrono). Consulte o recibo na SEFAZ. ' . ($out['xMotivo'] ?? '');
+            return $out;
+        }
+
+        $out['success'] = false;
+        $out['message'] = $out['xMotivo'] ?: ('SEFAZ retornou cStat lote=' . ($cLote ?? '-') . ' prot=' . ($cProt ?? '-'));
+
+        return $out;
     }
 }
 

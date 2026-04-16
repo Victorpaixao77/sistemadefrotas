@@ -9,6 +9,8 @@
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/db_connect.php';
 require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
 configure_session();
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -25,6 +27,9 @@ if ($empresa_id <= 0) {
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
+
+// Protege mutações (POST/PUT/PATCH/DELETE) com CSRF.
+api_require_csrf_json();
 
 try {
     $conn->query("SELECT 1 FROM planos_manutencao LIMIT 1");

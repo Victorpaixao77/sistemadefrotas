@@ -66,7 +66,7 @@ try {
             cliente_razao_social VARCHAR(255),
             cliente_nome_fantasia VARCHAR(255),
             valor_total DECIMAL(15,2) NOT NULL,
-            status ENUM('pendente', 'autorizada', 'cancelada', 'denegada', 'inutilizada') DEFAULT 'pendente',
+            status ENUM('pendente', 'autorizada', 'cancelada', 'denegada', 'rascunho', 'inutilizada', 'recebida', 'consultada_sefaz', 'validada', 'em_transporte') NULL DEFAULT 'pendente',
             protocolo_autorizacao VARCHAR(50),
             xml_nfe LONGTEXT,
             pdf_nfe VARCHAR(255),

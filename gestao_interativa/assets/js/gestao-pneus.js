@@ -9,7 +9,7 @@ class VeiculoComponente {
     
     async carregarPneus(veiculoId) {
         try {
-            const response = await fetch(`/sistema-frotas/api/pneus_data.php?action=get_pneus&veiculo_id=${veiculoId}`);
+            const response = await fetch(sfApiUrl(`pneus_data.php?action=get_pneus&veiculo_id=${veiculoId}`));
             const data = await response.json();
             
             if (data.success) {
@@ -128,7 +128,7 @@ class VeiculoComponente {
     
     async carregarHistorico(veiculoId) {
         try {
-            const response = await fetch(`/sistema-frotas/api/pneus_data.php?action=get_historico&veiculo_id=${veiculoId}`);
+            const response = await fetch(sfApiUrl(`pneus_data.php?action=get_historico&veiculo_id=${veiculoId}`));
             const data = await response.json();
             
             if (data.success) {
@@ -265,7 +265,7 @@ class VeiculoComponente {
             }
             
             try {
-                const resp = await fetch('/sistema-frotas/api/salvar_eixos.php', {
+                const resp = await fetch(sfApiUrl('salvar_eixos.php'), {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -301,7 +301,7 @@ class VeiculoComponente {
             if (!veiculoId) return;
             
             try {
-                const resp = await fetch(`/sistema-frotas/api/pneus_data.php?action=get_pneus&veiculo_id=${veiculoId}`);
+                const resp = await fetch(sfApiUrl(`pneus_data.php?action=get_pneus&veiculo_id=${veiculoId}`));
                 const data = await resp.json();
                 
                 if (data.pneus && data.pneus.some(p => p.veiculo_id == veiculoId)) {

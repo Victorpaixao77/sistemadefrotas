@@ -14,6 +14,7 @@ require_authentication();
 
 // Set page title
 $page_title = "Gestão de Motoristas";
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
 
 // Função para buscar motoristas do banco de dados
 function getMotoristas($page = 1) {
@@ -86,6 +87,9 @@ $total_paginas = $resultado['total_paginas'];
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
@@ -132,6 +136,9 @@ $total_paginas = $resultado['total_paginas'];
             border-radius: 4px;
             border-left: 3px solid #007bff;
         }
+        body.gestao-motoristas-modern .dashboard-header { display: none; }
+        body.gestao-motoristas-modern .dashboard-content.fornc-page { overflow-x: auto; }
+        body.gestao-motoristas-modern #motoristTable.fornc-table { min-width: 860px; }
     </style>
     
     <!-- Custom scripts -->
@@ -139,7 +146,7 @@ $total_paginas = $resultado['total_paginas'];
     <script src="../js/sidebar.js"></script>
     <script src="../js/motoristas.js"></script>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'gestao-motoristas-modern' : ''; ?>">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
@@ -150,7 +157,55 @@ $total_paginas = $resultado['total_paginas'];
             <?php include '../includes/header.php'; ?>
             
             <!-- Page Content -->
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <?php if ($is_modern): ?>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Motoristas ativos</span><span class="val" id="kpiTotalAtivos">0</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Checklists pendentes</span><span class="val" id="kpiChecklistsPendentes">0</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Infrações (30 dias)</span><span class="val" id="kpiInfracoesRecentes">0</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Melhor eficiência</span><span class="val" id="kpiMelhorEficiencia">-</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Mais viagens</span><span class="val" id="kpiMaisViagens">-</span></div>
+                </div>
+                <div class="fornc-toolbar">
+                    <div class="fornc-search-block">
+                        <label for="searchMotorist">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" id="searchMotorist" placeholder="Buscar motorista..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="fornc-filters-inline">
+                        <div class="fg">
+                            <label for="statusFilter">Status</label>
+                            <select id="statusFilter">
+                                <option value="">Todos os status</option>
+                                <option value="Ativo">Ativo</option>
+                                <option value="Inativo">Inativo</option>
+                                <option value="Férias">Férias</option>
+                                <option value="Afastado">Afastado</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="categoriaFilter">Categoria</label>
+                            <select id="categoriaFilter">
+                                <option value="">Todas as categorias</option>
+                                <option value="A">Categoria A</option>
+                                <option value="B">Categoria B</option>
+                                <option value="C">Categoria C</option>
+                                <option value="D">Categoria D</option>
+                                <option value="E">Categoria E</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="fornc-btn-row">
+                        <button id="applyMotoristFilters" class="fornc-btn fornc-btn--accent" title="Aplicar filtros"><i class="fas fa-search"></i> Pesquisar</button>
+                        <button id="clearMotoristFilters" class="fornc-btn fornc-btn--ghost" title="Limpar filtros"><i class="fas fa-undo"></i></button>
+                        <button id="filterBtn" class="fornc-btn fornc-btn--ghost" title="Filtros"><i class="fas fa-sliders-h"></i> Opções</button>
+                        <button id="exportBtn" class="fornc-btn fornc-btn--muted" title="Exportar"><i class="fas fa-file-export"></i> Exportar</button>
+                        <button id="helpBtn" class="fornc-btn fornc-btn--ghost fornc-btn--icon" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="dashboard-header">
                     <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
@@ -167,8 +222,10 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- KPI Cards Row -->
+                <?php if (!$is_modern): ?>
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
@@ -230,8 +287,10 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- Search and Filter -->
+                <?php if (!$is_modern): ?>
                 <div class="filter-section">
                     <div class="search-box">
                         <input type="text" id="searchMotorist" placeholder="Buscar motorista...">
@@ -264,10 +323,11 @@ $total_paginas = $resultado['total_paginas'];
                         </button>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- Motorists Table -->
-                <div class="data-table-container">
-                    <table class="data-table" id="motoristTable">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="motoristTable">
                         <thead>
                             <tr>
                                 <th>Nome</th>
@@ -310,7 +370,8 @@ $total_paginas = $resultado['total_paginas'];
                 </div>
                 
                 <!-- Pagination -->
-                <div class="pagination">
+                <?php if ($is_modern): ?><div class="fornc-pagination-bar"><?php endif; ?>
+                <div class="pagination<?php echo $is_modern ? ' fornc-modern-pagination' : ''; ?>">
                     <?php if ($total_paginas > 1): ?>
                         <a href="#" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" 
                            onclick="return changePage(<?php echo $pagina_atual - 1; ?>)">
@@ -327,6 +388,7 @@ $total_paginas = $resultado['total_paginas'];
                         </a>
                     <?php endif; ?>
                 </div>
+                <?php if ($is_modern): ?></div><?php endif; ?>
 
                 <!-- Analytics Section -->
                 <div class="analytics-section">
@@ -402,8 +464,8 @@ $total_paginas = $resultado['total_paginas'];
     </div>
     
     <!-- Modal de Visualização de Motorista -->
-    <div class="modal" id="motoristModal">
-        <div class="modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="motoristModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2 id="modalTitle">Detalhes do Motorista</h2>
                 <button class="close-modal" type="button" aria-label="Fechar">
@@ -425,7 +487,7 @@ $total_paginas = $resultado['total_paginas'];
     </div>
 
     <!-- Modal de Ajuda -->
-    <div class="modal" id="helpMotoristModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpMotoristModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Ajuda - Gestão de Motoristas</h2>
@@ -561,7 +623,8 @@ $total_paginas = $resultado['total_paginas'];
     
     // Função para mudar página
     function changePage(page) {
-        window.location.href = '?page=' + page;
+        const classic = <?php echo $is_modern ? 'false' : 'true'; ?>;
+        window.location.href = '?page=' + page + (classic ? '&classic=1' : '');
         return false;
     }
     

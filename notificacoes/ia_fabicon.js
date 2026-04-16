@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   function carregarIANotificacoes(verTodas = false) {
-    const url = verTodas ? '/sistema-frotas/notificacoes/notificacoes.php?todas=1' : '/sistema-frotas/notificacoes/notificacoes.php';
+    const url = verTodas ? sfAppUrl('notificacoes/notificacoes.php?todas=1') : sfAppUrl('notificacoes/notificacoes.php');
     fetch(url, {
       credentials: 'same-origin',
       headers: {
@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const clearBtn = panel.querySelector('.notification-clear-btn');
   clearBtn.addEventListener('click', function(e) {
     e.stopPropagation();
-    fetch('/sistema-frotas/notificacoes/limpar_notificacoes_ia.php', { method: 'POST' })
+    fetch(sfAppUrl('notificacoes/limpar_notificacoes_ia.php'), { method: 'POST' })
       .then(res => res.json())
       .then(data => {
         if (data.success) {

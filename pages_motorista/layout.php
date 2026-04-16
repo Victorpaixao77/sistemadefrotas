@@ -102,8 +102,11 @@ $motorista_foto = $_SESSION['motorista_foto'] ?? 'default.jpg';
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Custom JS -->
+    <?php
+    $sn = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '/pages_motorista/index.php');
+    $motoristaApi = rtrim(dirname($sn), '/') . '/api/motorista_api.php';
+    ?>
+    <script>window.__MOTORISTA_API_URL__=<?php echo json_encode($motoristaApi, JSON_UNESCAPED_SLASHES); ?>;</script>
     <script src="js/motorista.js"></script>
     
     <!-- Scripts específicos da página -->

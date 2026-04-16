@@ -53,6 +53,6 @@ header("Cache-Control: post-check=0, pre-check=0", false);
 header("Pragma: no-cache");
 
 // Redirecionar para a página de login com parâmetro de logout
-header("Location: /sistema-frotas/login.php?logout=1");
+header('Location: ' . sf_app_url('login.php?logout=1'));
 exit();
 ?>

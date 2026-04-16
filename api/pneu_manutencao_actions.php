@@ -1,6 +1,9 @@
 <?php
 require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
+require_once __DIR__ . '/../includes/pneu_movimentacoes_helper.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
 header('Content-Type: application/json');
 
@@ -24,6 +27,14 @@ if (!$empresa) {
 
 // Obter a ação solicitada
 $action = $_GET['action'] ?? '';
+
+// Protege mutações com CSRF (add/update/delete) e retorno JSON padronizado.
+if (in_array($action, ['add', 'update', 'delete', 'create', 'edit'], true)) {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        api_json_method_not_allowed('Use POST para alterar dados.');
+    }
+    api_require_csrf_json();
+}
 
 // Processar a ação
 switch ($action) {
@@ -61,6 +72,24 @@ switch ($action) {
         
         try {
             executeNonQuery($conn, $sql, $params);
+            // Histórico único: recapagem ou manutenção
+            $tipo_nome = null;
+            try {
+                $st = $conn->prepare("SELECT nome FROM tipo_manutencao_pneus WHERE id = ?");
+                $st->execute([$data['tipo_manutencao_id']]);
+                if ($row = $st->fetch(PDO::FETCH_ASSOC)) {
+                    $tipo_nome = trim($row['nome']);
+                }
+            } catch (Exception $e) {}
+            $tipo_mov = (strtolower($tipo_nome ?? '') === 'recapagem') ? 'recapagem' : 'manutencao';
+            pneu_movimentacao_inserir($conn, [
+                'empresa_id' => $_SESSION['empresa_id'],
+                'pneu_id'    => (int) $data['pneu_id'],
+                'tipo'       => $tipo_mov,
+                'veiculo_id' => !empty($data['veiculo_id']) ? (int) $data['veiculo_id'] : null,
+                'custo'      => (float) $data['custo'],
+                'observacoes'=> $data['observacoes'] ?? null,
+            ]);
             echo json_encode(['success' => true]);
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'error' => 'Erro ao adicionar manutenção: ' . $e->getMessage()]);

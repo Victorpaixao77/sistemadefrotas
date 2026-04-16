@@ -1412,5 +1412,7 @@ try {
             });
         }
     </script>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html>

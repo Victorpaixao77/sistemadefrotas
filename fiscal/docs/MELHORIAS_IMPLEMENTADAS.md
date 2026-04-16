@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS eventos_fiscais (
 ### **Classe: `FiscalEventManager`**
 - Gerencia todo o ciclo de vida dos eventos fiscais
 - Validações automáticas de permissões
-- Integração simulada com SEFAZ (pronta para implementação real)
+- Integração com SEFAZ ainda não conectada nesta etapa
 - Logs completos de todas as operações
 
 ---

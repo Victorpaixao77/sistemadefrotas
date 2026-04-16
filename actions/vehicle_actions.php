@@ -61,21 +61,39 @@ function handleSaveVehicle() {
     try {
         $conn = getConnection();
         
+        // Único campo obrigatório: placa
+        $placa = trim((string)($_POST['placa'] ?? ''));
+        if ($placa === '') {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Placa é obrigatória.'
+            ]);
+            exit;
+        }
+        $placa = strtoupper($placa);
+        if (!validarPlaca($placa)) {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Placa inválida. Use o formato Mercosul (ABC1D23) ou antigo (ABC1234).'
+            ]);
+            exit;
+        }
+        
         // Get form data
         $id = $_POST['id'] ?? null;
         $data = [
             'empresa_id' => $_SESSION['empresa_id'],
-            'placa' => strtoupper($_POST['placa']),
-            'modelo' => $_POST['modelo'],
-            'marca' => $_POST['marca'] ?? null,
-            'ano' => $_POST['ano'] ?? null,
+            'placa' => $placa,
+            'modelo' => trim((string)($_POST['modelo'] ?? '')) ?: '',
+            'marca' => trim((string)($_POST['marca'] ?? '')) ?: null,
+            'ano' => isset($_POST['ano']) && $_POST['ano'] !== '' ? (int)$_POST['ano'] : null,
             'cor' => $_POST['cor'] ?? null,
             'chassi' => $_POST['chassi'] ?? null,
             'renavam' => $_POST['renavam'] ?? null,
-            'km_atual' => $_POST['km_atual'] ?? 0,
+            'km_atual' => isset($_POST['km_atual']) && $_POST['km_atual'] !== '' ? (float)$_POST['km_atual'] : 0,
             'observacoes' => $_POST['observacoes'] ?? null,
-            'id_cavalo' => $_POST['id_cavalo'] ?: null,
-            'id_carreta' => $_POST['id_carreta'] ?: null,
+            'id_cavalo' => !empty($_POST['id_cavalo']) ? $_POST['id_cavalo'] : null,
+            'id_carreta' => !empty($_POST['id_carreta']) ? $_POST['id_carreta'] : null,
             'capacidade_carga' => $_POST['capacidade_carga'] ?: null,
             'capacidade_passageiros' => $_POST['capacidade_passageiros'] ?: null,
             'numero_motor' => $_POST['numero_motor'] ?? null,
@@ -84,7 +102,7 @@ function handleSaveVehicle() {
             'potencia_motor' => $_POST['potencia_motor'] ?? null,
             'numero_eixos' => $_POST['numero_eixos'] ?: null,
             'carroceria_id' => $_POST['carroceria_id'] ?: null,
-            'status_id' => $_POST['status_id'] ?: null
+            'status_id' => !empty($_POST['status_id']) ? $_POST['status_id'] : 1
         ];
 
         // Log para debug em produção
@@ -353,4 +371,25 @@ function handleGetVehicle() {
     
     echo json_encode($response);
     exit;
+}
+
+/**
+ * Valida formato da placa: Mercosul (4 letras + 1 número + 1 letra + 2 números) ou antigo (3 letras + 4 números).
+ * @param string $placa Placa sem máscara (apenas letras e números).
+ * @return bool
+ */
+function validarPlaca($placa) {
+    $placa = preg_replace('/[^A-Za-z0-9]/', '', $placa);
+    if (strlen($placa) !== 7) {
+        return false;
+    }
+    // Mercosul: ABC1D23 (4 letras, 1 número, 1 letra, 2 números)
+    if (preg_match('/^[A-Z]{4}\d[A-Z]\d{2}$/i', $placa)) {
+        return true;
+    }
+    // Antigo: ABC1234 (3 letras, 4 números)
+    if (preg_match('/^[A-Z]{3}\d{4}$/i', $placa)) {
+        return true;
+    }
+    return false;
 } 

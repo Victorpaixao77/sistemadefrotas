@@ -30,7 +30,9 @@ class ComposerStaticInit62e10e6c8df9afc192311b196c75bb33
         'N' => 
         array (
             'NFePHP\\NFe\\' => 11,
+            'NFePHP\\MDFe\\' => 12,
             'NFePHP\\Gtin\\' => 12,
+            'NFePHP\\DA\\' => 10,
             'NFePHP\\Common\\' => 14,
             'NFePHP\\CTe\\' => 11,
         ),
@@ -53,6 +55,8 @@ class ComposerStaticInit62e10e6c8df9afc192311b196c75bb33
         array (
             'Composer\\Pcre\\' => 14,
             'Complex\\' => 8,
+            'Com\\Tecnick\\Color\\' => 18,
+            'Com\\Tecnick\\Barcode\\' => 20,
         ),
         'B' => 
         array (
@@ -89,9 +93,17 @@ class ComposerStaticInit62e10e6c8df9afc192311b196c75bb33
         array (
             0 => __DIR__ . '/..' . '/nfephp-org/sped-nfe/src',
         ),
+        'NFePHP\\MDFe\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/nfephp-org/sped-mdfe/src',
+        ),
         'NFePHP\\Gtin\\' => 
         array (
             0 => __DIR__ . '/..' . '/nfephp-org/sped-gtin/src',
+        ),
+        'NFePHP\\DA\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/nfephp-org/sped-da/src',
         ),
         'NFePHP\\Common\\' => 
         array (
@@ -132,6 +144,14 @@ class ComposerStaticInit62e10e6c8df9afc192311b196c75bb33
         'Complex\\' => 
         array (
             0 => __DIR__ . '/..' . '/markbaker/complex/classes/src',
+        ),
+        'Com\\Tecnick\\Color\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/tecnickcom/tc-lib-color/src',
+        ),
+        'Com\\Tecnick\\Barcode\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/tecnickcom/tc-lib-barcode/src',
         ),
         'Box\\Spout\\' => 
         array (

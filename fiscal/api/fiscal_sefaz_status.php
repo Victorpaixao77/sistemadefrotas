@@ -34,30 +34,56 @@ try {
     configure_session();
     session_start();
     
-    // TEMPORÁRIO: Bypass da autenticação para desenvolvimento
-    // if (!isset($_SESSION['user_id'])) {
-    //     http_response_code(401);
-    //     echo json_encode([
-    //         'success' => false,
-    //         'message' => 'Usuário não autenticado'
-    //     ]);
-    //     exit();
-    // }
-    
     // Obter dados do POST
     $input = json_decode(file_get_contents('php://input'), true);
     $empresa_id = $input['empresa_id'] ?? 1; // Usar empresa_id padrão se não fornecido
     
-    // Simular status SEFAZ (por enquanto)
-    // Em produção, isso seria verificado via API da SEFAZ
+    // Preferir cache já calculado pelo endpoint real `sefaz_status.php`
     $sefaz_status = [
-        'status' => 'online',
-        'ultima_sincronizacao' => date('Y-m-d H:i:s'),
-        'mensagem' => 'Sistema SEFAZ funcionando normalmente',
-        'tempo_resposta' => '150ms',
-        'versao_api' => '4.00',
-        'ambiente' => 'homologacao'
+        'status' => 'offline',
+        'ultima_sincronizacao' => null,
+        'mensagem' => 'Sem cache SEFAZ disponível'
     ];
+
+    $cache_file = __DIR__ . '/sefaz_status_cache.json';
+    if (file_exists($cache_file)) {
+        $cache = json_decode(file_get_contents($cache_file), true);
+        $st = $cache['status'] ?? null;
+        if ($st && isset($st['timestamp']) === false) {
+            // Estrutura típica: cache['timestamp'] existe no topo
+        }
+        if ($st && isset($st['status_geral'])) {
+            $sefaz_status['status'] = ($st['status_geral'] ?? 'offline') === 'online' ? 'online' : 'offline';
+            $sefaz_status['ultima_sincronizacao'] = $cache['timestamp'] ?? date('Y-m-d H:i:s');
+            $sefaz_status['mensagem'] = $st['status_texto'] ?? ($st['status_geral'] ?? 'Offline');
+            // Se cache existe, não precisa chamar SOAP novamente.
+        }
+    }
+
+    // Se ainda estiver offline sem cache, chama o endpoint real (com cache interno e refresh controlado)
+    if ($sefaz_status['status'] === 'offline' && empty($sefaz_status['ultima_sincronizacao'])) {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $dir = dirname($_SERVER['SCRIPT_NAME']);
+        $url = $scheme . '://' . $host . $dir . '/sefaz_status.php?action=status&force=true';
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        $resp = curl_exec($ch);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        if ($resp !== false && empty($err)) {
+            $data = json_decode($resp, true);
+            if (!empty($data['success']) && !empty($data['status_geral'])) {
+                $sefaz_status['status'] = ($data['status_geral'] ?? 'offline') === 'online' ? 'online' : 'offline';
+                $sefaz_status['ultima_sincronizacao'] = $data['timestamp'] ?? date('Y-m-d H:i:s');
+                $sefaz_status['mensagem'] = $data['status_texto'] ?? ($data['status_geral'] ?? 'Offline');
+            }
+        }
+    }
     
     // Retornar sucesso
     echo json_encode([

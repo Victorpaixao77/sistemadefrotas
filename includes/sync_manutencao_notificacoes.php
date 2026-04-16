@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/sf_paths.php';
 /**
  * Sincroniza alertas de Planos de Manutenção para a tabela de notificações (sino do header).
  * Incluir após maintenance_alertas_score.php em manutencoes.php.
@@ -67,7 +68,7 @@ try {
         'title' => $title,
         'message' => $message,
         'type' => $type,
-        'data' => json_encode(['url' => '/sistema-frotas/pages/manutencoes.php', 'vencidos' => count($vencidos), 'proximos' => count($proximos)])
+        'data' => json_encode(['url' => sf_app_url('pages/manutencoes.php'), 'vencidos' => count($vencidos), 'proximos' => count($proximos)])
     ]);
 } catch (Exception $e) {
     error_log("sync_manutencao_notificacoes: " . $e->getMessage());

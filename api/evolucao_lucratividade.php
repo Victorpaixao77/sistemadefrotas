@@ -31,9 +31,9 @@ try {
     // Query simplificada para evolução da lucratividade
     $sql = "
     SELECT 
-        DATE_FORMAT(data_rota, '%Y-%m') AS mes_ano,
-        MONTH(data_rota) as mes,
-        YEAR(data_rota) as ano,
+        DATE_FORMAT(COALESCE(data_rota, data_saida), '%Y-%m') AS mes_ano,
+        MONTH(COALESCE(data_rota, data_saida)) as mes,
+        YEAR(COALESCE(data_rota, data_saida)) as ano,
         COALESCE(SUM(frete), 0) AS total_frete,
         COALESCE(SUM(comissao), 0) AS total_comissao,
         (
@@ -41,10 +41,10 @@ try {
         ) AS lucro_liquido
     FROM rotas 
     WHERE empresa_id = :empresa_id
-      AND data_rota >= DATE_SUB(:data_inicio, INTERVAL 6 MONTH)
-      AND data_rota <= :data_fim
-    GROUP BY DATE_FORMAT(data_rota, '%Y-%m'), MONTH(data_rota), YEAR(data_rota)
-    ORDER BY YEAR(data_rota), MONTH(data_rota)
+      AND COALESCE(data_rota, data_saida) >= DATE_SUB(:data_inicio, INTERVAL 6 MONTH)
+      AND COALESCE(data_rota, data_saida) <= :data_fim
+    GROUP BY DATE_FORMAT(COALESCE(data_rota, data_saida), '%Y-%m'), MONTH(COALESCE(data_rota, data_saida)), YEAR(COALESCE(data_rota, data_saida))
+    ORDER BY YEAR(COALESCE(data_rota, data_saida)), MONTH(COALESCE(data_rota, data_saida))
     ";
     
     $data_inicio = $ano . '-' . str_pad($mes, 2, '0', STR_PAD_LEFT) . '-01';

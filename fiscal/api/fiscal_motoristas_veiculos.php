@@ -34,63 +34,35 @@ try {
     configure_session();
     session_start();
     
-    // TEMPORÁRIO: Bypass da autenticação para desenvolvimento
-    // if (!isset($_SESSION['user_id'])) {
-    //     http_response_code(401);
-    //     echo json_encode([
-    //         'success' => false,
-    //         'message' => 'Usuário não autenticado'
-    //     ]);
-    //     exit();
-    // }
-    
     // Obter dados do POST
     $input = json_decode(file_get_contents('php://input'), true);
     $empresa_id = $input['empresa_id'] ?? 1; // Usar empresa_id padrão se não fornecido
     
-    // Simular dados de motoristas e veículos (por enquanto)
-    // Em produção, isso viria do banco de dados
+    $conn = getConnection();
+
+    // Motoristas
+    $stmtM = $conn->prepare("
+        SELECT id, nome, cpf, cnh, data_validade_cnh
+        FROM motoristas
+        WHERE empresa_id = ?
+        ORDER BY nome
+    ");
+    $stmtM->execute([$empresa_id]);
+    $motoristas = $stmtM->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    // Veículos
+    $stmtV = $conn->prepare("
+        SELECT id, placa, modelo
+        FROM veiculos
+        WHERE empresa_id = ?
+        ORDER BY placa
+    ");
+    $stmtV->execute([$empresa_id]);
+    $veiculos = $stmtV->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
     $data = [
-        'motoristas' => [
-            [
-                'id' => 1,
-                'nome' => 'João Silva',
-                'cpf' => '123.456.789-00',
-                'cnh' => '12345678901',
-                'categoria_cnh' => 'E',
-                'validade_cnh' => '2026-12-31',
-                'status' => 'ativo'
-            ],
-            [
-                'id' => 2,
-                'nome' => 'Maria Santos',
-                'cpf' => '987.654.321-00',
-                'cnh' => '98765432109',
-                'categoria_cnh' => 'E',
-                'validade_cnh' => '2027-06-30',
-                'status' => 'ativo'
-            ]
-        ],
-        'veiculos' => [
-            [
-                'id' => 1,
-                'placa' => 'ABC-1234',
-                'modelo' => 'Mercedes-Benz Actros',
-                'ano' => 2020,
-                'capacidade' => 30000,
-                'tipo' => 'Truck',
-                'status' => 'ativo'
-            ],
-            [
-                'id' => 2,
-                'placa' => 'XYZ-5678',
-                'modelo' => 'Volkswagen Delivery',
-                'ano' => 2021,
-                'capacidade' => 15000,
-                'tipo' => 'Truck',
-                'status' => 'ativo'
-            ]
-        ]
+        'motoristas' => $motoristas,
+        'veiculos' => $veiculos,
     ];
     
     // Retornar sucesso

@@ -5,6 +5,9 @@ header('Access-Control-Allow-Methods: POST');
 
 require_once '../../includes/config.php';
 require_once '../../includes/functions.php';
+require_once '../../includes/csrf.php';
+require_once '../../includes/api_json.php';
+require_once __DIR__ . '/../../includes/bi_cache_invalidate.php';
 
 if (function_exists('configure_session')) {
     configure_session();
@@ -22,6 +25,9 @@ if (!$empresa_id) {
     echo json_encode(['success' => false, 'error' => 'ID da empresa não encontrado']);
     exit;
 }
+
+// Protege mutações (POST) com CSRF e retorno JSON padronizado.
+api_require_csrf_json();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -109,6 +115,7 @@ try {
     $stmt->bindValue(':empresa_id', $empresa_id);
     $stmt->execute();
 
+    bi_cache_invalidate_empresa($conn, (int) $empresa_id);
     echo json_encode(['success' => true, 'message' => 'Abastecimento atualizado com sucesso']);
     exit;
 } catch (Exception $e) {

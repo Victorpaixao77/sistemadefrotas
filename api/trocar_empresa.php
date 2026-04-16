@@ -1,11 +1,13 @@
 <?php
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/csrf.php';
+require_once '../includes/rate_limit.php';
 
 configure_session();
 session_start();
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 // Verificar se está logado
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
@@ -39,7 +41,12 @@ if ($action === 'listar') {
         echo json_encode(['success' => false, 'message' => 'Erro ao listar empresas.', 'error' => $e->getMessage()]);
     }
 } elseif ($action === 'trocar' && isset($_POST['empresa_id'])) {
-    // Trocar de empresa
+    api_require_csrf_json();
+    if (!sf_rate_limit_allow('trocar_empresa', 40, 300)) {
+        http_response_code(429);
+        echo json_encode(['success' => false, 'message' => 'Muitas alterações. Aguarde alguns minutos.']);
+        exit;
+    }
     $empresa_id = (int)$_POST['empresa_id'];
     
     try {

@@ -5,6 +5,8 @@
 require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
+require_once '../includes/csrf.php';
+require_once '../includes/api_json.php';
 
 // Configura a sessão antes de iniciá-la
 configure_session();
@@ -28,6 +30,14 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 
 // Obtém o empresa_id da sessão
 $empresa_id = isset($_SESSION["empresa_id"]) ? $_SESSION["empresa_id"] : null;
+
+// Mutações: alteração de dados ou favorito (somente POST + CSRF)
+if (in_array($action, ['add', 'update', 'delete', 'favorito_toggle'], true)) {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        api_json_method_not_allowed('Use POST para alterar dados.');
+    }
+    api_require_csrf_json();
+}
 
 // Trata diferentes ações
 switch ($action) {
@@ -62,12 +72,17 @@ switch ($action) {
         $status = isset($_GET['status']) ? $_GET['status'] : null;
         $search = isset($_GET['search']) ? $_GET['search'] : null;
         $name = isset($_GET['name']) ? $_GET['name'] : null;
+        $categoria_cnh = isset($_GET['categoria_cnh']) ? $_GET['categoria_cnh'] : null;
+        $tipo_contrato = isset($_GET['tipo_contrato']) ? $_GET['tipo_contrato'] : null;
+        $sort = isset($_GET['sort']) ? $_GET['sort'] : 'nome';
+        $order = isset($_GET['order']) && strtoupper($_GET['order']) === 'DESC' ? 'DESC' : 'ASC';
         if ($search === null && $name !== null) {
             $search = $name;
         }
+        $only_favoritos = isset($_GET['only_favoritos']) && $_GET['only_favoritos'] === '1';
         
         // Return list of motorists
-        echo json_encode(getMotoristsList($limit, $page, $status, $search));
+        echo json_encode(getMotoristsList($limit, $page, $status, $search, $categoria_cnh, $tipo_contrato, $sort, $order, $only_favoritos));
         break;
         
     case 'routes':
@@ -98,6 +113,33 @@ switch ($action) {
             http_response_code(400);
             echo json_encode(['error' => 'ID do motorista é obrigatório']);
         }
+        break;
+        
+    case 'log':
+        // Return alteration history for a motorist
+        if ($motoristId) {
+            echo json_encode(getMotoristLog($motoristId));
+        } else {
+            http_response_code(400);
+            echo json_encode(['error' => 'ID do motorista é obrigatório']);
+        }
+        break;
+        
+    case 'cnh_alertas':
+        echo json_encode(getCnhAlertas());
+        break;
+        
+    case 'favorito_toggle':
+        if ($motoristId) {
+            echo json_encode(toggleMotoristaFavorito($motoristId));
+        } else {
+            http_response_code(400);
+            echo json_encode(['error' => 'ID do motorista é obrigatório']);
+        }
+        break;
+        
+    case 'favoritos_ids':
+        echo json_encode(getFavoritosIds());
         break;
         
     case 'commission_summary':
@@ -142,9 +184,13 @@ switch ($action) {
  * @param int $page Page number
  * @param string $status Filter by status
  * @param string $search Text search across multiple fields
+ * @param string $categoria_cnh Filter by categoria_cnh_id
+ * @param string $tipo_contrato Filter by tipo_contrato_id
+ * @param string $sort Sort column
+ * @param string $order ASC or DESC
  * @return array List of motorists and pagination info
  */
-function getMotoristsList($limit = 10, $page = 1, $status = null, $search = null) {
+function getMotoristsList($limit = 10, $page = 1, $status = null, $search = null, $categoria_cnh = null, $tipo_contrato = null, $sort = 'nome', $order = 'ASC', $only_favoritos = false) {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
@@ -159,6 +205,32 @@ function getMotoristsList($limit = 10, $page = 1, $status = null, $search = null
         if ($status) {
             $where[] = 'm.disponibilidade_id = :status';
             $params[':status'] = $status;
+        }
+        if ($categoria_cnh) {
+            $where[] = 'm.categoria_cnh_id = :categoria_cnh';
+            $params[':categoria_cnh'] = $categoria_cnh;
+        }
+        if ($tipo_contrato) {
+            $where[] = 'm.tipo_contrato_id = :tipo_contrato';
+            $params[':tipo_contrato'] = $tipo_contrato;
+        }
+        
+        if ($only_favoritos) {
+            $uid = $_SESSION['usuario_id'] ?? $_SESSION['id'] ?? $_SESSION['user_id'] ?? null;
+            if ($uid) {
+                $st = $conn->prepare("SHOW TABLES LIKE 'motorista_favoritos'");
+                $st->execute();
+                if ($st->rowCount() > 0) {
+                    $st = $conn->prepare("SELECT motorista_id FROM motorista_favoritos WHERE usuario_id = ? AND empresa_id = ?");
+                    $st->execute([$uid, $empresa_id]);
+                    $fav_ids = array_column($st->fetchAll(PDO::FETCH_ASSOC), 'motorista_id');
+                    if (!empty($fav_ids)) {
+                        $where[] = 'm.id IN (' . implode(',', array_map('intval', $fav_ids)) . ')';
+                    } else {
+                        $where[] = '1=0';
+                    }
+                }
+            }
         }
         
         if ($search) {
@@ -197,6 +269,10 @@ function getMotoristsList($limit = 10, $page = 1, $status = null, $search = null
         
         $whereClause = implode(' AND ', $where);
         
+        $sortMap = ['nome'=>'m.nome','cpf'=>'m.cpf','cnh'=>'m.cnh','telefone'=>'m.telefone','email'=>'m.email','porcentagem_comissao'=>'m.porcentagem_comissao','disponibilidade_nome'=>'dm.nome','categoria_cnh_nome'=>'cc.nome','tipo_contrato_nome'=>'tc.nome'];
+        $sortCol = isset($sortMap[$sort]) ? $sortMap[$sort] : 'm.nome';
+        $orderSql = $order === 'DESC' ? 'DESC' : 'ASC';
+        
         // Get total count
         $sql_count = "SELECT COUNT(*) as total FROM motoristas m WHERE $whereClause";
         $stmt_count = $conn->prepare($sql_count);
@@ -216,7 +292,7 @@ function getMotoristsList($limit = 10, $page = 1, $status = null, $search = null
                 LEFT JOIN tipos_contrato tc ON m.tipo_contrato_id = tc.id 
                 LEFT JOIN categorias_cnh cc ON m.categoria_cnh_id = cc.id 
                 WHERE $whereClause
-                ORDER BY m.nome ASC
+                ORDER BY $sortCol $orderSql
                 LIMIT :limit OFFSET :offset";
                 
         $stmt = $conn->prepare($sql);
@@ -228,6 +304,25 @@ function getMotoristsList($limit = 10, $page = 1, $status = null, $search = null
         $stmt->execute();
         
         $motorists = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Marcar favoritos do usuário
+        $favoritos_ids = [];
+        try {
+            $uid = $_SESSION['usuario_id'] ?? $_SESSION['id'] ?? $_SESSION['user_id'] ?? null;
+            if ($uid) {
+                $st = $conn->prepare("SHOW TABLES LIKE 'motorista_favoritos'");
+                $st->execute();
+                if ($st->rowCount() > 0) {
+                    $st = $conn->prepare("SELECT motorista_id FROM motorista_favoritos WHERE usuario_id = ? AND empresa_id = ?");
+                    $st->execute([$uid, $empresa_id]);
+                    $favoritos_ids = array_column($st->fetchAll(PDO::FETCH_ASSOC), 'motorista_id');
+                }
+            }
+        } catch (Exception $e) {}
+        foreach ($motorists as &$m) {
+            $m['is_favorite'] = in_array((int)$m['id'], array_map('intval', $favoritos_ids));
+        }
+        unset($m);
         
         // Get summary data
         $sql_summary = "SELECT 
@@ -479,17 +574,24 @@ function getMotoristDocuments($motoristId) {
         $stmt->execute();
         
         $motorist = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$motorist) {
+            return ['success' => false, 'error' => 'Motorista não encontrado'];
+        }
         
-        // Check CNH status
-        $cnh_expiry = new DateTime($motorist['data_validade_cnh']);
-        $today = new DateTime();
-        $days_until_expiry = $today->diff($cnh_expiry)->days;
-        
-        $cnh_status = 'Válido';
-        if ($cnh_expiry < $today) {
-            $cnh_status = 'Vencido';
-        } elseif ($days_until_expiry <= 30) {
-            $cnh_status = 'Próximo ao vencimento';
+        // Check CNH status (handle null data_validade_cnh)
+        $cnh_status = 'Não informado';
+        $cnh_expiry = null;
+        if (!empty($motorist['data_validade_cnh'])) {
+            $cnh_expiry = new DateTime($motorist['data_validade_cnh']);
+            $today = new DateTime();
+            $days_until_expiry = $today->diff($cnh_expiry)->days;
+            if ($cnh_expiry < $today) {
+                $cnh_status = 'Vencido';
+            } elseif ($days_until_expiry <= 30) {
+                $cnh_status = 'Próximo ao vencimento';
+            } else {
+                $cnh_status = 'Válido';
+            }
         }
         
         return [
@@ -510,6 +612,190 @@ function getMotoristDocuments($motoristId) {
         error_log("Error in getMotoristDocuments: " . $e->getMessage());
         http_response_code(500);
         return ['success' => false, 'error' => 'Erro ao buscar status dos documentos'];
+    }
+}
+
+/**
+ * Get motorist alteration history (log)
+ *
+ * @param int $motoristId Motorist ID
+ * @return array Log entries
+ */
+function getMotoristLog($motoristId) {
+    try {
+        $conn = getConnection();
+        $empresa_id = $_SESSION['empresa_id'];
+        
+        $stmt = $conn->prepare("SHOW TABLES LIKE 'motoristas_log'");
+        $stmt->execute();
+        if ($stmt->rowCount() === 0) {
+            return ['success' => true, 'entries' => []];
+        }
+        
+        $sql = "SELECT * FROM motoristas_log 
+                WHERE motorista_id = :motorista_id AND empresa_id = :empresa_id 
+                ORDER BY created_at DESC 
+                LIMIT 100";
+        $stmt = $conn->prepare($sql);
+        $stmt->bindValue(':motorista_id', $motoristId, PDO::PARAM_INT);
+        $stmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->execute();
+        $entries = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($entries as &$e) {
+            $e['created_at_formatted'] = $e['created_at'] ? date('d/m/Y H:i', strtotime($e['created_at'])) : '';
+            if (!empty($e['dados_anteriores']) && is_string($e['dados_anteriores'])) {
+                $e['dados_anteriores'] = json_decode($e['dados_anteriores'], true);
+            }
+            if (!empty($e['dados_novos']) && is_string($e['dados_novos'])) {
+                $e['dados_novos'] = json_decode($e['dados_novos'], true);
+            }
+        }
+        
+        return ['success' => true, 'entries' => $entries];
+    } catch(PDOException $e) {
+        error_log("Error in getMotoristLog: " . $e->getMessage());
+        return ['success' => false, 'error' => 'Erro ao buscar histórico', 'entries' => []];
+    }
+}
+
+/**
+ * Insert motorist log entry (create/update)
+ * Grava quem alterou (usuario_id, nome_usuario) e ip_origem quando as colunas existirem.
+ */
+function insertMotoristLog($conn, $motorista_id, $empresa_id, $acao, $descricao, $dados_anteriores = null, $dados_novos = null) {
+    $stmt = $conn->prepare("SHOW TABLES LIKE 'motoristas_log'");
+    $stmt->execute();
+    if ($stmt->rowCount() === 0) {
+        return;
+    }
+    $usuario_id = $_SESSION['usuario_id'] ?? $_SESSION['id'] ?? $_SESSION['user_id'] ?? null;
+    $nome_usuario = $_SESSION['nome'] ?? null;
+    $ip_origem = $_SERVER['REMOTE_ADDR'] ?? null;
+    
+    $stmt = $conn->prepare("SHOW COLUMNS FROM motoristas_log LIKE 'nome_usuario'");
+    $stmt->execute();
+    $has_extra = $stmt->rowCount() > 0;
+    
+    if ($has_extra) {
+        $sql = "INSERT INTO motoristas_log (motorista_id, empresa_id, acao, descricao, dados_anteriores, dados_novos, usuario_id, nome_usuario, ip_origem) 
+                VALUES (:motorista_id, :empresa_id, :acao, :descricao, :dados_anteriores, :dados_novos, :usuario_id, :nome_usuario, :ip_origem)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bindValue(':usuario_id', $usuario_id, PDO::PARAM_INT);
+        $stmt->bindValue(':nome_usuario', $nome_usuario);
+        $stmt->bindValue(':ip_origem', $ip_origem);
+    } else {
+        $sql = "INSERT INTO motoristas_log (motorista_id, empresa_id, acao, descricao, dados_anteriores, dados_novos) 
+                VALUES (:motorista_id, :empresa_id, :acao, :descricao, :dados_anteriores, :dados_novos)";
+        $stmt = $conn->prepare($sql);
+    }
+    $stmt->bindValue(':motorista_id', $motorista_id, PDO::PARAM_INT);
+    $stmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+    $stmt->bindValue(':acao', $acao);
+    $stmt->bindValue(':descricao', $descricao);
+    $stmt->bindValue(':dados_anteriores', $dados_anteriores ? json_encode($dados_anteriores) : null);
+    $stmt->bindValue(':dados_novos', $dados_novos ? json_encode($dados_novos) : null);
+    $stmt->execute();
+}
+
+/**
+ * Get CNH expiration alerts (30, 60, 90 days)
+ */
+function getCnhAlertas() {
+    try {
+        $conn = getConnection();
+        $empresa_id = $_SESSION['empresa_id'];
+        $sql = "SELECT id, nome, data_validade_cnh, cnh,
+                DATEDIFF(data_validade_cnh, CURRENT_DATE) as dias_para_vencimento
+                FROM motoristas 
+                WHERE empresa_id = :empresa_id 
+                AND data_validade_cnh IS NOT NULL 
+                AND data_validade_cnh >= CURRENT_DATE
+                AND DATEDIFF(data_validade_cnh, CURRENT_DATE) <= 90
+                ORDER BY data_validade_cnh ASC";
+        $stmt = $conn->prepare($sql);
+        $stmt->bindValue(':empresa_id', $empresa_id);
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $em_30 = []; $em_60 = []; $em_90 = [];
+        foreach ($rows as $r) {
+            $dias = (int)$r['dias_para_vencimento'];
+            $r['dias_para_vencimento'] = $dias;
+            if ($dias <= 30) {
+                $em_30[] = $r;
+            } elseif ($dias <= 60) {
+                $em_60[] = $r;
+            } else {
+                $em_90[] = $r;
+            }
+        }
+        return [
+            'success' => true,
+            'em_30_dias' => $em_30,
+            'em_60_dias' => $em_60,
+            'em_90_dias' => $em_90
+        ];
+    } catch (PDOException $e) {
+        error_log("Error in getCnhAlertas: " . $e->getMessage());
+        return ['success' => false, 'em_30_dias' => [], 'em_60_dias' => [], 'em_90_dias' => []];
+    }
+}
+
+/**
+ * Toggle motorista favorito para o usuário logado
+ */
+function toggleMotoristaFavorito($motorista_id) {
+    try {
+        $conn = getConnection();
+        $empresa_id = $_SESSION['empresa_id'];
+        $usuario_id = $_SESSION['usuario_id'] ?? $_SESSION['id'] ?? $_SESSION['user_id'] ?? null;
+        if (!$usuario_id) {
+            return ['success' => false, 'error' => 'Usuário não identificado', 'favorito' => false];
+        }
+        $stmt = $conn->prepare("SHOW TABLES LIKE 'motorista_favoritos'");
+        $stmt->execute();
+        if ($stmt->rowCount() === 0) {
+            return ['success' => false, 'error' => 'Tabela de favoritos não existe', 'favorito' => false];
+        }
+        $stmt = $conn->prepare("SELECT 1 FROM motorista_favoritos WHERE usuario_id = ? AND motorista_id = ? AND empresa_id = ?");
+        $stmt->execute([$usuario_id, $motorista_id, $empresa_id]);
+        $is_fav = $stmt->fetch();
+        if ($is_fav) {
+            $stmt = $conn->prepare("DELETE FROM motorista_favoritos WHERE usuario_id = ? AND motorista_id = ? AND empresa_id = ?");
+            $stmt->execute([$usuario_id, $motorista_id, $empresa_id]);
+            return ['success' => true, 'favorito' => false];
+        }
+        $stmt = $conn->prepare("INSERT INTO motorista_favoritos (usuario_id, motorista_id, empresa_id) VALUES (?, ?, ?)");
+        $stmt->execute([$usuario_id, $motorista_id, $empresa_id]);
+        return ['success' => true, 'favorito' => true];
+    } catch (PDOException $e) {
+        error_log("Error in toggleMotoristaFavorito: " . $e->getMessage());
+        return ['success' => false, 'error' => $e->getMessage(), 'favorito' => false];
+    }
+}
+
+/**
+ * Retorna IDs dos motoristas favoritos do usuário logado
+ */
+function getFavoritosIds() {
+    try {
+        $conn = getConnection();
+        $empresa_id = $_SESSION['empresa_id'];
+        $usuario_id = $_SESSION['usuario_id'] ?? $_SESSION['id'] ?? $_SESSION['user_id'] ?? null;
+        if (!$usuario_id) {
+            return ['success' => true, 'ids' => []];
+        }
+        $stmt = $conn->prepare("SHOW TABLES LIKE 'motorista_favoritos'");
+        $stmt->execute();
+        if ($stmt->rowCount() === 0) {
+            return ['success' => true, 'ids' => []];
+        }
+        $stmt = $conn->prepare("SELECT motorista_id FROM motorista_favoritos WHERE usuario_id = ? AND empresa_id = ?");
+        $stmt->execute([$usuario_id, $empresa_id]);
+        $ids = array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'motorista_id');
+        return ['success' => true, 'ids' => $ids];
+    } catch (PDOException $e) {
+        return ['success' => true, 'ids' => []];
     }
 }
 
@@ -642,7 +928,9 @@ function getMotoristById($id) {
         $sql = "SELECT m.*,
                 dm.nome as disponibilidade_nome,
                 tc.nome as tipo_contrato_nome,
-                cc.nome as categoria_cnh_nome
+                cc.nome as categoria_cnh_nome,
+                (SELECT COUNT(*) FROM multas mu WHERE mu.motorista_id = m.id AND mu.empresa_id = m.empresa_id) as total_multas,
+                (SELECT COUNT(*) FROM manutencoes ma INNER JOIN rotas r ON r.veiculo_id = ma.veiculo_id AND r.empresa_id = ma.empresa_id WHERE r.motorista_id = m.id AND ma.empresa_id = m.empresa_id) as total_manutencoes
                 FROM motoristas m
                 LEFT JOIN disponibilidades_motoristas dm ON m.disponibilidade_id = dm.id
                 LEFT JOIN tipos_contrato tc ON m.tipo_contrato_id = tc.id
@@ -682,9 +970,9 @@ function addMotorist($data) {
     try {
         $conn = getConnection();
         
-        // Validate required fields
-        if (empty($data['nome']) || empty($data['cpf'])) {
-            return ['success' => false, 'error' => 'Nome e CPF são obrigatórios'];
+        // Validate required fields (CPF é opcional para permitir motoristas terceirizados)
+        if (empty(trim($data['nome'] ?? ''))) {
+            return ['success' => false, 'error' => 'Nome é obrigatório'];
         }
         
         // Get empresa_id from session
@@ -749,20 +1037,27 @@ function addMotorist($data) {
         
         $stmt = $conn->prepare($sql);
         
+        $disponibilidade_id = $data['disponibilidade_id'] ?? null;
+        if ($disponibilidade_id === '' || $disponibilidade_id === '0' || $disponibilidade_id === 0) $disponibilidade_id = null;
+        $categoria_cnh_id = $data['categoria_cnh_id'] ?? null;
+        if ($categoria_cnh_id === '' || $categoria_cnh_id === '0' || $categoria_cnh_id === 0) $categoria_cnh_id = null;
+        $tipo_contrato_id = $data['tipo_contrato_id'] ?? null;
+        if ($tipo_contrato_id === '' || $tipo_contrato_id === '0' || $tipo_contrato_id === 0) $tipo_contrato_id = null;
+
         // Bind parameters
         $stmt->bindValue(':empresa_id', $empresa_id);
         $stmt->bindValue(':nome', $data['nome']);
-        $stmt->bindValue(':cpf', $data['cpf']);
+        $stmt->bindValue(':cpf', trim((string)($data['cpf'] ?? '')) ?: '');
         $stmt->bindValue(':cnh', $data['cnh'] ?? null);
-        $stmt->bindValue(':categoria_cnh_id', $data['categoria_cnh_id'] ?? null);
+        $stmt->bindValue(':categoria_cnh_id', $categoria_cnh_id);
         $stmt->bindValue(':data_validade_cnh', $data['data_validade_cnh'] ?? null);
         $stmt->bindValue(':telefone', $data['telefone'] ?? null);
         $stmt->bindValue(':telefone_emergencia', $data['telefone_emergencia'] ?? null);
         $stmt->bindValue(':email', $data['email'] ?? null);
         $stmt->bindValue(':endereco', $data['endereco'] ?? null);
         $stmt->bindValue(':data_contratacao', $data['data_contratacao'] ?? null);
-        $stmt->bindValue(':tipo_contrato_id', $data['tipo_contrato_id'] ?? null);
-        $stmt->bindValue(':disponibilidade_id', $data['disponibilidade_id'] ?? null);
+        $stmt->bindValue(':tipo_contrato_id', $tipo_contrato_id);
+        $stmt->bindValue(':disponibilidade_id', $disponibilidade_id);
         $stmt->bindValue(':porcentagem_comissao', $data['porcentagem_comissao'] ?? 10.00);
         $stmt->bindValue(':observacoes', $data['observacoes'] ?? null);
         $stmt->bindValue(':cnh_arquivo', $cnh_arquivo_path);
@@ -771,10 +1066,27 @@ function addMotorist($data) {
         
         $stmt->execute();
         
+        $new_id = $conn->lastInsertId();
+        insertMotoristLog($conn, $new_id, $empresa_id, 'create', 'Cadastro do motorista criado', null, [
+            'nome' => $data['nome'],
+            'cpf' => trim($data['cpf'] ?? '') ?: null,
+            'cnh' => $data['cnh'] ?? null,
+            'data_validade_cnh' => $data['data_validade_cnh'] ?? null,
+            'telefone' => $data['telefone'] ?? null,
+            'telefone_emergencia' => $data['telefone_emergencia'] ?? null,
+            'email' => $data['email'] ?? null,
+            'endereco' => $data['endereco'] ?? null,
+            'data_contratacao' => $data['data_contratacao'] ?? null,
+            'tipo_contrato_id' => $data['tipo_contrato_id'] ?? null,
+            'disponibilidade_id' => $data['disponibilidade_id'] ?? null,
+            'porcentagem_comissao' => $data['porcentagem_comissao'] ?? 10.00,
+            'observacoes' => $data['observacoes'] ?? null
+        ]);
+        
         return [
             'success' => true,
             'message' => 'Motorista adicionado com sucesso',
-            'id' => $conn->lastInsertId()
+            'id' => $new_id
         ];
         
     } catch(PDOException $e) {
@@ -794,16 +1106,16 @@ function updateMotorist($id, $data) {
     try {
         $conn = getConnection();
         
-        // Validate required fields
-        if (empty($data['nome']) || empty($data['cpf'])) {
-            return ['success' => false, 'error' => 'Nome e CPF são obrigatórios'];
+        // Validate required fields (CPF é opcional)
+        if (empty(trim($data['nome'] ?? ''))) {
+            return ['success' => false, 'error' => 'Nome é obrigatório'];
         }
         
         // Get empresa_id from session
         $empresa_id = $_SESSION['empresa_id'];
         
-        // Verify motorist belongs to the company
-        $check_sql = "SELECT id, cnh_arquivo, contrato_arquivo, foto_motorista FROM motoristas WHERE id = ? AND empresa_id = ?";
+        // Verify motorist belongs to the company and get current values for log
+        $check_sql = "SELECT id, nome, cpf, cnh, data_validade_cnh, telefone, telefone_emergencia, email, endereco, data_contratacao, tipo_contrato_id, disponibilidade_id, porcentagem_comissao, observacoes, cnh_arquivo, contrato_arquivo, foto_motorista FROM motoristas WHERE id = ? AND empresa_id = ?";
         $check_stmt = $conn->prepare($check_sql);
         $check_stmt->execute([$id, $empresa_id]);
         
@@ -812,6 +1124,24 @@ function updateMotorist($id, $data) {
         }
         
         $current_data = $check_stmt->fetch(PDO::FETCH_ASSOC);
+        $old_for_log = [
+            'nome' => $current_data['nome'],
+            'cpf' => $current_data['cpf'],
+            'cnh' => $current_data['cnh'],
+            'data_validade_cnh' => $current_data['data_validade_cnh'],
+            'telefone' => $current_data['telefone'],
+            'telefone_emergencia' => $current_data['telefone_emergencia'] ?? null,
+            'email' => $current_data['email'],
+            'endereco' => $current_data['endereco'] ?? null,
+            'data_contratacao' => $current_data['data_contratacao'] ?? null,
+            'tipo_contrato_id' => $current_data['tipo_contrato_id'] ?? null,
+            'disponibilidade_id' => $current_data['disponibilidade_id'] ?? null,
+            'porcentagem_comissao' => $current_data['porcentagem_comissao'],
+            'observacoes' => $current_data['observacoes'] ?? null,
+            'cnh_arquivo' => !empty($current_data['cnh_arquivo']),
+            'contrato_arquivo' => !empty($current_data['contrato_arquivo']),
+            'foto_motorista' => !empty($current_data['foto_motorista'])
+        ];
         
         // Process uploaded files
         $foto_motorista_path = $current_data['foto_motorista'];
@@ -864,21 +1194,28 @@ function updateMotorist($id, $data) {
         
         $stmt = $conn->prepare($sql);
         
+        $disponibilidade_id = $data['disponibilidade_id'] ?? null;
+        if ($disponibilidade_id === '' || $disponibilidade_id === '0' || $disponibilidade_id === 0) $disponibilidade_id = null;
+        $categoria_cnh_id = $data['categoria_cnh_id'] ?? null;
+        if ($categoria_cnh_id === '' || $categoria_cnh_id === '0' || $categoria_cnh_id === 0) $categoria_cnh_id = null;
+        $tipo_contrato_id = $data['tipo_contrato_id'] ?? null;
+        if ($tipo_contrato_id === '' || $tipo_contrato_id === '0' || $tipo_contrato_id === 0) $tipo_contrato_id = null;
+
         // Bind parameters
         $stmt->bindValue(':id', $id);
         $stmt->bindValue(':empresa_id', $empresa_id);
         $stmt->bindValue(':nome', $data['nome']);
-        $stmt->bindValue(':cpf', $data['cpf']);
+        $stmt->bindValue(':cpf', trim((string)($data['cpf'] ?? '')) ?: '');
         $stmt->bindValue(':cnh', $data['cnh'] ?? null);
-        $stmt->bindValue(':categoria_cnh_id', $data['categoria_cnh_id'] ?? null);
+        $stmt->bindValue(':categoria_cnh_id', $categoria_cnh_id);
         $stmt->bindValue(':data_validade_cnh', $data['data_validade_cnh'] ?? null);
         $stmt->bindValue(':telefone', $data['telefone'] ?? null);
         $stmt->bindValue(':telefone_emergencia', $data['telefone_emergencia'] ?? null);
         $stmt->bindValue(':email', $data['email'] ?? null);
         $stmt->bindValue(':endereco', $data['endereco'] ?? null);
         $stmt->bindValue(':data_contratacao', $data['data_contratacao'] ?? null);
-        $stmt->bindValue(':tipo_contrato_id', $data['tipo_contrato_id'] ?? null);
-        $stmt->bindValue(':disponibilidade_id', $data['disponibilidade_id'] ?? null);
+        $stmt->bindValue(':tipo_contrato_id', $tipo_contrato_id);
+        $stmt->bindValue(':disponibilidade_id', $disponibilidade_id);
         $stmt->bindValue(':porcentagem_comissao', $data['porcentagem_comissao'] ?? 10.00);
         $stmt->bindValue(':observacoes', $data['observacoes'] ?? null);
         $stmt->bindValue(':cnh_arquivo', $cnh_arquivo_path);
@@ -886,6 +1223,43 @@ function updateMotorist($id, $data) {
         $stmt->bindValue(':foto_motorista', $foto_motorista_path);
         
         $stmt->execute();
+        
+        $new_for_log = [
+            'nome' => $data['nome'],
+            'cpf' => trim($data['cpf'] ?? '') ?: null,
+            'cnh' => $data['cnh'] ?? null,
+            'data_validade_cnh' => $data['data_validade_cnh'] ?? null,
+            'telefone' => $data['telefone'] ?? null,
+            'telefone_emergencia' => $data['telefone_emergencia'] ?? null,
+            'email' => $data['email'] ?? null,
+            'endereco' => $data['endereco'] ?? null,
+            'data_contratacao' => $data['data_contratacao'] ?? null,
+            'tipo_contrato_id' => $tipo_contrato_id,
+            'disponibilidade_id' => $disponibilidade_id,
+            'porcentagem_comissao' => $data['porcentagem_comissao'] ?? 10.00,
+            'observacoes' => $data['observacoes'] ?? null,
+            'cnh_arquivo' => !empty($cnh_arquivo_path),
+            'contrato_arquivo' => !empty($contrato_arquivo_path),
+            'foto_motorista' => !empty($foto_motorista_path)
+        ];
+        $changed = [];
+        $fieldLabels = [
+            'nome' => 'Nome', 'cpf' => 'CPF', 'cnh' => 'CNH', 'data_validade_cnh' => 'Validade CNH',
+            'telefone' => 'Telefone', 'telefone_emergencia' => 'Telefone emergência', 'email' => 'E-mail',
+            'endereco' => 'Endereço', 'data_contratacao' => 'Data contratação', 'tipo_contrato_id' => 'Tipo contrato',
+            'disponibilidade_id' => 'Disponibilidade', 'porcentagem_comissao' => 'Comissão %', 'observacoes' => 'Observações',
+            'cnh_arquivo' => 'Documento CNH', 'contrato_arquivo' => 'Documento contrato', 'foto_motorista' => 'Foto'
+        ];
+        foreach ($new_for_log as $k => $v) {
+            $old_v = $old_for_log[$k] ?? null;
+            if ((string)$old_v !== (string)$v) {
+                $changed[] = $fieldLabels[$k] ?? $k;
+            }
+        }
+        if (count($changed) > 0) {
+            $descricao = 'Alteração em: ' . implode(', ', $changed);
+            insertMotoristLog($conn, $id, $empresa_id, 'update', $descricao, $old_for_log, $new_for_log);
+        }
         
         return [
             'success' => true,

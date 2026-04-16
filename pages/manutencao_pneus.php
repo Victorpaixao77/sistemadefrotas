@@ -12,6 +12,8 @@ session_start();
 
 // Set page title
 $page_title = "Manutenção de Pneus";
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
+$classic_param = $is_modern ? '' : '&classic=1';
 
 // Obter conexão com o banco de dados
 $conn = getConnection();
@@ -38,17 +40,34 @@ if ($mes && $ano) {
 
 $kpis = fetchOne($conn, $sql, $params);
 
-// Consulta para obter as manutenções (sem filtro de mês/ano)
+// Paginação: definir página e limite antes da query da lista
+$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$limit = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
+$allowed_per = [5, 10, 25, 50, 100];
+if (!in_array($limit, $allowed_per)) {
+    $limit = 10;
+}
+$offset = ($page - 1) * $limit;
+
+// Total de registros para paginação
+$sql_count = "SELECT COUNT(*) as total FROM pneu_manutencao WHERE empresa_id = :empresa_id";
+$total = (int) fetchOne($conn, $sql_count, [':empresa_id' => $_SESSION['empresa_id']])['total'];
+$total_pages = $total > 0 ? (int) ceil($total / $limit) : 1;
+
+// Lista de manutenções com LIMIT/OFFSET (paginação efetiva)
 $sql = "SELECT m.*, p.numero_serie as numero_pneu, v.placa as placa_veiculo, t.nome as tipo_nome
         FROM pneu_manutencao m 
         LEFT JOIN pneus p ON m.pneu_id = p.id 
         LEFT JOIN veiculos v ON m.veiculo_id = v.id 
         LEFT JOIN tipo_manutencao_pneus t ON m.tipo_manutencao_id = t.id
         WHERE m.empresa_id = :empresa_id
-        ORDER BY m.data_manutencao DESC";
+        ORDER BY m.data_manutencao DESC
+        LIMIT :limit OFFSET :offset";
 
 $stmt = $conn->prepare($sql);
 $stmt->bindValue(':empresa_id', $_SESSION['empresa_id']);
+$stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+$stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
 $manutencoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -70,16 +89,6 @@ $stmt_veiculos = $conn->prepare($sql_veiculos);
 $stmt_veiculos->bindValue(':empresa_id', $_SESSION['empresa_id']);
 $stmt_veiculos->execute();
 $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
-
-// Pegar a página atual da URL ou definir como 1
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$limit = 5; // Registros por página
-$offset = ($page - 1) * $limit;
-
-// Primeiro, conta o total de registros
-$sql_count = "SELECT COUNT(*) as total FROM pneu_manutencao WHERE empresa_id = :empresa_id";
-$total = fetchOne($conn, $sql_count, [':empresa_id' => $_SESSION['empresa_id']])['total'];
-$total_pages = ceil($total / $limit);
 ?>
 
 <!DOCTYPE html>
@@ -95,6 +104,9 @@ $total_pages = ceil($total / $limit);
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="stylesheet" href="../css/maintenance.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
@@ -204,7 +216,7 @@ $total_pages = ceil($total / $limit);
         }
     </style>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'manutencao-pneus-modern' : ''; ?>">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
@@ -215,7 +227,15 @@ $total_pages = ceil($total / $limit);
             <?php include '../includes/header.php'; ?>
             
             <!-- Page Content -->
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <style>
+                    body.manutencao-pneus-modern .dashboard-content.fornc-page { overflow-x: auto; }
+                    body.manutencao-pneus-modern .dashboard-header h1 { display: none; }
+                    body.manutencao-pneus-modern .dashboard-grid { display: none; }
+                    body.manutencao-pneus-modern .filter-section { display: none; }
+                </style>
+
+                <?php if (!$is_modern): ?>
                 <div class="dashboard-header">
                     <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
@@ -229,12 +249,76 @@ $total_pages = ceil($total / $limit);
                             <button id="exportBtn" class="btn-toggle-layout" title="Exportar">
                                 <i class="fas fa-file-export"></i>
                             </button>
-                            <button id="helpBtn" class="btn-help" title="Ajuda">
+                            <button id="helpBtn" class="btn-help" title="Ajuda" aria-label="Ajuda">
                                 <i class="fas fa-question-circle"></i>
                             </button>
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
+
+                <?php if ($is_modern): ?>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Manutenções (mês)</span><span class="val"><?php echo (int)($kpis['manutencoes_mes'] ?? 0); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Custo total</span><span class="val">R$ <?php echo number_format($kpis['custo_total'] ?? 0, 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Total geral</span><span class="val"><?php echo (int)($kpis['total_manutencoes'] ?? 0); ?></span></div>
+                </div>
+                <div class="fornc-toolbar">
+                    <div class="fornc-search-block">
+                        <label for="searchMaintenance">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" id="searchMaintenance" placeholder="Buscar manutenção..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="fornc-filters-inline">
+                        <div class="fg">
+                            <label for="perPageManutencao">Por página</label>
+                            <select id="perPageManutencao" name="per_page" class="filter-per-page" title="Registros por página" onchange="document.getElementById('formPerPageManutencao')?.submit()">
+                                <option value="5"  <?php echo $limit == 5   ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $limit == 10  ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $limit == 25  ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $limit == 50  ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $limit == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="tipoFilter">Tipo</label>
+                            <select id="tipoFilter" title="Tipo de manutenção">
+                                <option value="">Todos os tipos</option>
+                                <?php
+                                $sql = "SELECT id, nome FROM tipo_manutencao_pneus ORDER BY nome";
+                                $tipos = executeQuery($conn, $sql);
+                                foreach ($tipos as $tipo) {
+                                    $nomeTipo = htmlspecialchars($tipo['nome']);
+                                    echo "<option value='{$nomeTipo}'>{$nomeTipo}</option>";
+                                }
+                                ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="fornc-btn-row">
+                        <button type="button" id="addMaintenanceBtn" class="fornc-btn fornc-btn--primary" title="Nova Manutenção">
+                            <i class="fas fa-plus"></i> Nova
+                        </button>
+                        <button type="button" id="filterBtn" class="fornc-btn fornc-btn--ghost" title="Filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" class="fornc-btn fornc-btn--accent" id="applyTireFilters" title="Aplicar filtros">
+                            <i class="fas fa-search"></i>
+                        </button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="clearTireFilters" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                        <button type="button" id="exportBtn" class="fornc-btn fornc-btn--muted" title="Exportar">
+                            <i class="fas fa-file-export"></i>
+                        </button>
+                        <button type="button" id="helpBtn" class="fornc-btn fornc-btn--ghost fornc-btn--icon" title="Ajuda" aria-label="Ajuda">
+                            <i class="fas fa-question-circle"></i>
+                        </button>
+                    </div>
+                </div>
+                <?php endif; ?>
                 
                 <!-- KPI Cards Row -->
                 <div class="dashboard-grid">
@@ -276,6 +360,7 @@ $total_pages = ceil($total / $limit);
                 </div>
                 
                 <!-- Search and Filter -->
+                <?php if (!$is_modern): ?>
                 <div class="filter-section">
                     <div class="search-box">
                         <input type="text" id="searchMaintenance" placeholder="Buscar manutenção...">
@@ -283,6 +368,21 @@ $total_pages = ceil($total / $limit);
                     </div>
                     
                     <div class="filter-options">
+                        <form method="get" action="" id="formPerPageManutencao" style="display:inline-flex; align-items:center; gap:0.5rem;">
+                            <?php if ($mes && $ano): ?>
+                                <input type="hidden" name="mes" value="<?php echo (int)$mes; ?>">
+                                <input type="hidden" name="ano" value="<?php echo (int)$ano; ?>">
+                            <?php endif; ?>
+                            <input type="hidden" name="page" value="1">
+                            <span class="filter-label">Por página</span>
+                            <select id="perPageManutencao" name="per_page" class="filter-per-page" title="Registros por página" onchange="this.form.submit()">
+                                <option value="5"  <?php echo $limit == 5   ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $limit == 10  ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $limit == 25  ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $limit == 50  ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $limit == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                        </form>
                         <select id="tipoFilter" title="Tipo de manutenção">
                             <option value="">Todos os tipos</option>
                             <?php
@@ -303,10 +403,11 @@ $total_pages = ceil($total / $limit);
                         </button>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- Maintenance Table -->
-                <div class="data-table-container">
-                    <table class="data-table" id="maintenanceTable">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="maintenanceTable">
                         <thead>
                             <tr>
                                 <th>Data</th>
@@ -343,24 +444,49 @@ $total_pages = ceil($total / $limit);
                         </tbody>
                     </table>
                     
-                    <!-- Pagination -->
-                    <div class="pagination">
-                        <?php if ($total_pages > 1): ?>
-                            <a href="#" class="pagination-btn <?php echo $page <= 1 ? 'disabled' : ''; ?>" 
-                               onclick="return changePage(<?php echo $page - 1; ?>)">
-                                <i class="fas fa-chevron-left"></i>
-                            </a>
-                            
-                            <span class="pagination-info">
-                                Página <?php echo $page; ?> de <?php echo $total_pages; ?>
-                            </span>
-                            
-                            <a href="#" class="pagination-btn <?php echo $page >= $total_pages ? 'disabled' : ''; ?>"
-                               onclick="return changePage(<?php echo $page + 1; ?>)">
-                                <i class="fas fa-chevron-right"></i>
-                            </a>
-                        <?php endif; ?>
+                    <!-- Paginação (igual abastecimentos.php) -->
+                    <?php
+                    $base_params = ['page' => 1, 'per_page' => $limit];
+                    if ($mes && $ano) {
+                        $base_params['mes'] = $mes;
+                        $base_params['ano'] = $ano;
+                    }
+                    $prev_params = array_merge($base_params, ['page' => max(1, $page - 1)]);
+                    $next_params = array_merge($base_params, ['page' => min($total_pages, $page + 1)]);
+                    ?>
+                    <?php if ($is_modern): ?>
+                    <div class="fornc-pagination-bar">
+                    <div class="pagination fornc-modern-pagination">
+                        <a href="manutencao_pneus.php?<?php echo htmlspecialchars(http_build_query($prev_params)); ?>"
+                           class="pagination-btn <?php echo $page <= 1 ? 'disabled' : ''; ?>">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                        <span class="pagination-info">
+                            <?php if ($total_pages > 1): ?>Página <?php echo $page; ?> de <?php echo $total_pages; ?> (<?php echo (int)$total; ?> registros)
+                            <?php else: ?><?php echo (int)$total; ?> registros<?php endif; ?>
+                        </span>
+                        <a href="manutencao_pneus.php?<?php echo htmlspecialchars(http_build_query($next_params)); ?>"
+                           class="pagination-btn <?php echo $page >= $total_pages ? 'disabled' : ''; ?>">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
                     </div>
+                    </div>
+                    <?php else: ?>
+                    <div class="pagination">
+                        <a href="manutencao_pneus.php?<?php echo htmlspecialchars(http_build_query($prev_params)); ?><?php echo $classic_param; ?>"
+                           class="pagination-btn <?php echo $page <= 1 ? 'disabled' : ''; ?>">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                        <span class="pagination-info">
+                            <?php if ($total_pages > 1): ?>Página <?php echo $page; ?> de <?php echo $total_pages; ?> (<?php echo (int)$total; ?> registros)
+                            <?php else: ?><?php echo (int)$total; ?> registros<?php endif; ?>
+                        </span>
+                        <a href="manutencao_pneus.php?<?php echo htmlspecialchars(http_build_query($next_params)); ?><?php echo $classic_param; ?>"
+                           class="pagination-btn <?php echo $page >= $total_pages ? 'disabled' : ''; ?>">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 
                 <!-- Analytics Section -->
@@ -423,8 +549,8 @@ $total_pages = ceil($total / $limit);
     </div>
 
     <!-- Add/Edit Maintenance Modal -->
-    <div class="modal" id="maintenanceModal">
-        <div class="modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="maintenanceModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2 id="modalTitle">Adicionar Manutenção</h2>
                 <span class="close-modal">&times;</span>
@@ -501,8 +627,8 @@ $total_pages = ceil($total / $limit);
     </div>
     
     <!-- View Maintenance Modal -->
-    <div class="modal" id="viewMaintenanceModal">
-        <div class="modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="viewMaintenanceModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2>Detalhes da Manutenção</h2>
                 <span class="close-modal">&times;</span>
@@ -546,7 +672,7 @@ $total_pages = ceil($total / $limit);
     </div>
     
     <!-- Help Modal -->
-    <div class="modal" id="helpModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Ajuda - Manutenção de Pneus</h2>
@@ -625,7 +751,7 @@ $total_pages = ceil($total / $limit);
     </div>
     
     <!-- Filter Modal -->
-    <div class="modal" id="filterModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="filterModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Filtros</h2>
@@ -698,6 +824,14 @@ $total_pages = ceil($total / $limit);
             
             document.getElementById('cancelMaintenanceBtn').addEventListener('click', closeAllModals);
             document.getElementById('saveMaintenanceBtn').addEventListener('click', saveMaintenance);
+        }
+        
+        function debounce(fn, delay) {
+            let timeout;
+            return function (...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => fn.apply(this, args), delay);
+            };
         }
         
         function setupFilters() {
@@ -1152,5 +1286,7 @@ $total_pages = ceil($total / $limit);
             return false;
         }
     </script>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html> 

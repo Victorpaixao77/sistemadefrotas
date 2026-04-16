@@ -19,6 +19,8 @@ require_authentication();
 
 // Set page title
 $page_title = "Abastecimentos";
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
+$classic_param = $is_modern ? '' : '&classic=1';
 
 // Pegar filtros da URL
 $data_rota_filtro = isset($_GET['data_rota']) ? $_GET['data_rota'] : '';
@@ -159,7 +161,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         setFlashMessage('error', 'Erro ao processar abastecimento: ' . $e->getMessage());
     }
     
-    header('Location: abastecimentos_motoristas.php');
+    header('Location: abastecimentos_motoristas.php' . ($is_modern ? '' : '?classic=1'));
     exit;
 }
 ?>
@@ -177,15 +179,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
+    <style>
+        body.abastecimentos-motoristas-modern .dashboard-content.fornc-page { overflow-x: auto; }
+    </style>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'abastecimentos-motoristas-modern' : ''; ?>">
     <div class="app-container">
         <?php include '../includes/sidebar_pages.php'; ?>
         
         <div class="main-content">
             <?php include '../includes/header.php'; ?>
             
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <?php if ($is_modern): ?>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Pendentes</span><span class="val"><?php echo $counts['pendentes']; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Aprovados</span><span class="val"><?php echo $counts['aprovados']; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Rejeitados</span><span class="val"><?php echo $counts['rejeitados']; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Total</span><span class="val"><?php echo $counts['total']; ?></span></div>
+                </div>
+                <div class="fornc-toolbar">
+                    <div class="fornc-search-block">
+                        <label for="searchFuelDriver">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" id="searchFuelDriver" placeholder="Buscar por motorista, veículo ou posto..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="fornc-filters-inline">
+                        <div class="fg">
+                            <label for="filterDataRota">Data</label>
+                            <input type="date" id="filterDataRota" title="Data da rota">
+                        </div>
+                        <div class="fg">
+                            <label for="filterVeiculo">Veículo</label>
+                            <select id="filterVeiculo" title="Veículo">
+                                <option value="">Todos os veículos</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="filterRota">Rota</label>
+                            <select id="filterRota" title="Rota">
+                                <option value="">Todas as rotas</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="statusFilter">Status</label>
+                            <select id="statusFilter" title="Status">
+                                <option value="">Todos os status</option>
+                                <option value="pendente">Pendentes</option>
+                                <option value="aprovado">Aprovados</option>
+                                <option value="rejeitado">Rejeitados</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="driverFilter">Motorista</label>
+                            <select id="driverFilter" title="Motorista">
+                                <option value="">Todos os motoristas</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="fornc-btn-row">
+                        <button type="button" id="applyRefuelDriverFilters" class="fornc-btn fornc-btn--accent" title="Aplicar filtros">
+                            <i class="fas fa-filter"></i>
+                        </button>
+                        <button type="button" id="clearRefuelDriverFilters" class="fornc-btn fornc-btn--ghost" title="Limpar filtros">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="dashboard-header">
                     <h1>Gestão de Abastecimentos</h1>
                 </div>
@@ -246,8 +312,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         </button>
                     </div>
                 </div>
-                <div class="table-container">
-                    <table class="data-table">
+                <?php endif; ?>
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>">
                         <thead>
                             <tr>
                                 <th>Data</th>
@@ -312,8 +379,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         </tbody>
                     </table>
                 </div>
+                <?php if ($is_modern): ?>
+                <div class="fornc-pagination-bar">
+                    <div class="pagination fornc-modern-pagination">
+                        <a href="?page=<?php echo max(1, $pagina_atual - 1); ?>" 
+                           class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                        
+                        <span class="pagination-info">
+                            Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
+                        </span>
+                        
+                        <a href="?page=<?php echo min($total_paginas, $pagina_atual + 1); ?>" 
+                           class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="pagination">
-                    <a href="?page=<?php echo max(1, $pagina_atual - 1); ?>" 
+                    <a href="?page=<?php echo max(1, $pagina_atual - 1); ?><?php echo $classic_param; ?>" 
                        class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
                         <i class="fas fa-chevron-left"></i>
                     </a>
@@ -322,11 +408,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?>
                     </span>
                     
-                    <a href="?page=<?php echo min($total_paginas, $pagina_atual + 1); ?>" 
+                    <a href="?page=<?php echo min($total_paginas, $pagina_atual + 1); ?><?php echo $classic_param; ?>" 
                        class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -586,43 +673,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 searchInput.addEventListener('input', applySearchFilter);
             }
 
-            // Eventos para filtro dinâmico
-            document.getElementById('filterDataRota').addEventListener('change', function() {
-                const data = this.value;
-                if (data) {
-                    // Carregar veículos disponíveis para a data
-                    fetch(`../api/refuel_data.php?action=get_veiculos_by_data&data=${data}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                const veiculoSelect = document.getElementById('filterVeiculo');
-                                veiculoSelect.innerHTML = '<option value="">Todos os veículos</option>' +
-                                    data.data.map(v => `<option value="${v.id}">${v.placa} (${v.modelo})</option>`).join('');
-                                veiculoSelect.disabled = false;
-                            }
-                        });
-                }
-            });
+            // Eventos para filtro dinâmico (somente se os controles existirem)
+            const filterDataRotaEl = document.getElementById('filterDataRota');
+            const filterVeiculoEl = document.getElementById('filterVeiculo');
 
-            document.getElementById('filterVeiculo').addEventListener('change', function() {
-                const veiculoId = this.value;
-                const data = document.getElementById('filterDataRota').value;
-                if (veiculoId && data) {
-                    // Carregar rotas disponíveis para o veículo e data
-                    fetch(`../api/refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${veiculoId}&data=${data}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                const rotaSelect = document.getElementById('filterRota');
-                                rotaSelect.innerHTML = '<option value="">Todas as rotas</option>' +
-                                    data.data.map(r => `<option value="${r.id}">${r.data_rota} - ${r.cidade_origem_nome} → ${r.cidade_destino_nome}</option>`).join('');
-                                rotaSelect.disabled = false;
-                            }
-                        });
-                }
-            });
+            if (filterDataRotaEl) {
+                filterDataRotaEl.addEventListener('change', function() {
+                    const data = this.value;
+                    if (data) {
+                        // Carregar veículos disponíveis para a data
+                        fetch(`../api/refuel_data.php?action=get_veiculos_by_data&data=${data}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    const veiculoSelect = document.getElementById('filterVeiculo');
+                                    if (!veiculoSelect) return;
+                                    veiculoSelect.innerHTML = '<option value="">Todos os veículos</option>' +
+                                        data.data.map(v => `<option value="${v.id}">${v.placa} (${v.modelo})</option>`).join('');
+                                    veiculoSelect.disabled = false;
+                                }
+                            });
+                    }
+                });
+            }
 
-            document.getElementById('applyRefuelDriverFilters').addEventListener('click', function() {
+            if (filterVeiculoEl) {
+                filterVeiculoEl.addEventListener('change', function() {
+                    const veiculoId = this.value;
+                    const data = document.getElementById('filterDataRota')?.value;
+                    if (veiculoId && data) {
+                        // Carregar rotas disponíveis para o veículo e data
+                        fetch(`../api/refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${veiculoId}&data=${data}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    const rotaSelect = document.getElementById('filterRota');
+                                    if (!rotaSelect) return;
+                                    rotaSelect.innerHTML = '<option value="">Todas as rotas</option>' +
+                                        data.data.map(r => `<option value="${r.id}">${r.data_rota} - ${r.cidade_origem_nome} → ${r.cidade_destino_nome}</option>`).join('');
+                                    rotaSelect.disabled = false;
+                                }
+                            });
+                    }
+                });
+            }
+
+            const classicParamJs = <?php echo json_encode($classic_param); ?>; // '' ou '&classic=1'
+            const classicQueryJs = <?php echo $is_modern ? json_encode('') : json_encode('?classic=1'); ?>; // '' ou '?classic=1'
+
+            const applyFiltersBtn = document.getElementById('applyRefuelDriverFilters');
+            if (applyFiltersBtn) applyFiltersBtn.addEventListener('click', function() {
                 const data = document.getElementById('filterDataRota').value;
                 const veiculo = document.getElementById('filterVeiculo').value;
                 const rota = document.getElementById('filterRota').value;
@@ -634,10 +734,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if (rota) url += `rota_id=${rota}&`;
                 if (status) url += `status=${status}`;
 
-                window.location.href = url.endsWith('?') ? 'abastecimentos_motoristas.php' : url;
+                window.location.href = url.endsWith('?')
+                    ? ('abastecimentos_motoristas.php' + classicQueryJs)
+                    : (url + classicParamJs);
             });
 
-            document.getElementById('clearRefuelDriverFilters').addEventListener('click', function() {
+            const clearFiltersBtn = document.getElementById('clearRefuelDriverFilters');
+            if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', function() {
                 const dataInput = document.getElementById('filterDataRota');
                 const veiculoSelect = document.getElementById('filterVeiculo');
                 const rotaSelect = document.getElementById('filterRota');
@@ -651,7 +754,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 if (statusSelect) statusSelect.value = '';
                 if (driverSelect) driverSelect.value = '';
 
-                window.location.href = 'abastecimentos_motoristas.php';
+                window.location.href = 'abastecimentos_motoristas.php' + classicQueryJs;
             });
 
             // Adicionar função para carregar rotas
@@ -713,8 +816,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     </script>
 
     <!-- Modal de Visualização -->
-    <div id="viewModal" class="modal">
-        <div class="modal-content">
+    <div id="viewModal" class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2 id="viewModalTitle">Detalhes do Abastecimento</h2>
                 <span class="close-modal">&times;</span>
@@ -755,8 +858,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     </div>
 
     <!-- Modal de Edição -->
-    <div id="editModal" class="modal">
-        <div class="modal-content">
+    <div id="editModal" class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2>Editar Abastecimento</h2>
                 <span class="close-modal">&times;</span>

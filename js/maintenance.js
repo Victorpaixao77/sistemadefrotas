@@ -145,13 +145,7 @@ function initializeModals() {
                 modal.classList.remove('active');
             }
         });
-
-        // Close when pressing Escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal.classList.contains('active')) {
-                modal.classList.remove('active');
-            }
-        });
+        // Escape: js/modal_a11y.js (global)
     });
 }
 
@@ -234,6 +228,9 @@ function buildPageUrl(page) {
     if (d.get('data_fim')) params.set('data_fim', d.get('data_fim'));
     params.set('order', d.get('order') || 'data_manutencao');
     params.set('dir', d.get('dir') || 'DESC');
+    if (!document.body.classList.contains('manutencoes-modern')) {
+        params.set('classic', '1');
+    }
     return '?' + params.toString();
 }
 
@@ -296,7 +293,7 @@ function loadPageViaAjax(page) {
     const tbody = document.getElementById('maintenanceTableBody');
     if (!tbody) return Promise.resolve();
     const url = buildListUrl(page);
-    const container = tbody.closest('.data-table-container');
+    const container = tbody.closest('.data-table-container') || tbody.closest('.fornc-table-wrap') || tbody.closest('.mann-table-wrap');
     if (container) container.classList.add('loading');
     return fetch(url, { credentials: 'include' })
         .then(r => r.json())
@@ -1155,7 +1152,10 @@ async function initializeMaintenanceCharts(preloadedData) {
     } catch (error) {
         console.error('Erro ao carregar dados dos gráficos:', error);
         console.error('Stack trace:', error.stack);
-        const errorMessage = `Erro ao carregar dados dos gráficos: ${error.message}`;
+        const msg = (typeof sfSafeErrorMessage === 'function')
+            ? sfSafeErrorMessage(error, 'Falha ao carregar os gráficos.')
+            : (error && error.message) || 'Falha ao carregar os gráficos.';
+        const errorMessage = `Erro ao carregar dados dos gráficos: ${msg}`;
         alert(errorMessage);
         const section = document.getElementById('analyticsSection');
         if (section) {

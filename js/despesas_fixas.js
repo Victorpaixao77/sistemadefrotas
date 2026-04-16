@@ -1,3 +1,58 @@
+(function (g) {
+    g.sfApiUrl = g.sfApiUrl || function (rel) {
+        rel = String(rel || '').replace(/^\//, '');
+        var b = typeof g.__SF_API_BASE__ === 'string' && g.__SF_API_BASE__ !== ''
+            ? String(g.__SF_API_BASE__).replace(/\/+$/, '')
+            : '';
+        if (b) return b + '/' + rel;
+        try { return new URL('../api/' + rel, g.location.href).href; }
+        catch (e) { return '../api/' + rel; }
+    };
+})(typeof window !== 'undefined' ? window : this);
+
+var dfSortField = 'vencimento';
+var dfSortDir = 'DESC';
+
+var DF_ALLOWED_SORT = ['vencimento', 'veiculo_placa', 'tipo_nome', 'descricao', 'valor', 'status_nome', 'data_pagamento', 'forma_pagamento_nome', 'repetir'];
+
+function dfDefaultSortDir(field) {
+    const textLike = ['veiculo_placa', 'tipo_nome', 'descricao', 'status_nome', 'forma_pagamento_nome'];
+    if (textLike.indexOf(field) >= 0) return 'ASC';
+    return 'DESC';
+}
+
+function syncDfSortIndicators() {
+    const table = document.getElementById('despesasTable');
+    if (!table) return;
+    table.querySelectorAll('thead th.sortable').forEach(function (th) {
+        const field = th.getAttribute('data-sort');
+        const ind = th.querySelector('.sort-ind');
+        if (!ind) return;
+        const on = field === dfSortField;
+        th.classList.toggle('sorted', on);
+        ind.textContent = on ? (dfSortDir === 'ASC' ? '▲' : '▼') : '⇅';
+    });
+}
+
+function wireDespesasFixasSortHeaders() {
+    const table = document.getElementById('despesasTable');
+    if (!table) return;
+    table.querySelectorAll('thead th.sortable').forEach(function (th) {
+        th.addEventListener('click', function () {
+            const field = th.getAttribute('data-sort');
+            if (!field) return;
+            if (dfSortField === field) {
+                dfSortDir = dfSortDir === 'ASC' ? 'DESC' : 'ASC';
+            } else {
+                dfSortField = field;
+                dfSortDir = dfDefaultSortDir(field);
+            }
+            syncDfSortIndicators();
+            loadDespesasData(1);
+        });
+    });
+}
+
 // Global variables
 let currentFilter = null;
 let currentPage = 1;
@@ -170,7 +225,7 @@ function initializeFormasPagamentoChart() {
 // Load data functions
 async function loadVehicles() {
     try {
-        const response = await fetch('../api/veiculos.php?action=list');
+        const response = await fetch(sfApiUrl('veiculos.php?action=list'));
         if (!response.ok) throw new Error('Erro ao carregar veículos');
         
         const result = await response.json();
@@ -208,7 +263,7 @@ async function loadVehicles() {
 
 async function loadPaymentMethods() {
     try {
-        const response = await fetch('../api/formas_pagamento.php?action=list');
+        const response = await fetch(sfApiUrl('formas_pagamento.php?action=list'));
         if (!response.ok) throw new Error('Erro ao carregar formas de pagamento');
         
         const data = await response.json();
@@ -266,7 +321,7 @@ async function loadDespesasData(page = null) {
         // Build URL with filters (per_page igual ao select da página)
         const perPageSelect = document.querySelector('select.filter-per-page');
         const perPage = perPageSelect ? perPageSelect.value : '10';
-        let url = '../api/despesas_fixas.php?action=list';
+        let url = sfApiUrl('despesas_fixas.php?action=list');
         url += `&page=${currentPage}&per_page=${perPage}`;
         if (search) url += `&search=${encodeURIComponent(search)}`;
         if (vehicleFilter) url += `&veiculo=${encodeURIComponent(vehicleFilter)}`;
@@ -277,7 +332,25 @@ async function loadDespesasData(page = null) {
             const [year, month] = currentFilter.split('-');
             url += `&year=${year}&month=${month}`;
         }
-        
+        url += `&sort=${encodeURIComponent(dfSortField)}&dir=${encodeURIComponent(dfSortDir)}`;
+
+        const isModern = document.body.classList.contains('despesas-fixas-modern');
+        const hasListFilters = !!(search || vehicleFilter || tipoFilter || statusFilter || paymentFilter || currentFilter);
+        const isDefaultSort = dfSortField === 'vencimento' && dfSortDir === 'DESC';
+        const urlParams = new URLSearchParams();
+        urlParams.set('page', String(currentPage));
+        urlParams.set('per_page', String(perPage));
+        if (!isModern) urlParams.set('classic', '1');
+        if (!isDefaultSort) {
+            urlParams.set('sort', dfSortField);
+            urlParams.set('dir', dfSortDir);
+        }
+        const isDefaultPage = currentPage === 1 && parseInt(perPage, 10) === 10 && !hasListFilters && isDefaultSort;
+        const desiredSearch = isDefaultPage && isModern ? '' : ('?' + urlParams.toString());
+        if (window.location.search !== desiredSearch) {
+            window.history.replaceState({}, '', window.location.pathname + desiredSearch);
+        }
+
         const response = await fetch(url);
         if (!response.ok) throw new Error('Erro ao carregar dados');
         
@@ -286,6 +359,7 @@ async function loadDespesasData(page = null) {
         // Update table and pagination (padrão: "Página X de Y (N registros)")
         updateDespesasTable(data.despesas);
         updatePagination(data.pagina_atual, data.total_paginas, data.total_registros || 0);
+        syncDfSortIndicators();
         updateKPICards(data.metrics);
         updateCharts(data.charts);
         
@@ -306,7 +380,7 @@ function updateDespesasTable(despesas) {
             <td>${despesa.veiculo_placa || '-'}</td>
             <td>${despesa.tipo_nome || '-'}</td>
             <td>${despesa.descricao || '-'}</td>
-            <td>R$ ${formatCurrency(despesa.valor)}</td>
+            <td>R$ ${formatNumber(despesa.valor, 2)}</td>
             <td>${despesa.status_nome || '-'}</td>
             <td>${despesa.data_pagamento ? formatDate(despesa.data_pagamento) : '-'}</td>
             <td>${despesa.forma_pagamento_nome || '-'}</td>
@@ -334,22 +408,14 @@ function updateDespesasTable(despesas) {
 
 function updateKPICards(metrics) {
     if (!metrics) return;
-    
-    // Update total despesas
-    document.querySelector('.dashboard-card:nth-child(1) .metric-value').textContent = 
-        metrics.total_despesas || '0';
-    
-    // Update valor total
-    document.querySelector('.dashboard-card:nth-child(2) .metric-value').textContent = 
-        `R$ ${formatNumber(metrics.valor_total || 0, 2)}`;
-    
-    // Update pendentes
-    document.querySelector('.dashboard-card:nth-child(3) .metric-value').textContent = 
-        metrics.total_pendentes || '0';
-    
-    // Update vencidas
-    document.querySelector('.dashboard-card:nth-child(4) .metric-value').textContent = 
-        metrics.total_vencidas || '0';
+    function setKpi(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+    setKpi('dfKpiQtd', String(metrics.total_despesas || '0'));
+    setKpi('dfKpiValor', `R$ ${formatNumber(metrics.valor_total || 0, 2)}`);
+    setKpi('dfKpiPendentes', String(metrics.total_pendentes || '0'));
+    setKpi('dfKpiVencidas', String(metrics.total_vencidas || '0'));
 }
 
 function updateCharts(data) {
@@ -412,8 +478,12 @@ function updatePagination(currentPage, totalPages, totalRegistros) {
     // Atualizar href dos links para manter per_page na URL
     const perPageSelect = document.querySelector('select.filter-per-page');
     const perPage = perPageSelect ? perPageSelect.value : '10';
-    prevBtn.href = currentPage > 1 ? `?page=${currentPage - 1}&per_page=${perPage}` : '#';
-    nextBtn.href = currentPage < totalPagesNum ? `?page=${currentPage + 1}&per_page=${perPage}` : '#';
+    const classic = document.body.classList.contains('despesas-fixas-modern') ? '' : '&classic=1';
+    const sortQs = (dfSortField !== 'vencimento' || dfSortDir !== 'DESC')
+        ? `&sort=${encodeURIComponent(dfSortField)}&dir=${encodeURIComponent(dfSortDir)}`
+        : '';
+    prevBtn.href = currentPage > 1 ? `?page=${currentPage - 1}&per_page=${perPage}${classic}${sortQs}` : '#';
+    nextBtn.href = currentPage < totalPagesNum ? `?page=${currentPage + 1}&per_page=${perPage}${classic}${sortQs}` : '#';
     
     // Remove old event listeners
     prevBtn.replaceWith(prevBtn.cloneNode(true));
@@ -451,7 +521,7 @@ function showAddDespesaModal() {
 
 async function showEditDespesaModal(id) {
     await loadVehicles();
-    fetch(`../api/despesas_fixas.php?action=get&id=${id}`)
+    fetch(sfApiUrl(`despesas_fixas.php?action=get&id=${id}`))
         .then(response => response.json())
         .then(data => {
             document.getElementById('despesaId').value = data.id;
@@ -486,11 +556,12 @@ async function handleDespesaSubmit(event) {
     }
     
     try {
-        console.log('Iniciando salvamento da despesa...');
-        
         // Get form data
         const form = document.getElementById('despesaForm');
         const formData = new FormData(form);
+        if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+            formData.append('csrf_token', window.__SF_CSRF__);
+        }
         
         // Adiciona o ID da despesa se estiver editando
         const despesaId = document.getElementById('despesaId').value;
@@ -498,17 +569,13 @@ async function handleDespesaSubmit(event) {
             formData.append('id', despesaId);
         }
         
-        // Log form data for debugging
-        console.log('Dados do formulário:', Object.fromEntries(formData));
-        
         // Send request to API
-        const response = await fetch('../api/despesas_fixas.php', {
+        const response = await fetch(sfApiUrl('despesas_fixas.php'), {
             method: 'POST',
             body: formData
         });
         
         const result = await response.json();
-        console.log('Resposta da API:', result);
         
         if (result.success) {
             // Close modal and reload data
@@ -598,7 +665,12 @@ function setupTableButtons() {
         button.addEventListener('click', () => {
             const comprovante = button.getAttribute('data-comprovante');
             if (comprovante) {
-                window.open('../' + comprovante, '_blank');
+                const rel = String(comprovante).replace(/^\//, '');
+                try {
+                    window.open(new URL('../' + rel, window.location.href).href, '_blank');
+                } catch (e) {
+                    window.open('../' + rel, '_blank');
+                }
             }
         });
     });
@@ -606,7 +678,7 @@ function setupTableButtons() {
 
 async function deleteDespesa(id) {
     try {
-        const response = await fetch(`../api/despesas_fixas.php?action=delete&id=${id}`, {
+        const response = await fetch(sfApiUrl(`despesas_fixas.php?action=delete&id=${id}`), {
             method: 'DELETE'
         });
         
@@ -621,6 +693,17 @@ async function deleteDespesa(id) {
 // Initialize page
 document.addEventListener('DOMContentLoaded', async function() {
     try {
+        const urlParamsInit = new URLSearchParams(window.location.search);
+        if (urlParamsInit.has('sort')) {
+            const s = urlParamsInit.get('sort');
+            if (s && DF_ALLOWED_SORT.indexOf(s) >= 0) {
+                dfSortField = s;
+            }
+        }
+        if (urlParamsInit.has('dir')) {
+            dfSortDir = (urlParamsInit.get('dir') || '').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+        }
+
         // Initialize components
         initializeDespesasTipoChart();
         initializeStatusDespesasChart();
@@ -636,18 +719,36 @@ document.addEventListener('DOMContentLoaded', async function() {
         // Setup event listeners
         setupModalEventListeners();
         setupTableButtons();
+
+        wireDespesasFixasSortHeaders();
+        syncDfSortIndicators();
+
+        document.querySelectorAll('form.df-per-page-form').forEach(function (form) {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                loadDespesasData(1);
+            });
+        });
+        document.querySelectorAll('select.filter-per-page').forEach(function (sel) {
+            sel.addEventListener('change', function () {
+                loadDespesasData(1);
+            });
+        });
         
         // Load initial data
         await loadDespesasData();
-        
+
         // Setup filter event listeners
         document.getElementById('filterBtn').addEventListener('click', showFilterModal);
         document.getElementById('helpBtn').addEventListener('click', showHelpModal);
         document.getElementById('addDespesaBtn').addEventListener('click', showAddDespesaModal);
         
         // Setup search and filter events
-        document.getElementById('searchDespesa').addEventListener('input', debounce(loadDespesasData, 500));
-        document.querySelectorAll('.filter-options select').forEach(select => {
+        const searchDespesaEl = document.getElementById('searchDespesa');
+        if (searchDespesaEl) {
+            searchDespesaEl.addEventListener('input', debounce(loadDespesasData, 500));
+        }
+        document.querySelectorAll('.filter-options select, .fornc-filters-inline select:not(.filter-per-page)').forEach(function (select) {
             select.addEventListener('change', loadDespesasData);
         });
         const applyFiltersBtn = document.getElementById('applyFixedExpenseFilters');
@@ -659,7 +760,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             clearFiltersBtn.addEventListener('click', () => {
                 const searchInput = document.getElementById('searchDespesa');
                 if (searchInput) searchInput.value = '';
-                document.querySelectorAll('.filter-options select').forEach(select => {
+                document.querySelectorAll('.filter-options select, .fornc-filters-inline select:not(.filter-per-page)').forEach(function (select) {
                     select.value = '';
                 });
                 loadDespesasData();
@@ -712,6 +813,11 @@ function setupModalEventListeners() {
     // Cancel button
     if (cancelBtn) {
         cancelBtn.addEventListener('click', () => closeModal('despesaModal'));
+    }
+
+    const despesaForm = document.getElementById('despesaForm');
+    if (despesaForm) {
+        despesaForm.addEventListener('submit', handleDespesaSubmit);
     }
     
     // Save button

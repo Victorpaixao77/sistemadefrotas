@@ -1,6 +1,8 @@
 <?php
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
 configure_session();
 session_start();
@@ -12,6 +14,9 @@ if (!isset($_SESSION['empresa_id'])) {
 
 $empresa_id = $_SESSION['empresa_id'];
 $conn = getConnection();
+
+// Protege mutações (POST/PUT/PATCH/DELETE) com CSRF e retorno JSON padronizado.
+api_require_csrf_json();
 
 // Processar requisições - suportar JSON e POST
 $input = file_get_contents('php://input');

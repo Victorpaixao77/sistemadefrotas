@@ -4,6 +4,8 @@ $base_path = dirname(__DIR__);
 require_once $base_path . '/includes/config.php';
 require_once $base_path . '/includes/functions.php';
 require_once $base_path . '/includes/db_connect.php';
+require_once $base_path . '/includes/csrf.php';
+require_once $base_path . '/includes/api_json.php';
 
 configure_session();
 session_start();
@@ -21,6 +23,13 @@ $conn = getConnection();
 header('Content-Type: application/json');
 
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
+
+if (in_array($action, ['create', 'update', 'delete'], true)) {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        api_json_method_not_allowed('Use POST para alterar dados.');
+    }
+    api_require_csrf_json();
+}
 
 try {
     switch ($action) {

@@ -14,7 +14,7 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_
     // Clear session and redirect to login
     session_unset();
     session_destroy();
-    header("location: /sistema-frotas/login.php");
+    header('location: ' . sf_app_url('login.php'));
     exit;
 }
 
@@ -28,7 +28,7 @@ try {
     if ($stmt->rowCount() === 0 || $stmt->fetch()['status'] !== 'ativo') {
         session_unset();
         session_destroy();
-        header("location: /sistema-frotas/login.php?error=empresa_inativa");
+        header('location: ' . sf_app_url('login.php?error=empresa_inativa'));
         exit;
     }
 } catch(PDOException $e) {
@@ -41,6 +41,29 @@ $page_title = "Empresa";
 
 // Get company data from database
 $companyData = getCompanyData();
+
+// CRT (situação tributária do emitente na NF-e) — coluna fiscal_config_empresa.crt
+$fiscal_crt = 1;
+$fiscal_crt_editable = false;
+try {
+    $connF = getConnection();
+    $tbl = $connF->query("SHOW TABLES LIKE 'fiscal_config_empresa'");
+    if ($tbl && $tbl->rowCount() > 0) {
+        $colCrt = $connF->query("SHOW COLUMNS FROM fiscal_config_empresa LIKE 'crt'");
+        if ($colCrt && $colCrt->rowCount() > 0) {
+            $fiscal_crt_editable = true;
+            $st = $connF->prepare('SELECT crt FROM fiscal_config_empresa WHERE empresa_id = ? LIMIT 1');
+            $st->execute([$_SESSION['empresa_id']]);
+            $fr = $st->fetch(PDO::FETCH_ASSOC);
+            if ($fr && isset($fr['crt'])) {
+                $fiscal_crt = max(1, min(3, (int)$fr['crt']));
+            }
+        }
+    }
+} catch (Throwable $e) {
+    $fiscal_crt = 1;
+    $fiscal_crt_editable = false;
+}
 
 // Handle form submission
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -86,6 +109,43 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
         
         if ($stmt->execute()) {
+            // Atualizar situação tributária (CRT) na configuração fiscal, se disponível
+            $fiscal_crt_post = isset($_POST['fiscal_crt']) ? (int)$_POST['fiscal_crt'] : 1;
+            if (!in_array($fiscal_crt_post, [1, 2, 3], true)) {
+                $fiscal_crt_post = 1;
+            }
+            try {
+                $chkTbl = $conn->query("SHOW TABLES LIKE 'fiscal_config_empresa'");
+                $chkCol = $conn->query("SHOW COLUMNS FROM fiscal_config_empresa LIKE 'crt'");
+                if ($chkTbl && $chkTbl->rowCount() > 0 && $chkCol && $chkCol->rowCount() > 0) {
+                    $stEx = $conn->prepare('SELECT id FROM fiscal_config_empresa WHERE empresa_id = ? LIMIT 1');
+                    $stEx->execute([$_SESSION['empresa_id']]);
+                    if ($stEx->fetch()) {
+                        $up = $conn->prepare('UPDATE fiscal_config_empresa SET crt = ? WHERE empresa_id = ?');
+                        $up->execute([$fiscal_crt_post, $_SESSION['empresa_id']]);
+                    } else {
+                        $cnpjLimpo = preg_replace('/\D/', '', (string)$data['cnpj']);
+                        $razao = trim((string)$data['razao_social']);
+                        if (strlen($cnpjLimpo) === 14 && $razao !== '') {
+                            $ins = $conn->prepare(
+                                'INSERT INTO fiscal_config_empresa (empresa_id, cnpj, razao_social, nome_fantasia, ambiente_sefaz, crt) VALUES (?, ?, ?, ?, ?, ?)'
+                            );
+                            $ins->execute([
+                                $_SESSION['empresa_id'],
+                                $data['cnpj'],
+                                $razao,
+                                $data['nome_fantasia'] !== '' ? $data['nome_fantasia'] : null,
+                                'homologacao',
+                                $fiscal_crt_post
+                            ]);
+                        }
+                    }
+                    $fiscal_crt = $fiscal_crt_post;
+                }
+            } catch (Throwable $e) {
+                error_log('empresa.php: falha ao salvar CRT fiscal: ' . $e->getMessage());
+            }
+
             setFlashMessage('success', 'Dados da empresa atualizados com sucesso!');
             $companyData = getCompanyData(); // Refresh data
         } else {
@@ -208,6 +268,38 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             font-size: 1.1rem;
         }
         
+        .dashboard-content .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1rem 1.25rem;
+        }
+        .dashboard-content .form-grid .form-group label {
+            display: block;
+            margin-bottom: 0.35rem;
+        }
+        .dashboard-content .form-grid .form-group input[type="text"],
+        .dashboard-content .form-grid .form-group input[type="email"],
+        .dashboard-content .form-grid .form-group select {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        .dashboard-content .form-grid .form-group textarea.empresa-logradouro {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            min-height: 4.5rem;
+            line-height: 1.45;
+            resize: vertical;
+            font-family: inherit;
+            font-size: inherit;
+        }
+        /* CRT: não ocupar a largura inteira do card */
+        .dashboard-content .form-grid .form-group.empresa-fiscal-crt select#fiscal_crt {
+            width: 100%;
+            max-width: 28rem;
+        }
+
         .form-group-full {
             grid-column: 1 / -1;
         }
@@ -236,6 +328,46 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         
         .btn-lg i {
             margin-right: 8px;
+        }
+        .empresa-cnpj-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        .empresa-cnpj-row input#cnpj {
+            flex: 0 0 auto;
+            width: 15.75rem;
+            max-width: 100%;
+            min-width: 11rem;
+        }
+        .empresa-cnpj-row .btn-buscar-cnpj {
+            white-space: nowrap;
+            padding: 10px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color, #dee2e6);
+            background: var(--bg-secondary, #f8f9fa);
+            color: var(--text-primary, #333);
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .empresa-cnpj-row .btn-buscar-cnpj:hover:not(:disabled) {
+            background: var(--primary-color, #0d6efd);
+            color: #fff;
+            border-color: var(--primary-color, #0d6efd);
+        }
+        .empresa-cnpj-row .btn-buscar-cnpj:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+        }
+        #empresaBrasilapiHint {
+            display: block;
+            width: 100%;
+            margin-top: 6px;
+            font-size: 0.85rem;
+            color: var(--text-secondary, #6c757d);
         }
     </style>
 </head>
@@ -293,10 +425,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         </div>
                         <div class="card-body">
                             <div class="form-grid">
-                                <div class="form-group">
+                                <div class="form-group form-group-full">
                                     <label for="cnpj">CNPJ *</label>
-                                    <input type="text" id="cnpj" name="cnpj" 
-                                           value="<?php echo htmlspecialchars($companyData['cnpj'] ?? ''); ?>" required>
+                                    <div class="empresa-cnpj-row">
+                                        <input type="text" id="cnpj" name="cnpj" maxlength="18" autocomplete="off"
+                                               placeholder="Ex.: 02.603.624/0001-29"
+                                               value="<?php echo htmlspecialchars($companyData['cnpj'] ?? ''); ?>" required>
+                                        <button type="button" class="btn-buscar-cnpj" id="btnEmpresaBuscarCnpj" title="Consulta gratuita BrasilAPI (mesma do cadastro de fornecedores)">
+                                            <i class="fas fa-cloud-download-alt"></i> Buscar CNPJ
+                                        </button>
+                                    </div>
+                                    <small id="empresaBrasilapiHint"></small>
                                 </div>
                                 
                                 <div class="form-group">
@@ -304,6 +443,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     <input type="text" id="inscricaoEstadual" name="inscricao_estadual" 
                                            value="<?php echo htmlspecialchars($companyData['inscricao_estadual'] ?? ''); ?>">
                                 </div>
+                                <?php if (!empty($fiscal_crt_editable)): ?>
+                                <div class="form-group form-group-full empresa-fiscal-crt">
+                                    <label for="fiscal_crt">Situação tributária (CRT — emitente NF-e)</label>
+                                    <select id="fiscal_crt" name="fiscal_crt">
+                                        <option value="1" <?php echo (int)$fiscal_crt === 1 ? 'selected' : ''; ?>>1 — Simples Nacional</option>
+                                        <option value="2" <?php echo (int)$fiscal_crt === 2 ? 'selected' : ''; ?>>2 — Simples Nacional (excesso de sublimite de receita bruta)</option>
+                                        <option value="3" <?php echo (int)$fiscal_crt === 3 ? 'selected' : ''; ?>>3 — Regime normal (Lucro presumido ou real)</option>
+                                    </select>
+                                </div>
+                                <?php else: ?>
+                                <div class="form-group form-group-full">
+                                    <p class="form-text" style="margin:0;color:var(--text-secondary);font-size:0.9rem;">
+                                        <strong>Situação tributária (CRT):</strong> indisponível — instale/atualize o banco fiscal (<code>fiscal_config_empresa.crt</code>) para editar aqui.
+                                    </p>
+                                </div>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -339,9 +494,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             <div class="form-grid">
                                 <div class="form-group form-group-full">
                                     <label for="endereco">Logradouro</label>
-                                    <input type="text" id="endereco" name="endereco" 
-                                           value="<?php echo htmlspecialchars($companyData['endereco'] ?? ''); ?>"
-                                           placeholder="Rua, Avenida, etc.">
+                                    <textarea id="endereco" name="endereco" class="empresa-logradouro" rows="3"
+                                              placeholder="Rua, Avenida, número, complemento, bairro..."><?php echo htmlspecialchars($companyData['endereco'] ?? ''); ?></textarea>
                                 </div>
                                 
                                 <div class="form-group">
@@ -399,16 +553,169 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <?php include '../includes/footer.php'; ?>
     
     <!-- JavaScript Files -->
+    <script src="../js/doc_validators.js"></script>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <script>
-        $(document).ready(function() {
-            // Aplicar máscaras nos campos
-            $('#cnpj').mask('00.000.000/0000-00');
-            $('#cep').mask('00000-000');
-            $('#telefone').mask('(00) 00000-0000');
-            $('#inscricaoEstadual').mask('000.000.000.000');
-        });
+        (function () {
+            function apiCnpjUrl() {
+                try {
+                    return new URL('../api/cnpj_brasilapi.php', window.location.href).href;
+                } catch (e) {
+                    return '../api/cnpj_brasilapi.php';
+                }
+            }
+            function onlyDigits(s) {
+                return String(s || '').replace(/\D/g, '');
+            }
+            function fmtCnpjMask(digits) {
+                var d = onlyDigits(digits);
+                if (d.length !== 14) return digits;
+                return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+            }
+            function fmtCep(v) {
+                var d = onlyDigits(v);
+                if (d.length === 8) return d.replace(/(\d{5})(\d{3})/, '$1-$2');
+                return v;
+            }
+            function montarLogradouro(d) {
+                var log = String(d.endereco || '').trim();
+                var num = String(d.numero || '').trim();
+                var comp = String(d.complemento || '').trim();
+                var bai = String(d.bairro || '').trim();
+                var parts = [];
+                if (log) parts.push(log);
+                if (num) parts.push(num);
+                var line = parts.join(', ');
+                if (comp) line += (line ? ' — ' : '') + comp;
+                if (bai) line += (line ? ' — ' : '') + bai;
+                return line;
+            }
+            var FETCH_MS = 35000;
+            var _empCnpjTimer = null;
+            var _empCnpjLastFetch = '';
+
+            function fetchWithTimeout(url, opts, ms) {
+                var c = new AbortController();
+                var tid = setTimeout(function () { c.abort(); }, ms || FETCH_MS);
+                var o = Object.assign({}, opts || {}, { signal: c.signal, credentials: 'same-origin' });
+                return fetch(url, o).finally(function () { clearTimeout(tid); });
+            }
+
+            function setHint(t) {
+                var el = document.getElementById('empresaBrasilapiHint');
+                if (el) el.textContent = t || '';
+            }
+
+            function applyBrasilapiEmpresa(d) {
+                if (!d) return;
+                var set = function (sel, v) {
+                    var el = document.querySelector(sel);
+                    if (el && v != null && String(v).trim() !== '') el.value = String(v).trim();
+                };
+                set('#razaoSocial', d.nome);
+                set('#nomeFantasia', d.nome_fantasia);
+                set('#endereco', montarLogradouro(d));
+                set('#cep', fmtCep(d.cep));
+                set('#cidade', d.cidade);
+                set('#email', d.email);
+                set('#telefone', d.telefone);
+                if (d.inscricao_estadual != null) {
+                    var ieVal = String(d.inscricao_estadual).trim();
+                    var $ie = $('#inscricaoEstadual');
+                    $ie.unmask();
+                    $ie.val(ieVal);
+                    var ieDig = onlyDigits(ieVal);
+                    if (ieVal !== '' && ieDig.length >= 8 && ieDig.length <= 14 && ieVal.length === ieDig.length) {
+                        $ie.mask('000.000.000.000');
+                    } else if (ieVal === '') {
+                        $ie.mask('000.000.000.000');
+                    }
+                }
+                var uf = String(d.uf || '').toUpperCase().substring(0, 2);
+                if (uf.length === 2) {
+                    var est = document.getElementById('estado');
+                    if (est) est.value = uf;
+                }
+                $('#cep').trigger('input');
+                $('#telefone').trigger('input');
+                $('#cnpj').val(fmtCnpjMask(onlyDigits($('#cnpj').val())));
+            }
+
+            function buscarCnpjEmpresa(isManual) {
+                var cnpj = onlyDigits(document.getElementById('cnpj').value);
+                var btn = document.getElementById('btnEmpresaBuscarCnpj');
+                if (cnpj.length !== 14) {
+                    if (isManual) alert('Informe o CNPJ com 14 dígitos (pode usar a máscara).');
+                    return;
+                }
+                if (window.DocValidators && !window.DocValidators.validarCnpj(cnpj)) {
+                    if (isManual) alert('CNPJ inválido (dígitos verificadores).');
+                    return;
+                }
+                if (isManual) setHint('Consultando BrasilAPI...');
+                if (btn) btn.disabled = true;
+                fetchWithTimeout(apiCnpjUrl() + '?cnpj=' + encodeURIComponent(cnpj), { method: 'GET' }, FETCH_MS)
+                    .then(function (r) { return r.json(); })
+                    .then(function (res) {
+                        if (!res.success) {
+                            if (isManual) alert(res.message || 'Não foi possível consultar o CNPJ.');
+                            else setHint(res.message || '');
+                            return;
+                        }
+                        var d = res.data || {};
+                        applyBrasilapiEmpresa(d);
+                        _empCnpjLastFetch = cnpj;
+                        setHint((d.hint != null ? String(d.hint) : '').trim());
+                    })
+                    .catch(function (err) {
+                        if (isManual) {
+                            alert(err && err.name === 'AbortError' ? 'Tempo esgotado ao consultar o CNPJ.' : 'Erro de comunicação ao consultar o CNPJ.');
+                        } else {
+                            setHint('Falha de rede ao consultar CNPJ.');
+                        }
+                    })
+                    .finally(function () {
+                        if (btn) btn.disabled = false;
+                    });
+            }
+
+            function scheduleEmpresaCnpjAuto() {
+                if (_empCnpjTimer) clearTimeout(_empCnpjTimer);
+                var cnpj = onlyDigits(document.getElementById('cnpj').value);
+                if (cnpj.length !== 14 || cnpj === _empCnpjLastFetch) return;
+                _empCnpjTimer = setTimeout(function () {
+                    _empCnpjTimer = null;
+                    var again = onlyDigits(document.getElementById('cnpj').value);
+                    if (again.length === 14 && again !== _empCnpjLastFetch) {
+                        buscarCnpjEmpresa(false);
+                    }
+                }, 1200);
+            }
+
+            $(document).ready(function() {
+                $('#cnpj').mask('00.000.000/0000-00');
+                $('#cep').mask('00000-000');
+                $('#telefone').mask('(00) 00000-0000');
+                $('#inscricaoEstadual').mask('000.000.000.000');
+
+                var raw = onlyDigits($('#cnpj').val());
+                if (raw.length === 14) {
+                    $('#cnpj').val(fmtCnpjMask(raw));
+                }
+
+                document.getElementById('btnEmpresaBuscarCnpj').addEventListener('click', function () {
+                    buscarCnpjEmpresa(true);
+                });
+                document.getElementById('cnpj').addEventListener('input', function () {
+                    var d = onlyDigits(this.value);
+                    if (d.length !== 14) _empCnpjLastFetch = '';
+                    scheduleEmpresaCnpjAuto();
+                });
+            });
+        })();
     </script>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html>

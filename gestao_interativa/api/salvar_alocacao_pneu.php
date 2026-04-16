@@ -6,6 +6,9 @@ ob_start();
 
 // Incluir configuração de sessão do sistema principal
 require_once __DIR__ . '/../../includes/config.php';
+require_once __DIR__ . '/../../includes/pneu_movimentacoes_helper.php';
+require_once __DIR__ . '/../../includes/csrf.php';
+require_once __DIR__ . '/../../includes/api_json.php';
 
 // Iniciar sessão se não estiver ativa
 if (session_status() === PHP_SESSION_NONE) {
@@ -23,7 +26,9 @@ try {
     if (!isset($_SESSION['empresa_id'])) {
         throw new Exception('Usuário não autenticado ou empresa não identificada');
     }
-    
+
+    api_require_csrf_json();
+
     // Obter dados do POST
     $data = json_decode(file_get_contents('php://input'), true);
     
@@ -93,6 +98,14 @@ try {
                 $stmt = $pdo->prepare("UPDATE pneus SET status_id = 3 WHERE id = ? AND empresa_id = ?");
                 $stmt->execute([$pneu_id, $empresa_id]);
                 
+                pneu_movimentacao_inserir($pdo, [
+                    'empresa_id' => $empresa_id,
+                    'pneu_id'    => $pneu_id,
+                    'tipo'       => 'remocao',
+                    'veiculo_id' => $veiculo_id,
+                    'observacoes'=> 'Enviado para manutenção',
+                ]);
+                
                 $mensagem = 'Pneu enviado para manutenção com sucesso';
                 break;
                 
@@ -104,6 +117,13 @@ try {
                 // Atualizar status do pneu para disponível
                 $stmt = $pdo->prepare("UPDATE pneus SET status_id = 2 WHERE id = ? AND empresa_id = ?");
                 $stmt->execute([$pneu_id, $empresa_id]);
+                
+                pneu_movimentacao_inserir($pdo, [
+                    'empresa_id' => $empresa_id,
+                    'pneu_id'    => $pneu_id,
+                    'tipo'       => 'remocao',
+                    'veiculo_id' => $veiculo_id,
+                ]);
                 
                 $mensagem = 'Pneu removido com sucesso';
                 break;

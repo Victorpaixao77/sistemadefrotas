@@ -341,6 +341,7 @@ try {
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     
     <!-- Custom JS -->
+    <?php require_once __DIR__ . '/../includes/sf_api_base.php'; sf_render_api_scripts(); ?>
     <script src="js/painel.js"></script>
     
     <script>

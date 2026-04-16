@@ -3,6 +3,9 @@
 require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
+require_once __DIR__ . '/../includes/bi_cache_invalidate.php';
 
 // Configure session before starting it
 configure_session();
@@ -27,6 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Ensure the request is authenticated
 require_authentication();
+
+// Protege mutações (POST/PUT/PATCH/DELETE) com CSRF e retorno JSON padronizado.
+api_require_csrf_json();
 
 // Create database connection
 $conn = getConnection();
@@ -253,6 +259,7 @@ switch ($method) {
             // Atualizar plano de manutenção (ultimo_km, ultima_data) se for preventiva concluída
             atualizar_plano_apos_manutencao($conn, $_SESSION['empresa_id'], (int)$data['veiculo_id'], (int)$data['componente_id'], (int)$data['tipo_manutencao_id'], (int)$data['status_manutencao_id'], $data['data_manutencao'], (int)$data['km_atual']);
             
+            bi_cache_invalidate_empresa($conn, (int) $_SESSION['empresa_id']);
             echo json_encode(['success' => true, 'message' => 'Manutenção cadastrada com sucesso', 'id' => $id]);
             
         } catch (Exception $e) {
@@ -333,6 +340,7 @@ switch ($method) {
             
             atualizar_plano_apos_manutencao($conn, $_SESSION['empresa_id'], (int)$data['veiculo_id'], (int)$data['componente_id'], (int)$data['tipo_manutencao_id'], (int)$data['status_manutencao_id'], $data['data_manutencao'], (int)$data['km_atual']);
             
+            bi_cache_invalidate_empresa($conn, (int) $_SESSION['empresa_id']);
             echo json_encode(['success' => true, 'message' => 'Manutenção atualizada com sucesso']);
             
         } catch (Exception $e) {
@@ -368,6 +376,7 @@ switch ($method) {
             $stmt->bindParam(':empresa_id', $_SESSION['empresa_id'], PDO::PARAM_INT);
             $stmt->execute();
             
+            bi_cache_invalidate_empresa($conn, (int) $_SESSION['empresa_id']);
             echo json_encode(['success' => true, 'message' => 'Manutenção excluída com sucesso']);
             
         } catch (Exception $e) {

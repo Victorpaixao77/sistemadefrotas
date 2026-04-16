@@ -5,6 +5,9 @@
 require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
+require_once '../includes/csrf.php';
+require_once '../includes/api_json.php';
+require_once __DIR__ . '/../includes/bi_cache_invalidate.php';
 
 // Configura a sessão antes de iniciá-la
 configure_session();
@@ -25,6 +28,11 @@ $empresa_id = isset($_SESSION["empresa_id"]) ? $_SESSION["empresa_id"] : null;
 
 // Verifica o parâmetro de ação
 $action = isset($_GET['action']) ? $_GET['action'] : '';
+
+$route_mutating = ['add', 'update', 'delete', 'import_nfe_xml', 'save_expenses', 'delete_expenses'];
+if (in_array($action, $route_mutating, true)) {
+    api_require_csrf_json();
+}
 
 try {
     switch ($action) {
@@ -185,6 +193,7 @@ try {
                 $stmt->bindParam(':adiantamento', $data['adiantamento'], PDO::PARAM_STR);
                 
                 if ($stmt->execute()) {
+                    bi_cache_invalidate_empresa($conn, (int) $empresa_id);
                     echo json_encode(['success' => true, 'message' => 'Despesas salvas com sucesso']);
                 } else {
                     throw new Exception($stmt->errorInfo()[2]);
@@ -204,6 +213,7 @@ try {
                     $stmt->bindParam(':rota_id', $rota_id, PDO::PARAM_INT);
                     $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
                     $stmt->execute();
+                    bi_cache_invalidate_empresa($conn, (int) $empresa_id);
                     echo json_encode(['success' => true]);
                 } catch (Exception $e) {
                     echo json_encode(['success' => false, 'message' => 'Erro ao excluir despesas.', 'error' => $e->getMessage()]);
@@ -322,6 +332,7 @@ function addRoute($data) {
         
         $stmt->execute();
         
+        bi_cache_invalidate_empresa($conn, (int) $empresa_id);
         return [
             'success' => true,
             'message' => 'Rota adicionada com sucesso',
@@ -439,6 +450,7 @@ function updateRoute($id, $data) {
         
         $stmt->execute();
         
+        bi_cache_invalidate_empresa($conn, (int) $empresa_id);
         return [
             'success' => true,
             'message' => 'Rota atualizada com sucesso'
@@ -478,6 +490,7 @@ function deleteRoute($id) {
         $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
         $stmt->execute();
         
+        bi_cache_invalidate_empresa($conn, (int) $empresa_id);
         return [
             'success' => true,
             'message' => 'Rota excluída com sucesso'
@@ -756,13 +769,18 @@ function importNFeXml() {
     $km_saida = null;
     $km_chegada = null;
     $distancia_km = null;
+    $motorista_fallback_usado = false;
     if (preg_match('/Motorista:\s*([^-]+)\s*-\s*CPF:\s*([\d.\s-]+)/ui', $infCpl, $m)) {
         $cpf = preg_replace('/\D/', '', trim($m[2]));
         if (strlen($cpf) >= 11) {
-            $stmt = $conn->prepare("SELECT id FROM motoristas WHERE empresa_id = :e AND REPLACE(REPLACE(REPLACE(cpf,'.',''),'-',''),' ','') = :c LIMIT 1");
+            $stmt = $conn->prepare("SELECT id FROM motoristas WHERE empresa_id = :e AND REPLACE(REPLACE(REPLACE(COALESCE(cpf,''),'.',''),'-',''),' ','') = :c LIMIT 1");
             $stmt->execute([':e' => $empresa_id, ':c' => $cpf]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($row) $motorista_id = (int)$row['id'];
+            if ($row) {
+                $motorista_id = (int)$row['id'];
+            } else {
+                $motorista_fallback_usado = true;
+            }
         }
     }
     if (preg_match('/Placa:\s*([A-Za-z0-9-]+)/ui', $infCpl, $m)) {
@@ -780,7 +798,9 @@ function importNFeXml() {
         $stmt->execute([':e' => $empresa_id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         $motorista_id = $row ? (int)$row['id'] : null;
-        if ($motorista_id && $infCpl !== '') $observacoes .= ' [Motorista do XML não encontrado no cadastro; usado o primeiro da lista.]';
+        if ($motorista_id && $motorista_fallback_usado) {
+            $observacoes .= ' [Motorista do XML não encontrado no cadastro por CPF; usado o primeiro da lista.]';
+        }
     }
     if (!$veiculo_id) {
         $stmt = $conn->prepare("SELECT id FROM veiculos WHERE empresa_id = :e ORDER BY placa LIMIT 1");
@@ -821,7 +841,11 @@ function importNFeXml() {
         'peso_carga' => null,
         'descricao_carga' => $descricao_carga,
     ];
-    return addRoute($data);
+    $result = addRoute($data);
+    if ($motorista_fallback_usado && $result && !empty($result['success'])) {
+        $result['warning'] = 'Motorista do XML não encontrado no cadastro por CPF. Foi usado o primeiro motorista da lista. Cadastre o CPF do motorista para vincular corretamente nas próximas importações.';
+    }
+    return $result;
 }
 
 function resolveCidadeByIbgeOrNome($conn, $codigoIbge, $nomeCidade, $uf) {

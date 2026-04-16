@@ -34,42 +34,23 @@ try {
     configure_session();
     session_start();
     
-    // TEMPORÁRIO: Bypass da autenticação para desenvolvimento
-    // if (!isset($_SESSION['user_id'])) {
-    //     http_response_code(401);
-    //     echo json_encode([
-    //         'success' => false,
-    //         'message' => 'Usuário não autenticado'
-    //     ]);
-    //     exit();
-    // }
-    
-    // Obter dados do POST
-    $input = json_decode(file_get_contents('php://input'), true);
+    // Obter dados do POST (esta rota recebe tanto JSON quanto FormData/multipart)
     $empresa_id = $_SESSION['empresa_id'];
-    $action = $input['action'] ?? 'list';
+    $action = $_POST['action'] ?? $_GET['action'] ?? 'list';
     
     switch ($action) {
         case 'list':
-            // Simular lista de NF-e
-            $nfe_list = [
-                [
-                    'id' => 1,
-                    'numero_nfe' => '001',
-                    'cliente_razao_social' => 'Empresa ABC Ltda',
-                    'data_emissao' => '2025-08-20',
-                    'valor_total' => 1500.00,
-                    'status' => 'autorizado'
-                ],
-                [
-                    'id' => 2,
-                    'numero_nfe' => '002',
-                    'cliente_razao_social' => 'Empresa XYZ Ltda',
-                    'data_emissao' => '2025-08-21',
-                    'valor_total' => 2300.00,
-                    'status' => 'pendente'
-                ]
-            ];
+            $conn = getConnection();
+            $limit = isset($_POST['limit']) ? (int)$_POST['limit'] : 20;
+            $stmt = $conn->prepare("
+                SELECT id, numero_nfe, cliente_razao_social, data_emissao, valor_total, status
+                FROM fiscal_nfe_clientes
+                WHERE empresa_id = ?
+                ORDER BY data_emissao DESC, id DESC
+                LIMIT ?
+            ");
+            $stmt->execute([$empresa_id, $limit]);
+            $nfe_list = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
             
             echo json_encode([
                 'success' => true,
@@ -80,16 +61,14 @@ try {
             break;
             
         case 'importar_xml':
-            // Simular importação de XML
-            echo json_encode([
-                'success' => true,
-                'message' => 'NF-e importada com sucesso',
-                'data' => [
-                    'id' => rand(100, 999),
-                    'numero_nfe' => '003',
-                    'status' => 'pendente'
-                ]
-            ]);
+            if (empty($_FILES['xml_file']) || empty($_FILES['xml_file']['tmp_name'])) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Arquivo XML não enviado (campo xml_file).']);
+                break;
+            }
+            // Encaminhar para a implementação completa do fluxo no V2
+            $_POST['action'] = 'receber_nfe_xml';
+            require_once __DIR__ . '/documentos_fiscais_v2.php';
             break;
             
         default:

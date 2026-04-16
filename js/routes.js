@@ -1,8 +1,38 @@
 // Routes management JavaScript
+(function (g) {
+    g.sfApiUrl = g.sfApiUrl || function (rel) {
+        rel = String(rel || '').replace(/^\//, '');
+        var b = typeof g.__SF_API_BASE__ === 'string' && g.__SF_API_BASE__ !== ''
+            ? String(g.__SF_API_BASE__).replace(/\/+$/, '')
+            : '';
+        if (b) return b + '/' + rel;
+        try { return new URL('../api/' + rel, g.location.href).href; }
+        catch (e) { return '../api/' + rel; }
+    };
+})(typeof window !== 'undefined' ? window : this);
+
+function sfErrUserMessage(err, fallback) {
+    if (typeof sfSafeErrorMessage === 'function') {
+        return sfSafeErrorMessage(err, fallback);
+    }
+    var m = (err && err.message) ? String(err.message) : (fallback || 'Erro');
+    if (/maximum call stack size exceeded|too much recursion/i.test(m)) {
+        return 'Erro no navegador. Atualize a página.';
+    }
+    return m;
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize page
     initializePage();
+
+    wireRoutesKpiClicks();
+    wireRoutesSortHeaders();
+    wireRouteModalTabs();
+    wireRoutesKeyboardShortcuts();
+    wireRoutesBatchUi();
+    wireColumnsModal();
+    applyRoutesColumnVisibility();
     
     // Setup modal events
     setupModals();
@@ -46,6 +76,414 @@ let searchDebounceTimer = null;
 let currentRouteDateFrom = null;
 let currentRouteDateTo = null;
 let currentRouteFilterMonth = null;
+let currentSortField = 'data_rota';
+let currentSortDir = 'DESC';
+const ROUTES_MODERN_LS = 'routes_modern_prefs_v2';
+
+/** Primeira ordenação ao escolher coluna: texto A→Z, datas recentes primeiro, números maior→menor, status 0 antes de 1. */
+function routesDefaultSortDir(field) {
+    const textLike = ['motorista_nome', 'veiculo_placa', 'rota', 'descricao_carga'];
+    if (textLike.indexOf(field) >= 0) return 'ASC';
+    if (field === 'data_rota' || field === 'data_saida' || field === 'data_chegada') return 'DESC';
+    if (field === 'no_prazo') return 'ASC';
+    return 'DESC';
+}
+
+function getStoredRoutesColumnVisibility() {
+    try {
+        const raw = localStorage.getItem(ROUTES_MODERN_LS);
+        if (!raw) return {};
+        const prefs = JSON.parse(raw);
+        return prefs.columnVisibility && typeof prefs.columnVisibility === 'object' ? prefs.columnVisibility : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+/** Salva filtros/ordenação sem alterar colunas salvas (último “Salvar preferências” do modal). */
+function saveRoutesNonColumnPrefs() {
+    const searchInput = document.getElementById('searchRoute');
+    const statusEl = document.getElementById('statusFilter');
+    const driverEl = document.getElementById('driverFilter');
+    const perPageEl = document.getElementById('perPageRoutes');
+    const vis = getStoredRoutesColumnVisibility();
+    try {
+        localStorage.setItem(ROUTES_MODERN_LS, JSON.stringify({
+            search: searchInput ? searchInput.value : '',
+            delivery: statusEl ? statusEl.value : '',
+            driver: driverEl ? driverEl.value : '',
+            per_page: perPageEl ? perPageEl.value : '10',
+            sort: currentSortField,
+            dir: currentSortDir,
+            columnVisibility: vis
+        }));
+    } catch (e) {
+        /* ignore */
+    }
+}
+
+/** Persiste também as colunas marcadas no modal (botão Salvar preferências). */
+function saveRoutesModernPrefs() {
+    const searchInput = document.getElementById('searchRoute');
+    const statusEl = document.getElementById('statusFilter');
+    const driverEl = document.getElementById('driverFilter');
+    const perPageEl = document.getElementById('perPageRoutes');
+    const vis = {};
+    document.querySelectorAll('#columnsToggleList input[data-col-toggle]').forEach(cb => {
+        const k = cb.getAttribute('data-col-toggle');
+        if (k) vis[k] = cb.checked;
+    });
+    try {
+        localStorage.setItem(ROUTES_MODERN_LS, JSON.stringify({
+            search: searchInput ? searchInput.value : '',
+            delivery: statusEl ? statusEl.value : '',
+            driver: driverEl ? driverEl.value : '',
+            per_page: perPageEl ? perPageEl.value : '10',
+            sort: currentSortField,
+            dir: currentSortDir,
+            columnVisibility: vis
+        }));
+    } catch (e) {
+        /* ignore */
+    }
+}
+
+function mergeRoutesModernPrefsFromStorage() {
+    const raw = localStorage.getItem(ROUTES_MODERN_LS);
+    if (!raw) return;
+    let prefs;
+    try {
+        prefs = JSON.parse(raw);
+    } catch (e) {
+        return;
+    }
+    const p = new URLSearchParams(window.location.search);
+    const searchInput = document.getElementById('searchRoute');
+    if (searchInput && !p.has('search') && typeof prefs.search === 'string') {
+        searchInput.value = prefs.search;
+    }
+    const statusEl = document.getElementById('statusFilter');
+    if (statusEl && !p.has('delivery') && !p.has('status') && typeof prefs.delivery === 'string') {
+        statusEl.value = prefs.delivery;
+    }
+    const driverEl = document.getElementById('driverFilter');
+    if (driverEl && !p.has('driver') && typeof prefs.driver === 'string') {
+        driverEl.value = prefs.driver;
+    }
+    const perPageEl = document.getElementById('perPageRoutes');
+    if (perPageEl && !p.has('per_page') && prefs.per_page) {
+        perPageEl.value = String(prefs.per_page);
+    }
+    if (!p.has('sort') && prefs.sort) currentSortField = prefs.sort;
+    if (!p.has('dir') && prefs.dir) currentSortDir = prefs.dir;
+    if (prefs.columnVisibility && typeof prefs.columnVisibility === 'object') {
+        Object.keys(prefs.columnVisibility).forEach(k => {
+            const cb = document.querySelector(`#columnsToggleList input[data-col-toggle="${k}"]`);
+            if (cb) cb.checked = !!prefs.columnVisibility[k];
+        });
+        applyRoutesColumnVisibility();
+    }
+}
+
+function escapeHtmlRoute(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function fmtRouteDateTime(v) {
+    if (!v) return '-';
+    const d = new Date(v);
+    if (Number.isNaN(d.getTime())) return '-';
+    return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtRouteKmField(v) {
+    if (v === null || v === undefined || v === '') return '-';
+    const n = Number(v);
+    if (Number.isNaN(n)) return '-';
+    return n.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+}
+
+function fmtRoutePctField(v) {
+    if (v === null || v === undefined || v === '') return '-';
+    const n = Number(v);
+    if (Number.isNaN(n)) return '-';
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+}
+
+function fmtRoutePeso(v) {
+    if (v === null || v === undefined || v === '') return '-';
+    const n = Number(v);
+    if (Number.isNaN(n)) return '-';
+    return n.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+}
+
+function truncateRouteDesc(s) {
+    if (s == null || s === '') return '-';
+    const t = String(s);
+    return t.length > 48 ? t.slice(0, 48) + '…' : t;
+}
+
+function buildRouteOptionalCells(route) {
+    return `
+                <td data-col="col_id">${route.id != null ? escapeHtmlRoute(String(route.id)) : '-'}</td>
+                <td data-col="col_saida">${escapeHtmlRoute(fmtRouteDateTime(route.data_saida))}</td>
+                <td data-col="col_chegada">${escapeHtmlRoute(fmtRouteDateTime(route.data_chegada))}</td>
+                <td data-col="col_km_saida">${escapeHtmlRoute(fmtRouteKmField(route.km_saida))}</td>
+                <td data-col="col_km_chegada">${escapeHtmlRoute(fmtRouteKmField(route.km_chegada))}</td>
+                <td data-col="col_km_vazio">${escapeHtmlRoute(fmtRouteKmField(route.km_vazio))}</td>
+                <td data-col="col_total_km">${escapeHtmlRoute(fmtRouteKmField(route.total_km))}</td>
+                <td data-col="col_comissao">${route.comissao != null && route.comissao !== '' ? formatCurrency(route.comissao) : '-'}</td>
+                <td data-col="col_eficiencia">${escapeHtmlRoute(fmtRoutePctField(route.eficiencia_viagem))}</td>
+                <td data-col="col_pct_vazio">${escapeHtmlRoute(fmtRoutePctField(route.percentual_vazio))}</td>
+                <td data-col="col_peso">${escapeHtmlRoute(fmtRoutePeso(route.peso_carga))}</td>
+                <td data-col="col_desc_carga">${escapeHtmlRoute(truncateRouteDesc(route.descricao_carga))}</td>`;
+}
+
+function applyRoutesColumnVisibility() {
+    document.querySelectorAll('#columnsToggleList input[data-col-toggle]').forEach(cb => {
+        const key = cb.getAttribute('data-col-toggle');
+        const on = cb.checked;
+        document.querySelectorAll(`#routesDataTable [data-col="${key}"]`).forEach(cell => {
+            cell.style.display = on ? '' : 'none';
+        });
+    });
+}
+
+function setKpiActiveFromDelivery() {
+    const d = document.getElementById('statusFilter')?.value || '';
+    document.querySelectorAll('.dashboard-card[data-kpi]').forEach(c => c.classList.remove('kpi-active'));
+    if (d === 'no_prazo') {
+        document.querySelector('.dashboard-card[data-kpi="no_prazo"]')?.classList.add('kpi-active');
+    } else if (d === 'atrasado') {
+        document.querySelector('.dashboard-card[data-kpi="atrasadas"]')?.classList.add('kpi-active');
+    }
+}
+
+function wireRoutesKpiClicks() {
+    document.querySelectorAll('.dashboard-card[data-kpi]').forEach(card => {
+        card.addEventListener('click', function () {
+            const k = this.getAttribute('data-kpi');
+            const sel = document.getElementById('statusFilter');
+            document.querySelectorAll('.dashboard-card[data-kpi]').forEach(c => c.classList.remove('kpi-active'));
+            if (k === 'no_prazo' && sel) {
+                sel.value = 'no_prazo';
+                this.classList.add('kpi-active');
+            } else if (k === 'atrasadas' && sel) {
+                sel.value = 'atrasado';
+                this.classList.add('kpi-active');
+            } else if ((k === 'total' || k === 'concluidas' || k === 'distancia' || k === 'frete' || k === 'eficiencia' || k === 'km_vazio') && sel) {
+                sel.value = '';
+            } else {
+                return;
+            }
+            currentPage = 1;
+            saveRoutesNonColumnPrefs();
+            loadRouteData(1);
+        });
+    });
+}
+
+function wireRoutesSortHeaders() {
+    document.querySelectorAll('#routesDataTable thead th.sortable').forEach(th => {
+        th.addEventListener('click', function () {
+            const field = this.getAttribute('data-sort');
+            if (!field) return;
+            if (currentSortField === field) {
+                currentSortDir = currentSortDir === 'ASC' ? 'DESC' : 'ASC';
+            } else {
+                currentSortField = field;
+                currentSortDir = routesDefaultSortDir(field);
+            }
+            document.querySelectorAll('#routesDataTable thead th.sortable').forEach(h => {
+                h.classList.remove('sorted');
+                const ind = h.querySelector('.sort-ind');
+                if (ind) ind.textContent = '⇅';
+            });
+            this.classList.add('sorted');
+            const ind = this.querySelector('.sort-ind');
+            if (ind) ind.textContent = currentSortDir === 'ASC' ? '▲' : '▼';
+            currentPage = 1;
+            saveRoutesNonColumnPrefs();
+            loadRouteData(1);
+        });
+    });
+}
+
+function syncSortIndicators() {
+    document.querySelectorAll('#routesDataTable thead th.sortable').forEach(th => {
+        const field = th.getAttribute('data-sort');
+        const ind = th.querySelector('.sort-ind');
+        if (!ind) return;
+        th.classList.toggle('sorted', field === currentSortField);
+        if (field === currentSortField) {
+            ind.textContent = currentSortDir === 'ASC' ? '▲' : '▼';
+        } else {
+            ind.textContent = '⇅';
+        }
+    });
+}
+
+function wireRouteModalTabs() {
+    document.querySelectorAll('.route-tab-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const tab = this.getAttribute('data-route-tab');
+            document.querySelectorAll('.route-tab-btn').forEach(b => b.classList.remove('is-active'));
+            this.classList.add('is-active');
+            document.querySelectorAll('.route-modal-tab-pane').forEach(p => {
+                p.classList.toggle('is-active', p.getAttribute('data-route-tab') === tab);
+            });
+        });
+    });
+}
+
+function resetRouteModalTabs() {
+    document.querySelectorAll('.route-tab-btn').forEach((b, i) => b.classList.toggle('is-active', i === 0));
+    document.querySelectorAll('.route-modal-tab-pane').forEach((p, i) => p.classList.toggle('is-active', i === 0));
+}
+
+function wireRoutesKeyboardShortcuts() {
+    document.addEventListener('keydown', function (e) {
+        const t = e.target;
+        const tag = t && t.tagName;
+        const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable);
+        // Escape em modais: js/modal_a11y.js (captura, um modal por vez)
+        if (inField && e.key !== 'Escape') return;
+        if (e.key === 'n' || e.key === 'N') {
+            if (!e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                showAddRouteModal();
+                resetRouteModalTabs();
+            }
+            return;
+        }
+        if (e.key === '/') {
+            e.preventDefault();
+            const si = document.getElementById('searchRoute');
+            if (si) si.focus();
+        }
+    });
+}
+
+function wireRoutesBatchUi() {
+    const bar = document.getElementById('routesBatchBar');
+    const all = document.getElementById('routesSelectAll');
+    const countEl = document.getElementById('routesBatchCount');
+    function refreshBar() {
+        const n = document.querySelectorAll('.route-row-check:checked').length;
+        if (bar) bar.classList.toggle('visible', n > 0);
+        if (countEl) countEl.textContent = n + ' selecionada(s)';
+    }
+    if (all) {
+        all.addEventListener('change', function () {
+            document.querySelectorAll('.route-row-check').forEach(cb => {
+                cb.checked = all.checked;
+            });
+            refreshBar();
+        });
+    }
+    document.getElementById('routesClearSelectionBtn')?.addEventListener('click', function () {
+        document.querySelectorAll('.route-row-check').forEach(cb => {
+            cb.checked = false;
+        });
+        if (all) all.checked = false;
+        refreshBar();
+    });
+    document.getElementById('routesExportSelectedBtn')?.addEventListener('click', function () {
+        const ids = [];
+        const rows = [];
+        document.querySelectorAll('.route-row-check:checked').forEach(cb => {
+            ids.push(cb.value);
+            rows.push(cb.closest('tr'));
+        });
+        if (!rows.length) {
+            showRouteToast('Selecione ao menos uma rota.', 'warning');
+            return;
+        }
+        const headerRow = [];
+        document.querySelectorAll('#routesDataTable thead th').forEach(th => {
+            if (th.style.display === 'none') return;
+            if (th.querySelector('input[type="checkbox"]')) return;
+            headerRow.push(th.textContent.replace(/[⇅▼▲]/g, '').replace(/\s+/g, ' ').trim());
+        });
+        const lines = [headerRow];
+        rows.forEach(tr => {
+            const vals = [];
+            tr.querySelectorAll('td').forEach(td => {
+                if (td.style.display === 'none') return;
+                if (td.classList.contains('col-sel') || td.classList.contains('actions')) return;
+                vals.push(td.textContent.trim().replace(/\s+/g, ' '));
+            });
+            lines.push(vals);
+        });
+        const csv = lines.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\r\n');
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'rotas_selecionadas_' + new Date().toISOString().slice(0, 10) + '.csv';
+        a.click();
+        URL.revokeObjectURL(a.href);
+        showRouteToast('CSV das selecionadas gerado.', 'success');
+    });
+    document.getElementById('routesEmptyCreateBtn')?.addEventListener('click', function () {
+        showAddRouteModal();
+        resetRouteModalTabs();
+    });
+    document.getElementById('routeTableContainer')?.addEventListener('change', function (e) {
+        if (e.target.classList.contains('route-row-check')) refreshBar();
+    });
+}
+
+function wireColumnsModal() {
+    const btn = document.getElementById('columnsBtn');
+    const modal = document.getElementById('columnsModal');
+    if (btn && modal) {
+        btn.addEventListener('click', function () {
+            modal.style.display = 'block';
+        });
+    }
+    document.querySelectorAll('#columnsToggleList input[data-col-toggle]').forEach(cb => {
+        cb.addEventListener('change', function () {
+            applyRoutesColumnVisibility();
+        });
+    });
+    const saveBtn = document.getElementById('columnsSavePrefsBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', function () {
+            saveRoutesModernPrefs();
+            showRouteToast('Preferências de colunas salvas neste navegador.', 'success');
+            if (modal) modal.style.display = 'none';
+        });
+    }
+}
+
+function duplicateRouteById(routeId) {
+    fetch(sfApiUrl('route_data.php?action=view&id=' + encodeURIComponent(routeId)))
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                fillRouteForm(data.data);
+                document.getElementById('routeId').value = '';
+                document.getElementById('modalTitle').textContent = 'Duplicar Rota';
+                const obs = document.getElementById('observacoes');
+                if (obs && obs.value) obs.value = obs.value + '\n(Cópia)';
+                else if (obs) obs.value = '(Cópia)';
+                document.getElementById('routeModal').style.display = 'block';
+                setupFormCalculations();
+                resetRouteModalTabs();
+            } else {
+                throw new Error(data.error || 'Erro ao carregar rota');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            showRouteToast('Erro ao duplicar: ' + sfErrUserMessage(err), 'error');
+        });
+}
 
 function showRouteToast(msg, type) {
     if (typeof window.showToast === 'function') {
@@ -66,7 +504,10 @@ function initializePage() {
     const searchInput = document.getElementById('searchRoute');
     if (searchInput && urlParams.has('search')) searchInput.value = urlParams.get('search') || '';
     const statusFilter = document.getElementById('statusFilter');
-    if (statusFilter && urlParams.has('status')) statusFilter.value = urlParams.get('status') || '';
+    if (statusFilter) {
+        if (urlParams.has('delivery')) statusFilter.value = urlParams.get('delivery') || '';
+        else if (urlParams.has('status')) statusFilter.value = urlParams.get('status') || '';
+    }
     const driverFilter = document.getElementById('driverFilter');
     if (driverFilter && urlParams.has('driver')) driverFilter.value = urlParams.get('driver') || '';
     const dateFilter = document.getElementById('dateFilter');
@@ -86,6 +527,16 @@ function initializePage() {
         const fm = document.getElementById('filterMonth');
         if (fm) fm.value = currentRouteFilterMonth;
     }
+
+    if (urlParams.has('sort')) {
+        currentSortField = urlParams.get('sort') || 'data_rota';
+    }
+    if (urlParams.has('dir')) {
+        currentSortDir = (urlParams.get('dir') || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    }
+
+    mergeRoutesModernPrefsFromStorage();
+    syncSortIndicators();
     
     // Get current page and per_page from URL or use default
     const page = parseInt(urlParams.get('page')) || 1;
@@ -97,9 +548,6 @@ function initializePage() {
     
     // Load route data from API
     loadRouteData(page);
-    
-    // Setup button events
-    document.getElementById('addRouteBtn').addEventListener('click', showAddRouteModal);
     
     const importNfeXmlBtn = document.getElementById('importNfeXmlBtn');
     if (importNfeXmlBtn) {
@@ -128,9 +576,14 @@ function initializePage() {
             submitBtn.disabled = true;
             var formData = new FormData();
             formData.append('xml_file', file);
-            fetch('../api/route_actions.php?action=import_nfe_xml', {
+            if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+                formData.append('csrf_token', window.__SF_CSRF__);
+            }
+            fetch(sfApiUrl('route_actions.php?action=import_nfe_xml'), {
                 method: 'POST',
-                body: formData
+                body: formData,
+                credentials: 'include',
+                headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
             })
             .then(function(r) {
                 return r.json().then(function(data) {
@@ -146,9 +599,16 @@ function initializePage() {
             })
             .then(function(data) {
                 if (data.success) {
-                    statusEl.innerHTML = '<i class="fas fa-check-circle text-success"></i> Rota criada com sucesso.';
+                    var html = '<i class="fas fa-check-circle text-success"></i> Rota criada com sucesso.';
+                    if (data.warning) {
+                        html += '<div class="mt-2 p-2 rounded" style="background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.4); font-size: 0.9rem;"><i class="fas fa-exclamation-triangle text-warning"></i> ' + (data.warning || '') + '</div>';
+                    }
+                    statusEl.innerHTML = html;
                     statusEl.className = 'mt-2 text-success';
                     showRouteToast(data.message || 'Rota criada a partir da NF-e.', 'success');
+                    if (data.warning) {
+                        showRouteToast(data.warning, 'warning');
+                    }
                     document.getElementById('importNfeXmlModal').style.display = 'none';
                     loadRouteData(currentPage);
                     loadDashboardData(new Date().getMonth() + 1, new Date().getFullYear());
@@ -159,9 +619,9 @@ function initializePage() {
                 }
             })
             .catch(function(err) {
-                statusEl.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i> Erro: ' + err.message;
+                statusEl.innerHTML = '<i class="fas fa-exclamation-circle text-danger"></i> Erro: ' + sfErrUserMessage(err);
                 statusEl.className = 'mt-2 text-danger';
-                showRouteToast('Erro ao importar: ' + err.message, 'error');
+                showRouteToast('Erro ao importar: ' + sfErrUserMessage(err), 'error');
             })
             .finally(function() {
                 submitBtn.disabled = false;
@@ -295,6 +755,7 @@ function setupFilters() {
     if (applyFiltersBtn) {
         applyFiltersBtn.addEventListener('click', () => {
             currentPage = 1;
+            saveRoutesNonColumnPrefs();
             loadRouteData(1);
         });
     }
@@ -313,8 +774,11 @@ function setupFilters() {
             const dateFilterInput = document.getElementById('dateFilter');
             if (dateFilterInput) dateFilterInput.value = '';
 
+            document.querySelectorAll('.dashboard-card[data-kpi]').forEach(c => c.classList.remove('kpi-active'));
+
             currentPage = 1;
             loadRouteData(1);
+            saveRoutesNonColumnPrefs();
         });
     }
 
@@ -322,6 +786,7 @@ function setupFilters() {
     if (perPageSelect) {
         perPageSelect.addEventListener('change', function() {
             currentPage = 1;
+            saveRoutesNonColumnPrefs();
             loadRouteData(1);
         });
     }
@@ -333,18 +798,20 @@ function handleSearch(event) {
     }
     searchDebounceTimer = setTimeout(() => {
         currentPage = 1;
+        saveRoutesNonColumnPrefs();
         loadRouteData(1);
     }, 300);
 }
 
 function handleFilters() {
     currentPage = 1;
+    saveRoutesNonColumnPrefs();
     loadRouteData(1);
 }
 
 function loadSelectOptions() {
     // Load estados
-    fetch('../api/route_actions.php?action=get_estados')
+    fetch(sfApiUrl('route_actions.php?action=get_estados'))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -356,7 +823,7 @@ function loadSelectOptions() {
         .catch(error => console.error('Erro ao carregar estados:', error));
     
     // Load motoristas
-    fetch('../api/route_actions.php?action=get_motoristas')
+    fetch(sfApiUrl('route_actions.php?action=get_motoristas'))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -366,7 +833,7 @@ function loadSelectOptions() {
         .catch(error => console.error('Erro ao carregar motoristas:', error));
     
     // Load veículos
-    fetch('../api/route_actions.php?action=get_veiculos')
+    fetch(sfApiUrl('route_actions.php?action=get_veiculos'))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -385,7 +852,9 @@ function updateDriverSelects(drivers) {
     ).join('');
     
     if (driverFilter) {
+        const prev = driverFilter.value;
         driverFilter.innerHTML = '<option value="">Todos os motoristas</option>' + options;
+        if (prev) driverFilter.value = prev;
     }
     if (driverSelect) {
         driverSelect.innerHTML = '<option value="">Selecione um motorista</option>' + options;
@@ -440,7 +909,7 @@ function loadRouteData(page = 1) {
     if (tableEl) tableEl.style.visibility = 'hidden';
     
     const searchTerm = document.getElementById('searchRoute')?.value || '';
-    const status = document.getElementById('statusFilter')?.value || '';
+    const delivery = document.getElementById('statusFilter')?.value || '';
     const driver = document.getElementById('driverFilter')?.value || '';
     const date = document.getElementById('dateFilter')?.value || '';
     
@@ -448,13 +917,14 @@ function loadRouteData(page = 1) {
     const perPageFromSelect = perPageSelect ? parseInt(perPageSelect.value, 10) : 10;
     const limit = [5, 10, 25, 50, 100].indexOf(perPageFromSelect) >= 0 ? perPageFromSelect : 10;
     
-    let url = `../api/route_data.php?action=list&page=${page}&limit=${limit}`;
+    let url = sfApiUrl(`route_data.php?action=list&page=${page}&limit=${limit}`);
     if (searchTerm) url += `&search=${encodeURIComponent(searchTerm)}`;
-    if (status) url += `&status=${encodeURIComponent(status)}`;
+    if (delivery) url += `&delivery=${encodeURIComponent(delivery)}`;
     if (driver) url += `&driver=${encodeURIComponent(driver)}`;
     if (date) url += `&date=${encodeURIComponent(date)}`;
     if (currentRouteDateFrom) url += `&date_from=${encodeURIComponent(currentRouteDateFrom)}`;
     if (currentRouteDateTo) url += `&date_to=${encodeURIComponent(currentRouteDateTo)}`;
+    url += `&sort=${encodeURIComponent(currentSortField)}&dir=${encodeURIComponent(currentSortDir)}`;
     
     fetch(url)
         .then(response => response.json())
@@ -470,18 +940,24 @@ function loadRouteData(page = 1) {
                     if (currentPage !== 1) params.set('page', currentPage);
                     if (limit !== 10) params.set('per_page', limit);
                     if (searchTerm) params.set('search', searchTerm);
-                    if (status) params.set('status', status);
+                    if (delivery) params.set('delivery', delivery);
                     if (driver) params.set('driver', driver);
                     if (date) params.set('date', date);
                     if (currentRouteDateFrom) params.set('date_from', currentRouteDateFrom);
                     if (currentRouteDateTo) params.set('date_to', currentRouteDateTo);
                     if (currentRouteFilterMonth && !currentRouteDateFrom) params.set('month', currentRouteFilterMonth);
+                    if (currentSortField !== 'data_rota' || currentSortDir !== 'DESC') {
+                        params.set('sort', currentSortField);
+                        params.set('dir', currentSortDir);
+                    }
                     const qs = params.toString();
                     const newUrl = window.location.pathname + (qs ? '?' + qs : '');
                     if (window.location.search !== (qs ? '?' + qs : '')) {
                         window.history.replaceState({}, '', newUrl);
                     }
                 }
+                saveRoutesNonColumnPrefs();
+                setKpiActiveFromDelivery();
             } else {
                 throw new Error(data.error || 'Erro ao carregar dados das rotas');
             }
@@ -490,18 +966,24 @@ function loadRouteData(page = 1) {
             if (loadingEl) loadingEl.style.display = 'none';
             if (tableEl) tableEl.style.visibility = '';
             console.error('Erro ao carregar dados das rotas:', error);
-            showRouteToast('Erro ao carregar dados: ' + error.message, 'error');
+            showRouteToast('Erro ao carregar dados: ' + sfErrUserMessage(error), 'error');
             const tbody = document.querySelector('.data-table tbody');
             if (tbody) {
+                const cc = routesTableColspan();
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" class="text-center text-danger">
-                            Erro ao carregar dados: ${error.message}
+                        <td colspan="${cc}" class="text-center text-danger">
+                            Erro ao carregar dados: ${sfErrUserMessage(error)}
                         </td>
                     </tr>
                 `;
             }
         });
+}
+
+function routesTableColspan() {
+    const th = document.querySelectorAll('#routesDataTable thead th');
+    return th.length || 21;
 }
 
 function updateRouteTable(routes) {
@@ -510,29 +992,45 @@ function updateRouteTable(routes) {
         console.error('Elemento tbody não encontrado');
         return;
     }
+    const cc = routesTableColspan();
+    const emptyEl = document.getElementById('routesEmptyState');
+    const tableEl = document.getElementById('routesDataTable') || document.querySelector('.data-table');
+    if (emptyEl && tableEl) {
+        const empty = !routes || routes.length === 0;
+        emptyEl.classList.toggle('visible', empty);
+        tableEl.style.display = empty ? 'none' : '';
+    }
     
     tbody.innerHTML = '';
     
     if (routes && routes.length > 0) {
         routes.forEach(route => {
             const row = document.createElement('tr');
+            const badgeClass = route.no_prazo ? 'status-ok' : 'status-late';
+            const selCell = `<td class="col-sel" data-col="sel"><input type="checkbox" class="route-row-check" value="${route.id}" aria-label="Selecionar rota"></td>`;
+            const optCells = buildRouteOptionalCells(route);
             row.innerHTML = `
-                <td>${formatDate(route.data_rota)}</td>
-                <td>${route.motorista_nome || '-'}</td>
-                <td>${route.veiculo_placa || '-'}</td>
-                <td>${route.cidade_origem_nome || '-'} → ${route.cidade_destino_nome || '-'}</td>
-                <td>${formatDistance(route.distancia_km)}</td>
-                <td>${formatCurrency(route.frete)}</td>
-                <td><span class="status-badge ${route.no_prazo ? 'success' : 'warning'}">${route.no_prazo ? 'No Prazo' : 'Atrasado'}</span></td>
-                <td class="actions">
-                    <button class="btn-icon view-btn" data-id="${route.id}" title="Ver detalhes" aria-label="Ver detalhes da rota">
+                ${selCell}
+                <td data-col="data">${formatDate(route.data_rota)}</td>
+                <td data-col="motorista">${route.motorista_nome || '-'}</td>
+                <td data-col="veiculo">${route.veiculo_placa || '-'}</td>
+                <td data-col="rota">${route.cidade_origem_nome || '-'} → ${route.cidade_destino_nome || '-'}</td>
+                <td data-col="dist">${formatDistance(route.distancia_km)}</td>
+                <td data-col="frete">${formatCurrency(route.frete)}</td>
+                ${optCells}
+                <td data-col="status"><span class="status-badge ${badgeClass}">${route.no_prazo ? 'No Prazo' : 'Atrasado'}</span></td>
+                <td class="actions" data-col="acoes">
+                    <button class="btn-icon view-btn" data-id="${route.id}" title="Ver" aria-label="Ver detalhes da rota">
                         <i class="fas fa-eye"></i>
                     </button>
                     <button class="btn-icon edit-btn" data-id="${route.id}" title="Editar" aria-label="Editar rota">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn-icon expenses-btn" data-id="${route.id}" title="Despesas de Viagem" aria-label="Despesas da viagem">
+                    <button class="btn-icon expenses-btn" data-id="${route.id}" title="Despesas da viagem" aria-label="Despesas da viagem">
                         <i class="fas fa-money-bill"></i>
+                    </button>
+                    <button class="btn-icon duplicate-btn" data-id="${route.id}" title="Duplicar" aria-label="Duplicar rota">
+                        <i class="fas fa-copy"></i>
                     </button>
                     <button class="btn-icon delete-btn" data-id="${route.id}" title="Excluir" aria-label="Excluir rota">
                         <i class="fas fa-trash"></i>
@@ -542,10 +1040,14 @@ function updateRouteTable(routes) {
             tbody.appendChild(row);
         });
     } else {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center">Nenhuma rota encontrada</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="' + cc + '" class="text-center">Nenhuma rota encontrada</td></tr>';
     }
     
     setupTableButtons();
+    applyRoutesColumnVisibility();
+    const all = document.getElementById('routesSelectAll');
+    if (all) all.checked = false;
+    document.getElementById('routesBatchBar')?.classList.remove('visible');
 }
 
 function setupTableButtons() {
@@ -562,6 +1064,13 @@ function setupTableButtons() {
         button.addEventListener('click', function() {
             const routeId = this.getAttribute('data-id');
             showEditRouteModal(routeId);
+        });
+    });
+
+    document.querySelectorAll('.duplicate-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const routeId = this.getAttribute('data-id');
+            duplicateRouteById(routeId);
         });
     });
 
@@ -640,12 +1149,12 @@ function updateURLParameter(param, value) {
 }
 
 function updateDashboardMetrics() {
-    fetch('../api/route_data.php?action=summary')
+    fetch(sfApiUrl('route_data.php?action=summary'))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 const metrics = data.data;
-                console.log('Métricas recebidas:', metrics);
+                window.__SF_DEBUG__ && console.log('Métricas recebidas:', metrics);
                 
                 // Atualiza os elementos se eles existirem
                 const elements = {
@@ -659,13 +1168,13 @@ function updateDashboardMetrics() {
                     'percentualVazio': formatPercentage(metrics.media_percentual_vazio)
                 };
                 
-                console.log('Elementos a atualizar:', elements);
+                window.__SF_DEBUG__ && console.log('Elementos a atualizar:', elements);
                 
                 Object.entries(elements).forEach(([id, value]) => {
                     const element = document.getElementById(id);
                     if (element) {
                         element.textContent = value;
-                        console.log(`Atualizado ${id} com valor ${value}`);
+                        window.__SF_DEBUG__ && console.log(`Atualizado ${id} com valor ${value}`);
                     } else {
                         console.warn(`Elemento com ID ${id} não encontrado`);
                     }
@@ -678,6 +1187,12 @@ function updateDashboardMetrics() {
 // Helper functions
 function formatDate(dateString) {
     if (!dateString) return '-';
+    // Evita off-by-one em `YYYY-MM-DD` (JS interpreta como UTC)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        const [y, m, d] = dateString.split('-').map(Number);
+        const dt = new Date(y, m - 1, d); // horário local
+        return dt.toLocaleDateString('pt-BR');
+    }
     const date = new Date(dateString);
     return date.toLocaleDateString('pt-BR');
 }
@@ -712,10 +1227,11 @@ function showAddRouteModal() {
     document.getElementById('modalTitle').textContent = 'Adicionar Rota';
     document.getElementById('routeModal').style.display = 'block';
     setupFormCalculations();
+    resetRouteModalTabs();
 }
 
 function showEditRouteModal(routeId) {
-    fetch(`../api/route_data.php?action=view&id=${routeId}`)
+    fetch(sfApiUrl(`route_data.php?action=view&id=${routeId}`))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -724,18 +1240,19 @@ function showEditRouteModal(routeId) {
                 document.getElementById('modalTitle').textContent = 'Editar Rota';
                 document.getElementById('routeModal').style.display = 'block';
                 setupFormCalculations();
+                resetRouteModalTabs();
             } else {
                 throw new Error(data.error || 'Erro ao carregar dados da rota');
             }
         })
         .catch(error => {
             console.error('Erro ao carregar detalhes da rota:', error);
-            showRouteToast('Erro ao carregar detalhes da rota: ' + error.message, 'error');
+            showRouteToast('Erro ao carregar detalhes da rota: ' + sfErrUserMessage(error), 'error');
         });
 }
 
 function showDeleteConfirmation(routeId) {
-    fetch(`../api/route_data.php?action=view&id=${routeId}`)
+    fetch(sfApiUrl(`route_data.php?action=view&id=${routeId}`))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -751,15 +1268,17 @@ function showDeleteConfirmation(routeId) {
         })
         .catch(error => {
             console.error('Erro ao carregar detalhes da rota:', error);
-            showRouteToast('Erro ao carregar detalhes da rota: ' + error.message, 'error');
+            showRouteToast('Erro ao carregar detalhes da rota: ' + sfErrUserMessage(error), 'error');
         });
 }
 
 function deleteRoute(routeId) {
     if (!confirm('Tem certeza que deseja excluir esta rota?')) return;
     
-    fetch(`../api/route_actions.php?action=delete&id=${routeId}`, {
-        method: 'POST'
+    fetch(sfApiUrl(`route_actions.php?action=delete&id=${routeId}`), {
+        method: 'POST',
+        credentials: 'include',
+        headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
     })
         .then(response => response.json())
         .then(data => {
@@ -773,7 +1292,7 @@ function deleteRoute(routeId) {
         })
         .catch(error => {
             console.error('Erro ao excluir rota:', error);
-            showRouteToast('Erro ao excluir rota: ' + error.message, 'error');
+            showRouteToast('Erro ao excluir rota: ' + sfErrUserMessage(error), 'error');
         });
 }
 
@@ -789,11 +1308,12 @@ function saveRoute() {
     const routeId = document.getElementById('routeId').value;
     const method = routeId ? 'update' : 'add';
     
-    fetch(`../api/route_actions.php?action=${method}${routeId ? '&id=' + routeId : ''}`, {
+    fetch(sfApiUrl(`route_actions.php?action=${method}${routeId ? '&id=' + routeId : ''}`), {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        credentials: 'include',
+        headers: typeof sfMutationHeaders === 'function'
+            ? sfMutationHeaders({ 'Content-Type': 'application/json' })
+            : { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     })
         .then(response => response.json())
@@ -808,7 +1328,7 @@ function saveRoute() {
         })
         .catch(error => {
             console.error('Erro ao salvar rota:', error);
-            showRouteToast('Erro ao salvar rota: ' + error.message, 'error');
+            showRouteToast('Erro ao salvar rota: ' + sfErrUserMessage(error), 'error');
         });
 }
 
@@ -885,9 +1405,9 @@ function fillRouteForm(data) {
 }
 
 function loadCidades(uf, targetSelectId) {
-    console.log(`Carregando cidades para UF: ${uf}, target: ${targetSelectId}`);
+    window.__SF_DEBUG__ && console.log(`Carregando cidades para UF: ${uf}, target: ${targetSelectId}`);
     
-    return fetch(`../api/route_actions.php?action=get_cidades&uf=${uf}`)
+    return fetch(sfApiUrl(`route_actions.php?action=get_cidades&uf=${uf}`))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -898,7 +1418,7 @@ function loadCidades(uf, targetSelectId) {
                         `<option value="${cidade.id}">${cidade.nome}</option>`
                     ).join('');
                     cidadeSelect.innerHTML = '<option value="">Selecione a cidade</option>' + options;
-                    console.log(`Cidades carregadas com sucesso para ${targetSelectId}`);
+                    window.__SF_DEBUG__ && console.log(`Cidades carregadas com sucesso para ${targetSelectId}`);
                 } else {
                     console.error(`Elemento select não encontrado: ${targetSelectId}`);
                 }
@@ -919,7 +1439,7 @@ function loadCidades(uf, targetSelectId) {
 }
 
 function showRouteDetails(routeId) {
-    fetch(`../api/route_data.php?action=view&id=${routeId}`)
+    fetch(sfApiUrl(`route_data.php?action=view&id=${routeId}`))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -934,7 +1454,7 @@ function showRouteDetails(routeId) {
         })
         .catch(error => {
             console.error('Erro ao carregar detalhes da rota:', error);
-            showRouteToast('Erro ao carregar detalhes da rota: ' + error.message, 'error');
+            showRouteToast('Erro ao carregar detalhes da rota: ' + sfErrUserMessage(error), 'error');
         });
 }
 
@@ -953,9 +1473,16 @@ function fillRouteDetails(data) {
     setElementText('routeOriginDestination', 
         `${data.cidade_origem_nome || '-'}, ${data.estado_origem || '-'} → ${data.cidade_destino_nome || '-'}, ${data.estado_destino || '-'}`);
     
-    // Status da rota baseado no no_prazo
-    const statusText = data.no_prazo === '1' ? 'No Prazo' : data.no_prazo === '0' ? 'Atrasado' : '-';
-    setElementText('routeStatus', statusText);
+    // Status da rota baseado no no_prazo (badge no modal de detalhes)
+    const statusText = data.no_prazo === '1' ? 'No prazo' : data.no_prazo === '0' ? 'Atrasado' : '—';
+    const statusEl = document.getElementById('routeStatus');
+    if (statusEl) {
+        statusEl.textContent = statusText;
+        statusEl.className = 'rd-badge';
+        if (data.no_prazo === '1') statusEl.classList.add('rd-badge--success');
+        else if (data.no_prazo === '0') statusEl.classList.add('rd-badge--danger');
+        else statusEl.classList.add('rd-badge--neutral');
+    }
     setElementText('routeDate', data.data_rota ? formatDate(data.data_rota) : '-');
     
     // Informações gerais
@@ -1040,7 +1567,7 @@ function formatDateTime(dateString) {
 }
 
 function setupFormCalculations() {
-    console.log('Configurando cálculos do formulário...');
+    window.__SF_DEBUG__ && console.log('Configurando cálculos do formulário...');
     
     // Elementos do formulário
     const kmSaida = document.getElementById('km_saida');
@@ -1097,7 +1624,7 @@ function setupFormCalculations() {
     // Função para calcular comissão
     function calcularComissao() {
         if (frete && motorista && frete.value && motorista.value) {
-            fetch(`../api/route_actions.php?action=get_motorista_comissao&id=${motorista.value}`)
+            fetch(sfApiUrl(`route_actions.php?action=get_motorista_comissao&id=${motorista.value}`))
                 .then(response => response.json())
                 .then(data => {
                     if (data.success && data.porcentagem_comissao) {
@@ -1143,7 +1670,7 @@ function showExpensesModal(routeId) {
     }
     
     // Load existing expenses
-    fetch(`../api/route_data.php?action=get_expenses&id=${routeId}`)
+    fetch(sfApiUrl(`route_data.php?action=get_expenses&id=${routeId}`))
         .then(response => response.json())
         .then(data => {
             if (data.success && data.expenses) {
@@ -1156,7 +1683,7 @@ function showExpensesModal(routeId) {
         })
         .catch(error => {
             console.error('Erro ao carregar despesas:', error);
-            showRouteToast('Erro ao carregar despesas: ' + error.message, 'error');
+            showRouteToast('Erro ao carregar despesas: ' + sfErrUserMessage(error), 'error');
         });
 }
 
@@ -1220,11 +1747,12 @@ function saveExpenses() {
         data[key] = value === '' ? null : value;
     });
     
-    fetch('../api/route_actions.php?action=save_expenses', {
+    fetch(sfApiUrl('route_actions.php?action=save_expenses'), {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        credentials: 'include',
+        headers: typeof sfMutationHeaders === 'function'
+            ? sfMutationHeaders({ 'Content-Type': 'application/json' })
+            : { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     })
         .then(response => response.json())
@@ -1238,7 +1766,7 @@ function saveExpenses() {
         })
         .catch(error => {
             console.error('Erro ao salvar despesas:', error);
-            showRouteToast('Erro ao salvar despesas: ' + error.message, 'error');
+            showRouteToast('Erro ao salvar despesas: ' + sfErrUserMessage(error), 'error');
         });
 }
 
@@ -1263,7 +1791,7 @@ function initializeEventListeners() {
     // Botão de adicionar rota
     const addRouteBtn = document.getElementById('addRouteBtn');
     if (addRouteBtn) {
-        addRouteBtn.addEventListener('click', () => showModal('routeModal'));
+        addRouteBtn.addEventListener('click', () => showAddRouteModal());
     }
 
     // Botão de filtro
@@ -1283,13 +1811,13 @@ function initializeEventListeners() {
     if (exportBtn) {
         exportBtn.addEventListener('click', function() {
             const search = document.getElementById('searchRoute')?.value?.trim() || '';
-            const status = document.getElementById('statusFilter')?.value || '';
+            const delivery = document.getElementById('statusFilter')?.value || '';
             const driver = document.getElementById('driverFilter')?.value || '';
             const date = document.getElementById('dateFilter')?.value || '';
-            let url = '../api/route_export.php?';
+            let url = sfApiUrl('route_export.php?');
             const p = [];
             if (search) p.push('search=' + encodeURIComponent(search));
-            if (status) p.push('status=' + encodeURIComponent(status));
+            if (delivery) p.push('delivery=' + encodeURIComponent(delivery));
             if (driver) p.push('driver=' + encodeURIComponent(driver));
             if (date) p.push('date=' + encodeURIComponent(date));
             if (currentRouteDateFrom) p.push('date_from=' + encodeURIComponent(currentRouteDateFrom));
@@ -1355,10 +1883,17 @@ function initializeEventListeners() {
             const expenseRouteId = document.getElementById('expenseRouteId').value;
             if (!expenseRouteId) return;
             if (!confirm('Tem certeza que deseja excluir as despesas desta viagem?')) return;
-            fetch('../api/route_actions.php?action=delete_expenses', {
+            var delBody = 'rota_id=' + encodeURIComponent(expenseRouteId);
+            if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+                delBody += '&csrf_token=' + encodeURIComponent(window.__SF_CSRF__);
+            }
+            fetch(sfApiUrl('route_actions.php?action=delete_expenses'), {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: 'rota_id=' + encodeURIComponent(expenseRouteId)
+                credentials: 'include',
+                headers: typeof sfMutationHeaders === 'function'
+                    ? sfMutationHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' })
+                    : { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: delBody
             })
             .then(response => response.json())
             .then(result => {
@@ -1370,7 +1905,7 @@ function initializeEventListeners() {
                 }
             })
             .catch(error => {
-                showRouteToast('Erro ao excluir despesas: ' + error.message, 'error');
+                showRouteToast('Erro ao excluir despesas: ' + sfErrUserMessage(error), 'error');
             });
         });
     }
@@ -1388,6 +1923,7 @@ function clearFilter() {
     currentRouteDateTo = null;
     currentRouteFilterMonth = null;
     currentPage = 1;
+    saveRoutesNonColumnPrefs();
     loadRouteData(1);
     const currentDate = new Date();
     loadDashboardData(currentDate.getMonth() + 1, currentDate.getFullYear());
@@ -1412,6 +1948,7 @@ function applyFilter() {
         if (filterDateTo) filterDateTo.value = '';
     }
     currentPage = 1;
+    saveRoutesNonColumnPrefs();
     loadRouteData(1);
     if (currentRouteFilterMonth) {
         const [y, m] = currentRouteFilterMonth.split('-');
@@ -1429,7 +1966,7 @@ function loadDashboardData(month, year) {
     showLoading();
 
     // Fazer requisição AJAX para buscar os dados
-    fetch(`../api/routes_data.php?action=dashboard&month=${month}&year=${year}`)
+    fetch(sfApiUrl(`routes_data.php?action=dashboard&month=${month}&year=${year}`))
         .then(response => {
             if (!response.ok) {
                 throw new Error(`Erro na resposta da API: ${response.status} ${response.statusText}`);
@@ -1461,7 +1998,7 @@ function loadDashboardData(month, year) {
             console.error('Erro ao carregar dados:', error);
             hideLoading();
             // Mostrar mensagem de erro para o usuário
-            showRouteToast('Erro ao carregar dados do dashboard: ' + error.message, 'error');
+            showRouteToast('Erro ao carregar dados do dashboard: ' + sfErrUserMessage(error), 'error');
         });
 }
 

@@ -53,206 +53,17 @@ if ($row && !empty($row['certificado_a1_id'])) {
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
-    <style>
-        .logo-preview {
-            max-width: 200px;
-            max-height: 200px;
-            margin: 10px 0;
-            display: none;
-        }
-        .logo-preview img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-        }
-        .logo-upload {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-        }
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background-color 0.3s;
-        }
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-        .btn-secondary i {
-            margin-right: 8px;
-        }
-        
-        /* Responsividade para o grid */
-        @media (max-width: 768px) {
-            .dashboard-grid {
-                grid-template-columns: 1fr !important;
-            }
-            
-            .form-group[style*="grid-template-columns"] {
-                grid-template-columns: 1fr !important;
-            }
-        }
-        
-        @media (max-width: 1024px) {
-            .dashboard-grid {
-                grid-template-columns: 1fr !important;
-            }
-        }
-        
-        /* Garantir que o grid não afete o layout principal */
-        .dashboard-grid {
-            max-width: 1200px !important;
-            margin: 0 auto !important;
-        }
-        
-        /* Layout do sidebar - usar o padrão do sistema */
-        .main-content {
-            margin-left: var(--sidebar-width);
-            transition: margin-left var(--transition-speed) ease;
-            width: calc(100% - var(--sidebar-width));
-            min-height: 100vh;
-        }
-        
-        .sidebar-collapsed .main-content {
-            margin-left: var(--sidebar-collapsed-width);
-            width: calc(100% - var(--sidebar-collapsed-width));
-        }
-        
-        @media (max-width: 768px) {
-            .main-content {
-                margin-left: 0 !important;
-                width: 100% !important;
-            }
-        }
-        
-        
-        /* Melhorar contraste dos textos de ajuda */
-        .form-text {
-            color: #333 !important;
-            font-size: 0.875rem !important;
-            line-height: 1.4 !important;
-            margin-top: 0.5rem !important;
-        }
-        
-        .form-text strong {
-            color: #000 !important;
-            font-weight: 600 !important;
-        }
-        
-        /* Forçar contraste para elementos strong em form-text */
-        .form-text strong,
-        .form-text b {
-            color: #000 !important;
-            font-weight: 600 !important;
-        }
-        
-        /* Garantir que textos específicos sejam escuros no modo claro */
-        .form-text strong:not(.dark-theme),
-        .form-text b:not(.dark-theme) {
-            color: #000 !important;
-        }
-        
-        /* Sobrescrever qualquer estilo que possa estar interferindo */
-        .dashboard-card .form-text strong,
-        .dashboard-card .form-text b {
-            color: #000 !important;
-        }
-        
-        .form-text a {
-            color: #007bff !important;
-            text-decoration: underline !important;
-        }
-        
-        .form-text a:hover {
-            color: #0056b3 !important;
-        }
-        
-        /* Modo escuro */
-        @media (prefers-color-scheme: dark) {
-            .form-text {
-                color: #ccc !important;
-            }
-            
-            .form-text strong {
-                color: #fff !important;
-            }
-            
-            .form-text a {
-                color: #4dabf7 !important;
-            }
-            
-            .form-text a:hover {
-                color: #74c0fc !important;
-            }
-        }
-        
-        /* Tema escuro ativo */
-        .dark-theme .form-text {
-            color: #ccc !important;
-        }
-        
-        .dark-theme .form-text strong {
-            color: #fff !important;
-        }
-        
-        .dark-theme .form-text a {
-            color: #4dabf7 !important;
-        }
-        
-        .dark-theme .form-text a:hover {
-            color: #74c0fc !important;
-        }
-        
-        /* Forçar alinhamento correto do sidebar APENAS quando expandido */
-        .sidebar-link {
-            justify-content: flex-start !important;
-            text-align: left !important;
-        }
-        
-        .sidebar-link-icon {
-            justify-content: center !important;
-            text-align: center !important;
-            margin-right: 12px !important;
-            position: static !important;
-            left: auto !important;
-            transform: none !important;
-        }
-        
-        .sidebar-link-text {
-            text-align: left !important;
-        }
-        
-        /* MANTER comportamento responsivo correto quando colapsado */
-        .sidebar-collapsed .sidebar-link {
-            justify-content: center !important;
-            text-align: center !important;
-        }
-        
-        .sidebar-collapsed .sidebar-link-icon {
-            justify-content: center !important;
-            text-align: center !important;
-            margin-right: 0 !important;
-            position: absolute !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
-        }
-    </style>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <link rel="stylesheet" href="../css/configuracoes.css?v=5">
+    <?php require_once '../includes/sf_api_base.php'; sf_render_api_scripts(); ?>
 </head>
-<body>
+<body class="configuracoes-modern-page">
     <div class="app-container">
         <?php include '../includes/sidebar_pages.php'; ?>
         <div class="main-content">
             <?php include '../includes/header.php'; ?>
-            <div class="dashboard-content">
-                <div class="dashboard-header">
-                    <h1><?php echo $page_title; ?></h1>
-                </div>
-                <div class="dashboard-grid" style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); gap: 20px;">
+            <div class="dashboard-content configuracoes-page fornc-page" id="configuracoes-top">
+                <div class="config-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
                             <h3>Personalização do Menu Lateral</h3>
@@ -265,7 +76,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                 </div>
                                 <button type="submit" class="btn-primary" id="saveConfigBtn">Salvar</button>
                             </form>
-                            <div id="configMsg" style="margin-top:10px;"></div>
+                            <div id="configMsg"></div>
                         </div>
                     </div>
 
@@ -284,67 +95,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                 </div>
                                 <button type="submit" class="btn-primary" id="uploadLogoBtn">Enviar Logo</button>
                             </form>
-                            <div id="logoMsg" style="margin-top:10px;"></div>
-                        </div>
-                    </div>
-
-                    <div class="dashboard-card">
-                        <div class="card-header">
-                            <h3>Certificado Digital A1</h3>
-                        </div>
-                        <div class="card-body">
-                            <?php if (!empty($certificado_atual)): ?>
-                                <div class="form-text" style="margin-bottom: 10px;">
-                                    <strong>Certificado atual:</strong>
-                                    <?php echo htmlspecialchars($certificado_atual['nome']); ?>
-                                    <?php if (!empty($certificado_atual['data_vencimento'])): ?>
-                                        - válido até <?php echo date('d/m/Y', strtotime($certificado_atual['data_vencimento'])); ?>
-                                    <?php endif; ?>
-                                    <?php if (!empty($certificado_atual['arquivo'])): ?>
-                                        <br><strong>Arquivo:</strong> <?php echo htmlspecialchars($certificado_atual['arquivo']); ?>
-                                    <?php endif; ?>
-                                </div>
-                            <?php endif; ?>
-                            <form id="certificadoForm" enctype="multipart/form-data">
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                    <div class="form-group">
-                                        <label for="nome_certificado">Nome do Certificado</label>
-                                        <input type="text" id="nome_certificado" name="nome_certificado" placeholder="Ex: Certificado Empresa 2025" value="<?php echo !empty($certificado_atual['nome']) ? htmlspecialchars($certificado_atual['nome']) : ''; ?>" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="data_validade">Data de Validade</label>
-                                        <input type="date" id="data_validade" name="data_validade" value="<?php echo !empty($certificado_atual['data_vencimento']) ? htmlspecialchars($certificado_atual['data_vencimento']) : ''; ?>">
-                                        <small class="form-text">Será preenchida automaticamente a partir do certificado enviado.</small>
-                                    </div>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="arquivo_certificado">Arquivo do Certificado (.pfx, .p12)</label>
-                                    <input type="file" id="arquivo_certificado" name="arquivo_certificado" accept=".pfx,.p12" required>
-                                    <small class="form-text">Formatos aceitos: .pfx, .p12 (máx. 10MB)</small>
-                                </div>
-                                
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                    <div class="form-group">
-                                        <label for="senha_certificado">Senha do Certificado</label>
-                                        <input type="password" id="senha_certificado" name="senha_certificado" placeholder="Digite a senha do certificado" required>
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="tipo_certificado">Tipo de Certificado</label>
-                                        <select id="tipo_certificado" name="tipo_certificado" required>
-                                            <option value="A1">A1 - Arquivo</option>
-                                            <option value="A3">A3 - Token/Cartão</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="observacoes">Observações</label>
-                                    <textarea id="observacoes" name="observacoes" rows="3" placeholder="Informações adicionais sobre o certificado"></textarea>
-                                </div>
-                                <button type="submit" class="btn-primary" id="uploadCertificadoBtn">Enviar Certificado</button>
-                            </form>
-                            <div id="certificadoMsg" style="margin-top:10px;"></div>
+                            <div id="logoMsg"></div>
                         </div>
                     </div>
 
@@ -365,7 +116,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                         <strong>Permissões necessárias:</strong> Geocoding API, Maps JavaScript API, Places API
                                     </small>
                                 </div>
-                                <div class="form-group" style="display: flex; gap: 10px; align-items: center;">
+                                <div class="config-actions">
                                     <button type="button" id="testApiKeyBtn" class="btn-secondary">
                                         <i class="fas fa-check-circle"></i> Testar Chave
                                     </button>
@@ -374,18 +125,129 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     </button>
                                 </div>
                             </form>
-                            <div id="googleMapsMsg" style="margin-top:10px;"></div>
+                            <div id="googleMapsMsg"></div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card config-card--full config-gps-cercas" id="config-gps-cercas">
+                        <div class="card-header">
+                            <h3><i class="fas fa-draw-polygon"></i> Cercas GPS (geofence)</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="form-text config-card-lead">Zonas circulares no mapa: quando o app envia a posição, o sistema pode registrar <strong>entrou</strong> / <strong>saiu</strong> nos alertas. As cercas ativas aparecem no <a href="<?php echo htmlspecialchars(sf_app_url('pages/mapa_frota.php')); ?>">Mapa da frota</a>.</p>
+                            <div id="gpsCercasMsg" class="config-inline-msg" role="status" aria-live="polite"></div>
+                            <form id="gpsCercasCreateForm" autocomplete="off">
+                                <div class="config-row-2 config-row-2--mb">
+                                    <div class="form-group">
+                                        <label for="gpsCercaNome">Nome</label>
+                                        <input type="text" id="gpsCercaNome" name="nome" maxlength="120" placeholder="Ex.: Pátio matriz" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="gpsCercaRaio">Raio (metros)</label>
+                                        <input type="number" id="gpsCercaRaio" name="raio_metros" value="500" min="50" max="50000" step="10" required>
+                                    </div>
+                                </div>
+                                <div class="config-row-2 config-row-2--mb-lg">
+                                    <div class="form-group">
+                                        <label for="gpsCercaLat">Latitude</label>
+                                        <input type="text" id="gpsCercaLat" name="latitude" inputmode="decimal" placeholder="-23.550520" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="gpsCercaLng">Longitude</label>
+                                        <input type="text" id="gpsCercaLng" name="longitude" inputmode="decimal" placeholder="-46.633308" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn-primary" id="gpsCercasSubmitBtn">
+                                    <i class="fas fa-plus"></i> Cadastrar cerca
+                                </button>
+                            </form>
+                            <h4 class="config-gps-cercas-sub">Cercas cadastradas</h4>
+                            <div class="config-gps-cercas-table-wrap">
+                                <table class="config-gps-cercas-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>Lat / Lng</th>
+                                            <th>Raio (m)</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="gpsCercasTableBody">
+                                        <tr><td colspan="4" class="form-text">Carregando…</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
 
                     <div class="dashboard-card">
-                        <div class="card-header" style="background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%); color: white;">
+                        <div class="card-header">
+                            <h3>Certificado Digital A1</h3>
+                        </div>
+                        <div class="card-body">
+                            <?php if (!empty($certificado_atual)): ?>
+                                <div class="form-text config-cert-banner">
+                                    <strong>Certificado atual:</strong>
+                                    <?php echo htmlspecialchars($certificado_atual['nome']); ?>
+                                    <?php if (!empty($certificado_atual['data_vencimento'])): ?>
+                                        - válido até <?php echo date('d/m/Y', strtotime($certificado_atual['data_vencimento'])); ?>
+                                    <?php endif; ?>
+                                    <?php if (!empty($certificado_atual['arquivo'])): ?>
+                                        <br><strong>Arquivo:</strong> <?php echo htmlspecialchars($certificado_atual['arquivo']); ?>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                            <form id="certificadoForm" enctype="multipart/form-data">
+                                <div class="config-row-2">
+                                    <div class="form-group">
+                                        <label for="nome_certificado">Nome do Certificado</label>
+                                        <input type="text" id="nome_certificado" name="nome_certificado" placeholder="Ex: Certificado Empresa 2025" value="<?php echo !empty($certificado_atual['nome']) ? htmlspecialchars($certificado_atual['nome']) : ''; ?>" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="data_validade">Data de Validade</label>
+                                        <input type="date" id="data_validade" name="data_validade" value="<?php echo !empty($certificado_atual['data_vencimento']) ? htmlspecialchars($certificado_atual['data_vencimento']) : ''; ?>">
+                                        <small class="form-text">Será preenchida automaticamente a partir do certificado enviado.</small>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="arquivo_certificado">Arquivo do Certificado (.pfx, .p12)</label>
+                                    <input type="file" id="arquivo_certificado" name="arquivo_certificado" accept=".pfx,.p12" required>
+                                    <small class="form-text">Formatos aceitos: .pfx, .p12 (máx. 10MB)</small>
+                                </div>
+                                
+                                <div class="config-row-2">
+                                    <div class="form-group">
+                                        <label for="senha_certificado">Senha do Certificado</label>
+                                        <input type="password" id="senha_certificado" name="senha_certificado" placeholder="Digite a senha do certificado" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="tipo_certificado">Tipo de Certificado</label>
+                                        <select id="tipo_certificado" name="tipo_certificado" required>
+                                            <option value="A1">A1 - Arquivo</option>
+                                            <option value="A3">A3 - Token/Cartão</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="observacoes">Observações</label>
+                                    <textarea id="observacoes" name="observacoes" rows="3" placeholder="Informações adicionais sobre o certificado"></textarea>
+                                </div>
+                                <button type="submit" class="btn-primary" id="uploadCertificadoBtn">Enviar Certificado</button>
+                            </form>
+                            <div id="certificadoMsg"></div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-card config-card--span-2">
+                        <div class="card-header">
                             <h3><i class="fas fa-search"></i> Consulta de Multas (DETRAN)</h3>
                         </div>
                         <div class="card-body">
-                            <p class="form-text" style="margin-bottom: 1rem;">Configure a integração com o WSDenatran para consultar infrações na base do Denatran. Cadastre o certificado abaixo (igual ao Certificado Digital A1).</p>
+                            <p class="form-text config-card-lead">Configure a integração com o WSDenatran para consultar infrações na base do Denatran. Cadastre o certificado abaixo (igual ao Certificado Digital A1).</p>
                             <form id="denatranConfigForm">
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                <div class="config-row-2 config-row-2--mb">
                                     <div class="form-group">
                                         <label for="denatran_habilitado">Habilitar consulta DETRAN</label>
                                         <select id="denatran_habilitado" name="habilitado">
@@ -402,20 +264,20 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                         </select>
                                     </div>
                                 </div>
-                                <div class="form-group" style="margin-bottom: 15px;">
+                                <div class="form-group">
                                     <label for="denatran_cpf_usuario">CPF do usuário autorizado (11 dígitos)</label>
                                     <input type="text" id="denatran_cpf_usuario" name="cpf_usuario" placeholder="000.000.000-00" maxlength="14">
                                     <small class="form-text">Obrigatório no header da API WSDenatran.</small>
                                 </div>
                                 <button type="submit" class="btn-primary" id="saveDenatranConfigBtn"><i class="fas fa-save"></i> Salvar configuração DETRAN</button>
                             </form>
-                            <div id="denatranConfigMsg" style="margin-top:10px;"></div>
+                            <div id="denatranConfigMsg"></div>
 
-                            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color, #ddd);">
-                                <h4 style="margin-bottom: 0.75rem; font-size: 1rem;"><i class="fas fa-certificate"></i> Certificado Digital (DETRAN)</h4>
-                                <p id="denatranCertInfo" class="form-text" style="margin-bottom: 1rem; color: var(--text-muted, #666);">Nenhum certificado enviado. Envie um certificado .pfx ou .p12 (igual ao A1).</p>
+                            <div class="config-subsection">
+                                <h4><i class="fas fa-certificate"></i> Certificado Digital (DETRAN)</h4>
+                                <p id="denatranCertInfo" class="form-text config-text-muted">Nenhum certificado enviado. Envie um certificado .pfx ou .p12 (igual ao A1).</p>
                                 <form id="denatranCertForm" enctype="multipart/form-data">
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                    <div class="config-row-2 config-row-2--mb">
                                         <div class="form-group">
                                             <label for="denatran_nome_certificado">Nome do certificado</label>
                                             <input type="text" id="denatran_nome_certificado" name="nome_certificado" placeholder="Ex: Certificado DETRAN 2025" value="Certificado DETRAN">
@@ -425,28 +287,28 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                             <input type="date" id="denatran_data_validade" name="data_validade">
                                         </div>
                                     </div>
-                                    <div class="form-group" style="margin-bottom: 15px;">
+                                    <div class="form-group">
                                         <label for="denatran_arquivo_certificado">Arquivo do certificado (.pfx, .p12)</label>
                                         <input type="file" id="denatran_arquivo_certificado" name="arquivo_certificado" accept=".pfx,.p12" required>
                                         <small class="form-text">Formatos aceitos: .pfx, .p12 (máx. 10MB) — igual ao Certificado A1.</small>
                                     </div>
-                                    <div class="form-group" style="margin-bottom: 15px;">
+                                    <div class="form-group">
                                         <label for="denatran_senha_certificado">Senha do certificado</label>
                                         <input type="password" id="denatran_senha_certificado" name="senha_certificado" placeholder="Senha do arquivo .pfx/.p12" required>
                                     </div>
                                     <button type="submit" class="btn-primary" id="uploadDenatranCertBtn"><i class="fas fa-upload"></i> Enviar certificado DETRAN</button>
                                 </form>
-                                <div id="denatranCertMsg" style="margin-top:10px;"></div>
+                                <div id="denatranCertMsg"></div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="dashboard-card">
+                    <div class="dashboard-card config-card--full">
                         <div class="card-header">
                             <h3>Ambiente do Sistema Fiscal</h3>
                         </div>
                         <div class="card-body">
-                            <form id="ambienteFiscalForm">
+                            <form id="ambienteFiscalForm" class="config-form-fiscal">
                                 <div class="form-group">
                                     <label for="ambiente_sefaz">Ambiente SEFAZ</label>
                                     <select id="ambiente_sefaz" name="ambiente_sefaz" required>
@@ -476,6 +338,13 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     <input type="text" id="inscricao_estadual" name="inscricao_estadual" placeholder="Inscrição estadual" maxlength="20">
                                 </div>
                                 <div class="form-group">
+                                    <label for="rntrc">RNTRC (ANTT)</label>
+                                    <input type="text" id="rntrc" name="rntrc" placeholder="Ex: 1234567890123" maxlength="20">
+                                    <small class="form-text">
+                                        Necessário para emitir MDF-e rodoviário (e validações antes de envio para SEFAZ).
+                                    </small>
+                                </div>
+                                <div class="form-group">
                                     <label for="codigo_municipio">Código do Município</label>
                                     <input type="text" id="codigo_municipio" name="codigo_municipio" placeholder="Código IBGE do município" maxlength="7">
                                 </div>
@@ -497,12 +366,11 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                 </div>
                                 <button type="submit" class="btn-primary" id="saveAmbienteFiscalBtn">Salvar Configurações Fiscais</button>
                             </form>
-                            <div id="ambienteFiscalMsg" style="margin-top:10px;"></div>
+                            <div id="ambienteFiscalMsg"></div>
                             
-                            <!-- Botões de Teste SEFAZ -->
-                            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
-                                <h4 style="margin-bottom: 15px; color: #333;">🧪 Testes SEFAZ</h4>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                            <div class="config-subsection">
+                                <h4>🧪 Testes SEFAZ</h4>
+                                <div class="config-row-2 config-row-2--gap-sm config-row-2--mb">
                                     <button type="button" class="btn-secondary" id="testeSefazBtn" onclick="testarSefaz()">
                                         <i class="fas fa-wifi"></i> Testar Conexão SEFAZ
                                     </button>
@@ -510,7 +378,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                         <i class="fas fa-certificate"></i> Testar Certificado
                                     </button>
                                 </div>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div class="config-row-2 config-row-2--gap-sm">
                                     <button type="button" class="btn-secondary" id="converterCertificadoBtn" onclick="converterCertificado()">
                                         <i class="fas fa-exchange-alt"></i> Converter Certificado
                                     </button>
@@ -518,7 +386,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                         <i class="fas fa-stethoscope"></i> Diagnóstico Completo
                                     </button>
                                 </div>
-                                <div id="testeSefazMsg" style="margin-top: 15px;"></div>
+                                <div id="testeSefazMsg"></div>
                             </div>
                         </div>
                     </div>
@@ -527,8 +395,8 @@ if ($row && !empty($row['certificado_a1_id'])) {
                     <!-- CONFIGURAÇÕES DE FUNCIONALIDADES AVANÇADAS -->
                     <!-- ======================================== -->
                     
-                    <div class="dashboard-card">
-                        <div class="card-header" style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); color: white;">
+                    <div class="dashboard-card config-card--full">
+                        <div class="card-header">
                             <h3>⚙️ Configurações de Funcionalidades Avançadas</h3>
                         </div>
                         <div class="card-body">
@@ -538,7 +406,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     <i class="fas fa-bell me-2"></i>Sistema de Notificações
                                 </h5>
                                 <form id="configNotificacoesForm">
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                                    <div class="config-row-2 config-row-2--mb-lg">
                                         <div class="form-group">
                                             <label>
                                                 <input type="checkbox" id="notificacoes_badges" name="notificacoes_badges" checked> 
@@ -574,7 +442,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     
                                     <button type="submit" class="btn-primary">Salvar Configurações de Notificações</button>
                                 </form>
-                                <div id="configNotificacoesMsg" style="margin-top:10px;"></div>
+                                <div id="configNotificacoesMsg"></div>
                             </div>
 
                             <!-- Sistema de Cache -->
@@ -583,7 +451,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     <i class="fas fa-database me-2"></i>Sistema de Cache
                                 </h5>
                                 <form id="configCacheForm">
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                                    <div class="config-row-2 config-row-2--mb-lg">
                                         <div class="form-group">
                                             <label for="cache_ttl">TTL do Cache (minutos)</label>
                                             <input type="number" id="cache_ttl" name="cache_ttl" value="5" min="1" max="60">
@@ -625,7 +493,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                         <i class="fas fa-trash me-1"></i>Limpar Cache Agora
                                     </button>
                                 </form>
-                                <div id="configCacheMsg" style="margin-top:10px;"></div>
+                                <div id="configCacheMsg"></div>
                             </div>
                         </div>
                     </div>
@@ -634,8 +502,8 @@ if ($row && !empty($row['certificado_a1_id'])) {
                     <!-- CONFIGURAÇÕES DE GAMIFICAÇÃO -->
                     <!-- ======================================== -->
                     
-                    <div class="dashboard-card">
-                        <div class="card-header" style="background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%); color: white;">
+                    <div class="dashboard-card config-card--full">
+                        <div class="card-header">
                             <h3>🎮 Configurações de Gamificação</h3>
                         </div>
                         <div class="card-body">
@@ -656,7 +524,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     <i class="fas fa-medal me-2"></i>Sistema de Badges e Conquistas
                                 </h5>
                                 <form id="configBadgesForm">
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                                    <div class="config-row-2 config-row-2--mb-lg">
                                         <div class="form-group">
                                             <label for="badge_motorista_economico">Badge "Motorista Econômico"</label>
                                             <input type="number" id="badge_motorista_economico" name="badge_motorista_economico" value="3" min="1" max="12">
@@ -688,7 +556,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     
                                     <button type="submit" class="btn-primary">Salvar Configurações de Badges</button>
                                 </form>
-                                <div id="configBadgesMsg" style="margin-top:10px;"></div>
+                                <div id="configBadgesMsg"></div>
                             </div>
 
                             <!-- Sistema de Níveis Avançado -->
@@ -697,7 +565,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     <i class="fas fa-star me-2"></i>Sistema de Níveis Avançado
                                 </h5>
                                 <form id="configNiveisForm">
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                                    <div class="config-row-2 config-row-2--mb-lg">
                                         <div class="form-group">
                                             <label for="nivel_bronze_min">Bronze - Pontos Mínimos</label>
                                             <input type="number" id="nivel_bronze_min" name="nivel_bronze_min" value="0" min="0" max="1000">
@@ -757,7 +625,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     
                                     <button type="submit" class="btn-primary">Salvar Configurações de Níveis</button>
                                 </form>
-                                <div id="configNiveisMsg" style="margin-top:10px;"></div>
+                                <div id="configNiveisMsg"></div>
                             </div>
 
                             <!-- Sistema de Desafios -->
@@ -766,7 +634,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     <i class="fas fa-target me-2"></i>Sistema de Desafios
                                 </h5>
                                 <form id="configDesafiosForm">
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                                    <div class="config-row-2 config-row-2--mb-lg">
                                         <div class="form-group">
                                             <label for="desafio_km_sem_infracoes">Desafio: KM sem Infrações</label>
                                             <input type="number" id="desafio_km_sem_infracoes" name="desafio_km_sem_infracoes" value="5000" min="1000" max="50000">
@@ -806,7 +674,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     
                                     <button type="submit" class="btn-primary">Salvar Configurações de Desafios</button>
                                 </form>
-                                <div id="configDesafiosMsg" style="margin-top:10px;"></div>
+                                <div id="configDesafiosMsg"></div>
                             </div>
                         </div>
                     </div>
@@ -815,8 +683,8 @@ if ($row && !empty($row['certificado_a1_id'])) {
                     <!-- CONFIGURAÇÕES DE RANKING -->
                     <!-- ======================================== -->
                     
-                    <div class="dashboard-card">
-                        <div class="card-header" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <div class="dashboard-card config-card--full">
+                        <div class="card-header">
                             <h3>🏆 Configurações de Ranking</h3>
                         </div>
                         <div class="card-body">
@@ -837,7 +705,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     <i class="fas fa-cogs me-2"></i>Configurações de Performance Básicas
                                 </h5>
                                 <form id="configPerformanceForm">
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                                    <div class="config-row-2 config-row-2--mb-lg">
                                         <div class="form-group">
                                             <label for="peso_pontualidade">Peso da Pontualidade (%)</label>
                                             <input type="number" id="peso_pontualidade" name="peso_pontualidade" value="25" min="0" max="100" required>
@@ -880,7 +748,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     
                                     <button type="submit" class="btn-primary">Salvar Configurações de Performance</button>
                                 </form>
-                                <div id="configPerformanceMsg" style="margin-top:10px;"></div>
+                                <div id="configPerformanceMsg"></div>
                             </div>
 
                             <!-- Métricas Avançadas de Avaliação -->
@@ -889,7 +757,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     <i class="fas fa-chart-bar me-2"></i>Métricas Avançadas de Avaliação
                                 </h5>
                                 <form id="configMetricasForm">
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                                    <div class="config-row-2 config-row-2--mb-lg">
                                         <div class="form-group">
                                             <label for="peso_ocorrencias_sinistros">Peso de Ocorrências/Sinistros (%)</label>
                                             <input type="number" id="peso_ocorrencias_sinistros" name="peso_ocorrencias_sinistros" value="15" min="0" max="100">
@@ -921,7 +789,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     
                                     <button type="submit" class="btn-primary">Salvar Métricas Avançadas</button>
                                 </form>
-                                <div id="configMetricasMsg" style="margin-top:10px;"></div>
+                                <div id="configMetricasMsg"></div>
                             </div>
 
                             <!-- Filtros Dinâmicos de Ranking -->
@@ -930,7 +798,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     <i class="fas fa-filter me-2"></i>Filtros Dinâmicos de Ranking
                                 </h5>
                                 <form id="configFiltrosForm">
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                                    <div class="config-row-2 config-row-2--mb-lg">
                                         <div class="form-group">
                                             <label for="periodo_padrao">Período Padrão do Ranking</label>
                                             <select id="periodo_padrao" name="periodo_padrao">
@@ -976,11 +844,14 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                     
                                     <button type="submit" class="btn-primary">Salvar Configurações de Filtros</button>
                                 </form>
-                                <div id="configFiltrosMsg" style="margin-top:10px;"></div>
+                                <div id="configFiltrosMsg"></div>
                             </div>
                         </div>
                     </div>
                 </div>
+                <button type="button" class="config-scroll-top" id="configScrollTopBtn" aria-label="Voltar ao topo" title="Voltar ao topo">
+                    <i class="fas fa-arrow-up" aria-hidden="true"></i>
+                </button>
             </div>
         </div>
     </div>
@@ -1132,6 +1003,8 @@ if ($row && !empty($row['certificado_a1_id'])) {
                     document.getElementById('razao_social').value = data.data.razao_social || '';
                     document.getElementById('nome_fantasia').value = data.data.nome_fantasia || '';
                     document.getElementById('inscricao_estadual').value = data.data.inscricao_estadual || '';
+                        var rntrcEl = document.getElementById('rntrc');
+                        if (rntrcEl) rntrcEl.value = data.data.rntrc || '';
                     document.getElementById('codigo_municipio').value = data.data.codigo_municipio || '';
                     document.getElementById('cep').value = data.data.cep || '';
                     document.getElementById('endereco').value = data.data.endereco || '';
@@ -1194,6 +1067,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
             razao_social: formData.get('razao_social').trim(),
             nome_fantasia: formData.get('nome_fantasia').trim(),
             inscricao_estadual: formData.get('inscricao_estadual').trim(),
+            rntrc: (formData.get('rntrc') || '').trim(),
             codigo_municipio: formData.get('codigo_municipio').trim(),
             cep: formData.get('cep').trim(),
             endereco: formData.get('endereco').trim(),
@@ -2047,6 +1921,142 @@ if ($row && !empty($row['certificado_a1_id'])) {
         })
         .catch(() => alert('Erro ao salvar configurações de background processing.'));
     }
+
+    (function () {
+        var apiUrl = function () {
+            return (typeof sfApiUrl === 'function') ? sfApiUrl('gps_cercas.php') : '../api/gps_cercas.php';
+        };
+        var jsonHeaders = function () {
+            var h = { 'Content-Type': 'application/json' };
+            if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+                h['X-CSRF-Token'] = window.__SF_CSRF__;
+            }
+            return h;
+        };
+        var msgEl = document.getElementById('gpsCercasMsg');
+        var tbody = document.getElementById('gpsCercasTableBody');
+        var form = document.getElementById('gpsCercasCreateForm');
+        function showGpsMsg(text, ok) {
+            if (!msgEl) return;
+            msgEl.textContent = text || '';
+            msgEl.style.color = ok ? 'var(--success-color, #16a34a)' : 'var(--danger-color, #dc2626)';
+        }
+        function loadGpsCercas() {
+            if (!tbody) return;
+            fetch(apiUrl(), { credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (j) {
+                    tbody.innerHTML = '';
+                    if (!j.success || !j.data || !Array.isArray(j.data.cercas)) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="form-text">Não foi possível carregar as cercas.</td></tr>';
+                        return;
+                    }
+                    var rows = j.data.cercas;
+                    if (rows.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="form-text">Nenhuma cerca cadastrada. Use coordenadas de um mapa externo (ex.: clique com o botão direito no Google Maps).</td></tr>';
+                        return;
+                    }
+                    rows.forEach(function (c) {
+                        var tr = document.createElement('tr');
+                        var td1 = document.createElement('td');
+                        td1.textContent = c.nome || '';
+                        var td2 = document.createElement('td');
+                        td2.textContent = String(c.latitude) + ', ' + String(c.longitude);
+                        var td3 = document.createElement('td');
+                        td3.textContent = String(c.raio_metros);
+                        var td4 = document.createElement('td');
+                        var btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'btn-gps-cerca-del';
+                        btn.textContent = 'Excluir';
+                        btn.setAttribute('data-id', String(c.id));
+                        btn.addEventListener('click', function () {
+                            var id = parseInt(btn.getAttribute('data-id'), 10);
+                            if (!id || !window.confirm('Excluir esta cerca?')) return;
+                            fetch(apiUrl(), {
+                                method: 'POST',
+                                credentials: 'same-origin',
+                                headers: jsonHeaders(),
+                                body: JSON.stringify({ action: 'delete', id: id })
+                            })
+                                .then(function (r) { return r.json(); })
+                                .then(function (res) {
+                                    if (res.success) {
+                                        showGpsMsg(res.message || 'Cerca removida.', true);
+                                        loadGpsCercas();
+                                    } else {
+                                        showGpsMsg(res.message || 'Erro ao excluir.', false);
+                                    }
+                                })
+                                .catch(function () { showGpsMsg('Erro de rede.', false); });
+                        });
+                        td4.appendChild(btn);
+                        tr.appendChild(td1);
+                        tr.appendChild(td2);
+                        tr.appendChild(td3);
+                        tr.appendChild(td4);
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(function () {
+                    tbody.innerHTML = '<tr><td colspan="4" class="form-text">Erro ao carregar cercas.</td></tr>';
+                });
+        }
+        if (form && tbody) {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var nome = (document.getElementById('gpsCercaNome') && document.getElementById('gpsCercaNome').value || '').trim();
+                var lat = parseFloat(document.getElementById('gpsCercaLat').value.replace(',', '.'));
+                var lng = parseFloat(document.getElementById('gpsCercaLng').value.replace(',', '.'));
+                var raio = parseInt(document.getElementById('gpsCercaRaio').value, 10) || 500;
+                if (!nome) {
+                    showGpsMsg('Informe o nome da cerca.', false);
+                    return;
+                }
+                if (isNaN(lat) || isNaN(lng)) {
+                    showGpsMsg('Latitude e longitude inválidas.', false);
+                    return;
+                }
+                fetch(apiUrl(), {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: jsonHeaders(),
+                    body: JSON.stringify({ nome: nome, latitude: lat, longitude: lng, raio_metros: raio })
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (res) {
+                        if (res.success) {
+                            showGpsMsg(res.message || 'Cerca cadastrada.', true);
+                            form.reset();
+                            var rIn = document.getElementById('gpsCercaRaio');
+                            if (rIn) rIn.value = '500';
+                            loadGpsCercas();
+                        } else {
+                            showGpsMsg(res.message || 'Erro ao salvar.', false);
+                        }
+                    })
+                    .catch(function () { showGpsMsg('Erro de rede.', false); });
+            });
+            loadGpsCercas();
+        }
+    })();
+
+    (function () {
+        var btn = document.getElementById('configScrollTopBtn');
+        var topEl = document.getElementById('configuracoes-top');
+        if (!btn || !topEl) return;
+        function toggle() {
+            var y = window.scrollY || document.documentElement.scrollTop;
+            btn.classList.toggle('is-visible', y > 180);
+        }
+        window.addEventListener('scroll', toggle, { passive: true });
+        toggle();
+        btn.addEventListener('click', function () {
+            topEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    })();
+
     </script>
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html> 

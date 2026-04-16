@@ -5,7 +5,10 @@
  */
 function montarDanfeCompletoHtml($xml_content, array $row) {
     $ns = 'http://www.portalfiscal.inf.br/nfe';
-    $xml = @simplexml_load_string($xml_content);
+    $xml = null;
+    if (is_string($xml_content) && trim($xml_content) !== '') {
+        $xml = @simplexml_load_string($xml_content);
+    }
     $nfe_node = null;
     if ($xml) {
         if (isset($xml->NFe)) {
@@ -86,6 +89,8 @@ function montarDanfeCompletoHtml($xml_content, array $row) {
                 'vICMSDeson' => (float)($total->vICMSDeson ?? 0), 'vFCP' => (float)($total->vFCP ?? 0),
                 'vBCST' => (float)($total->vBCST ?? 0), 'vST' => (float)($total->vST ?? 0),
                 'vFCPST' => (float)($total->vFCPST ?? 0), 'vFCPSTRet' => (float)($total->vFCPSTRet ?? 0),
+                'qBCMonoRet' => (float)($total->qBCMonoRet ?? 0),
+                'vICMSMonoRet' => (float)($total->vICMSMonoRet ?? 0),
                 'vProd' => (float)($total->vProd ?? 0), 'vFrete' => (float)($total->vFrete ?? 0),
                 'vSeg' => (float)($total->vSeg ?? 0), 'vDesc' => (float)($total->vDesc ?? 0),
                 'vII' => (float)($total->vII ?? 0), 'vIPI' => (float)($total->vIPI ?? 0),
@@ -143,9 +148,13 @@ function montarDanfeCompletoHtml($xml_content, array $row) {
             $transp['modFrete'] = $modFrete;
         }
         if ($inf_adic_node) {
-            $inf_adic = $val($inf_adic_node, 'infCpl') ?: $val($inf_adic_node, 'infAdFisco');
+            $fisco = trim($val($inf_adic_node, 'infAdFisco'));
+            $cpl = trim($val($inf_adic_node, 'infCpl'));
+            $inf_adic = implode("\n\n", array_filter([$fisco, $cpl]));
         }
     }
+
+    $fromXml = $inf !== null;
 
     $numero = $numero ?: ($row['numero_nfe'] ?? '-');
     $serie = $serie ?: ($row['serie_nfe'] ?? '-');
@@ -172,7 +181,7 @@ function montarDanfeCompletoHtml($xml_content, array $row) {
         $vUn = $i['vUnCom'] > 0 ? number_format($i['vUnCom'], 4, ',', '.') : '-';
         $qCom = $i['qCom'] != 0 ? number_format($i['qCom'], 4, ',', '.') : '-';
         $vProd = number_format($i['vProd'], 2, ',', '.');
-        $html_itens .= '<tr><td>' . htmlspecialchars($i['nItem']) . '</td><td>' . htmlspecialchars($i['cProd']) . '</td><td>' . htmlspecialchars(mb_substr($i['xProd'], 0, 50)) . '</td><td>' . htmlspecialchars($i['NCM']) . '</td><td>' . htmlspecialchars($i['CFOP']) . '</td><td>' . htmlspecialchars($i['uCom']) . '</td><td class="col-num">' . $qCom . '</td><td class="col-num">' . $vUn . '</td><td class="col-num">' . $vProd . '</td></tr>';
+        $html_itens .= '<tr><td>' . htmlspecialchars($i['nItem']) . '</td><td>' . htmlspecialchars($i['cProd']) . '</td><td>' . htmlspecialchars(mb_substr($i['xProd'], 0, 120)) . '</td><td>' . htmlspecialchars($i['NCM']) . '</td><td>' . htmlspecialchars($i['CFOP']) . '</td><td>' . htmlspecialchars($i['uCom']) . '</td><td class="col-num">' . $qCom . '</td><td class="col-num">' . $vUn . '</td><td class="col-num">' . $vProd . '</td></tr>';
     }
     if ($html_itens === '') {
         $html_itens = '<tr><td colspan="9">Nenhum item informado no XML.</td></tr>';
@@ -183,7 +192,9 @@ function montarDanfeCompletoHtml($xml_content, array $row) {
         $labels = [
             'vBC' => 'Base de Cálculo do ICMS', 'vICMS' => 'Valor do ICMS', 'vICMSDeson' => 'ICMS Desoneração',
             'vFCP' => 'Valor do FCP', 'vBCST' => 'Base de Cálculo do ICMS ST', 'vST' => 'Valor do ICMS ST',
-            'vFCPST' => 'Valor do FCP ST', 'vFCPSTRet' => 'FCP ST Retido', 'vProd' => 'Valor dos Produtos',
+            'vFCPST' => 'Valor do FCP ST', 'vFCPSTRet' => 'FCP ST Retido',
+            'qBCMonoRet' => 'Qtd BC ICMS monofásico retido', 'vICMSMonoRet' => 'Valor ICMS monofásico retido',
+            'vProd' => 'Valor dos Produtos',
             'vFrete' => 'Valor do Frete', 'vSeg' => 'Valor do Seguro', 'vDesc' => 'Desconto',
             'vII' => 'Valor do II', 'vIPI' => 'Valor do IPI', 'vIPIDevol' => 'IPI Devolvido',
             'vPIS' => 'Valor do PIS', 'vCOFINS' => 'Valor do COFINS', 'vOutro' => 'Outras Despesas',
@@ -264,7 +275,9 @@ function montarDanfeCompletoHtml($xml_content, array $row) {
 <table width="100%">' . $html_totais . '</table></div>
 ' . (!empty($html_transp) ? '<div class="bloco"><table width="100%">' . $html_transp . '</table></div>' : '') . '
 ' . $html_adic . '
-<p class="rodape">Documento gerado a partir do XML da NF-e. Consulte o XML para validade fiscal.</p>
+<p class="rodape">' . ($fromXml
+        ? 'Documento gerado a partir do XML da NF-e. Consulte o XML para validade fiscal.'
+        : 'Resumo gerado a partir dos dados cadastrados (sem XML completo no sistema). Quando possível, use o download de XML ou consulte a SEFAZ para obter o nfeProc.') . '</p>
 ';
 
     return ['html' => $html, 'numero' => $numero];

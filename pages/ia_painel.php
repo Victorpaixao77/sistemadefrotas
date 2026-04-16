@@ -18,9 +18,8 @@ require_authentication();
 
 // Validar empresa_id com tratamento de erro
 if (!isset($_SESSION['empresa_id']) || empty($_SESSION['empresa_id'])) {
-    error_log("Erro: Empresa não identificada na sessão. Sessão: " . print_r($_SESSION, true));
-    // Redirecionar para login em vez de throw exception
-    header("Location: /sistema-frotas/login.php");
+    sf_log_debug('ia_painel: empresa não identificada na sessão');
+    header('Location: ' . sf_app_url('login.php'));
     exit;
 }
 $empresa_id = $_SESSION['empresa_id'];
@@ -269,10 +268,10 @@ function sortByDate($array, $date_key = 'data') {
     <link rel="icon" type="image/png" href="../logo.png">
     
     <!-- CSS -->
-    <link rel="stylesheet" href="/sistema-frotas/css/styles.css">
-    <link rel="stylesheet" href="/sistema-frotas/css/responsive.css">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(sf_app_url('css/styles.css')); ?>">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(sf_app_url('css/responsive.css')); ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="/sistema-frotas/css/theme.css">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(sf_app_url('css/theme.css')); ?>">
     
     <style>
         /* Estilos específicos para o Painel IA */
@@ -1222,9 +1221,9 @@ function sortByDate($array, $date_key = 'data') {
             onerror="console.warn('Font Awesome CDN falhou, usando fallback')"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" 
             onerror="console.warn('Chart.js CDN falhou, carregando fallback')"></script>
-    <script src="/sistema-frotas/js/theme.js"></script>
-    <script src="/sistema-frotas/js/sidebar.js"></script>
-    <script src="/sistema-frotas/js/dashboard.js"></script>
+    <script src="<?php echo htmlspecialchars(sf_app_url('js/theme.js')); ?>"></script>
+    <script src="<?php echo htmlspecialchars(sf_app_url('js/sidebar.js')); ?>"></script>
+    <script src="<?php echo htmlspecialchars(sf_app_url('js/dashboard.js')); ?>"></script>
     
     <!-- Fallback para Chart.js se CDN falhar -->
     <script>

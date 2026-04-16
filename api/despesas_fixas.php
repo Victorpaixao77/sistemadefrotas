@@ -2,32 +2,22 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
+require_once '../includes/csrf.php';
+require_once '../includes/sf_cache.php';
+require_once '../includes/upload_comprovante.php';
+require_once __DIR__ . '/../includes/bi_cache_invalidate.php';
 
-// Configure session before starting it
 configure_session();
-
-// Initialize the session
 session_start();
-
-// Require authentication
 require_authentication();
 
-// Create database connection
 $conn = getConnection();
 
-// Set content type to JSON
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
+if (DEBUG_MODE) {
+    ini_set('display_errors', '0');
+}
 
-// Enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('log_errors', 1);
-ini_set('error_log', __DIR__ . '/../logs/php_error.log');
-
-// Debug session state
-error_log("Session state in despesas_fixas.php: " . print_r($_SESSION, true));
-
-// Get the action from the request
 $action = isset($_GET['action']) ? $_GET['action'] : '';
 
 try {
@@ -114,9 +104,27 @@ try {
             $stmt_count->execute();
             $total_records = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
             $total_pages = ceil($total_records / $limit);
+
+            $allowedSort = [
+                'vencimento' => 'df.vencimento',
+                'veiculo_placa' => 'v.placa',
+                'tipo_nome' => 'td.nome',
+                'descricao' => 'df.descricao',
+                'valor' => 'df.valor',
+                'status_nome' => 'sp.nome',
+                'data_pagamento' => 'df.data_pagamento',
+                'forma_pagamento_nome' => 'fp.nome',
+                'repetir' => 'df.repetir_automaticamente',
+            ];
+            $sortKey = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'vencimento';
+            if ($sortKey === '' || !isset($allowedSort[$sortKey])) {
+                $sortKey = 'vencimento';
+            }
+            $orderCol = $allowedSort[$sortKey];
+            $dir = (isset($_GET['dir']) && strtoupper(trim((string) $_GET['dir'])) === 'ASC') ? 'ASC' : 'DESC';
             
             // Add pagination to main query
-            $sql .= " ORDER BY df.vencimento DESC, df.id DESC LIMIT :limit OFFSET :offset";
+            $sql .= " ORDER BY " . $orderCol . " " . $dir . ", df.id DESC LIMIT :limit OFFSET :offset";
             $params[':limit'] = $limit;
             $params[':offset'] = $offset;
             
@@ -131,21 +139,32 @@ try {
             }
             $stmt->execute();
             $despesas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Get metrics
+
+            $cacheKey = 'df_list_' . md5(json_encode([
+                (int) $_SESSION['empresa_id'],
+                $search, $veiculo, $tipo, $status, $pagamento, $year, $month,
+                $page, $per_page, $sortKey, $dir,
+            ]));
+            $cached = sf_file_cache_get($cacheKey, 60);
+            if (is_array($cached)) {
+                echo json_encode($cached);
+                break;
+            }
+
             $metrics = getDespesasMetrics($conn, $_SESSION['empresa_id'], $year, $month);
-            
-            // Get chart data
             $charts = getDespesasChartData($conn, $_SESSION['empresa_id'], $year, $month);
-            
-            echo json_encode([
+
+            $payload = [
+                'success' => true,
                 'despesas' => $despesas,
                 'metrics' => $metrics,
                 'charts' => $charts,
                 'pagina_atual' => $page,
                 'total_paginas' => $total_pages,
-                'total_registros' => $total_records
-            ]);
+                'total_registros' => $total_records,
+            ];
+            sf_file_cache_set($cacheKey, $payload);
+            echo json_encode($payload);
             break;
             
         case 'get':
@@ -178,12 +197,13 @@ try {
             $stmt->bindValue(':empresa_id', $_SESSION['empresa_id']);
             $stmt->execute();
             
-            echo json_encode(['success' => true]);
+            bi_cache_invalidate_empresa($conn, (int) $_SESSION['empresa_id']);
+            echo json_encode(['success' => true, 'message' => 'Registro excluído.']);
             break;
             
         default:
             if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                // Handle form submission
+                api_require_csrf_json();
                 $despesaId = isset($_POST['id']) ? $_POST['id'] : null;
                 
                 // Validate required fields
@@ -211,32 +231,13 @@ try {
                     'notificar_vencimento' => isset($_POST['notificar_vencimento']) ? $_POST['notificar_vencimento'] : 0
                 ];
 
-                // Processar o upload do comprovante
                 if (isset($_FILES['comprovante']) && $_FILES['comprovante']['error'] === UPLOAD_ERR_OK) {
-                    $upload_dir = '../uploads/comprovantes/';
-                    
-                    // Criar diretório se não existir
-                    if (!file_exists($upload_dir)) {
-                        mkdir($upload_dir, 0777, true);
-                    }
-                    
-                    // Gerar nome único para o arquivo
-                    $file_extension = pathinfo($_FILES['comprovante']['name'], PATHINFO_EXTENSION);
-                    $file_name = uniqid('comprovante_') . '.' . $file_extension;
-                    $file_path = $upload_dir . $file_name;
-                    
-                    // Mover o arquivo
-                    if (move_uploaded_file($_FILES['comprovante']['tmp_name'], $file_path)) {
-                        $data['comprovante'] = 'uploads/comprovantes/' . $file_name;
-                    } else {
-                        throw new Exception("Erro ao fazer upload do comprovante");
-                    }
+                    $root = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
+                    $uploadAbs = $root . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'comprovantes';
+                    $data['comprovante'] = sf_save_comprovante_upload($_FILES['comprovante'], $uploadAbs, 'uploads/comprovantes', false);
                 }
-                
-                // Log data for debugging
-                error_log("Session data: " . print_r($_SESSION, true));
-                error_log("POST data: " . print_r($_POST, true));
-                error_log("Prepared data: " . print_r($data, true));
+
+                sf_log_debug('despesas_fixas POST empresa=' . (int) $_SESSION['empresa_id']);
                 
                 if ($despesaId) {
                     // Update
@@ -283,13 +284,11 @@ try {
                     }
                 }
                 
-                error_log("SQL Query: " . $sql);
-                error_log("Parameters: " . print_r($params, true));
-                
                 if ($stmt->execute()) {
-                    echo json_encode(['success' => true]);
+                    bi_cache_invalidate_empresa($conn, (int) $_SESSION['empresa_id']);
+                    echo json_encode(['success' => true, 'message' => 'Salvo com sucesso.']);
                 } else {
-                    error_log("Database error: " . print_r($stmt->errorInfo(), true));
+                    sf_log_debug('despesas_fixas DB error: ' . json_encode($stmt->errorInfo()));
                     throw new Exception('Erro ao salvar despesa no banco de dados');
                 }
             } else {
@@ -298,7 +297,7 @@ try {
             break;
     }
 } catch (Exception $e) {
-    error_log("Error in despesas_fixas.php: " . $e->getMessage());
+    sf_log_debug('despesas_fixas: ' . $e->getMessage());
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => $e->getMessage()]);
 }
@@ -425,7 +424,7 @@ function getDespesasChartData($conn, $empresa_id, $year, $month) {
             ]
         ];
     } catch(PDOException $e) {
-        error_log("Erro ao buscar dados dos gráficos: " . $e->getMessage());
+        sf_log_debug('getDespesasChartData: ' . $e->getMessage());
         return [
             'tipos' => ['labels' => [], 'valores' => []],
             'status' => ['labels' => [], 'valores' => []],

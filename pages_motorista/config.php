@@ -1,38 +1,37 @@
 <?php
+require_once __DIR__ . '/../includes/sf_paths.php';
+
+define('MOTORISTA_DEBUG', false);
+
 // Configurações de sessão
 ini_set('session.gc_maxlifetime', 3600);
 ini_set('session.cookie_lifetime', 3600);
-ini_set('session.cookie_secure', 0);
 ini_set('session.cookie_httponly', 1);
 ini_set('session.use_only_cookies', 1);
 ini_set('session.cookie_samesite', 'Lax');
 
-// Define o nome da sessão
+$cookieSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+    || (isset($_SERVER['SERVER_PORT']) && (string) $_SERVER['SERVER_PORT'] === '443');
+ini_set('session.cookie_secure', $cookieSecure ? '1' : '0');
+
 session_name('sistema_frotas_session');
 
-// Define parâmetros do cookie da sessão
 session_set_cookie_params([
     'lifetime' => 3600,
-    'path' => '/sistema-frotas',
+    'path' => sf_session_cookie_path(),
     'domain' => '',
-    'secure' => false,
+    'secure' => $cookieSecure,
     'httponly' => true,
-    'samesite' => 'Lax'
+    'samesite' => 'Lax',
 ]);
 
-// Inicia a sessão
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Log da sessão para debug
-error_log("=== Início da sessão ===");
-error_log("Session ID: " . session_id());
-error_log("Session Name: " . session_name());
-error_log("Session Status: " . session_status());
-error_log("Session Data: " . print_r($_SESSION, true));
-error_log("HTTP_REFERER: " . ($_SERVER['HTTP_REFERER'] ?? 'não definido'));
-error_log("HTTP_COOKIE: " . ($_SERVER['HTTP_COOKIE'] ?? 'não definido'));
+if (MOTORISTA_DEBUG) {
+    error_log('motorista session: ' . session_id());
+}
 
 // Configurações do módulo
 define('MOTORISTA_MODULE_ENABLED', true);
@@ -140,21 +139,24 @@ function json_error($message = 'Erro ao processar a requisição', $status = 400
 function login_motorista($nome, $senha) {
     try {
         $conn = getConnection();
+        $login = strtolower(trim($nome));
         $stmt = $conn->prepare('
-            SELECT id, nome, empresa_id, motorista_id, status, senha 
-            FROM usuarios_motoristas 
-            WHERE nome = :nome 
-            AND status = "ativo"
+            SELECT um.id, um.nome, um.empresa_id, um.motorista_id, um.status, um.senha,
+                   m.nome AS nome_motorista
+            FROM usuarios_motoristas um
+            INNER JOIN motoristas m ON m.id = um.motorista_id AND m.empresa_id = um.empresa_id
+            WHERE um.status = "ativo"
+              AND (
+                LOWER(TRIM(um.nome)) = :login
+                OR LOWER(TRIM(COALESCE(m.email, ""))) = :login2
+              )
         ');
-        
-        $stmt->bindParam(':nome', $nome);
-        $stmt->execute();
-        
+        $stmt->execute([':login' => $login, ':login2' => $login]);
         $motorista = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($motorista && password_verify($senha, $motorista['senha'])) {
             $_SESSION['motorista_id'] = $motorista['motorista_id'];
-            $_SESSION['motorista_nome'] = $motorista['nome'];
+            $_SESSION['motorista_nome'] = !empty($motorista['nome_motorista']) ? $motorista['nome_motorista'] : $motorista['nome'];
             $_SESSION['empresa_id'] = $motorista['empresa_id'];
             $_SESSION['tipo_usuario'] = 'motorista';
             $_SESSION['last_activity'] = time();

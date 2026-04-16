@@ -1,6 +1,9 @@
 <?php
 require_once '../../includes/config.php';
 require_once '../../includes/functions.php';
+require_once '../../includes/csrf.php';
+require_once '../../includes/api_json.php';
+require_once __DIR__ . '/../../includes/bi_cache_invalidate.php';
 
 // Iniciar sessão
 session_start();
@@ -11,6 +14,9 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     echo json_encode(['error' => 'Não autorizado']);
     exit;
 }
+
+// Protege mutações (POST) com CSRF.
+api_require_csrf_json();
 
 // Verificar se é uma requisição POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -56,6 +62,7 @@ try {
     $stmt->execute([$status, $rota_id, $empresa_id]);
     
     if ($stmt->rowCount() > 0) {
+        bi_cache_invalidate_empresa($conn, (int) $empresa_id);
         echo json_encode(['success' => true, 'message' => 'Status atualizado com sucesso']);
     } else {
         http_response_code(500);

@@ -2,6 +2,7 @@
 ob_start();
 require_once 'config.php';
 require_once 'functions.php';
+require_once __DIR__ . '/pneu_movimentacoes_helper.php';
 
 session_start();
 
@@ -80,9 +81,18 @@ try {
             ]);
             
             $id = $pdo->lastInsertId();
+            
+            // Histórico único: entrada em estoque (só para pneu novo)
+            if ($id && isset($empresa_id)) {
+                $custo_entrada = isset($data['valor_compra']) ? (float) $data['valor_compra'] : 0.0;
+                pneu_movimentacao_inserir($pdo, [
+                    'empresa_id' => $empresa_id,
+                    'pneu_id'    => (int) $id,
+                    'tipo'       => 'entrada_estoque',
+                    'custo'      => $custo_entrada,
+                ]);
+            }
         }
-        
-        // Confirma a transação
         $pdo->commit();
         
         // Limpa qualquer output buffer antes de enviar JSON de sucesso

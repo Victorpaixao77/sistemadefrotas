@@ -2,6 +2,8 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/cache.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
 // Configurar sessão antes de iniciá-la
 configure_session();
@@ -24,6 +26,9 @@ $action = isset($_GET['action']) ? $_GET['action'] : (isset($_POST['action']) ? 
 
 try {
     $conn = getConnection();
+
+    // Protege mutações (POST/PUT/PATCH/DELETE) com CSRF e retorno JSON padronizado.
+    api_require_csrf_json();
     
     // Verificar se as tabelas existem
     $tabelas_existem = verificarTabelasGamificacao($conn);

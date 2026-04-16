@@ -66,9 +66,19 @@ try {
         $params[':driver'] = $_GET['driver'];
     }
 
-    if (!empty($_GET['status'])) {
-        $sql .= " AND r.no_prazo = :status";
-        $params[':status'] = $_GET['status'] === 'no_prazo' ? 1 : 0;
+    $delivery = isset($_GET['delivery']) ? trim((string) $_GET['delivery']) : '';
+    if ($delivery === '' && !empty($_GET['status'])) {
+        $legacy = trim((string) $_GET['status']);
+        if ($legacy === 'no_prazo') {
+            $delivery = 'no_prazo';
+        } elseif ($legacy === 'atrasado') {
+            $delivery = 'atrasado';
+        }
+    }
+    if ($delivery === 'no_prazo') {
+        $sql .= ' AND r.no_prazo = 1';
+    } elseif ($delivery === 'atrasado') {
+        $sql .= ' AND r.no_prazo = 0';
     }
 
     if (!empty($_GET['date'])) {
@@ -110,6 +120,30 @@ try {
 
     $out = fopen('php://output', 'w');
     fprintf($out, "\xEF\xBB\xBF");
+
+    fputcsv($out, ['Sistema de Frotas — Exportação de rotas'], ';');
+    fputcsv($out, ['Gerado em', date('d/m/Y H:i')], ';');
+    $filterParts = [];
+    if (!empty($_GET['search'])) {
+        $filterParts[] = 'Busca: ' . $_GET['search'];
+    }
+    if ($delivery === 'no_prazo') {
+        $filterParts[] = 'Entrega: no prazo';
+    } elseif ($delivery === 'atrasado') {
+        $filterParts[] = 'Entrega: atrasado';
+    }
+    if (!empty($_GET['driver'])) {
+        $filterParts[] = 'Motorista ID: ' . $_GET['driver'];
+    }
+    if (!empty($_GET['date_from']) && !empty($_GET['date_to'])) {
+        $filterParts[] = 'Período: ' . $_GET['date_from'] . ' a ' . $_GET['date_to'];
+    } elseif (!empty($_GET['year']) && !empty($_GET['month'])) {
+        $filterParts[] = 'Mês/ano: ' . $_GET['month'] . '/' . $_GET['year'];
+    }
+    if (!empty($filterParts)) {
+        fputcsv($out, ['Filtros aplicados', implode(' · ', $filterParts)], ';');
+    }
+    fputcsv($out, [], ';');
 
     $headers = ['ID', 'Data Rota', 'Saída', 'Chegada', 'Motorista', 'Veículo', 'Origem', 'Destino', 'Distância (km)', 'Frete', 'No Prazo', 'Eficiência', '% Vazio', 'Comissão', 'Observações'];
     fputcsv($out, $headers, ';');

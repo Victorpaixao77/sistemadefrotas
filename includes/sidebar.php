@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/sf_paths.php';
 // Incluir arquivo de permissões se ainda não foi incluído
 if (!function_exists('can_access_fiscal_system')) {
     require_once __DIR__ . '/permissions.php';
@@ -24,7 +25,7 @@ if (!function_exists('can_access_fiscal_system')) {
         <nav class="sidebar-nav">
             <ul class="sidebar-nav-list">
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/index.php" class="sidebar-link active">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('index.php')); ?>" class="sidebar-link active">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-tachometer-alt"></i>
                         </div>
@@ -32,7 +33,7 @@ if (!function_exists('can_access_fiscal_system')) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/empresa.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/empresa.php')); ?>" class="sidebar-link">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-building"></i>
                         </div>
@@ -40,7 +41,7 @@ if (!function_exists('can_access_fiscal_system')) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/vehicles.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/vehicles.php')); ?>" class="sidebar-link">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-truck"></i>
                         </div>
@@ -48,7 +49,7 @@ if (!function_exists('can_access_fiscal_system')) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/motorists.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/motorists.php')); ?>" class="sidebar-link">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-user-tie"></i>
                         </div>
@@ -56,7 +57,15 @@ if (!function_exists('can_access_fiscal_system')) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/routes.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/fornecedores_moderno.php')); ?>" class="sidebar-link">
+                        <div class="sidebar-link-icon">
+                            <i class="fas fa-truck-loading"></i>
+                        </div>
+                        <span class="sidebar-link-text">Fornecedores</span>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/routes.php')); ?>" class="sidebar-link">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-route"></i>
                         </div>
@@ -64,7 +73,7 @@ if (!function_exists('can_access_fiscal_system')) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/abastecimentos.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/abastecimentos.php')); ?>" class="sidebar-link">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-gas-pump"></i>
                         </div>
@@ -72,7 +81,7 @@ if (!function_exists('can_access_fiscal_system')) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/manutencoes.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/manutencoes.php')); ?>" class="sidebar-link">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-tools"></i>
                         </div>
@@ -89,13 +98,13 @@ if (!function_exists('can_access_fiscal_system')) {
                     </a>
                     <ul class="sidebar-dropdown">
                         <li>
-                            <a href="/sistema-frotas/pages/contas_pagar.php">Contas a Pagar</a>
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/contas_pagar.php')); ?>">Contas a Pagar</a>
                         </li>
                         <li>
 
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/financiamento.php">Financiamento</a>
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/financiamento.php')); ?>">Financiamento</a>
                         </li>
                     </ul>
                 </li>
@@ -110,16 +119,16 @@ if (!function_exists('can_access_fiscal_system')) {
                     </a>
                     <ul class="sidebar-dropdown">
                         <li>
-                            <a href="/sistema-frotas/pages/pneus.php">Pneus</a>
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/pneus.php')); ?>">Pneus</a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/manutencao_pneus.php">Manutenção de Pneus</a>
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/manutencao_pneus.php')); ?>">Manutenção de Pneus</a>
                         </li>
                     </ul>
                 </li>
                 <?php endif; ?>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/lucratividade.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/lucratividade.php')); ?>" class="sidebar-link">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-chart-line"></i>
                         </div>
@@ -127,7 +136,7 @@ if (!function_exists('can_access_fiscal_system')) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/reports.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/reports.php')); ?>" class="sidebar-link">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-chart-bar"></i>
                         </div>
@@ -135,7 +144,7 @@ if (!function_exists('can_access_fiscal_system')) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/configuracoes.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/configuracoes.php')); ?>" class="sidebar-link">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-cog"></i>
                         </div>
@@ -144,7 +153,7 @@ if (!function_exists('can_access_fiscal_system')) {
                 </li>
                 <?php if (function_exists('can_manage_system_settings') && can_manage_system_settings()): ?>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/debug_apis.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/debug_apis.php')); ?>" class="sidebar-link">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-bug"></i>
                         </div>
@@ -153,7 +162,7 @@ if (!function_exists('can_access_fiscal_system')) {
                 </li>
                 <?php endif; ?>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/log_acessos.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/log_acessos.php')); ?>" class="sidebar-link">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-history"></i>
                         </div>

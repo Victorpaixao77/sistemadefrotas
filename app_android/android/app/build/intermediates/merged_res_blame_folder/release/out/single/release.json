@@ -1,0 +1,10 @@
+[
+    {
+        "merged": "com.sistemafrotas.motorista.app-merged_res-64:/drawable_logo_frotec.png.flat",
+        "source": "com.sistemafrotas.motorista.app-main-65:/drawable/logo_frotec.png"
+    },
+    {
+        "merged": "com.sistemafrotas.motorista.app-merged_res-64:/drawable_ic_launcher.xml.flat",
+        "source": "com.sistemafrotas.motorista.app-main-65:/drawable/ic_launcher.xml"
+    }
+]

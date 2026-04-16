@@ -29,6 +29,21 @@ function montarCteProcXml(PDO $conn, array $cte, array $empresa, $itens = null) 
     $dataEmissao = $cte['data_emissao'] ?? date('Y-m-d');
     $dhEmi = $dataEmissao . 'T' . date('H:i:sP');
 
+    // Ambiente SEFAZ (tpAmb) precisa bater com a configuração fiscal da empresa.
+    // 1 = produção, 2 = homologação
+    $tpAmb = 2;
+    $empresaIdCfg = $cte['empresa_id'] ?? null;
+    if ($empresaIdCfg) {
+        try {
+            $stmtAmb = $conn->prepare("SELECT ambiente_sefaz FROM fiscal_config_empresa WHERE empresa_id = ? LIMIT 1");
+            $stmtAmb->execute([(int)$empresaIdCfg]);
+            $amb = (string)($stmtAmb->fetchColumn() ?: '');
+            $tpAmb = ($amb === 'producao') ? 1 : 2;
+        } catch (Throwable $e) {
+            $tpAmb = 2;
+        }
+    }
+
     $cnpjEmit = preg_replace('/\D/', '', $empresa['cnpj'] ?? '');
     $xNomeEmit = $empresa['razao_social'] ?? 'Transportadora';
     $xFantEmit = $empresa['nome_fantasia'] ?? $xNomeEmit;
@@ -110,7 +125,7 @@ function montarCteProcXml(PDO $conn, array $cte, array $empresa, $itens = null) 
     $xml .= '        <dhEmi>' . $dhEmi . '</dhEmi>' . "\n";
     $xml .= '        <tpImp>1</tpImp>' . "\n";
     $xml .= '        <tpEmis>1</tpEmis>' . "\n";
-    $xml .= '        <tpAmb>1</tpAmb>' . "\n";
+    $xml .= '        <tpAmb>' . $tpAmb . '</tpAmb>' . "\n";
     $xml .= '        <tpCTe>0</tpCTe>' . "\n";
     $xml .= '        <procEmi>0</procEmi>' . "\n";
     $xml .= '        <verProc>1.0</verProc>' . "\n";
@@ -177,7 +192,7 @@ function montarCteProcXml(PDO $conn, array $cte, array $empresa, $itens = null) 
     if ($nProt !== '') {
         $xml .= "\n  <protCTe>\n";
         $xml .= "    <infProt>\n";
-        $xml .= '      <tpAmb>1</tpAmb>' . "\n";
+        $xml .= '      <tpAmb>' . $tpAmb . '</tpAmb>' . "\n";
         $xml .= '      <verAplic>' . htmlspecialchars($verAplic) . '</verAplic>' . "\n";
         $xml .= '      <chCTe>' . $chave . '</chCTe>' . "\n";
         $xml .= '      <dhRecbto>' . $dhRecbto . '</dhRecbto>' . "\n";

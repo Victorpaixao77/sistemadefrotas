@@ -3,6 +3,7 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/progress_bars.php';
+require_once '../includes/sf_api_base.php';
 
 // Configure session before starting it
 configure_session();
@@ -12,7 +13,7 @@ session_start();
 
 // Check if user is logged in, if not redirect to login page
 if(!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true){
-    header("location: /sistema-frotas/login.php");
+    header('location: ' . sf_app_url('login.php'));
     exit;
 }
 
@@ -25,9 +26,15 @@ if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
     $per_page = 10;
 }
 
+// Layout moderno por padrão (como rotas / fornecedores_moderno); ?classic=1 para o anterior
+$is_modern = !isset($_GET['classic']) || (string)$_GET['classic'] !== '1';
+
 // Load motorists for listing and metrics
 $conn = getConnection();
 $empresa_id = $_SESSION['empresa_id'];
+
+// Sincronizar alertas de CNH vencendo para o sino de notificações (máx. 1 por dia)
+require_once __DIR__ . '/../includes/sync_cnh_notificacoes.php';
 
 $stmt = $conn->prepare("
     SELECT 
@@ -38,6 +45,7 @@ $stmt = $conn->prepare("
         m.email,
         m.cnh,
         m.porcentagem_comissao,
+        m.foto_motorista,
         d.nome AS disponibilidade_nome,
         c.nome AS categoria_cnh_nome
     FROM motoristas m
@@ -69,6 +77,14 @@ foreach ($motoristas as $motorista) {
 }
 
 $media_comissao = $total_motoristas > 0 ? $soma_comissoes / $total_motoristas : 0.0;
+
+$motoristas_sem_cpf = 0;
+foreach ($motoristas as $m) {
+    $cpf = trim($m['cpf'] ?? '');
+    if ($cpf === '' || preg_replace('/\D/', '', $cpf) === '') {
+        $motoristas_sem_cpf++;
+    }
+}
 
 // Helper functions
 if (!function_exists('normalize_status_class')) {
@@ -138,6 +154,9 @@ if (!function_exists('format_cpf_br')) {
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
@@ -222,6 +241,10 @@ if (!function_exists('format_cpf_br')) {
             color: var(--text-color);
             font-size: 0.9rem;
         }
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { color: var(--accent-primary); }
+        th.sortable .sort-ind { opacity: 0.45; margin-left: 0.2rem; font-size: 0.65rem; }
+        th.sortable.sorted .sort-ind { opacity: 1; color: var(--accent-primary); }
         
         /* Estilos para a seção de análise */
         .analytics-section {
@@ -1292,9 +1315,49 @@ if (!function_exists('format_cpf_br')) {
         .ranking-container::-webkit-scrollbar-thumb:hover {
             background: #a8a8a8;
         }
+
+        /* Modo moderno: toolbar e botões em fornc-modern-page.css */
+        body.motorists-modern .dashboard-content.motoristas-modern-page.fornc-page {
+            padding-top: 8px;
+        }
+        body.motorists-modern .dashboard-header {
+            display: none;
+        }
+        body.motorists-modern .fornc-filters-inline .fg--check label {
+            text-transform: none;
+            font-size: 0.78rem;
+            flex-direction: row;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        body.motorists-modern .view-mode-btn.fornc-btn--ghost.active {
+            outline: 2px solid var(--accent-primary);
+            outline-offset: 1px;
+        }
+        body.motorists-modern #motoristsTableContainer.motorists-table-wrap {
+            max-height: min(70vh, 560px);
+        }
+        body.motorists-modern .motorists-table-wrap .fornc-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: var(--forn-table-head);
+            box-shadow: 0 1px 0 var(--border-color);
+        }
+        body.motorists-modern .motorists-table-wrap #motoristsTable {
+            min-width: 960px;
+            table-layout: auto;
+        }
+        @media (max-width: 767px) {
+            body.motorists-modern .motorists-table-wrap .fornc-table th:not(:first-child):not(:last-child),
+            body.motorists-modern .motorists-table-wrap .fornc-table td:not(:first-child):not(:last-child) {
+                display: table-cell !important;
+            }
+        }
     </style>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'motorists-modern' : ''; ?>">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
@@ -1305,7 +1368,8 @@ if (!function_exists('format_cpf_br')) {
             <?php include '../includes/header.php'; ?>
             
             <!-- Page Content -->
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' motoristas-modern-page fornc-page' : ''; ?>">
+                <?php if (!$is_modern): ?>
                 <div class="dashboard-header">
                     <h1>Motoristas</h1>
                     <div class="dashboard-actions">
@@ -1331,8 +1395,16 @@ if (!function_exists('format_cpf_br')) {
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 
-                <!-- KPI Cards Row -->
+                <?php if ($is_modern): ?>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Total</span><span class="val" id="totalMotorists"><?php echo (int) $total_motoristas; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Ativos</span><span class="val" id="activeMotorists"><?php echo (int) $motoristas_disponiveis; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Indisponíveis</span><span class="val" id="totalTrips"><?php echo (int) $motoristas_indisponiveis; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Média comissão</span><span class="val" id="averageRating"><?php echo number_format($media_comissao, 2, ',', '.'); ?>%</span></div>
+                </div>
+                <?php else: ?>
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
@@ -1345,7 +1417,6 @@ if (!function_exists('format_cpf_br')) {
                             </div>
                         </div>
                     </div>
-                    
                     <div class="dashboard-card">
                         <div class="card-header">
                             <h3>Motoristas Ativos</h3>
@@ -1357,7 +1428,6 @@ if (!function_exists('format_cpf_br')) {
                             </div>
                         </div>
                     </div>
-                    
                     <div class="dashboard-card">
                         <div class="card-header">
                             <h3>Status</h3>
@@ -1369,7 +1439,6 @@ if (!function_exists('format_cpf_br')) {
                             </div>
                         </div>
                     </div>
-                    
                     <div class="dashboard-card">
                         <div class="card-header">
                             <h3>Comissão</h3>
@@ -1382,8 +1451,83 @@ if (!function_exists('format_cpf_br')) {
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 
-                <!-- Search and Filter -->
+                <div id="cnhAlertasWidget" class="cnh-alertas-widget" style="display:none; margin-bottom: 1rem; padding: 0.75rem 1rem; border-radius: 8px; background: var(--bg-secondary); border: 1px solid var(--border-color);">
+                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.95rem;"><i class="fas fa-exclamation-triangle"></i> CNH vencendo</h4>
+                    <div id="cnhAlertasContent" style="font-size: 0.9rem;"></div>
+                </div>
+                
+                <?php if ($motoristas_sem_cpf > 0): ?>
+                <div class="alert alert-info" style="margin-bottom: 1rem; padding: 0.6rem 1rem; font-size: 0.9rem;">
+                    <i class="fas fa-info-circle"></i> <strong>Atenção:</strong> <?php echo $motoristas_sem_cpf; ?> motorista(s) cadastrado(s) sem CPF. O CPF é necessário para emissão de MDF-e e para vincular corretamente o motorista na importação de XML (NF-e/CT-e). Motoristas sem CPF não poderão ser usados em MDF-e.
+                </div>
+                <?php endif; ?>
+                
+                <?php if ($is_modern): ?>
+                <div class="fornc-toolbar">
+                    <div class="fornc-search-block">
+                        <label for="searchMotorist">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" id="searchMotorist" placeholder="Nome, CPF, CNH..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="fornc-filters-inline">
+                        <div class="fg">
+                            <label for="perPageMotorists">Por página</label>
+                            <form method="get" action="" id="formPerPageMotorists" style="margin:0;">
+                                <input type="hidden" name="page" value="1">
+                                <select id="perPageMotorists" name="per_page" class="filter-per-page" title="Registros por página">
+                                    <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                    <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                    <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                    <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                    <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                                </select>
+                            </form>
+                        </div>
+                        <div class="fg">
+                            <label for="statusFilter">Status</label>
+                            <select id="statusFilter">
+                                <option value="">Todos</option>
+                                <option value="1">Ativo</option>
+                                <option value="2">Férias</option>
+                                <option value="3">Licença</option>
+                                <option value="4">Inativo</option>
+                                <option value="5">Afastado</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="categoriaCnhFilter">CNH</label>
+                            <select id="categoriaCnhFilter">
+                                <option value="">Todas</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="tipoContratoFilter">Contrato</label>
+                            <select id="tipoContratoFilter">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="fg fg--check">
+                            <label><input type="checkbox" id="filterOnlyFavoritos" value="1"> Só favoritos</label>
+                        </div>
+                    </div>
+                    <div class="fornc-btn-row">
+                        <button type="button" id="addMotoristBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Novo</button>
+                        <button type="button" id="rankingBtn" class="fornc-btn fornc-btn--accent" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);border:none;"><i class="fas fa-trophy"></i> Ranking</button>
+                        <button type="button" id="gamificacaoBtn" class="fornc-btn fornc-btn--accent" style="background:linear-gradient(135deg,#ff6b35 0%,#f7931e 100%);border:none;"><i class="fas fa-gamepad"></i> Gamificação</button>
+                        <button type="button" class="fornc-btn fornc-btn--accent" id="applyMotoristFilters" title="Aplicar filtros"><i class="fas fa-search"></i> Pesquisar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost view-mode-btn active" data-mode="table" title="Tabela"><i class="fas fa-table"></i></button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost view-mode-btn" data-mode="cards" title="Cards"><i class="fas fa-th-large"></i></button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="clearMotoristFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn" title="Filtros"><i class="fas fa-sliders-h"></i> Opções</button>
+                        <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar"><i class="fas fa-file-export"></i> Exportar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="filter-section">
                     <div class="search-box">
                         <input type="text" id="searchMotorist" placeholder="Buscar motorista...">
@@ -1393,6 +1537,7 @@ if (!function_exists('format_cpf_br')) {
                         <form method="get" action="" id="formPerPageMotorists" style="display:inline-flex; align-items:center; gap:0.5rem;">
                             <span class="filter-label">Por página</span>
                             <input type="hidden" name="page" value="1">
+                            <input type="hidden" name="classic" value="1">
                             <select id="perPageMotorists" name="per_page" class="filter-per-page" title="Registros por página" onchange="this.form.submit()">
                                 <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
                                 <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
@@ -1409,6 +1554,18 @@ if (!function_exists('format_cpf_br')) {
                             <option value="4">Inativo</option>
                             <option value="5">Afastado</option>
                         </select>
+                        <select id="categoriaCnhFilter">
+                            <option value="">Todas categorias CNH</option>
+                        </select>
+                        <select id="tipoContratoFilter">
+                            <option value="">Todos tipos de contrato</option>
+                        </select>
+                        <label class="filter-label" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+                            <input type="checkbox" id="filterOnlyFavoritos" value="1"> Só favoritos
+                        </label>
+                        <span class="filter-label" style="margin-left:8px;">Ver:</span>
+                        <button type="button" class="btn-restore-layout view-mode-btn active" data-mode="table" title="Visualização em tabela"><i class="fas fa-table"></i></button>
+                        <button type="button" class="btn-restore-layout view-mode-btn" data-mode="cards" title="Visualização em cards"><i class="fas fa-th-large"></i></button>
                         <button type="button" class="btn-restore-layout" id="applyMotoristFilters" title="Aplicar filtros">
                             <i class="fas fa-filter"></i>
                         </button>
@@ -1417,20 +1574,22 @@ if (!function_exists('format_cpf_br')) {
                         </button>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- Motorists List Table -->
-                <div class="data-table-container">
-                    <table class="data-table" id="motoristsTable">
+                <div class="<?php echo $is_modern ? 'motoristas-table-wrap fornc-table-wrap' : 'data-table-container'; ?>" id="motoristsTableContainer">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="motoristsTable">
                         <thead>
                             <tr>
-                                <th>Nome</th>
-                                <th>CPF</th>
-                                <th>CNH</th>
-                                <th>Categoria</th>
-                                <th>Telefone</th>
-                                <th>Email</th>
-                                <th>Status</th>
-                                <th>Comissão</th>
+                                <th style="width:50px;"></th>
+                                <th class="sortable sorted" data-sort="nome">Nome <span class="sort-ind">▲</span></th>
+                                <th class="sortable" data-sort="cpf">CPF <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="cnh">CNH <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="categoria_cnh_nome">Categoria <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="telefone">Telefone <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="email">Email <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="disponibilidade_nome">Status <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="porcentagem_comissao">Comissão <span class="sort-ind">⇅</span></th>
                                 <th>Ações</th>
                             </tr>
                         </thead>
@@ -1443,8 +1602,10 @@ if (!function_exists('format_cpf_br')) {
                                         $comissaoDisplay = isset($motorista['porcentagem_comissao'])
                                             ? number_format((float) $motorista['porcentagem_comissao'], 2, ',', '.') . '%'
                                             : '-';
+                                        $fotoUrl = !empty($motorista['foto_motorista']) ? '../uploads/motoristas/foto/' . basename($motorista['foto_motorista']) : '';
                                     ?>
                                     <tr>
+                                        <td><?php if ($fotoUrl): ?><img src="<?php echo htmlspecialchars($fotoUrl); ?>" alt="" class="motorist-thumb" style="width:36px;height:36px;object-fit:cover;border-radius:50%;"><?php else: ?><span class="motorist-thumb-placeholder" style="width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;background:var(--bg-tertiary);border-radius:50%;font-size:0.8rem;color:var(--text-muted);"><i class="fas fa-user"></i></span><?php endif; ?></td>
                                         <td><?php echo htmlspecialchars($motorista['nome']); ?></td>
                                         <td><?php echo htmlspecialchars(format_cpf_br($motorista['cpf'] ?? '')); ?></td>
                                         <td><?php echo htmlspecialchars($motorista['cnh'] ?? '-'); ?></td>
@@ -1466,14 +1627,16 @@ if (!function_exists('format_cpf_br')) {
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr class="no-data-row">
-                                    <td colspan="9" class="text-center">Nenhum motorista encontrado</td>
+                                    <td colspan="10" class="text-center">Nenhum motorista encontrado</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
+                    <div id="motoristsCardsContainer" class="motorists-cards-grid" style="display:none;"></div>
                 </div>
                 
                 <!-- Pagination -->
+                <?php if ($is_modern): ?><div class="fornc-pagination-bar"><?php endif; ?>
                 <div class="pagination" id="motoristsPagination" data-per-page="<?php echo (int)$per_page; ?>">
                     <a href="?page=1&per_page=<?php echo (int)$per_page; ?>" class="pagination-btn disabled" id="prevPageBtn">
                         <i class="fas fa-chevron-left"></i>
@@ -1485,6 +1648,7 @@ if (!function_exists('format_cpf_br')) {
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
+                <?php if ($is_modern): ?></div><?php endif; ?>
                 
                 <!-- Motorist Analytics -->
                 <div class="analytics-section">
@@ -1524,8 +1688,8 @@ if (!function_exists('format_cpf_br')) {
     </div>
     
     <!-- Add/Edit Motorist Modal -->
-    <div class="modal" id="motoristModal">
-        <div class="modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="motoristModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2 id="modalTitle">Adicionar Motorista</h2>
                 <span class="close-modal">&times;</span>
@@ -1548,8 +1712,11 @@ if (!function_exists('format_cpf_br')) {
                         </div>
                         
                         <div class="form-group">
-                            <label for="cpf">CPF*</label>
-                            <input type="text" id="cpf" name="cpf" required>
+                            <label for="cpf">CPF</label>
+                            <input type="text" id="cpf" name="cpf" placeholder="000.000.000-00">
+                            <small class="form-text text-muted" style="margin-top: 0.35rem; display: block;">
+                                <i class="fas fa-info-circle"></i> O CPF é necessário para emissão de MDF-e e para vincular corretamente o motorista na importação de XML (NF-e/CT-e).
+                            </small>
                         </div>
                         
                         <div class="form-group">
@@ -1640,7 +1807,7 @@ if (!function_exists('format_cpf_br')) {
     </div>
     
     <!-- Modal de Visualização -->
-    <div class="modal" id="viewMotoristModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="viewMotoristModal">
         <div class="modal-content modal-lg">
             <div class="modal-header">
                 <h2>Detalhes do Motorista</h2>
@@ -1710,6 +1877,11 @@ if (!function_exists('format_cpf_br')) {
                 <!-- Documentos -->
                 <div class="documents-section">
                     <h3>Documentos</h3>
+                    <div id="documentChecklist" class="document-checklist" style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;padding:0.5rem;background:var(--bg-tertiary);border-radius:6px;">
+                        <span id="checkCnh"><i class="fas fa-id-card"></i> CNH: <strong>—</strong></span>
+                        <span id="checkContrato"><i class="fas fa-file-contract"></i> Contrato: <strong>—</strong></span>
+                        <span id="checkFoto"><i class="fas fa-user"></i> Foto: <strong>—</strong></span>
+                    </div>
                     <div class="documents-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;">
                         <div class="document-card">
                             <div class="document-icon">
@@ -1821,6 +1993,27 @@ if (!function_exists('format_cpf_br')) {
                                 <p id="view-average-consumption">0.0 L/100km</p>
                             </div>
                         </div>
+                        <div class="metric-card">
+                            <div class="metric-icon">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                            </div>
+                            <div class="metric-info">
+                                <h4>Total de multas</h4>
+                                <p id="view-total-multas">0</p>
+                                <a href="#" id="viewLinkMultas" target="_blank" class="btn-sm btn-secondary" style="margin-top:4px;">Ver multas</a>
+                                <a href="multas.php" target="_blank" class="btn-sm btn-secondary" style="margin-top:4px;margin-left:4px;">Consultar DETRAN</a>
+                            </div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-icon">
+                                <i class="fas fa-wrench"></i>
+                            </div>
+                            <div class="metric-info">
+                                <h4>Manutenções (veículos que dirigiu)</h4>
+                                <p id="view-total-manutencoes">0</p>
+                                <a href="manutencoes.php" target="_blank" class="btn-sm btn-secondary" style="margin-top:4px;">Ver manutenções</a>
+                            </div>
+                        </div>
                     </div>
                     <div class="chart-container">
                         <canvas id="performanceChart"></canvas>
@@ -1828,13 +2021,67 @@ if (!function_exists('format_cpf_br')) {
                 </div>
             </div>
             <div class="modal-footer">
+                <button class="btn-primary" id="editFromViewBtn" onclick="editarMotoristaDoModalVisualizacao()" style="margin-right: 8px;">
+                    <i class="fas fa-edit"></i> Editar
+                </button>
+                <button class="btn-secondary" id="historyFromViewBtn" onclick="abrirHistoricoDoModalVisualizacao()" style="margin-right: 8px;">
+                    <i class="fas fa-history"></i> Histórico
+                </button>
+                <button class="btn-secondary" id="shareMotoristBtn" onclick="compartilharMotorista()" style="margin-right: 8px;" title="Copiar link para visualização">
+                    <i class="fas fa-share-alt"></i> Compartilhar
+                </button>
                 <button class="btn-secondary" onclick="closeModal('viewMotoristModal')">Fechar</button>
             </div>
         </div>
     </div>
     
+    <!-- Modal Histórico de Alterações -->
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="motoristLogModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2>Histórico de Alterações</h2>
+                <span class="close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted" id="motoristLogName"></p>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Ação</th>
+                                <th>Alterado por</th>
+                                <th>Descrição</th>
+                                <th>Detalhes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="motoristLogTbody">
+                        </tbody>
+                    </table>
+                </div>
+                <p id="motoristLogEmpty" class="text-muted" style="display:none;">Nenhuma alteração registrada.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('motoristLogModal')">Fechar</button>
+            </div>
+        </div>
+    </div>
+    <style>
+        #motoristLogModal .log-details { font-size: 0.85rem; max-width: 280px; word-break: break-word; }
+        .btn-icon.favorite-btn.is-favorite { color: #f59e0b; }
+        .btn-icon.favorite-btn.is-favorite i { font-weight: 900; }
+        .motorists-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .motorist-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; display: flex; align-items: flex-start; gap: 0.75rem; }
+        .motorist-card .card-foto { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+        .motorist-card .card-body { flex: 1; min-width: 0; }
+        .motorist-card .card-name { font-weight: 600; margin-bottom: 0.25rem; }
+        .motorist-card .card-meta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+        .motorist-card .card-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+        .view-mode-btn.active { background: var(--accent-primary); color: #fff; }
+    </style>
+    
     <!-- Delete Confirmation Modal -->
-    <div class="modal" id="deleteMotoristModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="deleteMotoristModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Confirmar Exclusão</h2>
@@ -1852,7 +2099,7 @@ if (!function_exists('format_cpf_br')) {
     </div>
     
     <!-- Modal de Gamificação -->
-    <div class="modal" id="gamificacaoModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="gamificacaoModal">
         <div class="modal-content modal-xl">
             <div class="modal-header">
                 <h2><i class="fas fa-gamepad me-2"></i>Sistema de Gamificação</h2>
@@ -1874,7 +2121,7 @@ if (!function_exists('format_cpf_br')) {
     </div>
 
     <!-- Modal de Ranking -->
-    <div class="modal" id="rankingModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="rankingModal">
         <div class="modal-content modal-xl">
             <div class="modal-header">
                 <h2><i class="fas fa-trophy me-2"></i>Sistema de Ranking</h2>
@@ -1896,7 +2143,7 @@ if (!function_exists('format_cpf_br')) {
     </div>
     
     <!-- Modal de Ajuda -->
-    <div class="modal" id="helpMotoristsModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpMotoristsModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Ajuda - Gestão de Motoristas</h2>
@@ -1958,6 +2205,7 @@ if (!function_exists('format_cpf_br')) {
     </div>
     
     <!-- JavaScript Files -->
+    <?php sf_render_api_scripts(); ?>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <script src="../js/motorists.js"></script>
@@ -2155,18 +2403,7 @@ if (!function_exists('format_cpf_br')) {
                 fecharModalRanking();
             }
         });
-
-        // Event listeners para fechar modais com ESC
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                if (document.getElementById('gamificacaoModal').style.display === 'block') {
-                    fecharModalGamificacao();
-                }
-                if (document.getElementById('rankingModal').style.display === 'block') {
-                    fecharModalRanking();
-                }
-            }
-        });
+        // Escape: js/modal_a11y.js fecha .modal e restaura scroll do body
     });
 
     // Funções para abrir modais de gamificação e ranking
@@ -3435,5 +3672,7 @@ if (!function_exists('format_cpf_br')) {
         margin-top: 8px;
     }
     </style>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html>

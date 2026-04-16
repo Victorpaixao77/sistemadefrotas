@@ -3,6 +3,7 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
+require_once '../includes/sf_api_base.php';
 
 // Configure session before starting it
 configure_session();
@@ -19,19 +20,40 @@ $conn = getConnection();
 // Set page title
 $page_title = "Despesas Fixas";
 
+// Layout moderno (fornc-page); ?classic=1 para o layout anterior
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
+
 // Por página: 5, 10, 25, 50, 100 — padrão 10
 $per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
 if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
     $per_page = 10;
 }
 
-// Função para buscar despesas fixas do banco de dados
+// Função para buscar despesas fixas do banco de dados (ORDER BY alinhado à API list)
 function getDespesasFixas($page = 1, $per_page = 10) {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
         $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
         $offset = ($page - 1) * $limit;
+
+        $allowedSort = [
+            'vencimento' => 'df.vencimento',
+            'veiculo_placa' => 'v.placa',
+            'tipo_nome' => 'td.nome',
+            'descricao' => 'df.descricao',
+            'valor' => 'df.valor',
+            'status_nome' => 'sp.nome',
+            'data_pagamento' => 'df.data_pagamento',
+            'forma_pagamento_nome' => 'fp.nome',
+            'repetir' => 'df.repetir_automaticamente',
+        ];
+        $sortKey = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'vencimento';
+        if ($sortKey === '' || !isset($allowedSort[$sortKey])) {
+            $sortKey = 'vencimento';
+        }
+        $orderCol = $allowedSort[$sortKey];
+        $dir = (isset($_GET['dir']) && strtoupper(trim((string) $_GET['dir'])) === 'ASC') ? 'ASC' : 'DESC';
         
         // Primeiro, conta o total de registros
         $sql_count = "SELECT COUNT(*) as total FROM despesas_fixas WHERE empresa_id = :empresa_id";
@@ -49,7 +71,7 @@ function getDespesasFixas($page = 1, $per_page = 10) {
                 LEFT JOIN status_pagamento sp ON df.status_pagamento_id = sp.id
                 LEFT JOIN formas_pagamento fp ON df.forma_pagamento_id = fp.id
                 WHERE df.empresa_id = :empresa_id
-                ORDER BY df.vencimento DESC, df.id DESC
+                ORDER BY " . $orderCol . " " . $dir . ", df.id DESC
                 LIMIT :limit OFFSET :offset";
         
         $stmt = $conn->prepare($sql);
@@ -101,6 +123,9 @@ $total_paginas = $resultado['total_paginas'];
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     <link rel="stylesheet" href="../css/maintenance.css">
     
     <!-- Chart.js for analytics -->
@@ -112,9 +137,31 @@ $total_paginas = $resultado['total_paginas'];
     <!-- Custom scripts -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <?php sf_render_api_scripts(); ?>
     <script src="../js/despesas_fixas.js"></script>
+    
+    <style>
+        /* Modal financeiro: deixa os campos em 2 colunas (desktop) e 1 coluna (mobile) */
+        #despesaModal .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 14px;
+            margin-bottom: 4px;
+        }
+        @media (max-width: 640px) {
+            #despesaModal .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        body.despesas-fixas-modern .dashboard-header { display: none; }
+        body.despesas-fixas-modern .dashboard-content.fornc-page { overflow-x: auto; }
+        body.despesas-fixas-modern #despesasTable.fornc-table { min-width: 1020px; }
+        #despesasTable thead th.sortable { cursor: pointer; user-select: none; }
+        #despesasTable thead th.sortable .sort-ind { font-size: 0.75rem; opacity: 0.85; margin-left: 0.15rem; }
+        #despesasTable thead th.sortable.sorted { font-weight: 600; }
+    </style>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'despesas-fixas-modern' : ''; ?>">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
@@ -125,7 +172,88 @@ $total_paginas = $resultado['total_paginas'];
             <?php include '../includes/header.php'; ?>
             
             <!-- Page Content -->
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <?php if ($is_modern): ?>
+                <p class="fornc-modern-hint">
+                    Despesas fixas por veículo e tipo. Use <code>?classic=1</code> para o layout anterior.
+                </p>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Qtd. despesas</span><span class="val" id="dfKpiQtd">0</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Valor total</span><span class="val" id="dfKpiValor">R$ 0,00</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Pendentes</span><span class="val" id="dfKpiPendentes">0</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Vencidas</span><span class="val" id="dfKpiVencidas">0</span></div>
+                </div>
+                <p class="fornc-kpi-summary" id="dfKpiSummary">Indicadores do período filtrado (via API).</p>
+
+                <div class="fornc-toolbar">
+                    <div class="fornc-search-block">
+                        <label for="searchDespesa">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" id="searchDespesa" placeholder="Buscar despesa..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="fornc-filters-inline">
+                        <div class="fg">
+                            <label for="vehicleFilter">Veículo</label>
+                            <select id="vehicleFilter">
+                            <option value="">Todos os veículos</option>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="tipoFilter">Tipo</label>
+                            <select id="tipoFilter">
+                            <option value="">Todos os tipos</option>
+                            <?php
+                            $sql = "SELECT id, nome FROM tipos_despesa_fixa ORDER BY nome";
+                            $stmt = $conn->prepare($sql);
+                            $stmt->execute();
+                            while ($tipo = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                                echo "<option value='" . $tipo['id'] . "'>" . htmlspecialchars($tipo['nome']) . "</option>";
+                            }
+                            ?>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="statusFilter">Status</label>
+                            <select id="statusFilter">
+                            <option value="">Todos os status</option>
+                            <option value="1">Pendente</option>
+                            <option value="2">Pago</option>
+                            <option value="3">Vencido</option>
+                            <option value="4">Cancelado</option>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="paymentFilter">Forma pgto</label>
+                            <select id="paymentFilter">
+                            <option value="">Todas as formas de pagamento</option>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="per_page_df">Por página</label>
+                            <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.35rem;" class="df-per-page-form">
+                                <input type="hidden" name="page" value="1">
+                                <select name="per_page" id="per_page_df" class="filter-per-page">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="fornc-btn-row">
+                        <button type="button" id="addDespesaBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Nova despesa</button>
+                        <button type="button" class="fornc-btn fornc-btn--accent" id="applyFixedExpenseFilters" title="Aplicar filtros"><i class="fas fa-search"></i> Pesquisar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn" title="Destacar filtros"><i class="fas fa-sliders-h"></i> Opções</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="clearFixedExpenseFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
+                        <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar"><i class="fas fa-file-export"></i> Exportar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="dashboard-header">
                     <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
@@ -154,7 +282,7 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">0</span>
+                                <span class="metric-value" id="dfKpiQtd">0</span>
                                 <span class="metric-subtitle">Total este mês</span>
                             </div>
                         </div>
@@ -166,7 +294,7 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">R$ 0,00</span>
+                                <span class="metric-value" id="dfKpiValor">R$ 0,00</span>
                                 <span class="metric-subtitle">Total este mês</span>
                             </div>
                         </div>
@@ -178,7 +306,7 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">0</span>
+                                <span class="metric-value" id="dfKpiPendentes">0</span>
                                 <span class="metric-subtitle">Despesas pendentes</span>
                             </div>
                         </div>
@@ -190,7 +318,7 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">0</span>
+                                <span class="metric-value" id="dfKpiVencidas">0</span>
                                 <span class="metric-subtitle">Despesas vencidas</span>
                             </div>
                         </div>
@@ -204,10 +332,11 @@ $total_paginas = $resultado['total_paginas'];
                         <i class="fas fa-search"></i>
                     </div>
                     <div class="filter-options">
-                        <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.5rem;">
+                        <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.5rem;" class="df-per-page-form">
                             <span class="filter-label">Por página</span>
                             <input type="hidden" name="page" value="1">
-                            <select name="per_page" class="filter-per-page" onchange="this.form.submit()">
+                            <input type="hidden" name="classic" value="1">
+                            <select name="per_page" class="filter-per-page">
                                 <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
                                 <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
                                 <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
@@ -252,12 +381,24 @@ $total_paginas = $resultado['total_paginas'];
                         </button>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- Despesas Table -->
-                <div class="data-table-container">
-                    <table class="data-table" id="despesasTable">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="despesasTable">
                         <thead>
                             <tr>
+                                <?php if ($is_modern): ?>
+                                <th class="sortable sorted" data-sort="vencimento">Vencimento <span class="sort-ind">▼</span></th>
+                                <th class="sortable" data-sort="veiculo_placa">Veículo <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="tipo_nome">Tipo <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="descricao">Descrição <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="valor">Valor <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="status_nome">Status <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="data_pagamento">Data Pagamento <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="forma_pagamento_nome">Forma Pgto <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="repetir">Repetir <span class="sort-ind">⇅</span></th>
+                                <?php else: ?>
                                 <th>Vencimento</th>
                                 <th>Veículo</th>
                                 <th>Tipo</th>
@@ -267,6 +408,7 @@ $total_paginas = $resultado['total_paginas'];
                                 <th>Data Pagamento</th>
                                 <th>Forma Pgto</th>
                                 <th>Repetir</th>
+                                <?php endif; ?>
                                 <th>Ações</th>
                             </tr>
                         </thead>
@@ -308,20 +450,40 @@ $total_paginas = $resultado['total_paginas'];
                 </div>
                 
                 <!-- Paginação -->
-                <?php $total_reg_df = (int)($resultado['total'] ?? 0); ?>
-                <div class="pagination">
-                    <a href="?page=<?php echo max(1, $pagina_atual - 1); ?>&per_page=<?php echo (int)$per_page; ?>" 
+                <?php
+                $total_reg_df = (int)($resultado['total'] ?? 0);
+                $df_q = ['per_page' => (int) $per_page];
+                if (!$is_modern) {
+                    $df_q['classic'] = '1';
+                }
+                $df_allowed_keys = ['vencimento', 'veiculo_placa', 'tipo_nome', 'descricao', 'valor', 'status_nome', 'data_pagamento', 'forma_pagamento_nome', 'repetir'];
+                $df_sort_get = isset($_GET['sort']) ? trim((string) $_GET['sort']) : '';
+                if ($df_sort_get === '' || !in_array($df_sort_get, $df_allowed_keys, true)) {
+                    $df_sort_get = 'vencimento';
+                }
+                $df_dir_get = (isset($_GET['dir']) && strtoupper(trim((string) $_GET['dir'])) === 'ASC') ? 'ASC' : 'DESC';
+                if (!($df_sort_get === 'vencimento' && $df_dir_get === 'DESC')) {
+                    $df_q['sort'] = $df_sort_get;
+                    $df_q['dir'] = $df_dir_get;
+                }
+                $df_prev = array_merge($df_q, ['page' => max(1, $pagina_atual - 1)]);
+                $df_next = array_merge($df_q, ['page' => min($total_paginas, $pagina_atual + 1)]);
+                ?>
+                <?php if ($is_modern): ?><div class="fornc-pagination-bar"><?php endif; ?>
+                <div class="pagination<?php echo $is_modern ? ' fornc-modern-pagination' : ''; ?>">
+                    <a href="?<?php echo htmlspecialchars(http_build_query($df_prev)); ?>"
                        class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
                         <i class="fas fa-chevron-left"></i>
                     </a>
                     <span class="pagination-info">
                         Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?> (<?php echo $total_reg_df; ?> registros)
                     </span>
-                    <a href="?page=<?php echo min($total_paginas, $pagina_atual + 1); ?>&per_page=<?php echo (int)$per_page; ?>" 
+                    <a href="?<?php echo htmlspecialchars(http_build_query($df_next)); ?>"
                        class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
+                <?php if ($is_modern): ?></div><?php endif; ?>
 
                 <!-- Analytics Section -->
                 <div class="analytics-section">
@@ -372,8 +534,8 @@ $total_paginas = $resultado['total_paginas'];
     </div>
     
     <!-- Add/Edit Despesa Modal -->
-    <div class="modal" id="despesaModal">
-        <div class="modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="despesaModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2 id="modalTitle">Nova Despesa Fixa</h2>
                 <span class="close-modal">&times;</span>
@@ -494,7 +656,7 @@ $total_paginas = $resultado['total_paginas'];
     </div>
 
     <!-- Filter Modal -->
-    <div class="modal" id="filterModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="filterModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Filtros</h2>
@@ -516,7 +678,7 @@ $total_paginas = $resultado['total_paginas'];
     </div>
 
     <!-- Help Modal -->
-    <div class="modal" id="helpModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Ajuda - Despesas Fixas</h2>
@@ -607,56 +769,6 @@ $total_paginas = $resultado['total_paginas'];
         </div>
     </div>
 
-    <!-- Initialize page -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize components
-            initializeFilters();
-            initializeCharts();
-            setupEventListeners();
-            loadDespesasData();
-        });
-
-        function initializeFilters() {
-            // Load vehicles for filter
-            loadVehicles();
-            
-            // Load payment methods for filter
-            loadPaymentMethods();
-        }
-        
-        function initializeCharts() {
-            // Initialize charts with empty data
-            initializeDespesasTipoChart();
-            initializeStatusDespesasChart();
-            initializeTopVeiculosChart();
-            initializeFormasPagamentoChart();
-        }
-
-        function setupEventListeners() {
-            // Add event listeners for buttons and forms
-            document.getElementById('addDespesaBtn').addEventListener('click', showAddDespesaModal);
-            document.getElementById('filterBtn').addEventListener('click', showFilterModal);
-            document.getElementById('helpBtn').addEventListener('click', showHelpModal);
-            
-            // Setup form submission
-            document.getElementById('despesaForm').addEventListener('submit', handleDespesaSubmit);
-            
-            // Setup search and filter events
-            document.getElementById('searchDespesa').addEventListener('input', debounce(loadDespesasData, 500));
-            document.querySelectorAll('.filter-options select').forEach(select => {
-                select.addEventListener('change', loadDespesasData);
-            });
-            
-            // Adicionar evento para visualizar comprovante
-            const viewComprovanteButtons = document.querySelectorAll('.view-comprovante-btn');
-            viewComprovanteButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    const comprovante = this.getAttribute('data-comprovante');
-                    window.open('../' + comprovante, '_blank');
-                });
-            });
-        }
-    </script>
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html> 

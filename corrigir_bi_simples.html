@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔧 Corrigir Erro do BI - Passo a Passo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px 30px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            font-size: 1.8em;
+        }
+        
+        .step {
+            background: #f8f9fa;
+            border-left: 5px solid #667eea;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .step-number {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 40px;
+            font-weight: bold;
+            margin-right: 15px;
+            font-size: 1.2em;
+        }
+        
+        .step h3 {
+            display: inline-block;
+            color: #333;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        
+        .step p {
+            color: #666;
+            margin-left: 55px;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        
+        .step code {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #d63384;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin: 30px 0;
+            margin-left: 55px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 6px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+        
+        .alert {
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 5px solid;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            border-left-color: #0c5460;
+            color: #0c5460;
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            border-left-color: #856404;
+            color: #856404;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            border-left-color: #155724;
+            color: #155724;
+        }
+        
+        .alert-danger {
+            background: #f8d7da;
+            border-left-color: #721c24;
+            color: #721c24;
+        }
+        
+        .checklist {
+            margin-left: 55px;
+        }
+        
+        .checklist li {
+            margin-bottom: 10px;
+            line-height: 1.6;
+            color: #666;
+        }
+        
+        .checklist li span {
+            display: inline-block;
+            margin-right: 10px;
+        }
+        
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin-left: 55px;
+            margin-bottom: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        
+        .footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #ddd;
+        }
+        
+        .timeline {
+            position: relative;
+            margin-left: 55px;
+            padding-left: 20px;
+            border-left: 3px solid #667eea;
+        }
+        
+        .timeline-item {
+            margin-bottom: 30px;
+            position: relative;
+        }
+        
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -26px;
+            top: 5px;
+            width: 16px;
+            height: 16px;
+            background: #667eea;
+            border-radius: 50%;
+            border: 3px solid white;
+        }
+        
+        .emoji {
+            font-size: 1.5em;
+            margin-right: 10px;
+        }
+        
+        @media (max-width: 600px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            
+            .content {
+                padding: 20px 15px;
+            }
+            
+            .button-group {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    
+    <div class="header">
+        <h1>🔧 Corrigir Erro do BI</h1>
+        <p>Guia Passo a Passo - Simples e Prático</p>
+    </div>
+    
+    <div class="content">
+        
+        <div class="alert alert-danger">
+            <strong>❌ Erro Atual:</strong> "Erro ao montar o BI: Erro no navegador (sobrecarga)"
+        </div>
+        
+        <!-- SEÇÃO 1: O QUE É O ERRO -->
+        <div class="section">
+            <h2>📚 O que é o erro?</h2>
+            
+            <p style="color: #666; line-height: 1.8; margin-bottom: 20px;">
+                O <strong>navegador está recebendo MUITOS DADOS</strong> da API e não consegue processar tudo. 
+                É como tentar carregar 1000 coisas no carro pequeno. O carro (navegador) não aguenta e trava.
+            </p>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                <h3>O Problema:</h3>
+                <p style="display: block; margin-left: 0;">
+                    A página BI está tentando carregar dados de 500+ veículos de uma vez ❌
+                </p>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                <h3>A Solução:</h3>
+                <p style="display: block; margin-left: 0;">
+                    Limitar para 3 meses de dados, 20 veículos no consumo e 10 nos rankings ✅
+                </p>
+            </div>
+        </div>
+        
+        <!-- SEÇÃO 2: COMO CORRIGIR -->
+        <div class="section">
+            <h2>🚀 Como Corrigir? (3 opções)</h2>
+            
+            <div class="alert alert-info">
+                <strong>💡 Dica:</strong> Comece pela <strong>Opção 1 (Automática)</strong> se você for admin. Se não for, use a <strong>Opção 1.5</strong>. É a mais fácil!
+            </div>
+            
+            <!-- OPÇÃO 1 -->
+            <div class="step">
+                <span class="step-number">A</span>
+                <h3>OPÇÃO 1: Correção Automática (RECOMENDADO) ⭐</h3>
+                <p>Esta é a forma MAIS FÁCIL. Clique no botão abaixo e deixa pronto:</p>
+                
+                <div class="button-group">
+                    <a href="fix_bi_overflow.php" class="btn btn-success">✅ CLIQUE AQUI PARA CORRIGIR</a>
+                </div>
+                
+                <p><strong>O que vai acontecer:</strong></p>
+                <ul class="checklist">
+                    <li><span>1️⃣</span> Você vai para uma página</li>
+                    <li><span>2️⃣</span> Clica no botão "EXECUTAR CORREÇÕES AGORA"</li>
+                    <li><span>3️⃣</span> Aguarda 30 segundos</li>
+                    <li><span>4️⃣</span> Pronto! Volta na página do BI com <strong>Ctrl+F5</strong></li>
+                </ul>
+            </div>
+            
+            <!-- OPÇÃO 1.5 -->
+            <div class="step">
+                <span class="step-number">1.5</span>
+                <h3>OPÇÃO 1.5: Correção Automática (Sem Admin) ⭐</h3>
+                <p>Se você não é administrador, use esta opção. É quase automática:</p>
+                
+                <div class="code-block" style="margin: 15px 0;">
+                    <a href="http://localhost/sistema-frotas/fix_bi_manual.php" target="_blank" style="background: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                        ✅ CLIQUE AQUI PARA CORRIGIR (SEM ADMIN)
+                    </a>
+                </div>
+                
+                <p><strong>O que vai acontecer:</strong></p>
+                <ul class="checklist">
+                    <li><span>1️⃣</span> Você vai para uma página (faça login se necessário)</li>
+                    <li><span>2️⃣</span> As correções rodam automaticamente</li>
+                    <li><span>3️⃣</span> Aguarda 10 segundos</li>
+                    <li><span>4️⃣</span> Pronto! Volta na página do BI com <strong>Ctrl+F5</strong></li>
+                </ul>
+            </div>
+            
+            <!-- OPÇÃO 2 -->
+            <div class="step">
+                <span class="step-number">B</span>
+                <h3>OPÇÃO 2: Correção Manual (MySQL)</h3>
+                <p>Se a opção 1 não funcionar, use esta. Abra o <strong>phpMyAdmin</strong>:</p>
+                
+                <p style="margin-top: 15px;"><strong>Passo 1:</strong> Acesse:</p>
+                <div class="code-block">http://localhost/phpmyadmin</div>
+                
+                <p style="margin-top: 15px;"><strong>Passo 2:</strong> Cole este código:</p>
+                <div class="code-block">CREATE INDEX IF NOT EXISTS idx_desp_viagem_rota_empresa ON despesas_viagem(rota_id, empresa_id);
+DELETE FROM bi_cache WHERE 1=1;</div>
+                
+                <p style="margin-top: 15px;"><strong>Passo 3:</strong> Clique em "Executar" (ou Enter)</p>
+                
+                <p style="margin-top: 15px;"><strong>Passo 4:</strong> Recarregue o BI com <strong>Ctrl+F5</strong></p>
+            </div>
+            
+            <!-- OPÇÃO 3 -->
+            <div class="step">
+                <span class="step-number">C</span>
+                <h3>OPÇÃO 3: Leitura do Código (Para Desenvolvedores)</h3>
+                <p>Os arquivos foram modificados. Veja o que foi mudado:</p>
+                
+                <ul class="checklist">
+                    <li><span>📄</span> <code>api/performance_indicators.php</code> - Limita dados retornados</li>
+                    <li><span>📄</span> <code>pages/bi.php</code> - Limita renderização no JS</li>
+                    <li><span>📄</span> <code>sql/fix_bi_overflow.sql</code> - Script de índice</li>
+                </ul>
+            </div>
+            
+        </div>
+        
+        <!-- SEÇÃO 3: APÓS A CORREÇÃO -->
+        <div class="section">
+            <h2>✅ Após Corrigir, O Que Fazer?</h2>
+            
+            <div class="timeline">
+                <div class="timeline-item">
+                    <h3>1️⃣ Recarregue a Página</h3>
+                    <p>Pressione: <code>Ctrl + F5</code> (ou <code>Cmd + Shift + R</code> no Mac)</p>
+                    <p style="color: #999; margin-top: 10px;"><em>Isso "limpa" a cache do navegador</em></p>
+                </div>
+                
+                <div class="timeline-item">
+                    <h3>2️⃣ Acesse o BI Novamente</h3>
+                    <p>Clique em <strong>BI Frota</strong> no menu lateral</p>
+                </div>
+                
+                <div class="timeline-item">
+                    <h3>3️⃣ Verifique Se Funcionou</h3>
+                    <p>Você deve ver:</p>
+                    <ul class="checklist">
+                        <li><span>✅</span> Gráficos carregando</li>
+                        <li><span>✅</span> Tabelas aparecendo</li>
+                        <li><span>✅</span> Nenhuma mensagem de erro</li>
+                        <li><span>✅</span> Animações suaves no carregamento</li>
+                        <li><span>✅</span> Atalho <code>Ctrl+R</code> para atualizar dados</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- SEÇÃO 4: E SE AINDA HOUVER ERRO? -->
+        <div class="section">
+            <h2>❓ E Se Ainda Houver Erro?</h2>
+            
+            <div class="alert alert-warning">
+                Se a página de BI <strong>CONTINUAR dando erro</strong>, faça isso:
+            </div>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                <h3>Use o Diagnóstico</h3>
+                <p>Clique no link abaixo para verificar quanto dados você tem:</p>
+                <div class="button-group">
+                    <a href="diagnostico_bi.php" class="btn btn-primary" target="_blank">🔍 ABRIR DIAGNÓSTICO</a>
+                </div>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                <h3>Use o Teste da API</h3>
+                <p>Para ver o tamanho exato da resposta da API:</p>
+                <div class="button-group">
+                    <a href="teste_api_bi.php" class="btn btn-primary" target="_blank">🧪 ABRIR TESTE DA API</a>
+                </div>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                <h3>Procure por "⚠️ MUITOS DADOS"</h3>
+                <p>Use o diagnóstico para verificar o volume de dados:</p>
+                <div class="button-group">
+                    <a href="diagnostico_bi.php" class="btn btn-secondary" target="_blank">🔍 ABRIR DIAGNÓSTICO</a>
+                </div>
+                <p>Se encontrar "⚠️ MUITOS DADOS", significa que sua empresa tem MUITO volume de dados (tabelas com 5000+ registros).</p>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">4</span>
+                <h3>Verifique o Console do Navegador</h3>
+                <p>Pressione <code>F12</code>, vá na aba <strong>Console</strong> e recarregue a página. Procure por erros em vermelho.</p>
+                <p>Se aparecer "Maximum call stack size exceeded" ou similar, ainda há sobrecarga de dados.</p>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">5</span>
+                <h3>Próximas Ações (Se Necessário)</h3>
+                <p>Se o volume for muito alto, as soluções são:</p>
+                <ul class="checklist">
+                    <li><span>📈</span> Arquivar dados antigos</li>
+                    <li><span>📊</span> Separar BI em múltiplas páginas</li>
+                    <li><span>⚙️</span> Implementar filtros mais restritivos</li>
+                    <li><span>📧</span> Contactar suporte técnico</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- SEÇÃO 5: RESUMO RÁPIDO -->
+        <div class="section">
+            <h2>📋 Resumo Rápido</h2>
+            
+            <div class="alert alert-success">
+                <h3 style="margin-top: 0;">✨ O que foi feito:</h3>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li>✅ API agora retorna 3 meses de dados (em vez de 12), 20 veículos no consumo e 10 nos rankings</li>
+                    <li>✅ Tabelas renderizam 200 registros no máximo</li>
+                    <li>✅ Índices foram criados para velocidade</li>
+                    <li>✅ Cache foi limpado para recalcular dados</li>
+                </ul>
+            </div>
+            
+            <table style="width: 100%; margin-top: 20px; border-collapse: collapse;">
+                <tr style="background: #f8f9fa; border: 1px solid #ddd;">
+                    <th style="padding: 15px; text-align: left; border: 1px solid #ddd;">Antes da Correção</th>
+                    <th style="padding: 15px; text-align: left; border: 1px solid #ddd;">Depois da Correção</th>
+                </tr>
+                <tr style="border: 1px solid #ddd;">
+                    <td style="padding: 15px; border: 1px solid #ddd;">❌ Erro de sobrecarga</td>
+                    <td style="padding: 15px; border: 1px solid #ddd;">✅ Funciona normal</td>
+                </tr>
+                <tr style="background: #f8f9fa; border: 1px solid #ddd;">
+                    <td style="padding: 15px; border: 1px solid #ddd;">Carregamento: 30+ segundos</td>
+                    <td style="padding: 15px; border: 1px solid #ddd;">Carregamento: 2-5 segundos</td>
+                </tr>
+                <tr style="border: 1px solid #ddd;">
+                    <td style="padding: 15px; border: 1px solid #ddd;">500+ veículos (travava)</td>
+                    <td style="padding: 15px; border: 1px solid #ddd;">3 meses (muito rápido)</td>
+                </tr>
+            </table>
+        </div>
+        
+    </div>
+    
+    <div class="footer">
+        <p><strong>Precisa de ajuda?</strong> Consulte os guias:</p>
+        <ul style="list-style: none; margin-top: 10px;">
+            <li>📘 <a href="START_HERE_BI.md" style="color: #667eea;">START_HERE_BI.md</a> - Começar rápido</li>
+            <li>📗 <a href="GUIA_OTIMIZACOES_PRATICAS_BI.md" style="color: #667eea;">GUIA_OTIMIZACOES_PRATICAS_BI.md</a> - Guia completo</li>
+            <li>📕 <a href="CORRECAO_BI_OVERFLOW.md" style="color: #667eea;">CORRECAO_BI_OVERFLOW.md</a> - Documentação técnica</li>
+        </ul>
+        <p style="margin-top: 20px; opacity: 0.7;">Gerado em 5 de Abril de 2026</p>
+    </div>
+    
+</div>
+
+</body>
+</html>

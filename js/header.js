@@ -3,10 +3,15 @@
  */
 
 function initHeader() {
+    if (window.__sfHeaderInited) {
+        return;
+    }
+    window.__sfHeaderInited = true;
     initNotifications();
     initProfileDropdown();
     initColorPalette();
     initEmpresaSelector();
+    setupHeaderEscapeKey();
 }
 
 document.addEventListener('DOMContentLoaded', initHeader);
@@ -36,7 +41,7 @@ function initNotifications() {
 
     // Função para carregar notificações (padrão: só não lidas, todas se true)
     function carregarNotificacoesIA(verTodas = false) {
-        const url = verTodas ? '/sistema-frotas/notificacoes/notificacoes.php?todas=1' : '/sistema-frotas/notificacoes/notificacoes.php';
+        const url = verTodas ? sfAppUrl('notificacoes/notificacoes.php?todas=1') : sfAppUrl('notificacoes/notificacoes.php');
         fetch(url, {
             credentials: 'same-origin',
             headers: {
@@ -104,7 +109,9 @@ function initNotifications() {
         e.preventDefault();
         e.stopPropagation();
         notificationDropdown.classList.toggle('show');
-        if (notificationDropdown.classList.contains('show')) {
+        var isOpen = notificationDropdown.classList.contains('show');
+        notificationBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        if (isOpen) {
             carregarNotificacoesIA(false);
         }
     });
@@ -124,6 +131,7 @@ function initNotifications() {
             !notificationDropdown.contains(e.target) && 
             e.target !== notificationBtn) {
             notificationDropdown.classList.remove('show');
+            notificationBtn.setAttribute('aria-expanded', 'false');
         }
     });
 
@@ -135,7 +143,7 @@ function initNotifications() {
     // Limpar notificações regulares (marca como lidas no banco e visual)
     if (notificationClearBtn) {
         notificationClearBtn.addEventListener('click', function() {
-            fetch('/sistema-frotas/notificacoes/limpar_notificacoes.php', { method: 'POST' })
+            fetch(sfAppUrl('notificacoes/limpar_notificacoes.php'), { method: 'POST' })
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
@@ -187,12 +195,18 @@ function initProfileDropdown() {
     
     if (!userProfileBtn || !profileDropdown) return;
     
+    function setProfileOpen(isOpen) {
+        profileDropdown.classList.toggle('show', isOpen);
+        userProfileBtn.classList.toggle('active', isOpen);
+        userProfileBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    }
+
     // Toggle do dropdown de perfil
     userProfileBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        profileDropdown.classList.toggle('show');
-        userProfileBtn.classList.toggle('active');
+        var willOpen = !profileDropdown.classList.contains('show');
+        setProfileOpen(willOpen);
     });
     
     // Fechar o dropdown ao clicar fora dele
@@ -201,8 +215,7 @@ function initProfileDropdown() {
             !profileDropdown.contains(e.target) && 
             e.target !== userProfileBtn && 
             !userProfileBtn.contains(e.target)) {
-            profileDropdown.classList.remove('show');
-            userProfileBtn.classList.remove('active');
+            setProfileOpen(false);
         }
     });
     
@@ -212,6 +225,47 @@ function initProfileDropdown() {
     });
     
     window.__profileDropdownInited = true;
+}
+
+/**
+ * Fecha dropdowns do header com Escape e devolve o foco ao botão correspondente
+ */
+function setupHeaderEscapeKey() {
+    document.addEventListener('keydown', function(e) {
+        if (e.key !== 'Escape') {
+            return;
+        }
+
+        var notificationDropdown = document.getElementById('notificationDropdown');
+        var notificationBtn = document.getElementById('notificationBtn');
+        if (notificationDropdown && notificationDropdown.classList.contains('show') && notificationBtn) {
+            notificationDropdown.classList.remove('show');
+            notificationBtn.setAttribute('aria-expanded', 'false');
+            notificationBtn.focus();
+            e.preventDefault();
+            return;
+        }
+
+        var empresaDropdown = document.getElementById('empresaDropdown');
+        var empresaSelectorBtn = document.getElementById('empresaSelectorBtn');
+        if (empresaDropdown && empresaDropdown.classList.contains('show') && empresaSelectorBtn) {
+            empresaDropdown.classList.remove('show');
+            empresaSelectorBtn.setAttribute('aria-expanded', 'false');
+            empresaSelectorBtn.focus();
+            e.preventDefault();
+            return;
+        }
+
+        var profileDropdown = document.getElementById('profileDropdown');
+        var userProfileBtn = document.getElementById('userProfileBtn');
+        if (profileDropdown && profileDropdown.classList.contains('show') && userProfileBtn) {
+            profileDropdown.classList.remove('show');
+            userProfileBtn.classList.remove('active');
+            userProfileBtn.setAttribute('aria-expanded', 'false');
+            userProfileBtn.focus();
+            e.preventDefault();
+        }
+    });
 }
 
 /**
@@ -308,9 +362,10 @@ function initEmpresaSelector() {
     empresaSelectorBtn.addEventListener('click', function(e) {
         e.stopPropagation();
         empresaDropdown.classList.toggle('show');
-        
+        var isOpen = empresaDropdown.classList.contains('show');
+        empresaSelectorBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         // Se abrindo, carregar empresas
-        if (empresaDropdown.classList.contains('show')) {
+        if (isOpen) {
             carregarEmpresas();
         }
     });
@@ -319,6 +374,7 @@ function initEmpresaSelector() {
     document.addEventListener('click', function(e) {
         if (!empresaDropdown.contains(e.target) && !empresaSelectorBtn.contains(e.target)) {
             empresaDropdown.classList.remove('show');
+            empresaSelectorBtn.setAttribute('aria-expanded', 'false');
         }
     });
     
@@ -326,7 +382,7 @@ function initEmpresaSelector() {
     function carregarEmpresas() {
         empresaDropdownList.innerHTML = '<div style="padding: 12px; text-align: center; color: #999;">Carregando...</div>';
         
-        fetch('/sistema-frotas/api/trocar_empresa.php?action=listar', {
+        fetch(sfApiUrl('trocar_empresa.php?action=listar'), {
             credentials: 'same-origin'
         })
         .then(res => res.json())
@@ -373,8 +429,11 @@ function initEmpresaSelector() {
     function trocarEmpresa(empresaId) {
         const formData = new FormData();
         formData.append('empresa_id', empresaId);
+        if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+            formData.append('csrf_token', window.__SF_CSRF__);
+        }
         
-        fetch('/sistema-frotas/api/trocar_empresa.php?action=trocar', {
+        fetch(sfApiUrl('trocar_empresa.php?action=trocar'), {
             method: 'POST',
             credentials: 'same-origin',
             body: formData

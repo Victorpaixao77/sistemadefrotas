@@ -2,12 +2,16 @@
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/sf_api_base.php';
+require_once '../includes/abastecimentos_repository.php';
 
 // Configure session before starting it
 configure_session();
 
 // Initialize the session
 session_start();
+
+require_authentication();
 
 // Set page title
 $page_title = "Abastecimentos";
@@ -18,66 +22,7 @@ if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
     $per_page = 10;
 }
 
-// Função para buscar abastecimentos do banco de dados
-function getAbastecimentos($page = 1, $per_page = 10) {
-    try {
-        $conn = getConnection();
-        $empresa_id = $_SESSION['empresa_id'];
-        $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
-        $offset = ($page - 1) * $limit;
-        
-        // Primeiro, conta o total de registros
-        $sql_count = "SELECT COUNT(*) as total FROM abastecimentos WHERE empresa_id = :empresa_id AND status = 'aprovado'";
-        $stmt_count = $conn->prepare($sql_count);
-        $stmt_count->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        $stmt_count->execute();
-        $total = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
-        
-        // Consulta paginada com JOIN para obter informações das cidades
-        $sql = "SELECT 
-                a.*,
-                v.placa as veiculo_placa,
-                m.nome as motorista_nome,
-                r.id as rota_id,
-                co.nome as cidade_origem_nome,
-                cd.nome as cidade_destino_nome
-                FROM abastecimentos a
-                LEFT JOIN veiculos v ON a.veiculo_id = v.id
-                LEFT JOIN motoristas m ON a.motorista_id = m.id
-                LEFT JOIN rotas r ON a.rota_id = r.id
-                LEFT JOIN cidades co ON r.cidade_origem_id = co.id
-                LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-                WHERE a.empresa_id = :empresa_id AND a.status = 'aprovado'
-                ORDER BY a.data_abastecimento DESC, a.id DESC
-                LIMIT :limit OFFSET :offset";
-        
-        $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
-        $stmt->execute();
-        
-        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Log para debug (apenas em desenvolvimento)
-        // error_log("Dados dos abastecimentos (PHP): " . print_r($result, true));
-        
-        return [
-            'abastecimentos' => $result,
-            'total' => $total,
-            'pagina_atual' => $page,
-            'total_paginas' => ceil($total / $limit)
-        ];
-    } catch(PDOException $e) {
-        error_log("Erro ao buscar abastecimentos: " . $e->getMessage());
-        return [
-            'abastecimentos' => [],
-            'total' => 0,
-            'pagina_atual' => 1,
-            'total_paginas' => 1
-        ];
-    }
-}
+$is_modern = !isset($_GET['classic']) || (string)$_GET['classic'] !== '1';
 
 // Pegar a página atual da URL ou definir como 1
 $pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
@@ -94,6 +39,7 @@ $total_paginas = $resultado['total_paginas'];
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Gestão de Frotas - <?php echo $page_title; ?></title>
+    <?php sf_render_api_scripts(); ?>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
@@ -103,6 +49,10 @@ $total_paginas = $resultado['total_paginas'];
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <link rel="stylesheet" href="../css/abastecimentos.css?v=<?php echo htmlspecialchars(sf_asset_v(), ENT_QUOTES, 'UTF-8'); ?>">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     
     <!-- Chart.js for analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -110,7 +60,7 @@ $total_paginas = $resultado['total_paginas'];
     <!-- Sortable.js for drag-and-drop -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'abastecimentos-modern' : ''; ?>">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
@@ -121,7 +71,8 @@ $total_paginas = $resultado['total_paginas'];
             <?php include '../includes/header.php'; ?>
             
             <!-- Page Content -->
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <?php if (!$is_modern): ?>
                 <div class="dashboard-header">
                     <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
@@ -141,8 +92,16 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 
-                <!-- KPI Cards Row -->
+                <?php if ($is_modern): ?>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Abastecimentos</span><span class="val" id="refuelKpiAbastecimentos">0</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Litros (mês)</span><span class="val" id="refuelKpiLitros">0</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Valor (mês)</span><span class="val" id="refuelKpiValor">R$ 0,00</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Média R$/L</span><span class="val" id="refuelKpiMediaLitro">R$ 0,00/L</span></div>
+                </div>
+                <?php else: ?>
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
@@ -150,50 +109,112 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">0</span>
+                                <span class="metric-value" id="refuelKpiAbastecimentos">0</span>
                                 <span class="metric-subtitle">Total este mês</span>
                             </div>
                         </div>
                     </div>
-                    
                     <div class="dashboard-card">
                         <div class="card-header">
                             <h3>Litros</h3>
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">0</span>
+                                <span class="metric-value" id="refuelKpiLitros">0</span>
                                 <span class="metric-subtitle">Total este mês</span>
                             </div>
                         </div>
                     </div>
-                    
                     <div class="dashboard-card">
                         <div class="card-header">
                             <h3>Valor</h3>
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">R$ 0,00</span>
+                                <span class="metric-value" id="refuelKpiValor">R$ 0,00</span>
                                 <span class="metric-subtitle">Total este mês</span>
                             </div>
                         </div>
                     </div>
-                    
                     <div class="dashboard-card">
                         <div class="card-header">
                             <h3>Médias</h3>
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">R$ 0,00/L</span>
-                                <span class="metric-subtitle">0,0 km/L média</span>
+                                <span class="metric-value" id="refuelKpiMediaLitro">R$ 0,00/L</span>
+                                <span class="metric-subtitle">Média no mês</span>
                             </div>
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 
-                <!-- Search and Filter -->
+                <?php if ($is_modern): ?>
+                <div class="fornc-toolbar">
+                    <div class="fornc-search-block">
+                        <label for="searchRefueling">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" id="searchRefueling" placeholder="Posto, placa, motorista..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="fornc-filters-inline">
+                        <div class="fg">
+                            <label for="vehicleFilter">Veículo</label>
+                            <select id="vehicleFilter" title="Filtrar por veículo">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="driverFilter">Motorista</label>
+                            <select id="driverFilter" title="Filtrar por motorista">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="fuelFilter">Combustível</label>
+                            <select id="fuelFilter" title="Tipo de combustível">
+                                <option value="">Todos</option>
+                                <option value="Diesel S10">Diesel S10</option>
+                                <option value="Diesel Comum">Diesel Comum</option>
+                                <option value="Gasolina">Gasolina</option>
+                                <option value="Etanol">Etanol</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="paymentFilter">Pagamento</label>
+                            <select id="paymentFilter" title="Forma de pagamento">
+                                <option value="">Todas</option>
+                                <option value="Dinheiro">Dinheiro</option>
+                                <option value="Cartão">Cartão</option>
+                                <option value="Boleto">Boleto</option>
+                                <option value="PIX">PIX</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="perPageRefuel">Por página</label>
+                            <form method="get" action="" id="formPerPageRefuel" style="margin:0;">
+                                <select id="perPageRefuel" name="per_page" class="filter-per-page" title="Registros por página">
+                                    <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                    <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                    <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                    <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                    <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                                </select>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="fornc-btn-row">
+                        <button type="button" id="addRefuelBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Novo</button>
+                        <button type="button" class="fornc-btn fornc-btn--accent" id="applyRefuelFilters" title="Aplicar filtros"><i class="fas fa-search"></i> Pesquisar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn" title="Filtro por mês/ano"><i class="fas fa-sliders-h"></i> Opções</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="clearRefuelFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
+                        <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar CSV"><i class="fas fa-file-export"></i> Exportar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="filter-section">
                     <div class="search-box">
                         <input type="text" id="searchRefueling" placeholder="Buscar abastecimento...">
@@ -203,6 +224,7 @@ $total_paginas = $resultado['total_paginas'];
                         <form method="get" action="" id="formPerPageRefuel" style="display:inline-flex; align-items:center; gap:0.5rem;">
                             <span class="filter-label">Por página</span>
                             <input type="hidden" name="page" value="1">
+                            <input type="hidden" name="classic" value="1">
                             <select id="perPageRefuel" name="per_page" class="filter-per-page" title="Registros por página" onchange="this.form.submit()">
                                 <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
                                 <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
@@ -239,16 +261,30 @@ $total_paginas = $resultado['total_paginas'];
                         </button>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- Refueling Table -->
-                <div class="data-table-container" id="refuelTableContainer">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap refuel-table-wrap' : 'data-table-container'; ?>" id="refuelTableContainer">
                     <div class="table-loading" id="refuelTableLoading" aria-live="polite">
                         <i class="fas fa-spinner fa-spin"></i>
                         <span>Carregando abastecimentos...</span>
                     </div>
-                    <table class="data-table" id="refuelingTable">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="refuelingTable">
                         <thead>
                             <tr>
+                                <?php if ($is_modern): ?>
+                                <th class="sortable sorted" data-sort="data_abastecimento">Data <span class="sort-ind">▼</span></th>
+                                <th class="sortable" data-sort="veiculo_placa">Veículo <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="motorista_nome">Motorista <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="posto">Posto <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="litros">Litros <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="valor_litro">Valor/L <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="valor_total">Valor Total <span class="sort-ind">⇅</span></th>
+                                <th class="col-arla sortable" data-sort="litros_arla">ARLA <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="km_atual">Km <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="forma_pagamento">Forma Pgto <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="rota">Rota <span class="sort-ind">⇅</span></th>
+                                <?php else: ?>
                                 <th>Data</th>
                                 <th>Veículo</th>
                                 <th>Motorista</th>
@@ -256,14 +292,15 @@ $total_paginas = $resultado['total_paginas'];
                                 <th>Litros</th>
                                 <th>Valor/L</th>
                                 <th>Valor Total</th>
-                                <th>ARLA</th>
+                                <th class="col-arla">ARLA</th>
                                 <th>Km</th>
                                 <th>Forma Pgto</th>
                                 <th>Rota</th>
+                                <?php endif; ?>
                                 <th>Ações</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="refuelingTableBody">
                             <?php if (!empty($abastecimentos)): ?>
                                 <?php foreach ($abastecimentos as $abastecimento): ?>
                                 <tr>
@@ -280,7 +317,7 @@ $total_paginas = $resultado['total_paginas'];
                                         }
                                     ?>
                                     <td>R$ <?php echo number_format($valor_total_abastecimento, 2, ',', '.'); ?></td>
-                                    <td>
+                                    <td class="col-arla">
                                         <?php if (!empty($abastecimento['inclui_arla']) && $abastecimento['inclui_arla'] == 1): ?>
                                             <?php 
                                             $percentual_arla = 0;
@@ -295,10 +332,13 @@ $total_paginas = $resultado['total_paginas'];
                                             } else {
                                                 $classe_percentual = 'percentual-baixo';
                                             }
-                                            
+                                            $arla_pct_txt = abs($percentual_arla) >= 100
+                                                ? number_format(round($percentual_arla), 0, ',', '')
+                                                : number_format($percentual_arla, 1, ',', '');
+                                            $arla_pct_title = number_format($percentual_arla, 2, ',', '');
                                             ?>
-                                            <span class="percentual-arla <?php echo $classe_percentual; ?>">
-                                                <?php echo number_format($percentual_arla, 1, ',', '.'); ?>%
+                                            <span class="percentual-arla <?php echo $classe_percentual; ?>" title="Percentual ARLA (litros ARLA ÷ diesel): <?php echo htmlspecialchars($arla_pct_title, ENT_QUOTES, 'UTF-8'); ?>%">
+                                                <?php echo htmlspecialchars($arla_pct_txt, ENT_QUOTES, 'UTF-8'); ?>%
                                             </span>
                                         <?php else: ?>
                                             <span class="text-muted">-</span>
@@ -340,10 +380,14 @@ $total_paginas = $resultado['total_paginas'];
                 <!-- Paginação -->
                 <?php
                 $base_params = ['page' => 1, 'per_page' => $per_page];
+                if (!$is_modern) {
+                    $base_params['classic'] = '1';
+                }
                 $prev_params = array_merge($base_params, ['page' => max(1, $pagina_atual - 1)]);
                 $next_params = array_merge($base_params, ['page' => min($total_paginas, $pagina_atual + 1)]);
                 ?>
-                <div class="pagination" id="paginationRefuelContainer" data-per-page="<?php echo (int)$per_page; ?>">
+                <?php if ($is_modern): ?><div class="fornc-pagination-bar"><?php endif; ?>
+                <div class="pagination<?php echo $is_modern ? ' fornc-modern-pagination' : ''; ?>" id="paginationRefuelContainer" data-per-page="<?php echo (int)$per_page; ?>">
                     <a href="?<?php echo htmlspecialchars(http_build_query($prev_params)); ?>" 
                        class="pagination-btn pagination-prev <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>"
                        data-page="<?php echo max(1, $pagina_atual - 1); ?>">
@@ -359,6 +403,7 @@ $total_paginas = $resultado['total_paginas'];
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
+                <?php if ($is_modern): ?></div><?php endif; ?>
 
                 <!-- Analytics Section (gráficos) -->
                 <div class="analytics-section">
@@ -424,8 +469,8 @@ $total_paginas = $resultado['total_paginas'];
     <?php include '../includes/footer.php'; ?>
     
     <!-- Add/Edit Refueling Modal -->
-    <div class="modal" id="refuelModal">
-        <div class="modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="refuelModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2 id="modalTitle">Adicionar Abastecimento</h2>
                 <span class="close-modal">&times;</span>
@@ -571,7 +616,7 @@ $total_paginas = $resultado['total_paginas'];
     </div>
 
     <!-- Filter Modal -->
-    <div class="modal" id="filterModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="filterModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Filtros</h2>
@@ -593,7 +638,7 @@ $total_paginas = $resultado['total_paginas'];
     </div>
 
     <!-- Help Modal -->
-    <div class="modal" id="helpModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Ajuda - Abastecimentos</h2>
@@ -682,7 +727,7 @@ $total_paginas = $resultado['total_paginas'];
     <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
     <!-- Modal de confirmação de exclusão -->
-    <div class="modal" id="deleteConfirmModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="deleteConfirmModal">
         <div class="modal-content modal-content-sm">
             <div class="modal-header">
                 <h2>Excluir abastecimento</h2>
@@ -707,6 +752,46 @@ $total_paginas = $resultado['total_paginas'];
         var currentFilter = null;
         var refuelingCurrentPage = 1;
         var pendingDeleteId = null;
+        var refuelSortField = 'data_abastecimento';
+        var refuelSortDir = 'DESC';
+
+        function refuelDefaultSortDir(field) {
+            var textLike = ['veiculo_placa', 'motorista_nome', 'posto', 'forma_pagamento', 'rota'];
+            if (textLike.indexOf(field) >= 0) return 'ASC';
+            return 'DESC';
+        }
+
+        function syncRefuelSortIndicators() {
+            var table = document.getElementById('refuelingTable');
+            if (!table) return;
+            table.querySelectorAll('thead th.sortable').forEach(function (th) {
+                var field = th.getAttribute('data-sort');
+                var ind = th.querySelector('.sort-ind');
+                if (!ind) return;
+                var on = field === refuelSortField;
+                th.classList.toggle('sorted', on);
+                ind.textContent = on ? (refuelSortDir === 'ASC' ? '▲' : '▼') : '⇅';
+            });
+        }
+
+        function wireRefuelSortHeaders() {
+            var table = document.getElementById('refuelingTable');
+            if (!table) return;
+            table.querySelectorAll('thead th.sortable').forEach(function (th) {
+                th.addEventListener('click', function () {
+                    var field = th.getAttribute('data-sort');
+                    if (!field) return;
+                    if (refuelSortField === field) {
+                        refuelSortDir = refuelSortDir === 'ASC' ? 'DESC' : 'ASC';
+                    } else {
+                        refuelSortField = field;
+                        refuelSortDir = refuelDefaultSortDir(field);
+                    }
+                    syncRefuelSortIndicators();
+                    loadRefuelingData(1);
+                });
+            });
+        }
 
         function showToast(message, type) {
             type = type || 'info';
@@ -740,7 +825,7 @@ $total_paginas = $resultado['total_paginas'];
                         var parts = currentFilter.split('-');
                         if (parts.length === 2) { params.set('year', parts[0]); params.set('month', parts[1]); }
                     }
-                    window.open('../api/refuel_export.php?' + params.toString(), '_blank');
+                    window.open(sfApiUrl('refuel_export.php?' + params.toString()), '_blank');
                     showToast('Exportação iniciada. O download deve abrir em instantes.', 'info');
                 });
             }
@@ -760,7 +845,7 @@ $total_paginas = $resultado['total_paginas'];
                 }
             });
 
-            // Inicializa a página
+            wireRefuelSortHeaders();
             initializePage();
             
             // Configura eventos dos modais
@@ -774,6 +859,10 @@ $total_paginas = $resultado['total_paginas'];
         });
         
         function initializePage() {
+            var upInit = new URLSearchParams(window.location.search);
+            if (upInit.has('sort')) refuelSortField = upInit.get('sort') || refuelSortField;
+            if (upInit.has('dir')) refuelSortDir = (upInit.get('dir') || '').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+            syncRefuelSortIndicators();
             // Load refuel data from API
             loadRefuelingData();
             
@@ -846,7 +935,14 @@ $total_paginas = $resultado['total_paginas'];
             const urlParams = new URLSearchParams(window.location.search);
             urlParams.set('page', refuelingCurrentPage);
             urlParams.set('per_page', perPageValid);
-            const isDefault = refuelingCurrentPage === 1 && perPageValid === 10;
+            if (refuelSortField !== 'data_abastecimento' || refuelSortDir !== 'DESC') {
+                urlParams.set('sort', refuelSortField);
+                urlParams.set('dir', refuelSortDir);
+            } else {
+                urlParams.delete('sort');
+                urlParams.delete('dir');
+            }
+            const isDefault = refuelingCurrentPage === 1 && perPageValid === 10 && refuelSortField === 'data_abastecimento' && refuelSortDir === 'DESC';
             const desiredSearch = isDefault ? '' : '?' + urlParams.toString();
             if (window.location.search !== desiredSearch) {
                 window.history.replaceState({}, '', window.location.pathname + desiredSearch);
@@ -864,7 +960,7 @@ $total_paginas = $resultado['total_paginas'];
             const fuelFilter = fuelSelect ? fuelSelect.value : '';
             const paymentFilter = paymentSelect ? paymentSelect.value : '';
             
-            let url = `../api/refuel_data.php?action=list&page=${refuelingCurrentPage}&limit=${perPageValid}`;
+            let url = sfApiUrl(`refuel_data.php?action=list&page=${refuelingCurrentPage}&limit=${perPageValid}`);
             if (search) url += `&search=${encodeURIComponent(search)}`;
             if (currentFilter) {
                 const [year, month] = currentFilter.split('-');
@@ -874,7 +970,8 @@ $total_paginas = $resultado['total_paginas'];
             if (driverFilter) url += `&motorista=${encodeURIComponent(driverFilter)}`;
             if (fuelFilter) url += `&combustivel=${encodeURIComponent(fuelFilter)}`;
             if (paymentFilter) url += `&pagamento=${encodeURIComponent(paymentFilter)}`;
-            
+            url += `&sort=${encodeURIComponent(refuelSortField)}&dir=${encodeURIComponent(refuelSortDir)}`;
+
             fetch(url, { credentials: 'include' })
                 .then(response => {
                     if (!response.ok) {
@@ -891,7 +988,14 @@ $total_paginas = $resultado['total_paginas'];
                             const updatedParams = new URLSearchParams(window.location.search);
                             updatedParams.set('page', refuelingCurrentPage);
                             updatedParams.set('per_page', perPageValid);
-                            const isDefaultResp = refuelingCurrentPage === 1 && perPageValid === 10;
+                            if (refuelSortField !== 'data_abastecimento' || refuelSortDir !== 'DESC') {
+                                updatedParams.set('sort', refuelSortField);
+                                updatedParams.set('dir', refuelSortDir);
+                            } else {
+                                updatedParams.delete('sort');
+                                updatedParams.delete('dir');
+                            }
+                            const isDefaultResp = refuelingCurrentPage === 1 && perPageValid === 10 && refuelSortField === 'data_abastecimento' && refuelSortDir === 'DESC';
                             const desiredSearchResp = isDefaultResp ? '' : '?' + updatedParams.toString();
                             if (window.location.search !== desiredSearchResp) {
                                 window.history.replaceState({}, '', window.location.pathname + desiredSearchResp);
@@ -904,12 +1008,16 @@ $total_paginas = $resultado['total_paginas'];
                 .catch(error => {
                     if (loadingEl) loadingEl.classList.remove('is-visible');
                     if (containerEl) containerEl.classList.remove('table-loading-visible');
-                    console.error('Erro ao carregar dados dos abastecimentos:', error);
+                    window.__SF_DEBUG__ && console.error('Erro ao carregar dados dos abastecimentos:', error);
                 });
         }
         
         function updateRefuelingsTable(refuelings) {
-            const tbody = document.querySelector('.data-table tbody');
+            var tbody = document.getElementById('refuelingTableBody') ||
+                document.querySelector('#refuelingTable tbody') ||
+                document.querySelector('table.fornc-table tbody') ||
+                document.querySelector('table.data-table tbody');
+            if (!tbody) return;
             tbody.innerHTML = '';
             
             if (refuelings && refuelings.length > 0) {
@@ -923,7 +1031,7 @@ $total_paginas = $resultado['total_paginas'];
                         <td>${formatNumber(refuel.litros, 1)} L</td>
                         <td>R$ ${formatNumber(refuel.valor_litro, 2)}</td>
                         <td>R$ ${formatNumber((parseFloat(refuel.valor_total || 0) + (refuel.inclui_arla == 1 ? parseFloat(refuel.valor_total_arla || 0) : 0)), 2)}</td>
-                        <td>
+                        <td class="col-arla">
                             ${refuel.inclui_arla == 1 ? 
                                 (() => {
                                     const percentual = refuel.litros > 0 ? (refuel.litros_arla / refuel.litros) * 100 : 0;
@@ -935,9 +1043,8 @@ $total_paginas = $resultado['total_paginas'];
                                     } else {
                                         classePercentual = 'percentual-baixo';
                                     }
-                                    return `<span class="percentual-arla ${classePercentual}">
-                                        ${formatNumber(percentual, 1)}%
-                                    </span>`;
+                                    const titleAttr = formatArlaPercentTitle(percentual).replace(/"/g, '&quot;');
+                                    return `<span class="percentual-arla ${classePercentual}" title="${titleAttr}">${formatArlaPercentDisplay(percentual)}</span>`;
                                 })() : 
                                 '<span class="text-muted">-</span>'
                             }
@@ -1025,7 +1132,7 @@ $total_paginas = $resultado['total_paginas'];
         }
         
         function loadRefuelingSummary() {
-            let url = '../api/refuel_data.php?action=summary';
+            let url = sfApiUrl('refuel_data.php?action=summary');
             
             if (currentFilter) {
                 const [year, month] = currentFilter.split('-');
@@ -1043,7 +1150,7 @@ $total_paginas = $resultado['total_paginas'];
                     updateMetricCards(data.data);
                 })
                 .catch(error => {
-                    console.error('Error loading refueling summary:', error);
+                    window.__SF_DEBUG__ && console.error('Error loading refueling summary:', error);
                 });
         }
 
@@ -1061,7 +1168,7 @@ $total_paginas = $resultado['total_paginas'];
                     }
                 }
             } catch (e) {}
-            fetch('../api/refuel_data.php?action=filter_options', { credentials: 'include' })
+            fetch(sfApiUrl('refuel_data.php?action=filter_options'), { credentials: 'include' })
                 .then(response => {
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}`);
@@ -1077,7 +1184,7 @@ $total_paginas = $resultado['total_paginas'];
                     }
                 })
                 .catch(error => {
-                    console.error('Erro ao carregar opções de filtro:', error);
+                    window.__SF_DEBUG__ && console.error('Erro ao carregar opções de filtro:', error);
                 });
         }
         
@@ -1117,16 +1224,18 @@ $total_paginas = $resultado['total_paginas'];
         }
 
         function updateMetricCards(data) {
-            // Ordem dos cards: 1-Abastecimentos, 2-Litros, 3-Valor, 4-Médias
-            document.querySelectorAll('.metric-value')[0].textContent = formatNumber(data.total_abastecimentos, 0);
-            document.querySelectorAll('.metric-value')[1].textContent = formatNumber(data.total_litros, 2) + ' L';
-            document.querySelectorAll('.metric-value')[2].textContent = 'R$ ' + formatNumber(data.total_gasto, 2);
-            document.querySelectorAll('.metric-value')[3].textContent = 'R$ ' + formatNumber(data.media_valor_litro, 2) + '/L';
-            document.querySelectorAll('.metric-subtitle')[3].textContent = formatNumber(data.media_km_litro, 1) + ' km/L média';
+            function setText(id, text) {
+                var el = document.getElementById(id);
+                if (el) el.textContent = text;
+            }
+            setText('refuelKpiAbastecimentos', formatNumber(data.total_abastecimentos, 0));
+            setText('refuelKpiLitros', formatNumber(data.total_litros, 2) + ' L');
+            setText('refuelKpiValor', 'R$ ' + formatNumber(data.total_gasto, 2));
+            setText('refuelKpiMediaLitro', 'R$ ' + formatNumber(data.media_valor_litro, 2) + '/L');
         }
         
         function loadConsumptionChart() {
-            let url = '../api/refuel_data.php?action=consumption_chart';
+            let url = sfApiUrl('refuel_data.php?action=consumption_chart');
             
             if (currentFilter) {
                 const [year, month] = currentFilter.split('-');
@@ -1168,12 +1277,12 @@ $total_paginas = $resultado['total_paginas'];
                     });
                 })
                 .catch(error => {
-                    console.error('Error loading consumption chart:', error);
+                    window.__SF_DEBUG__ && console.error('Error loading consumption chart:', error);
                 });
         }
         
         function loadEfficiencyChart() {
-            let url = '../api/refuel_data.php?action=efficiency_chart';
+            let url = sfApiUrl('refuel_data.php?action=efficiency_chart');
             
             if (currentFilter) {
                 const [year, month] = currentFilter.split('-');
@@ -1215,7 +1324,7 @@ $total_paginas = $resultado['total_paginas'];
                     });
                 })
                 .catch(error => {
-                    console.error('Error loading efficiency chart:', error);
+                    window.__SF_DEBUG__ && console.error('Error loading efficiency chart:', error);
                 });
         }
         
@@ -1238,7 +1347,7 @@ $total_paginas = $resultado['total_paginas'];
         }
         
         function showDeleteConfirmation(refuelId) {
-            fetch(`../api/refuel_data.php?action=get&id=${refuelId}`)
+            fetch(sfApiUrl(`refuel_data.php?action=get&id=${refuelId}`))
                 .then(response => {
                     if (!response.ok) {
                         return response.json().then(data => {
@@ -1261,15 +1370,23 @@ $total_paginas = $resultado['total_paginas'];
                     if (modal) modal.classList.add('active');
                 })
                 .catch(error => {
-                    console.error('Error loading refuel data:', error);
+                    window.__SF_DEBUG__ && console.error('Error loading refuel data:', error);
                     showToast('Erro ao carregar dados do abastecimento: ' + error.message, 'error');
                 });
         }
         
         function deleteRefuel(refuelId) {
-            fetch(`../api/refuel_actions.php?action=delete&id=${refuelId}`, {
-                method: 'GET',
-                credentials: 'include'
+            const fd = new FormData();
+            fd.append('action', 'delete');
+            fd.append('id', refuelId);
+            if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+                fd.append('csrf_token', window.__SF_CSRF__);
+            }
+            fetch(sfApiUrl('refuel_actions.php'), {
+                method: 'POST',
+                body: fd,
+                credentials: 'include',
+                headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
             })
             .then(response => {
                 if (!response.ok) {
@@ -1296,7 +1413,7 @@ $total_paginas = $resultado['total_paginas'];
                 }
             })
             .catch(error => {
-                console.error('Error deleting refuel:', error);
+                window.__SF_DEBUG__ && console.error('Error deleting refuel:', error);
                 showToast('Erro ao excluir abastecimento: ' + error.message, 'error');
             });
         }
@@ -1314,6 +1431,22 @@ $total_paginas = $resultado['total_paginas'];
                 minimumFractionDigits: decimals,
                 maximumFractionDigits: decimals
             });
+        }
+
+        function formatArlaPercentDisplay(percentual) {
+            var p = Number(percentual);
+            if (!isFinite(p)) return '0%';
+            if (Math.abs(p) >= 100) {
+                return Math.round(p).toLocaleString('pt-BR', { maximumFractionDigits: 0, useGrouping: false }) + '%';
+            }
+            return p.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }) + '%';
+        }
+
+        function formatArlaPercentTitle(percentual) {
+            var p = Number(percentual);
+            if (!isFinite(p)) return '';
+            return 'Percentual ARLA (litros ARLA ÷ diesel): ' +
+                p.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4, useGrouping: false }) + '%';
         }
         
         function debounce(func, wait) {
@@ -1380,7 +1513,7 @@ $total_paginas = $resultado['total_paginas'];
         function showEditRefuelModal(refuelId) {
             document.getElementById('refuelForm').reset();
             // Carrega os dados completos do abastecimento
-            fetch(`../api/refuel_data.php?action=get&id=${refuelId}`)
+            fetch(sfApiUrl(`refuel_data.php?action=get&id=${refuelId}`))
                 .then(response => response.json())
                 .then(data => {
                     if (!data.success) throw new Error(data.error || 'Erro ao carregar dados do abastecimento');
@@ -1388,7 +1521,7 @@ $total_paginas = $resultado['total_paginas'];
                     window.openEditRefuelModal(data.data);
                 })
                 .catch(error => {
-                    alert('Erro ao carregar dados do abastecimento: ' + error.message);
+                    showToast('Erro ao carregar dados do abastecimento: ' + error.message, 'error');
                 });
         }
         
@@ -1612,7 +1745,7 @@ $total_paginas = $resultado['total_paginas'];
                 formData.append('rota_id', rotaId);
                 formData.append('km_abastecimento', kmAbastecimento);
                 
-                const response = await fetch('../api/validar_quilometragem.php', {
+                const response = await fetch(sfApiUrl('validar_quilometragem.php'), {
                     method: 'POST',
                     body: formData
                 });
@@ -1620,7 +1753,7 @@ $total_paginas = $resultado['total_paginas'];
                 const data = await response.json();
                 return data;
             } catch (error) {
-                console.error('Erro na validação de quilometragem:', error);
+                window.__SF_DEBUG__ && console.error('Erro na validação de quilometragem:', error);
                 return { valido: false, mensagem: 'Erro na validação' };
             }
         }
@@ -1630,11 +1763,11 @@ $total_paginas = $resultado['total_paginas'];
             if (!rotaId) return null;
             
             try {
-                const response = await fetch(`../api/validar_quilometragem.php?action=obter_abastecimentos_rota&rota_id=${rotaId}`);
+                const response = await fetch(sfApiUrl(`validar_quilometragem.php?action=obter_abastecimentos_rota&rota_id=${rotaId}`));
                 const data = await response.json();
                 return data.success ? data : null;
             } catch (error) {
-                console.error('Erro ao obter abastecimentos da rota:', error);
+                window.__SF_DEBUG__ && console.error('Erro ao obter abastecimentos da rota:', error);
                 return null;
             }
         }
@@ -1706,393 +1839,16 @@ $total_paginas = $resultado['total_paginas'];
         
         // Inicializar validação quando DOM estiver carregado
         document.addEventListener('DOMContentLoaded', function() {
-            // Aguardar um pouco para garantir que todos os elementos estejam carregados
-            setTimeout(() => {
-                configurarValidacaoKmAbastecimento();
-            }, 500);
+            // Evita "race condition" sem depender de setTimeout fixo
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    configurarValidacaoKmAbastecimento();
+                });
+            });
         });
     </script>
     <script src="../js/abastecimentos.js"></script>
-    <style>
-    /* Estilos adicionais para a página de abastecimentos */
-    
-    /* Toast (notificações) */
-    .toast-container {
-        position: fixed;
-        top: 80px;
-        right: 20px;
-        z-index: 9999;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        max-width: 360px;
-    }
-    .toast {
-        padding: 12px 16px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        animation: toastIn 0.3s ease;
-    }
-    .toast-success { background: #d4edda; border-left: 4px solid #28a745; color: #155724; }
-    .toast-error { background: #f8d7da; border-left: 4px solid #dc3545; color: #721c24; }
-    .toast-info { background: #d1ecf1; border-left: 4px solid #17a2b8; color: #0c5460; }
-    @keyframes toastIn {
-        from { opacity: 0; transform: translateX(100%); }
-        to { opacity: 1; transform: translateX(0); }
-    }
-    
-    /* Loading da tabela */
-    .table-loading {
-        display: none;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        padding: 24px;
-        color: var(--text-secondary);
-    }
-    .table-loading.is-visible { display: flex; }
-    .data-table-container.table-loading-visible .data-table { opacity: 0.5; pointer-events: none; }
-    
-    /* Modal pequeno (confirmação) */
-    .modal-content-sm { max-width: 420px; }
-    .btn-danger { background: #dc3545; color: #fff; border-color: #dc3545; }
-    .btn-danger:hover { background: #c82333; color: #fff; }
-    
-    /* Estilos para a seção de análise */
-    .analytics-section {
-        margin-top: 20px;
-    }
 
-    /* Estilo para o botão de filtro quando ativo */
-    .btn-restore-layout.active {
-        background-color: var(--primary-color);
-        color: white;
-    }
-    
-    .analytics-section .section-header {
-        margin-bottom: 20px;
-    }
-    
-    .analytics-section .section-header h2 {
-        font-size: 1.25rem;
-        color: var(--text-primary);
-        margin: 0;
-    }
-    
-    .analytics-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 20px;
-        margin-bottom: 20px;
-    }
-    
-    .analytics-card {
-        background: var(--bg-secondary);
-        border-radius: 8px;
-        border: 1px solid var(--border-color);
-        overflow: hidden;
-    }
-    
-    .analytics-card .card-header {
-        padding: 15px;
-        border-bottom: 1px solid var(--border-color);
-    }
-    
-    .analytics-card .card-header h3 {
-        margin: 0;
-        font-size: 1rem;
-        color: var(--text-primary);
-    }
-    
-    .analytics-card .card-body {
-        padding: 15px;
-        height: 400px; /* Altura fixa para os gráficos */
-        position: relative; /* Necessário para o Chart.js */
-    }
-    
-    .search-box {
-        position: relative;
-        flex: 1;
-        max-width: 360px;
-        min-width: 240px;
-    }
-    
-    .search-box input {
-        width: 100%;
-        padding: 6px 40px 6px 12px;
-        border-radius: 4px;
-        border: 1px solid var(--border-color);
-        background-color: var(--bg-tertiary);
-        color: var(--text-primary);
-        font-size: 0.875rem;
-        box-sizing: border-box;
-    }
-    
-    .search-box i {
-        position: absolute;
-        right: 10px;
-        left: auto;
-        top: 50%;
-        transform: translateY(-50%);
-        color: var(--text-secondary);
-        font-size: 0.875rem;
-        pointer-events: none;
-    }
-    
-    .pagination {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin-top: 20px;
-        gap: 15px;
-    }
-    
-    .pagination-btn {
-        padding: 8px 16px;
-        border: 1px solid var(--border-color);
-        border-radius: 4px;
-        background: var(--bg-secondary);
-        color: var(--text-color);
-        text-decoration: none;
-        transition: all 0.3s ease;
-    }
-    
-    .pagination-btn:hover:not(.disabled) {
-        background: var(--bg-tertiary);
-    }
-    
-    .pagination-btn.disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        pointer-events: none;
-    }
-    
-    .pagination-info {
-        font-size: 0.9rem;
-        color: var(--text-color);
-    }
-
-    .numeric-input {
-        text-align: right;
-    }
-
-    /* Estilos para checkbox personalizado */
-    .checkbox-group {
-        margin: 15px 0;
-    }
-
-    .checkbox-label {
-        display: flex;
-        align-items: center;
-        cursor: pointer;
-        font-size: 1rem;
-        color: var(--text-primary);
-        user-select: none;
-    }
-
-    .checkbox-label input[type="checkbox"] {
-        display: none;
-    }
-
-    .checkmark {
-        width: 20px;
-        height: 20px;
-        border: 2px solid var(--border-color);
-        border-radius: 4px;
-        margin-right: 10px;
-        position: relative;
-        background-color: var(--bg-secondary);
-        transition: all 0.3s ease;
-    }
-
-    .checkbox-label input[type="checkbox"]:checked + .checkmark {
-        background-color: var(--primary-color);
-        border-color: var(--primary-color);
-    }
-
-    .checkbox-label input[type="checkbox"]:checked + .checkmark::after {
-        content: '✓';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: white;
-        font-size: 14px;
-        font-weight: bold;
-    }
-
-    .checkbox-label:hover .checkmark {
-        border-color: var(--primary-color);
-    }
-
-    /* Estilos para campos ARLA */
-    #campos_arla {
-        margin-top: 15px;
-        padding: 15px;
-        background-color: var(--bg-tertiary);
-        border-radius: 8px;
-        border: 1px solid var(--border-color);
-    }
-
-    #campos_arla .form-group {
-        margin-bottom: 15px;
-    }
-
-    #campos_arla .form-group:last-child {
-        margin-bottom: 0;
-    }
-
-    /* Estilos para informação ARLA na tabela */
-    .arla-info {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        font-size: 0.875rem;
-        line-height: 1.2;
-    }
-
-    .arla-info i {
-        margin-bottom: 2px;
-    }
-
-    .arla-info small {
-        color: var(--text-secondary);
-        font-size: 0.75rem;
-    }
-
-    /* Estilos para porcentagem ARLA */
-    .percentual-arla {
-        font-weight: bold;
-        font-size: 0.9rem;
-        padding: 4px 8px;
-        border-radius: 12px;
-        display: inline-block;
-        text-align: center;
-        min-width: 50px;
-    }
-
-    .percentual-ok {
-        background-color: #28a745 !important;
-        color: #ffffff !important;
-        border: 2px solid #28a745 !important;
-        font-weight: bold !important;
-    }
-
-    .percentual-alto {
-        background-color: #dc3545 !important;
-        color: #ffffff !important;
-        border: 2px solid #dc3545 !important;
-        font-weight: bold !important;
-    }
-
-    .percentual-baixo {
-        background-color: #ffc107 !important;
-        color: #000000 !important;
-        border: 2px solid #ffc107 !important;
-        font-weight: bold !important;
-    }
-
-    /* Estilos para campos de input com validação ARLA */
-    #litros_arla.percentual-ok {
-        border-color: #28a745;
-        background-color: #d4edda;
-    }
-
-    #litros_arla.percentual-alto {
-        border-color: #dc3545;
-        background-color: #f8d7da;
-    }
-
-    #litros_arla.percentual-baixo {
-        border-color: #ffc107;
-        background-color: #fff3cd;
-    }
-
-    @media (max-width: 768px) {
-        .analytics-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .analytics-card .card-body {
-            height: 300px;
-        }
-        
-        /* Estilos responsivos para mobile */
-        .main-content {
-            margin-left: 0 !important;
-            width: 100% !important;
-        }
-    }
-    
-    /* Estilos responsivos para mobile */
-    .main-content {
-        margin-left: var(--sidebar-width);
-        transition: margin-left var(--transition-speed) ease;
-        width: calc(100% - var(--sidebar-width));
-        min-height: 100vh;
-        background: var(--bg-primary);
-    }
-    
-    .sidebar-collapsed .main-content {
-        margin-left: var(--sidebar-collapsed-width);
-        width: calc(100% - var(--sidebar-collapsed-width));
-    }
-    
-    .dashboard-content {
-        padding: 20px;
-        width: 100%;
-        max-width: 100%;
-        overflow-x: hidden;
-    }
-
-    /* Estilos para o modal de ajuda */
-    .help-section {
-        margin-bottom: 24px;
-    }
-
-    .help-section h3 {
-        color: var(--primary-color);
-        margin-bottom: 12px;
-        font-size: 1.1rem;
-    }
-
-    .help-section p {
-        margin-bottom: 12px;
-        line-height: 1.5;
-    }
-
-    .help-section ul, .help-section ol {
-        padding-left: 20px;
-        margin-bottom: 12px;
-    }
-
-    .help-section ul ul, .help-section ol ul {
-        margin-top: 8px;
-        margin-bottom: 8px;
-    }
-
-    .help-section li {
-        margin-bottom: 8px;
-        line-height: 1.5;
-    }
-
-    .help-section strong {
-        color: var(--text-primary);
-    }
-
-    /* Ajuste do modal para conteúdo longo */
-    #helpModal .modal-content {
-        max-width: 700px;
-        max-height: 80vh;
-    }
-
-    #helpModal .modal-body {
-        overflow-y: auto;
-        padding: 20px;
-    }
-    </style>
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html>

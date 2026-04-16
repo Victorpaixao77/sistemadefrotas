@@ -1,7 +1,8 @@
 <?php
+require_once __DIR__ . '/../../includes/sf_paths.php';
 // Verifica se o usuário está autenticado
 if (!isset($_SESSION['user_id'])) {
-    header('Location: /sistema-frotas/login.php');
+    header('Location: ' . sf_app_url('login.php'));
     exit;
 }
 
@@ -38,10 +39,10 @@ try {
     
     <!-- CSS Files -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="/sistema-frotas/css/styles.css">
-    <link rel="stylesheet" href="/sistema-frotas/css/theme.css">
-    <link rel="stylesheet" href="/sistema-frotas/css/responsive.css">
-    <link rel="stylesheet" href="/sistema-frotas/gestao_interativa/assets/css/style.css">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(sf_app_url('css/styles.css')); ?>">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(sf_app_url('css/theme.css')); ?>">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(sf_app_url('css/responsive.css')); ?>">
+    <link rel="stylesheet" href="<?php echo htmlspecialchars(sf_app_url('gestao_interativa/assets/css/style.css')); ?>">
 </head>
 <body>
     <div class="app-container">
@@ -162,9 +163,9 @@ try {
     </div>
 
     <!-- JavaScript Files -->
-    <script src="/sistema-frotas/js/header.js"></script>
-    <script src="/sistema-frotas/js/theme.js"></script>
-    <script src="/sistema-frotas/js/sidebar.js"></script>
-    <script src="/sistema-frotas/gestao_interativa/assets/js/gestao-pneus.js"></script>
+    <script src="<?php echo htmlspecialchars(sf_app_url('js/header.js')); ?>"></script>
+    <script src="<?php echo htmlspecialchars(sf_app_url('js/theme.js')); ?>"></script>
+    <script src="<?php echo htmlspecialchars(sf_app_url('js/sidebar.js')); ?>"></script>
+    <script src="<?php echo htmlspecialchars(sf_app_url('gestao_interativa/assets/js/gestao-pneus.js')); ?>"></script>
 </body>
 </html> 

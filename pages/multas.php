@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
+require_once '../includes/sf_api_base.php';
 
 configure_session();
 session_start();
@@ -9,6 +10,9 @@ require_authentication();
 
 $conn = getConnection();
 $page_title = "Multas";
+
+// Layout moderno (fornc-page); ?classic=1 para o layout anterior
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
 
 $per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
 if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
@@ -76,11 +80,27 @@ function getMultasKPIs($conn) {
     }
 }
 
-function getMultas($conn, $page = 1, $per_page = 10) {
+function getMultas($conn, $page = 1, $per_page = 10, $sort_field = 'data_infracao', $sort_dir = 'DESC') {
     try {
         $empresa_id = $_SESSION['empresa_id'];
         $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
         $offset = ($page - 1) * $limit;
+        $allowedSort = [
+            'data_infracao' => 'm.data_infracao',
+            'veiculo_placa' => 'v.placa',
+            'motorista_nome' => 'mo.nome',
+            'rota' => 'm.rota_id',
+            'tipo_infracao' => 'm.tipo_infracao',
+            'pontos' => 'm.pontos',
+            'valor' => 'm.valor',
+            'status_pagamento' => 'm.status_pagamento',
+            'vencimento' => 'm.vencimento',
+        ];
+        if (!isset($allowedSort[$sort_field])) {
+            $sort_field = 'data_infracao';
+        }
+        $orderCol = $allowedSort[$sort_field];
+        $dir = ($sort_dir === 'ASC') ? 'ASC' : 'DESC';
         $sql_count = "SELECT COUNT(*) as total FROM multas WHERE empresa_id = :empresa_id";
         $stmt_count = $conn->prepare($sql_count);
         $stmt_count->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
@@ -93,7 +113,7 @@ function getMultas($conn, $page = 1, $per_page = 10) {
                 LEFT JOIN motoristas mo ON m.motorista_id = mo.id
                 LEFT JOIN rotas r ON m.rota_id = r.id
                 WHERE m.empresa_id = :empresa_id
-                ORDER BY m.data_infracao DESC, m.id DESC
+                ORDER BY " . $orderCol . " " . $dir . ", m.id DESC
                 LIMIT :limit OFFSET :offset";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
@@ -119,7 +139,33 @@ function getMultas($conn, $page = 1, $per_page = 10) {
 }
 
 $pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-$resultado = getMultas($conn, $pagina_atual, $per_page);
+
+$mul_sort = isset($_GET['sort']) ? preg_replace('/[^a-z_]/', '', (string) $_GET['sort']) : 'data_infracao';
+$mul_dir = (isset($_GET['dir']) && strtoupper((string) $_GET['dir']) === 'ASC') ? 'ASC' : 'DESC';
+
+function multas_sort_link_url($field, $mul_sort, $mul_dir, $per_page, $is_modern) {
+    $next_dir = 'DESC';
+    if ($mul_sort === $field) {
+        $next_dir = $mul_dir === 'ASC' ? 'DESC' : 'ASC';
+    } else {
+        $text_like = ['veiculo_placa', 'motorista_nome', 'tipo_infracao', 'status_pagamento'];
+        $next_dir = in_array($field, $text_like, true) ? 'ASC' : 'DESC';
+    }
+    $q = ['page' => 1, 'per_page' => $per_page, 'sort' => $field, 'dir' => $next_dir];
+    if (!$is_modern) {
+        $q['classic'] = '1';
+    }
+    return '?' . http_build_query($q);
+}
+
+function multas_sort_indicator($field, $mul_sort, $mul_dir) {
+    if ($mul_sort !== $field) {
+        return '⇅';
+    }
+    return $mul_dir === 'ASC' ? '▲' : '▼';
+}
+
+$resultado = getMultas($conn, $pagina_atual, $per_page, $mul_sort, $mul_dir);
 $multas = $resultado['multas'];
 $total_paginas = $resultado['total_paginas'];
 $kpis = getMultasKPIs($conn);
@@ -135,15 +181,67 @@ $kpis = getMultasKPIs($conn);
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+    <style>
+        /* Modal financeiro: deixa os campos em 2 colunas (desktop) e 1 coluna (mobile) */
+        #multaModal .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 14px;
+            margin-bottom: 4px;
+        }
+        @media (max-width: 640px) {
+            #multaModal .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        body.multas-modern .dashboard-header { display: none; }
+        body.multas-modern .dashboard-content.fornc-page { overflow-x: auto; }
+        body.multas-modern #multasTable.fornc-table { min-width: 1020px; }
+        body.multas-modern #multasTable.fornc-table th.sortable .th-sort-link {
+            color: inherit;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        body.multas-modern #multasTable.fornc-table th.sortable .th-sort-link:hover {
+            color: var(--accent-primary, #3b82f6);
+        }
+        body.multas-modern #multasTable.fornc-table th.sortable.sorted .th-sort-link {
+            font-weight: 600;
+        }
+        #multasTable .sort-ind { font-size: 0.75rem; opacity: 0.85; }
+        .fornc-toolbar.highlight-filter,
+        .filter-section.highlight-filter {
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+            border-radius: 12px;
+        }
+    </style>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'multas-modern' : ''; ?>">
     <div class="app-container">
         <?php include '../includes/sidebar_pages.php'; ?>
         <div class="main-content">
             <?php include '../includes/header.php'; ?>
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <?php if ($is_modern): ?>
+                <p class="fornc-modern-hint">
+                    Multas e consulta DETRAN. Use <code>?classic=1</code> para o layout anterior.
+                </p>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Multas (mês)</span><span class="val"><?php echo (int) $kpis['total_multas']; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Valor total</span><span class="val">R$ <?php echo number_format($kpis['valor_total'], 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Pendentes</span><span class="val"><?php echo (int) $kpis['total_pendentes']; ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Pontos (mês)</span><span class="val"><?php echo (int) $kpis['pontos_total']; ?></span></div>
+                </div>
+                <p class="fornc-kpi-summary">Indicadores do mês corrente.</p>
+                <?php else: ?>
                 <div class="dashboard-header">
                     <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
@@ -214,6 +312,7 @@ $kpis = getMultasKPIs($conn);
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- Consulta DETRAN (WSDenatran) -->
                 <div class="dashboard-card denatran-consulta-card">
@@ -301,6 +400,61 @@ $kpis = getMultasKPIs($conn);
                     </div>
                 </div>
 
+                <?php if ($is_modern): ?>
+                <div class="fornc-toolbar">
+                    <div class="fornc-search-block">
+                        <label for="searchMulta">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" id="searchMulta" placeholder="Buscar multa..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="fornc-filters-inline">
+                        <div class="fg">
+                            <label for="vehicleFilter">Veículo</label>
+                            <select id="vehicleFilter">
+                            <option value="">Todos os veículos</option>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="driverFilter">Motorista</label>
+                            <select id="driverFilter">
+                            <option value="">Todos os motoristas</option>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="statusFilter">Status</label>
+                            <select id="statusFilter">
+                            <option value="">Todos os status</option>
+                            <option value="pendente">Pendente</option>
+                            <option value="pago">Pago</option>
+                            <option value="recurso">Recurso</option>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="per_page_mul">Por página</label>
+                            <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.35rem;">
+                                <input type="hidden" name="page" value="1">
+                                <select name="per_page" id="per_page_mul" class="filter-per-page" onchange="this.form.submit()">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="fornc-btn-row">
+                        <button type="button" id="addMultaBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Nova multa</button>
+                        <button type="button" class="fornc-btn fornc-btn--accent" id="applyFinesFilters" title="Aplicar filtros"><i class="fas fa-search"></i> Pesquisar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn" title="Destacar filtros"><i class="fas fa-sliders-h"></i> Opções</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="clearFinesFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
+                        <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar"><i class="fas fa-file-export"></i> Exportar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                    </div>
+                </div>
+                <?php else: ?>
                 <!-- Search and Filter -->
                 <div class="filter-section">
                     <div class="search-box">
@@ -311,6 +465,7 @@ $kpis = getMultasKPIs($conn);
                         <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.5rem;">
                             <span class="filter-label">Por página</span>
                             <input type="hidden" name="page" value="1">
+                            <input type="hidden" name="classic" value="1">
                             <select name="per_page" class="filter-per-page" onchange="this.form.submit()">
                                 <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
                                 <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
@@ -339,12 +494,24 @@ $kpis = getMultasKPIs($conn);
                         </button>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- Multas Table -->
-                <div class="data-table-container">
-                    <table class="data-table" id="multasTable">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="multasTable">
                         <thead>
                             <tr>
+                                <?php if ($is_modern): ?>
+                                <th class="sortable<?php echo $mul_sort === 'data_infracao' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(multas_sort_link_url('data_infracao', $mul_sort, $mul_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Data <span class="sort-ind"><?php echo htmlspecialchars(multas_sort_indicator('data_infracao', $mul_sort, $mul_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $mul_sort === 'veiculo_placa' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(multas_sort_link_url('veiculo_placa', $mul_sort, $mul_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Veículo <span class="sort-ind"><?php echo htmlspecialchars(multas_sort_indicator('veiculo_placa', $mul_sort, $mul_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $mul_sort === 'motorista_nome' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(multas_sort_link_url('motorista_nome', $mul_sort, $mul_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Motorista <span class="sort-ind"><?php echo htmlspecialchars(multas_sort_indicator('motorista_nome', $mul_sort, $mul_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $mul_sort === 'rota' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(multas_sort_link_url('rota', $mul_sort, $mul_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Rota <span class="sort-ind"><?php echo htmlspecialchars(multas_sort_indicator('rota', $mul_sort, $mul_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $mul_sort === 'tipo_infracao' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(multas_sort_link_url('tipo_infracao', $mul_sort, $mul_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Tipo <span class="sort-ind"><?php echo htmlspecialchars(multas_sort_indicator('tipo_infracao', $mul_sort, $mul_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $mul_sort === 'pontos' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(multas_sort_link_url('pontos', $mul_sort, $mul_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Pontos <span class="sort-ind"><?php echo htmlspecialchars(multas_sort_indicator('pontos', $mul_sort, $mul_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $mul_sort === 'valor' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(multas_sort_link_url('valor', $mul_sort, $mul_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Valor <span class="sort-ind"><?php echo htmlspecialchars(multas_sort_indicator('valor', $mul_sort, $mul_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $mul_sort === 'status_pagamento' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(multas_sort_link_url('status_pagamento', $mul_sort, $mul_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Status <span class="sort-ind"><?php echo htmlspecialchars(multas_sort_indicator('status_pagamento', $mul_sort, $mul_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $mul_sort === 'vencimento' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(multas_sort_link_url('vencimento', $mul_sort, $mul_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Vencimento <span class="sort-ind"><?php echo htmlspecialchars(multas_sort_indicator('vencimento', $mul_sort, $mul_dir)); ?></span></a></th>
+                                <?php else: ?>
                                 <th>Data</th>
                                 <th>Veículo</th>
                                 <th>Motorista</th>
@@ -354,6 +521,7 @@ $kpis = getMultasKPIs($conn);
                                 <th>Valor</th>
                                 <th>Status</th>
                                 <th>Vencimento</th>
+                                <?php endif; ?>
                                 <th>Ações</th>
                             </tr>
                         </thead>
@@ -399,18 +567,32 @@ $kpis = getMultasKPIs($conn);
                 </div>
 
                 <!-- Paginação -->
-                <?php $total_reg_mul = (int)($resultado['total'] ?? 0); ?>
-                <div class="pagination">
-                    <a href="?page=<?php echo max(1, $pagina_atual - 1); ?>&per_page=<?php echo (int)$per_page; ?>" 
+                <?php
+                $total_reg_mul = (int)($resultado['total'] ?? 0);
+                $mul_q = ['per_page' => (int) $per_page];
+                if ($mul_sort !== 'data_infracao' || $mul_dir !== 'DESC') {
+                    $mul_q['sort'] = $mul_sort;
+                    $mul_q['dir'] = $mul_dir;
+                }
+                if (!$is_modern) {
+                    $mul_q['classic'] = '1';
+                }
+                $mul_prev = array_merge($mul_q, ['page' => max(1, $pagina_atual - 1)]);
+                $mul_next = array_merge($mul_q, ['page' => min($total_paginas, $pagina_atual + 1)]);
+                ?>
+                <?php if ($is_modern): ?><div class="fornc-pagination-bar"><?php endif; ?>
+                <div class="pagination<?php echo $is_modern ? ' fornc-modern-pagination' : ''; ?>">
+                    <a href="?<?php echo htmlspecialchars(http_build_query($mul_prev)); ?>"
                        class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
                         <i class="fas fa-chevron-left"></i>
                     </a>
                     <span class="pagination-info">Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?> (<?php echo $total_reg_mul; ?> registros)</span>
-                    <a href="?page=<?php echo min($total_paginas, $pagina_atual + 1); ?>&per_page=<?php echo (int)$per_page; ?>" 
+                    <a href="?<?php echo htmlspecialchars(http_build_query($mul_next)); ?>"
                        class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
+                <?php if ($is_modern): ?></div><?php endif; ?>
 
                 <!-- Analytics Section -->
                 <div class="analytics-section">
@@ -463,8 +645,8 @@ $kpis = getMultasKPIs($conn);
     <?php include '../includes/footer.php'; ?>
     
     <!-- Modal de Multa -->
-    <div class="modal" id="multaModal">
-        <div class="modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="multaModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2 id="modalTitle">Nova Multa</h2>
                 <span class="close-modal">&times;</span>
@@ -610,7 +792,7 @@ $kpis = getMultasKPIs($conn);
     </div>
 
     <!-- Modal de Confirmação de Exclusão -->
-    <div class="modal" id="deleteMultaModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="deleteMultaModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Confirmar Exclusão</h2>
@@ -637,7 +819,7 @@ $kpis = getMultasKPIs($conn);
     </div>
 
     <!-- Modal de Ajuda -->
-    <div class="modal" id="helpMultaModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpMultaModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Ajuda - Gestão de Multas</h2>
@@ -698,6 +880,9 @@ $kpis = getMultasKPIs($conn);
 
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <?php sf_render_api_scripts(); ?>
     <script src="../js/multas.js"></script>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html> 

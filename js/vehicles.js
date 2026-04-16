@@ -1,6 +1,18 @@
 // Vehicles management JavaScript
+(function (g) {
+    g.sfApiUrl = g.sfApiUrl || function (rel) {
+        rel = String(rel || '').replace(/^\//, '');
+        var b = typeof g.__SF_API_BASE__ === 'string' && g.__SF_API_BASE__ !== ''
+            ? String(g.__SF_API_BASE__).replace(/\/+$/, '')
+            : '';
+        if (b) return b + '/' + rel;
+        try { return new URL('../api/' + rel, g.location.href).href; }
+        catch (e) { return '../api/' + rel; }
+    };
+})(typeof window !== 'undefined' ? window : this);
 
 document.addEventListener('DOMContentLoaded', function() {
+    wireVehicleSortHeaders();
     // Initialize page
     initializePage();
     
@@ -14,7 +26,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeCharts();
     
     // Setup form submission
-    document.getElementById('saveVehicleBtn').addEventListener('click', saveVehicle);
+    var saveBtn = document.getElementById('saveVehicleBtn');
+    if (saveBtn) saveBtn.addEventListener('click', saveVehicle);
     
     // Setup pagination
     setupPagination();
@@ -25,10 +38,55 @@ document.addEventListener('DOMContentLoaded', function() {
 
 let currentPage = 1;
 let totalPages = 1;
+let currentVehicleSortField = 'placa';
+let currentVehicleSortDir = 'ASC';
+
+function vehicleDefaultSortDir(field) {
+    const textLike = ['placa', 'modelo', 'marca', 'status_nome', 'cavalo_nome', 'carreta_nome'];
+    if (textLike.indexOf(field) >= 0) return 'ASC';
+    return 'DESC';
+}
+
+function syncVehicleSortIndicators() {
+    const table = document.getElementById('vehiclesTable');
+    if (!table) return;
+    table.querySelectorAll('thead th.sortable').forEach(th => {
+        const field = th.getAttribute('data-sort');
+        const ind = th.querySelector('.sort-ind');
+        if (!ind) return;
+        const on = field === currentVehicleSortField;
+        th.classList.toggle('sorted', on);
+        ind.textContent = on ? (currentVehicleSortDir === 'ASC' ? '▲' : '▼') : '⇅';
+    });
+}
+
+function wireVehicleSortHeaders() {
+    const table = document.getElementById('vehiclesTable');
+    if (!table) return;
+    table.querySelectorAll('thead th.sortable').forEach(th => {
+        th.addEventListener('click', function () {
+            const field = this.getAttribute('data-sort');
+            if (!field) return;
+            if (currentVehicleSortField === field) {
+                currentVehicleSortDir = currentVehicleSortDir === 'ASC' ? 'DESC' : 'ASC';
+            } else {
+                currentVehicleSortField = field;
+                currentVehicleSortDir = vehicleDefaultSortDir(field);
+            }
+            syncVehicleSortIndicators();
+            loadVehicleData(1);
+        });
+    });
+}
 
 function initializePage() {
     // Get current page and per_page from URL or use default
     const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('sort')) currentVehicleSortField = urlParams.get('sort') || 'placa';
+    if (urlParams.has('dir')) {
+        currentVehicleSortDir = (urlParams.get('dir') || '').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+    }
+    syncVehicleSortIndicators();
     const page = parseInt(urlParams.get('page')) || 1;
     const perPageFromUrl = parseInt(urlParams.get('per_page'), 10);
     const perPageEl = document.getElementById('perPageVehicles');
@@ -36,13 +94,18 @@ function initializePage() {
         perPageEl.value = String(perPageFromUrl);
     }
     
-    // Load vehicle data from API
+    // Load vehicle data from API (fonte única)
     loadVehicleData(page);
     
     // Setup button events
     document.getElementById('addVehicleBtn').addEventListener('click', showAddVehicleModal);
     
-    // Setup table buttons
+    // Por página: recarregar lista sem recarregar a página
+    if (perPageEl) {
+        perPageEl.addEventListener('change', () => loadVehicleData(1));
+    }
+    
+    // Setup table buttons (após primeira carga os botões são ligados em loadVehicleData)
     setupTableButtons();
     
     // Load select options
@@ -69,7 +132,7 @@ function setupModals() {
     
     // Close modal when clicking cancel buttons
     document.getElementById('cancelVehicleBtn')?.addEventListener('click', function() {
-        document.getElementById('vehicleModal').style.display = 'none';
+        closeModal(document.getElementById('vehicleModal'));
     });
     
     document.getElementById('closeVehicleDetailsBtn')?.addEventListener('click', function() {
@@ -100,15 +163,17 @@ function setupModals() {
 
 function closeModal(modal) {
     if (!modal) return;
-    
-    // Hide the modal
-    modal.style.display = 'none';
-    
-    // If it's the vehicle form modal, reset the form
+    modal.classList.remove('active');
+    modal.style.removeProperty('display');
     if (modal.id === 'vehicleModal') {
         document.getElementById('vehicleForm').reset();
         document.getElementById('vehicleId').value = '';
     }
+}
+
+function closeModalById(modalId) {
+    const el = document.getElementById(modalId);
+    if (el) closeModal(el);
 }
 
 function closeAllModals() {
@@ -121,65 +186,66 @@ function closeAllModals() {
 function setupFilters() {
     const searchInput = document.getElementById('searchVehicle');
     const statusFilter = document.getElementById('statusFilter');
-    const typeFilter = document.getElementById('typeFilter');
+    const marcaFilter = document.getElementById('marcaFilter');
     const applyButton = document.getElementById('applyVehicleFilters');
     const clearButton = document.getElementById('clearVehicleFilters');
 
-    function filterVehicles() {
-        const rows = document.querySelectorAll('#vehiclesTable tbody tr');
-        const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
-        const selectedStatus = statusFilter ? statusFilter.value.toLowerCase() : '';
-        const selectedType = typeFilter ? typeFilter.value.toLowerCase() : '';
+    let searchDebounce = null;
+    const debounceMs = 400;
 
-        rows.forEach(row => {
-            const rowText = row.textContent.toLowerCase();
-            const statusCell = row.querySelector('td:nth-child(5)');
-            const modelCell = row.querySelector('td:nth-child(2)');
-            const brandCell = row.querySelector('td:nth-child(3)');
-
-            const matchesSearch = !searchTerm || rowText.includes(searchTerm);
-            const matchesStatus = !selectedStatus || (statusCell && statusCell.textContent.toLowerCase().includes(selectedStatus));
-            const matchesType = !selectedType || (
-                (modelCell && modelCell.textContent.toLowerCase().includes(selectedType)) ||
-                (brandCell && brandCell.textContent.toLowerCase().includes(selectedType))
-            );
-
-            row.style.display = matchesSearch && matchesStatus && matchesType ? '' : 'none';
-        });
+    function applyFiltersToApi() {
+        loadVehicleData(1);
     }
 
     if (searchInput) {
-        searchInput.addEventListener('input', filterVehicles);
+        searchInput.addEventListener('input', () => {
+            if (searchDebounce) clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(applyFiltersToApi, debounceMs);
+        });
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (searchDebounce) clearTimeout(searchDebounce);
+                applyFiltersToApi();
+            }
+        });
     }
 
     if (statusFilter) {
-        statusFilter.addEventListener('change', filterVehicles);
+        statusFilter.addEventListener('change', applyFiltersToApi);
     }
 
-    if (typeFilter) {
-        typeFilter.addEventListener('change', filterVehicles);
+    if (marcaFilter) {
+        marcaFilter.addEventListener('input', () => {
+            if (searchDebounce) clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(applyFiltersToApi, debounceMs);
+        });
+        marcaFilter.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (searchDebounce) clearTimeout(searchDebounce);
+                applyFiltersToApi();
+            }
+        });
     }
 
     if (applyButton) {
-        applyButton.addEventListener('click', filterVehicles);
+        applyButton.addEventListener('click', applyFiltersToApi);
     }
 
     if (clearButton) {
         clearButton.addEventListener('click', () => {
             if (searchInput) searchInput.value = '';
             if (statusFilter) statusFilter.value = '';
-            if (typeFilter) typeFilter.value = '';
-            filterVehicles();
+            if (marcaFilter) marcaFilter.value = '';
+            loadVehicleData(1);
         });
     }
-
-    // Aplicar filtros inicialmente para garantir consistência
-    filterVehicles();
 }
 
 function loadSelectOptions() {
     // Load tipos de combustível
-    fetch('../api/combustiveis.php', {
+    fetch(sfApiUrl('combustiveis.php'), {
         credentials: 'include'
     })
         .then(response => {
@@ -212,7 +278,7 @@ function loadSelectOptions() {
         });
     
     // Load carrocerias
-    fetch('../api/carrocerias.php', {
+    fetch(sfApiUrl('carrocerias.php'), {
         credentials: 'include'
     })
         .then(response => {
@@ -251,37 +317,79 @@ function loadVehicleData(page = 1) {
     const perPageSelect = document.getElementById('perPageVehicles');
     const perPageFromSelect = perPageSelect ? parseInt(perPageSelect.value, 10) : 10;
     const limit = [5, 10, 25, 50, 100].indexOf(perPageFromSelect) >= 0 ? perPageFromSelect : 10;
-    
-    // Carregar dados dos veículos da API
-    fetch(`../api/vehicle_data.php?action=list&page=${page}&limit=${limit}`)
+
+    const params = new URLSearchParams();
+    params.set('action', 'list');
+    params.set('page', String(page));
+    params.set('limit', String(limit));
+    const search = document.getElementById('searchVehicle')?.value?.trim() || '';
+    if (search) params.set('search', search);
+    const status = document.getElementById('statusFilter')?.value || '';
+    if (status) params.set('status', status);
+    const marca = document.getElementById('marcaFilter')?.value?.trim() || '';
+    if (marca) params.set('marca', marca);
+    params.set('sort', currentVehicleSortField);
+    params.set('dir', currentVehicleSortDir);
+
+    fetch(sfApiUrl('vehicle_data.php?' + params.toString()))
         .then(response => response.json())
         .then(data => {
-            // Atualizar estatísticas dos veículos
-            if (data.summary) {
-                document.getElementById('totalVehicles').textContent = data.summary.totalVehicles || 0;
-                document.getElementById('activeVehicles').textContent = data.summary.statusDistribution?.Ativo || 0;
-                document.getElementById('maintenanceVehicles').textContent = data.summary.statusDistribution?.Manutencao || 0;
+            if (data.error || data.success === false) {
+                const tbody = document.querySelector('#vehiclesTable tbody');
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center">Erro ao carregar veículos</td></tr>';
+                document.getElementById('totalVehicles').textContent = '0';
+                document.getElementById('activeVehicles').textContent = '0';
+                document.getElementById('maintenanceVehicles').textContent = '0';
+                document.getElementById('totalMileage').textContent = '0 km';
+                return;
             }
-            
-            // Atualizar paginação
+
+            if (data.summary) {
+                document.getElementById('totalVehicles').textContent = data.summary.totalVehicles ?? 0;
+                document.getElementById('activeVehicles').textContent = data.summary.activeVehicles ?? 0;
+                document.getElementById('maintenanceVehicles').textContent = data.summary.maintenanceVehicles ?? 0;
+                const km = data.summary.totalMileage ?? 0;
+                document.getElementById('totalMileage').textContent = formatKm(km);
+            }
+
             if (data.pagination) {
-                document.getElementById('currentPage').textContent = data.pagination.page;
-                document.getElementById('totalPages').textContent = data.pagination.totalPages;
-                updatePaginationButtons(data.pagination);
+                const pag = data.pagination;
+                document.getElementById('currentPage').textContent = pag.page;
+                document.getElementById('totalPages').textContent = pag.totalPages || 1;
+                updatePaginationButtons(pag);
                 const urlParams = new URLSearchParams(window.location.search);
-                urlParams.set('page', data.pagination.page);
+                urlParams.set('page', pag.page);
                 urlParams.set('per_page', limit);
-                const isDefault = parseInt(data.pagination.page, 10) === 1 && parseInt(limit, 10) === 10;
-                const desiredSearch = isDefault ? '' : '?' + urlParams.toString();
+                if (document.body.classList.contains('vehicles-modern')) {
+                    urlParams.delete('classic');
+                } else {
+                    urlParams.set('classic', '1');
+                }
+                const sortDefault = currentVehicleSortField === 'placa' && currentVehicleSortDir === 'ASC';
+                if (sortDefault) {
+                    urlParams.delete('sort');
+                    urlParams.delete('dir');
+                } else {
+                    urlParams.set('sort', currentVehicleSortField);
+                    urlParams.set('dir', currentVehicleSortDir);
+                }
+                const isDefault = parseInt(pag.page, 10) === 1 && limit === 10 && !search && !status && !marca && sortDefault;
+                let desiredSearch;
+                if (isDefault && document.body.classList.contains('vehicles-modern')) {
+                    desiredSearch = '';
+                } else if (isDefault) {
+                    desiredSearch = '?classic=1';
+                } else {
+                    desiredSearch = '?' + urlParams.toString();
+                }
                 if (window.location.search !== desiredSearch) {
                     window.history.replaceState({}, '', window.location.pathname + desiredSearch);
                 }
             }
-            
-            // Limpar e preencher a tabela
+
             const tbody = document.querySelector('#vehiclesTable tbody');
             tbody.innerHTML = '';
-            
+
             if (data.data && data.data.length > 0) {
                 data.data.forEach(vehicle => {
                     const row = document.createElement('tr');
@@ -290,7 +398,7 @@ function loadVehicleData(page = 1) {
                         <td>${vehicle.modelo || '-'}</td>
                         <td>${vehicle.marca || '-'}</td>
                         <td>${vehicle.ano || '-'}</td>
-                        <td><span class="status-badge status-${(vehicle.status_nome || 'ativo').toLowerCase()}">${vehicle.status_nome || 'Ativo'}</span></td>
+                        <td><span class="status-badge status-${vehicle.status_id || 1}">${vehicle.status_nome || 'Ativo'}</span></td>
                         <td>${vehicle.cavalo_nome ? 
                             `${vehicle.cavalo_nome} (${vehicle.cavalo_eixos} eixos, ${vehicle.cavalo_tracao})` : 
                             '-'}</td>
@@ -298,7 +406,7 @@ function loadVehicleData(page = 1) {
                             `${vehicle.carreta_nome} (${vehicle.carreta_capacidade} ton)` : 
                             '-'}</td>
                         <td>${formatKm(vehicle.km_atual)}</td>
-                        <td>
+                        <td class="actions">
                             <div class="table-actions">
                                 <button class="btn-icon view-btn" data-id="${vehicle.id}" title="Ver detalhes">
                                     <i class="fas fa-eye"></i>
@@ -319,19 +427,18 @@ function loadVehicleData(page = 1) {
                 row.innerHTML = '<td colspan="9" class="text-center">Nenhum veículo encontrado</td>';
                 tbody.appendChild(row);
             }
-            
-            // Configurar eventos dos botões
+
             setupTableButtons();
+            syncVehicleSortIndicators();
         })
         .catch(error => {
             console.error('Error loading vehicle data:', error);
             const tbody = document.querySelector('#vehiclesTable tbody');
             tbody.innerHTML = '<tr><td colspan="9" class="text-center">Erro ao carregar dados dos veículos</td></tr>';
-            
-            // Zerar contadores
             document.getElementById('totalVehicles').textContent = '0';
             document.getElementById('activeVehicles').textContent = '0';
             document.getElementById('maintenanceVehicles').textContent = '0';
+            document.getElementById('totalMileage').textContent = '0 km';
         });
 }
 
@@ -369,10 +476,9 @@ function showAddVehicleModal() {
     // Set modal title
     document.getElementById('modalTitle').textContent = 'Adicionar Veículo';
     
-    // Show modal
     const modal = document.getElementById('vehicleModal');
     if (modal) {
-        modal.style.display = 'block';
+        modal.classList.add('active');
     }
 }
 
@@ -385,7 +491,7 @@ function showVehicleDetails(vehicleId) {
         return;
     }
 
-    fetch(`../api/vehicle_data.php?action=view&id=${vehicleId}`)
+    fetch(sfApiUrl(`vehicle_data.php?action=view&id=${vehicleId}`))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -495,8 +601,7 @@ function showVehicleDetails(vehicleId) {
                 // Carregar dados de custos automaticamente
                 loadVehicleCosts(vehicleId);
                 
-                // Mostra o modal
-                modal.style.display = 'block';
+                modal.classList.add('active');
             } else {
                 alert('Erro ao carregar dados do veículo');
             }
@@ -508,7 +613,7 @@ function showVehicleDetails(vehicleId) {
 }
 
 function loadMaintenanceHistory(vehicleId) {
-    fetch(`../api/vehicle_data.php?action=maintenance&id=${vehicleId}`, {
+    fetch(sfApiUrl(`vehicle_data.php?action=maintenance&id=${vehicleId}`), {
         credentials: 'include'
     })
     .then(response => {
@@ -556,7 +661,7 @@ function loadMaintenanceHistory(vehicleId) {
 
 function showDeleteConfirmation(vehicleId) {
     // Load vehicle data to show plate in confirmation
-    fetch(`../api/vehicle_data.php?action=view&id=${vehicleId}`, {
+    fetch(sfApiUrl(`vehicle_data.php?action=view&id=${vehicleId}`), {
         credentials: 'include'
     })
     .then(response => {
@@ -572,10 +677,10 @@ function showDeleteConfirmation(vehicleId) {
             throw new Error(data.error || 'Erro ao carregar dados do veículo');
         }
         
-        const vehicle = data.data;
+        const vehicle = data.data.veiculo || data.data;
         
         // Set vehicle plate in confirmation message
-        document.getElementById('deleteVehiclePlate').textContent = vehicle.placa;
+        document.getElementById('deleteVehiclePlate').textContent = vehicle.placa || '-';
         
         // Store vehicle ID in modal for delete action
         document.getElementById('deleteVehicleModal').setAttribute('data-id', vehicleId);
@@ -590,7 +695,7 @@ function showDeleteConfirmation(vehicleId) {
     })
     .catch(error => {
         console.error('Error loading vehicle data:', error);
-        alert('Erro ao carregar dados do veículo: ' + error.message);
+        alert('Erro ao carregar dados do veículo: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message));
     });
 }
 
@@ -599,7 +704,7 @@ function showEditVehicleModal(vehicleId) {
     document.getElementById('modalTitle').textContent = 'Editar Veículo';
     
     // Load vehicle data
-    fetch(`../api/vehicle_data.php?action=view&id=${vehicleId}`)
+    fetch(sfApiUrl(`vehicle_data.php?action=view&id=${vehicleId}`))
         .then(response => response.json())
         .then(data => {
             if (!data.success) {
@@ -638,16 +743,23 @@ function showEditVehicleModal(vehicleId) {
             document.getElementById('carroceria_id').value = vehicle.carroceria_id || '';
             document.getElementById('observacoes').value = vehicle.observacoes || '';
             
-            // Show modal
-            document.getElementById('vehicleModal').style.display = 'block';
+            document.getElementById('vehicleModal').classList.add('active');
         })
         .catch(error => {
             console.error('Error loading vehicle data:', error);
-            alert('Erro ao carregar dados do veículo: ' + error.message);
+            alert('Erro ao carregar dados do veículo: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message));
         });
 }
 
 function saveVehicle() {
+    // Validar placa (Mercosul ou antigo) antes de enviar
+    const placaRaw = (document.getElementById('placa').value || '').trim().toUpperCase();
+    const placa = placaRaw.replace(/[^A-Z0-9]/g, '');
+    if (!validarPlacaFront(placa)) {
+        alert('Placa inválida. Use o formato Mercosul (ex: ABC1D23) ou antigo (ex: ABC1234).');
+        return;
+    }
+
     // Get form data
     const vehicleId = document.getElementById('vehicleId').value;
     const action = vehicleId ? 'update' : 'create';
@@ -729,7 +841,7 @@ function saveVehicle() {
     .catch(error => {
         console.error('Error saving vehicle:', error);
         if (!error.message.includes('Redirecionado')) {
-            alert('Erro ao salvar veículo: ' + error.message);
+            alert('Erro ao salvar veículo: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message));
         }
     });
 }
@@ -738,9 +850,10 @@ function deleteVehicle() {
     const vehicleId = document.getElementById('deleteVehicleModal').getAttribute('data-id');
     
     // Send delete request to API
-    fetch(`../api/vehicle_data.php?action=delete&id=${vehicleId}`, {
+    fetch(sfApiUrl(`vehicle_data.php?action=delete&id=${vehicleId}`), {
         method: 'DELETE',
-        credentials: 'include'
+        credentials: 'include',
+        headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
     })
     .then(response => response.json())
     .then(data => {
@@ -775,6 +888,14 @@ function deleteVehicle() {
 function formatKm(km) {
     if (!km || km === 0) return '0 km';
     return `${parseFloat(km).toLocaleString('pt-BR')} km`;
+}
+
+/** Valida placa: Mercosul (4 letras + 1 número + 1 letra + 2 números) ou antigo (3 letras + 4 números). */
+function validarPlacaFront(placa) {
+    if (!placa || placa.length !== 7) return false;
+    if (/^[A-Z]{4}\d[A-Z]\d{2}$/i.test(placa)) return true;
+    if (/^[A-Z]{3}\d{4}$/i.test(placa)) return true;
+    return false;
 }
 
 function formatDate(dateString) {
@@ -1055,7 +1176,7 @@ function updateURLParameter(param, value) {
 // Função para carregar carretas compatíveis com o cavalo selecionado
 async function loadCompatibleCarretas(cavaloId) {
     try {
-        const response = await fetch(`../api/veiculos.php?action=get_compatible_carretas&cavalo_id=${cavaloId}`);
+        const response = await fetch(sfApiUrl(`veiculos.php?action=get_compatible_carretas&cavalo_id=${cavaloId}`));
         if (!response.ok) throw new Error('Erro ao carregar carretas compatíveis');
         
         const data = await response.json();
@@ -1095,49 +1216,36 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Função para configurar botões de ajuda e exportação
 function setupHelpAndExportButtons() {
-    // Help button
     const helpBtn = document.getElementById('helpBtn');
     if (helpBtn) {
         helpBtn.addEventListener('click', function() {
             const helpModal = document.getElementById('helpVehiclesModal');
             if (helpModal) {
-                helpModal.style.display = 'block';
+                helpModal.classList.add('active');
             }
         });
     }
 
-    // Close modal functionality for help modal
-    document.querySelectorAll('.close-modal').forEach(button => {
-        button.addEventListener('click', function() {
-            const modal = this.closest('.modal');
-            if (modal) {
-                modal.style.display = 'none';
-            }
+    const exportBtn = document.getElementById('exportBtn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', function() {
+            const params = new URLSearchParams();
+            const search = document.getElementById('searchVehicle')?.value?.trim() || '';
+            if (search) params.set('search', search);
+            const status = document.getElementById('statusFilter')?.value || '';
+            if (status) params.set('status', status);
+            const marca = document.getElementById('marcaFilter')?.value?.trim() || '';
+            if (marca) params.set('marca', marca);
+            const q = params.toString();
+            window.location.href = sfApiUrl('vehicle_export.php' + (q ? '?' + q : ''));
         });
-    });
-
-    // Close modal when clicking outside
-    document.querySelectorAll('.modal').forEach(modal => {
-        modal.addEventListener('click', function(event) {
-            if (event.target === this) {
-                this.style.display = 'none';
-            }
-        });
-    });
-}
-
-// Função para fechar modal específico
-function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.style.display = 'none';
     }
 }
 
 function loadVehicleCosts(vehicleId) {
     console.log('Carregando custos para veículo:', vehicleId);
     
-    fetch(`/sistema-frotas/api/vehicle_data.php?action=costs&id=${vehicleId}`, {
+    fetch(sfApiUrl(`vehicle_data.php?action=costs&id=${vehicleId}`), {
         credentials: 'include'
     })
     .then(response => {

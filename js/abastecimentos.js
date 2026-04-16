@@ -1,7 +1,26 @@
 // Lógica dinâmica para o modal de Abastecimento
+(function (g) {
+    if (typeof g.sfApiUrl === 'function') return;
+    g.sfApiUrl = function (rel) {
+        rel = String(rel || '').replace(/^\//, '');
+        var b = typeof g.__SF_API_BASE__ === 'string' && g.__SF_API_BASE__ !== ''
+            ? String(g.__SF_API_BASE__).replace(/\/+$/, '')
+            : '';
+        if (b) return b + '/' + rel;
+        try { return new URL('../api/' + rel, g.location.href).href; }
+        catch (e) { return '../api/' + rel; }
+    };
+})(typeof window !== 'undefined' ? window : this);
 
 var currentFilter = null;
 var refuelingCurrentPage = 1;
+
+if (typeof window.refuelSortField === 'undefined') {
+    window.refuelSortField = 'data_abastecimento';
+}
+if (typeof window.refuelSortDir === 'undefined') {
+    window.refuelSortDir = 'DESC';
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     let filtroData = '';
@@ -36,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function() {
         resetRotas();
         if (filtroData) {
             veiculoSelect.disabled = true;
-            fetch(`../api/refuel_data.php?action=get_veiculos_by_data&data=${filtroData}`)
+            fetch(sfApiUrl(`refuel_data.php?action=get_veiculos_by_data&data=${filtroData}`))
                 .then(r => r.json())
                 .then(res => {
                     if (res.success && res.data.length > 0) {
@@ -58,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
         resetRotas();
         if (filtroData && filtroVeiculo) {
             motoristaSelect.disabled = true;
-            fetch(`../api/refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${filtroVeiculo}&data=${filtroData}`)
+            fetch(sfApiUrl(`refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${filtroVeiculo}&data=${filtroData}`))
                 .then(r => r.json())
                 .then(res => {
                     if (res.success && res.data.length > 0) {
@@ -79,7 +98,7 @@ document.addEventListener('DOMContentLoaded', function() {
         resetRotas();
         if (filtroData && filtroVeiculo && filtroMotorista) {
             rotaSelect.disabled = true;
-            fetch(`../api/refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${filtroVeiculo}&motorista_id=${filtroMotorista}&data=${filtroData}`)
+            fetch(sfApiUrl(`refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${filtroVeiculo}&motorista_id=${filtroMotorista}&data=${filtroData}`))
                 .then(r => r.json())
                 .then(res => {
                     if (res.success && res.data.length > 0) {
@@ -175,6 +194,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (refuelId) {
             formData.append('id', refuelId);
         }
+        if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+            formData.append('csrf_token', window.__SF_CSRF__);
+        }
         
         // Debug: verificar FormData (apenas em caso de erro)
         // console.log('FormData contents:');
@@ -182,10 +204,11 @@ document.addEventListener('DOMContentLoaded', function() {
         //     console.log(key, value);
         // }
 
-        fetch('../api/refuel_actions.php', {
+        fetch(sfApiUrl('refuel_actions.php'), {
             method: 'POST',
             body: formData,
-            credentials: 'include'
+            credentials: 'include',
+            headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
         })
         .then(response => response.json())
         .then(data => {
@@ -214,9 +237,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             console.error('Error saving refuel:', error);
             if (typeof showToast === 'function') {
-                showToast('Erro ao salvar abastecimento: ' + error.message, 'error');
+                showToast('Erro ao salvar abastecimento: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message), 'error');
             } else {
-                alert('Erro ao salvar abastecimento: ' + error.message);
+                alert('Erro ao salvar abastecimento: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message));
             }
         });
     });
@@ -243,7 +266,7 @@ async function preencherCamposEdicao(refuel) {
     const rotaSelect = document.getElementById('rota_id');
 
     // Buscar veículos
-    let res = await fetch(`../api/refuel_data.php?action=get_veiculos_by_data&data=${refuel.data_rota}`);
+    let res = await fetch(sfApiUrl(`refuel_data.php?action=get_veiculos_by_data&data=${refuel.data_rota}`));
     let data = await res.json();
     if (data.success && data.data.length > 0) {
         veiculoSelect.innerHTML = '<option value="">Selecione um veículo</option>' +
@@ -253,7 +276,7 @@ async function preencherCamposEdicao(refuel) {
     }
 
     // Buscar motoristas
-    res = await fetch(`../api/refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${refuel.veiculo_id}&data=${refuel.data_rota}`);
+    res = await fetch(sfApiUrl(`refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${refuel.veiculo_id}&data=${refuel.data_rota}`));
     data = await res.json();
     if (data.success && data.data.length > 0) {
         motoristaSelect.innerHTML = '<option value="">Selecione um motorista</option>' +
@@ -263,7 +286,7 @@ async function preencherCamposEdicao(refuel) {
     }
 
     // Buscar rotas
-    res = await fetch(`../api/refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${refuel.veiculo_id}&motorista_id=${refuel.motorista_id}&data=${refuel.data_rota}`);
+    res = await fetch(sfApiUrl(`refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${refuel.veiculo_id}&motorista_id=${refuel.motorista_id}&data=${refuel.data_rota}`));
     data = await res.json();
     if (data.success && data.data.length > 0) {
         rotaSelect.innerHTML = '<option value="">Selecione a rota</option>' +
@@ -329,7 +352,7 @@ window.openEditRefuelModal = function(refuel) {
         const data = this.value;
         if (!data) return;
         // Buscar veículos disponíveis para a data
-        fetch(`../api/refuel_data.php?action=get_veiculos_by_data&data=${data}`)
+        fetch(sfApiUrl(`refuel_data.php?action=get_veiculos_by_data&data=${data}`))
             .then(response => response.json())
             .then(dataV => {
                 veiculoSelect.innerHTML = '';
@@ -343,7 +366,7 @@ window.openEditRefuelModal = function(refuel) {
         // Buscar motoristas disponíveis para a data e veículo selecionado
         setTimeout(() => {
             const veiculoId = veiculoSelect.value;
-            fetch(`../api/refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${veiculoId}&data=${data}`)
+            fetch(sfApiUrl(`refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${veiculoId}&data=${data}`))
                 .then(response => response.json())
                 .then(dataM => {
                     motoristaSelect.innerHTML = '';
@@ -359,7 +382,7 @@ window.openEditRefuelModal = function(refuel) {
         setTimeout(() => {
             const veiculoId = veiculoSelect.value;
             const motoristaId = motoristaSelect.value;
-            fetch(`../api/refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${veiculoId}&motorista_id=${motoristaId}&data=${data}`)
+            fetch(sfApiUrl(`refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${veiculoId}&motorista_id=${motoristaId}&data=${data}`))
                 .then(response => response.json())
                 .then(dataR => {
                     rotaSelect.innerHTML = '';
@@ -377,6 +400,23 @@ window.openEditRefuelModal = function(refuel) {
     document.getElementById('refuelModal').classList.add('active');
 }
 
+/** Percentual ARLA na listagem: sem agrupador de milhares (evita "1.785,7%"). */
+function formatArlaPercentDisplay(percentual) {
+    const p = Number(percentual);
+    if (!Number.isFinite(p)) return '0%';
+    if (Math.abs(p) >= 100) {
+        return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0, useGrouping: false }).format(Math.round(p)) + '%';
+    }
+    return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1, useGrouping: false }).format(p) + '%';
+}
+
+function formatArlaPercentTitle(percentual) {
+    const p = Number(percentual);
+    if (!Number.isFinite(p)) return '';
+    const s = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4, useGrouping: false }).format(p);
+    return 'Percentual ARLA (litros ARLA ÷ diesel): ' + s + '%';
+}
+
 function loadRefuelingData(page = null) {
     if (page !== null) {
         const parsedPage = parseInt(page, 10);
@@ -392,14 +432,6 @@ function loadRefuelingData(page = null) {
     const perPageSelect = document.getElementById('perPageRefuel');
     const perPageFromSelect = perPageSelect ? parseInt(perPageSelect.value, 10) : 10;
     const limit = [5, 10, 25, 50, 100].indexOf(perPageFromSelect) >= 0 ? perPageFromSelect : 10;
-    const urlParams = new URLSearchParams(window.location.search);
-    urlParams.set('page', refuelingCurrentPage);
-    urlParams.set('per_page', limit);
-    const isDefault = refuelingCurrentPage === 1 && limit === 10;
-    const desiredSearch = isDefault ? '' : '?' + urlParams.toString();
-    if (window.location.search !== desiredSearch) {
-        window.history.replaceState({}, '', window.location.pathname + desiredSearch);
-    }
 
     const searchInput = document.getElementById('searchRefueling');
     const vehicleSelect = document.getElementById('vehicleFilter');
@@ -412,9 +444,42 @@ function loadRefuelingData(page = null) {
     const driverFilter = driverSelect ? driverSelect.value : '';
     const fuelFilter = fuelSelect ? fuelSelect.value : '';
     const paymentFilter = paymentSelect ? paymentSelect.value : '';
+
+    const isModern = document.body.classList.contains('abastecimentos-modern');
+    const hasListFilters = !!(search || vehicleFilter || driverFilter || fuelFilter || paymentFilter || currentFilter);
+    const sortField = (typeof refuelSortField !== 'undefined' && refuelSortField)
+        ? refuelSortField
+        : 'data_abastecimento';
+    const sortDir = (typeof refuelSortDir !== 'undefined' && String(refuelSortDir).toUpperCase() === 'ASC')
+        ? 'ASC'
+        : 'DESC';
+
+    const urlParams = new URLSearchParams();
+    urlParams.set('page', String(refuelingCurrentPage));
+    urlParams.set('per_page', String(limit));
+    if (!isModern) {
+        urlParams.set('classic', '1');
+    }
+    if (sortField !== 'data_abastecimento' || sortDir !== 'DESC') {
+        urlParams.set('sort', sortField);
+        urlParams.set('dir', sortDir);
+    }
+    const isDefault = refuelingCurrentPage === 1 && limit === 10 && !hasListFilters
+        && sortField === 'data_abastecimento' && sortDir === 'DESC';
+    let desiredSearch;
+    if (isDefault && isModern) {
+        desiredSearch = '';
+    } else if (isDefault && !isModern) {
+        desiredSearch = '?classic=1';
+    } else {
+        desiredSearch = '?' + urlParams.toString();
+    }
+    if (window.location.search !== desiredSearch) {
+        window.history.replaceState({}, '', window.location.pathname + desiredSearch);
+    }
     
     // Constrói URL com filtros e paginação (limit = valor do select "Por página")
-    let url = `../api/refuel_data.php?action=list&page=${refuelingCurrentPage}&limit=${limit}`;
+    let url = sfApiUrl(`refuel_data.php?action=list&page=${refuelingCurrentPage}&limit=${limit}`);
     if (search) url += `&search=${encodeURIComponent(search)}`;
     if (currentFilter) {
         const [year, month] = currentFilter.split('-');
@@ -424,7 +489,8 @@ function loadRefuelingData(page = null) {
     if (driverFilter) url += `&motorista=${encodeURIComponent(driverFilter)}`;
     if (fuelFilter) url += `&combustivel=${encodeURIComponent(fuelFilter)}`;
     if (paymentFilter) url += `&pagamento=${encodeURIComponent(paymentFilter)}`;
-    
+    url += `&sort=${encodeURIComponent(sortField)}&dir=${encodeURIComponent(sortDir)}`;
+
     console.log('Carregando dados dos abastecimentos:', url);
     
     // Carrega dados dos abastecimentos
@@ -437,11 +503,28 @@ function loadRefuelingData(page = null) {
                 if (data.pagination) {
                     refuelingCurrentPage = data.pagination.page || refuelingCurrentPage;
                     updatePagination(data.pagination);
-                    const updatedParams = new URLSearchParams(window.location.search);
-                    updatedParams.set('page', refuelingCurrentPage);
-                    updatedParams.set('per_page', limit);
-                    const isDefaultAbast = refuelingCurrentPage === 1 && limit === 10;
-                    const desiredSearchAbast = isDefaultAbast ? '' : '?' + updatedParams.toString();
+                    const isModernAb = document.body.classList.contains('abastecimentos-modern');
+                    const hasListFiltersAb = !!(search || vehicleFilter || driverFilter || fuelFilter || paymentFilter || currentFilter);
+                    const updatedParams = new URLSearchParams();
+                    updatedParams.set('page', String(refuelingCurrentPage));
+                    updatedParams.set('per_page', String(limit));
+                    if (!isModernAb) {
+                        updatedParams.set('classic', '1');
+                    }
+                    if (sortField !== 'data_abastecimento' || sortDir !== 'DESC') {
+                        updatedParams.set('sort', sortField);
+                        updatedParams.set('dir', sortDir);
+                    }
+                    const isDefaultAbast = refuelingCurrentPage === 1 && limit === 10 && !hasListFiltersAb
+                        && sortField === 'data_abastecimento' && sortDir === 'DESC';
+                    let desiredSearchAbast;
+                    if (isDefaultAbast && isModernAb) {
+                        desiredSearchAbast = '';
+                    } else if (isDefaultAbast && !isModernAb) {
+                        desiredSearchAbast = '?classic=1';
+                    } else {
+                        desiredSearchAbast = '?' + updatedParams.toString();
+                    }
                     if (window.location.search !== desiredSearchAbast) {
                         window.history.replaceState({}, '', window.location.pathname + desiredSearchAbast);
                     }
@@ -452,7 +535,7 @@ function loadRefuelingData(page = null) {
         })
         .catch(error => {
             console.error('Error loading refueling data:', error);
-            alert('Erro ao carregar dados dos abastecimentos: ' + error.message);
+            alert('Erro ao carregar dados dos abastecimentos: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message));
         });
 }
 
@@ -465,7 +548,7 @@ function updatePagination(pagination) {
     const current = Math.min(Math.max(1, pagination.page || 1), totalPages);
     refuelingCurrentPage = current;
 
-    const paginationContainer = document.querySelector('.pagination');
+    const paginationContainer = document.getElementById('paginationRefuelContainer') || document.querySelector('.pagination');
     if (!paginationContainer) return;
     
     const prevBtn = paginationContainer.querySelector('a:first-child');
@@ -485,10 +568,31 @@ function updatePagination(pagination) {
     const prevPage = Math.max(1, current - 1);
     const nextPageValue = Math.min(totalPages, current + 1);
     
+    const abastModern = document.body.classList.contains('abastecimentos-modern');
+    const sortFieldPg = (typeof refuelSortField !== 'undefined' && refuelSortField)
+        ? refuelSortField
+        : 'data_abastecimento';
+    const sortDirPg = (typeof refuelSortDir !== 'undefined' && String(refuelSortDir).toUpperCase() === 'ASC')
+        ? 'ASC'
+        : 'DESC';
+    function refuelPaginationHref(pageNum) {
+        const p = new URLSearchParams();
+        p.set('page', String(pageNum));
+        p.set('per_page', String(perPageParam));
+        if (!abastModern) {
+            p.set('classic', '1');
+        }
+        if (sortFieldPg !== 'data_abastecimento' || sortDirPg !== 'DESC') {
+            p.set('sort', sortFieldPg);
+            p.set('dir', sortDirPg);
+        }
+        return '?' + p.toString();
+    }
+
     if (prevBtn) {
         const isDisabled = current <= 1;
         prevBtn.classList.toggle('disabled', isDisabled);
-        prevBtn.href = `?page=${prevPage}&per_page=${perPageParam}`;
+        prevBtn.href = refuelPaginationHref(prevPage);
         prevBtn.onclick = function(event) {
             event.preventDefault();
             if (isDisabled) return;
@@ -499,7 +603,7 @@ function updatePagination(pagination) {
     if (nextBtn) {
         const isDisabled = current >= totalPages;
         nextBtn.classList.toggle('disabled', isDisabled);
-        nextBtn.href = `?page=${nextPageValue}&per_page=${perPageParam}`;
+        nextBtn.href = refuelPaginationHref(nextPageValue);
         nextBtn.onclick = function(event) {
             event.preventDefault();
             if (isDisabled) return;
@@ -510,7 +614,15 @@ function updatePagination(pagination) {
 
 function updateRefuelingsTable(refuelings) {
     console.log('Atualizando tabela com:', refuelings);
-    const tbody = document.querySelector('.data-table tbody');
+    const tbody =
+        document.getElementById('refuelingTableBody') ||
+        document.querySelector('#refuelingTable tbody') ||
+        document.querySelector('table.fornc-table tbody') ||
+        document.querySelector('table.data-table tbody');
+    if (!tbody) {
+        console.error('updateRefuelingsTable: tbody da lista de abastecimentos não encontrado');
+        return;
+    }
     tbody.innerHTML = '';
     
     if (refuelings && refuelings.length > 0) {
@@ -543,7 +655,7 @@ function updateRefuelingsTable(refuelings) {
                 <td>${formatNumber(refuel.litros, 3)} L</td>
                 <td>R$ ${formatNumber(refuel.valor_litro, 2)}</td>
                 <td>R$ ${formatNumber(valorTotalAbastecimento, 2)}</td>
-                <td>
+                <td class="col-arla">
                     ${refuel.inclui_arla == 1 ? 
                         (() => {
                             const percentual = refuel.litros > 0 ? (refuel.litros_arla / refuel.litros) * 100 : 0;
@@ -555,9 +667,8 @@ function updateRefuelingsTable(refuelings) {
                             } else {
                                 classePercentual = 'percentual-baixo';
                             }
-                            return `<span class="percentual-arla ${classePercentual}">
-                                ${formatNumber(percentual, 1)}%
-                            </span>`;
+                            const titleAttr = formatArlaPercentTitle(percentual).replace(/"/g, '&quot;');
+                            return `<span class="percentual-arla ${classePercentual}" title="${titleAttr}">${formatArlaPercentDisplay(percentual)}</span>`;
                         })() : 
                         '<span class="text-muted">-</span>'
                     }
@@ -762,7 +873,7 @@ function showEditRefuelModal(id) {
     document.getElementById('refuelForm').reset();
     
     // Busca os dados do abastecimento
-    fetch(`../api/refuel_data.php?action=get&id=${id}`)
+    fetch(sfApiUrl(`refuel_data.php?action=get&id=${id}`))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -903,11 +1014,16 @@ function handleRefuelSubmit(e) {
     
     // Adiciona a ação
     formData.append('action', refuelId ? 'edit' : 'add');
+    if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+        formData.append('csrf_token', window.__SF_CSRF__);
+    }
     
     // Envia o formulário
-    fetch('../api/refuel_actions.php', {
+    fetch(sfApiUrl('refuel_actions.php'), {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include',
+        headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
     })
     .then(response => response.json())
     .then(data => {
@@ -996,7 +1112,7 @@ function setupTableButtons() {
 }
 
 function loadConsumptionChart() {
-    let url = '../api/refuel_data.php?action=consumption_chart';
+    let url = sfApiUrl('refuel_data.php?action=consumption_chart');
     
     if (currentFilter) {
         const [year, month] = currentFilter.split('-');
@@ -1083,7 +1199,7 @@ function loadConsumptionChart() {
 }
 
 function loadEfficiencyChart() {
-    let url = '../api/rendimento_veiculo.php';
+    let url = sfApiUrl('rendimento_veiculo.php');
     
     if (currentFilter) {
         const [year, month] = currentFilter.split('-');
@@ -1168,7 +1284,7 @@ function loadEfficiencyChart() {
 }
 
 function loadAnomaliesChart() {
-    let url = '../api/refuel_data.php?action=anomalies_chart';
+    let url = sfApiUrl('refuel_data.php?action=anomalies_chart');
     
     if (currentFilter) {
         const [year, month] = currentFilter.split('-');
@@ -1301,7 +1417,7 @@ function loadAnomaliesChart() {
 }
 
 function loadDriverConsumptionChart() {
-    let url = '../api/refuel_data.php?action=driver_consumption_chart';
+    let url = sfApiUrl('refuel_data.php?action=driver_consumption_chart');
     
     if (currentFilter) {
         const [year, month] = currentFilter.split('-');
@@ -1390,7 +1506,7 @@ function loadDriverConsumptionChart() {
 }
 
 function loadVehicleEfficiencyChart() {
-    let url = '../api/refuel_data.php?action=vehicle_efficiency_chart';
+    let url = sfApiUrl('refuel_data.php?action=vehicle_efficiency_chart');
     
     if (currentFilter) {
         const [year, month] = currentFilter.split('-');
@@ -1483,7 +1599,7 @@ function loadVehicleEfficiencyChart() {
 }
 
 function loadMonthlyCostChart() {
-    let url = '../api/refuel_data.php?action=monthly_cost_chart';
+    let url = sfApiUrl('refuel_data.php?action=monthly_cost_chart');
     
     if (currentFilter) {
         const [year, month] = currentFilter.split('-');
@@ -1649,6 +1765,17 @@ function setupFilters() {
 
 // Atualiza a função initializePage para garantir que os gráficos sejam carregados corretamente
 function initializePage() {
+    const upInit = new URLSearchParams(window.location.search);
+    if (upInit.has('sort')) {
+        refuelSortField = upInit.get('sort') || refuelSortField;
+    }
+    if (upInit.has('dir')) {
+        refuelSortDir = (upInit.get('dir') || '').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    }
+    if (typeof syncRefuelSortIndicators === 'function') {
+        syncRefuelSortIndicators();
+    }
+
     // Load refuel data from API
     loadRefuelingData();
     
@@ -1720,13 +1847,18 @@ function initializePage() {
             loadRefuelingData(1);
         });
     }
+
+    const perPageRefuelEl = document.getElementById('perPageRefuel');
+    if (perPageRefuelEl && document.body.classList.contains('abastecimentos-modern')) {
+        perPageRefuelEl.addEventListener('change', () => loadRefuelingData(1));
+    }
     
     // Setup table buttons
     setupTableButtons();
 }
 
 function loadFilterOptions() {
-    fetch('../api/refuel_data.php?action=filter_options', { credentials: 'include' })
+    fetch(sfApiUrl('refuel_data.php?action=filter_options'), { credentials: 'include' })
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
@@ -1774,7 +1906,7 @@ function loadFilterOptions() {
 }
 
 function carregarMotoristas(veiculoId, data) {
-    return fetch(`../api/refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${veiculoId}&data=${data}`)
+    return fetch(sfApiUrl(`refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${veiculoId}&data=${data}`))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -1786,7 +1918,7 @@ function carregarMotoristas(veiculoId, data) {
 }
 
 function carregarFormasPagamento() {
-    fetch('../api/formas_pagamento.php?action=list')
+    fetch(sfApiUrl('formas_pagamento.php?action=list'))
         .then(response => response.json())
         .then(data => {
             // data é um array simples
@@ -1802,7 +1934,7 @@ function carregarFormasPagamento() {
 }
 
 function carregarRotasPorAbastecimento(refuel) {
-    return fetch(`../api/refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${refuel.veiculo_id}&motorista_id=${refuel.motorista_id}&data=${refuel.data_rota}`)
+    return fetch(sfApiUrl(`refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${refuel.veiculo_id}&motorista_id=${refuel.motorista_id}&data=${refuel.data_rota}`))
         .then(response => response.json())
         .then(data => {
             if (data.success) {

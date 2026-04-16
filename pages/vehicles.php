@@ -8,6 +8,7 @@ if (!empty($_GET['debug']) && $_GET['debug'] === '1') {
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/sf_api_base.php';
 
 // Configure session before starting it
 configure_session();
@@ -27,115 +28,18 @@ if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
     $per_page = 10;
 }
 
-// Inicializar variáveis de estatísticas
-$total_veiculos = 0;
-$veiculos_ativos = 0;
-$veiculos_manutencao = 0;
-$quilometragem_total = 0;
+// Layout moderno por padrão (como rotas / fornecedores_moderno); ?classic=1 para o anterior
+$is_modern = !isset($_GET['classic']) || (string)$_GET['classic'] !== '1';
 
 // Função para formatar quilometragem
-function formatKm($km) {
+function formatKmVehicles($km) {
     if ($km === null) return '0 km';
     return number_format($km, 0, ',', '.') . ' km';
 }
 
-// Função para buscar veículos e estatísticas do banco de dados
-function getVehicles($page = 1, $limit = 10) {
-    global $total_veiculos, $veiculos_ativos, $veiculos_manutencao, $quilometragem_total;
-    
-    $page = max(1, (int)$page);
-    
-    try {
-        $conn = getConnection();
-        $empresa_id = $_SESSION['empresa_id'];
-        
-        // Primeiro busca as estatísticas totais
-        $sqlStats = "SELECT 
-            COUNT(*) as total_veiculos,
-            SUM(CASE WHEN status_id = 1 THEN 1 ELSE 0 END) as veiculos_ativos,
-            SUM(CASE WHEN status_id = 2 THEN 1 ELSE 0 END) as veiculos_manutencao,
-            SUM(COALESCE(km_atual, 0)) as quilometragem_total
-            FROM veiculos 
-            WHERE empresa_id = :empresa_id";
-            
-        $stmtStats = $conn->prepare($sqlStats);
-        $stmtStats->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        $stmtStats->execute();
-        $stats = $stmtStats->fetch(PDO::FETCH_ASSOC);
-        
-        // Atualiza as variáveis globais
-        $total_veiculos = $stats['total_veiculos'] ?? 0;
-        $veiculos_ativos = $stats['veiculos_ativos'] ?? 0;
-        $veiculos_manutencao = $stats['veiculos_manutencao'] ?? 0;
-        $quilometragem_total = $stats['quilometragem_total'] ?? 0;
-        
-        // Valida limit (5, 10, 25, 50, 100)
-        if (!in_array($limit, [5, 10, 25, 50, 100], true)) {
-            $limit = 10;
-        }
-        // Calcula o offset para a paginação
-        $offset = ($page - 1) * $limit;
-        
-        // Depois busca os veículos com paginação
-        $sql = "SELECT v.*, 
-    s.nome as status_nome,
-    tc.nome as tipo_combustivel_nome,
-    cr.nome as carroceria_nome,
-    cavalo.nome as cavalo_nome,
-    cavalo.eixos as cavalo_eixos,
-    cavalo.tracao as cavalo_tracao,
-    carreta.nome as carreta_nome,
-    carreta.capacidade_media as carreta_capacidade
-FROM veiculos v
-LEFT JOIN status_veiculos s ON v.status_id = s.id
-LEFT JOIN tipos_combustivel tc ON v.tipo_combustivel_id = tc.id
-LEFT JOIN carrocerias cr ON v.carroceria_id = cr.id
-LEFT JOIN tipos_cavalos cavalo ON v.id_cavalo = cavalo.id
-LEFT JOIN tipos_carretas carreta ON v.id_carreta = carreta.id
-WHERE v.empresa_id = :empresa_id 
-ORDER BY v.id DESC 
-LIMIT :limit OFFSET :offset";
-        
-        $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindParam(':offset', $offset, PDO::PARAM_INT);
-        $stmt->execute();
-        
-        $veiculos = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Calcula o total de páginas
-        $total_pages = ceil($total_veiculos / $limit);
-        
-        return [
-            'veiculos' => $veiculos,
-            'total_pages' => $total_pages,
-            'current_page' => $page
-        ];
-    } catch (Throwable $e) {
-        error_log("Erro ao buscar veículos: " . $e->getMessage());
-        return [
-            'veiculos' => [],
-            'total_pages' => 1,
-            'current_page' => 1
-        ];
-    }
-}
+// Lista e KPIs vêm da API (vehicles.js loadVehicleData). Não buscar veículos no PHP.
+$current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 
-// Pegar a página atual da URL ou definir como 1 (garantir int para operações)
-$current_page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$current_page = max(1, $current_page);
-
-// Buscar os veículos com paginação
-try {
-    $result = getVehicles($current_page, $per_page);
-    $veiculos = $result['veiculos'] ?? [];
-    $total_pages = max(1, (int)($result['total_pages'] ?? 1));
-} catch (Throwable $e) {
-    error_log('vehicles.php getVehicles: ' . $e->getMessage());
-    $veiculos = [];
-    $total_pages = 1;
-}
 ?>
 
 <!DOCTYPE html>
@@ -150,6 +54,9 @@ try {
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
@@ -312,9 +219,40 @@ try {
             grid-template-columns: 1fr;
         }
     }
+
+    /* Modo moderno: usa ../css/fornc-modern-page.css (fornecedores_moderno) — só ajustes locais */
+    body.vehicles-modern .dashboard-content.fornc-page {
+        padding-top: 8px;
+    }
+    body.vehicles-modern .dashboard-header {
+        display: none;
+    }
+    body.vehicles-modern .fornc-page .vehicles-table-wrap {
+        max-height: min(70vh, 560px);
+    }
+    body.vehicles-modern .fornc-page .vehicles-table-wrap .fornc-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: var(--forn-table-head);
+        box-shadow: 0 1px 0 var(--border-color);
+    }
+    @media (max-width: 767px) {
+        body.vehicles-modern .fornc-page .vehicles-table-wrap .fornc-table th:not(:first-child):not(:last-child),
+        body.vehicles-modern .fornc-page .vehicles-table-wrap .fornc-table td:not(:first-child):not(:last-child) {
+            display: table-cell !important;
+        }
+    }
+    body.vehicles-modern .fornc-page .vehicles-table-wrap #vehiclesTable {
+        min-width: 900px;
+        table-layout: auto;
+    }
+    body.vehicles-modern .fornc-modal .form-group.full-width {
+        grid-column: 1 / -1;
+    }
     </style>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'vehicles-modern' : ''; ?>">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
@@ -325,7 +263,8 @@ try {
             <?php include '../includes/header.php'; ?>
             
             <!-- Page Content -->
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' vehicles-modern-page fornc-page' : ''; ?>">
+                <?php if (!$is_modern): ?>
                 <div class="dashboard-header">
                     <h1>Veículos</h1>
                     <div class="dashboard-actions">
@@ -345,8 +284,17 @@ try {
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 
-                <!-- KPI Cards Row -->
+                <!-- KPIs (moderno: mesma faixa compacta que fornecedores_moderno) -->
+                <?php if ($is_modern): ?>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Total</span><span class="val" id="totalVehicles">0</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Ativos</span><span class="val" id="activeVehicles">0</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Em manutenção</span><span class="val" id="maintenanceVehicles">0</span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Quilometragem</span><span class="val" id="totalMileage">0 km</span></div>
+                </div>
+                <?php else: ?>
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
@@ -354,50 +302,93 @@ try {
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="totalVehicles"><?php echo $total_veiculos; ?></span>
+                                <span class="metric-value" id="totalVehicles">0</span>
                                 <span class="metric-subtitle">Veículos cadastrados</span>
                             </div>
                         </div>
                     </div>
-                    
                     <div class="dashboard-card">
                         <div class="card-header">
                             <h3>Veículos Ativos</h3>
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="activeVehicles"><?php echo $veiculos_ativos; ?></span>
+                                <span class="metric-value" id="activeVehicles">0</span>
                                 <span class="metric-subtitle">Em operação</span>
                             </div>
                         </div>
                     </div>
-                    
                     <div class="dashboard-card">
                         <div class="card-header">
                             <h3>Em Manutenção</h3>
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="maintenanceVehicles"><?php echo $veiculos_manutencao; ?></span>
+                                <span class="metric-value" id="maintenanceVehicles">0</span>
                                 <span class="metric-subtitle">Neste mês</span>
                             </div>
                         </div>
                     </div>
-                    
                     <div class="dashboard-card">
                         <div class="card-header">
                             <h3>Quilometragem Total</h3>
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="totalMileage"><?php echo formatKm($quilometragem_total); ?></span>
+                                <span class="metric-value" id="totalMileage">0 km</span>
                                 <span class="metric-subtitle">Percorridos</span>
                             </div>
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 
-                <!-- Search and Filter (div para não aninhar form "Por página") -->
+                <?php if ($is_modern): ?>
+                <div class="fornc-toolbar" id="vehicleFilterForm">
+                    <div class="fornc-search-block">
+                        <label for="searchVehicle">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" id="searchVehicle" placeholder="Placa, modelo, marca..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="fornc-filters-inline">
+                        <div class="fg">
+                            <label for="statusFilter">Status</label>
+                            <select id="statusFilter" title="Status do veículo">
+                                <option value="">Todos</option>
+                                <option value="1">Ativo</option>
+                                <option value="2">Em Manutenção</option>
+                                <option value="3">Inativo</option>
+                            </select>
+                        </div>
+                        <div class="fg">
+                            <label for="marcaFilter">Marca</label>
+                            <input type="text" id="marcaFilter" placeholder="Filtrar" title="Filtrar por marca">
+                        </div>
+                        <div class="fg">
+                            <label for="perPageVehicles">Por página</label>
+                            <form method="get" action="" id="formPerPageVehicles" style="margin:0;">
+                                <select id="perPageVehicles" name="per_page" class="filter-per-page" title="Registros por página">
+                                    <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                    <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                    <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                    <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                    <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                                </select>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="fornc-btn-row">
+                        <button type="button" id="addVehicleBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Novo</button>
+                        <button type="button" class="fornc-btn fornc-btn--accent" id="applyVehicleFilters" title="Aplicar filtros"><i class="fas fa-search"></i> Pesquisar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn" title="Filtros"><i class="fas fa-sliders-h"></i> Opções</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="clearVehicleFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
+                        <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar"><i class="fas fa-file-export"></i> Exportar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="filter-section" id="vehicleFilterForm">
                     <div class="search-box">
                         <input type="text" id="searchVehicle" placeholder="Buscar veículo, placa ou motorista...">
@@ -406,8 +397,8 @@ try {
                     <div class="filter-options">
                         <form method="get" action="" id="formPerPageVehicles" style="display:inline-flex; align-items:center; gap:0.5rem;">
                             <span class="filter-label">Por página</span>
-                            <input type="hidden" name="page" value="1">
-                            <select id="perPageVehicles" name="per_page" class="filter-per-page" title="Registros por página" onchange="this.form.submit()">
+                            <input type="hidden" name="classic" value="1">
+                            <select id="perPageVehicles" name="per_page" class="filter-per-page" title="Registros por página">
                                 <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
                                 <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
                                 <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
@@ -417,17 +408,12 @@ try {
                         </form>
                         <select id="statusFilter" title="Status do veículo">
                             <option value="">Todos os status</option>
-                            <option value="Ativo">Ativo</option>
-                            <option value="Manutenção">Em Manutenção</option>
-                            <option value="Inativo">Inativo</option>
+                            <option value="1">Ativo</option>
+                            <option value="2">Em Manutenção</option>
+                            <option value="3">Inativo</option>
                         </select>
                         
-                        <select id="typeFilter" title="Tipo / Modelo">
-                            <option value="">Todos os tipos</option>
-                            <option value="Mercedes">Mercedes-Benz</option>
-                            <option value="Volvo">Volvo</option>
-                            <option value="Scania">Scania</option>
-                        </select>
+                        <input type="text" id="marcaFilter" placeholder="Marca" title="Filtrar por marca" style="max-width:140px; padding:6px 10px; border:1px solid var(--border-color); border-radius:4px; background:var(--bg-secondary); color:var(--text-color); font-size:0.9rem;">
 
                         <button type="button" class="btn-restore-layout" id="applyVehicleFilters" title="Aplicar filtros">
                             <i class="fas fa-filter"></i>
@@ -437,12 +423,23 @@ try {
                         </button>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- Vehicles List Table -->
-                <div class="data-table-container">
-                    <table class="data-table" id="vehiclesTable">
+                <div class="<?php echo $is_modern ? 'vehicles-table-wrap fornc-table-wrap' : 'data-table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="vehiclesTable">
                         <thead>
                             <tr>
+                                <?php if (!empty($is_modern)): ?>
+                                <th class="sortable sorted" data-sort="placa">Placa <span class="sort-ind">▲</span></th>
+                                <th class="sortable" data-sort="modelo">Modelo <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="marca">Marca <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="ano">Ano <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="status_nome">Status <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="cavalo_nome">Cavalo <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="carreta_nome">Carreta <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="km_atual">Quilometragem <span class="sort-ind">⇅</span></th>
+                                <?php else: ?>
                                 <th>Placa</th>
                                 <th>Modelo</th>
                                 <th>Marca</th>
@@ -451,74 +448,25 @@ try {
                                 <th>Cavalo</th>
                                 <th>Carreta</th>
                                 <th>Quilometragem</th>
+                                <?php endif; ?>
                                 <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if (!empty($veiculos)): ?>
-                                <?php foreach ($veiculos as $veiculo): ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($veiculo['placa']); ?></td>
-                                    <td><?php echo htmlspecialchars($veiculo['modelo']); ?></td>
-                                    <td><?php echo htmlspecialchars($veiculo['marca']); ?></td>
-                                    <td><?php echo htmlspecialchars($veiculo['ano']); ?></td>
-                                    <td><span class="status-badge"><?php echo htmlspecialchars($veiculo['status_nome']); ?></span></td>
-                                    <td>
-                                        <?php if ($veiculo['cavalo_nome']): ?>
-                                            <?php echo htmlspecialchars($veiculo['cavalo_nome']); ?>
-                                            <small>(<?php echo $veiculo['cavalo_eixos']; ?> eixos, <?php echo $veiculo['cavalo_tracao']; ?>)</small>
-                                        <?php else: ?>
-                                            -
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <?php if ($veiculo['carreta_nome']): ?>
-                                            <?php echo htmlspecialchars($veiculo['carreta_nome']); ?>
-                                            <small>(<?php echo $veiculo['carreta_capacidade']; ?> ton)</small>
-                                        <?php else: ?>
-                                            -
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?php echo formatKm($veiculo['km_atual']); ?></td>
-                                    <td>
-                                        <div class="table-actions">
-                                            <button class="btn-icon view-btn" data-id="<?php echo $veiculo['id']; ?>" title="Ver detalhes">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                            <button class="btn-icon edit-btn" data-id="<?php echo $veiculo['id']; ?>" title="Editar">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                            <button class="btn-icon delete-btn" data-id="<?php echo $veiculo['id']; ?>" title="Excluir">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="9" class="text-center">Nenhum veículo encontrado</td>
-                                </tr>
-                            <?php endif; ?>
+                            <tr>
+                                <td colspan="9" class="text-center" id="vehiclesTableLoading">Carregando...</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
 
                 <!-- Pagination -->
-                <?php
-                $current_page_int = (int)$current_page;
-                $total_pages_int = (int)$total_pages;
-                ?>
                 <div class="pagination" id="vehiclesPagination" data-per-page="<?php echo (int)$per_page; ?>">
-                    <a href="?page=<?php echo max(1, $current_page_int - 1); ?>&per_page=<?php echo (int)$per_page; ?>" class="pagination-btn <?php echo $current_page_int <= 1 ? 'disabled' : ''; ?>" id="prevPageBtn">
-                        <i class="fas fa-chevron-left"></i>
-                    </a>
+                    <a href="#" class="pagination-btn" id="prevPageBtn"><i class="fas fa-chevron-left"></i></a>
                     <span class="pagination-info" id="paginationInfo">
-                        Página <span id="currentPage"><?php echo $current_page_int; ?></span> de <span id="totalPages"><?php echo $total_pages_int; ?></span> (<?php echo (int)$total_veiculos; ?> registros)
+                        Página <span id="currentPage">1</span> de <span id="totalPages">1</span> (0 registros)
                     </span>
-                    <a href="?page=<?php echo min($total_pages_int, $current_page_int + 1); ?>&per_page=<?php echo (int)$per_page; ?>" class="pagination-btn <?php echo $current_page_int >= $total_pages_int ? 'disabled' : ''; ?>" id="nextPageBtn">
-                        <i class="fas fa-chevron-right"></i>
-                    </a>
+                    <a href="#" class="pagination-btn" id="nextPageBtn"><i class="fas fa-chevron-right"></i></a>
                 </div>
                 
                 <!-- Vehicle Analytics -->
@@ -557,8 +505,8 @@ try {
     </div>
     
     <!-- Add/Edit Vehicle Modal -->
-    <div class="modal" id="vehicleModal">
-        <div class="modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="vehicleModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg' : ''; ?>">
             <div class="modal-header">
                 <h2 id="modalTitle">Adicionar Veículo</h2>
                 <span class="close-modal">&times;</span>
@@ -569,13 +517,13 @@ try {
                     
                     <div class="form-grid">
                         <div class="form-group">
-                            <label for="placa">Placa*</label>
-                            <input type="text" id="placa" name="placa" required>
+                            <label for="placa">Placa *</label>
+                            <input type="text" id="placa" name="placa" required placeholder="Ex: ABC1D23">
                         </div>
                         
                         <div class="form-group">
-                            <label for="modelo">Modelo*</label>
-                            <input type="text" id="modelo" name="modelo" required>
+                            <label for="modelo">Modelo</label>
+                            <input type="text" id="modelo" name="modelo" placeholder="Ex: 1318">
                         </div>
                         
                         <div class="form-group">
@@ -584,8 +532,8 @@ try {
                         </div>
                         
                         <div class="form-group">
-                            <label for="ano">Ano*</label>
-                            <input type="number" id="ano" name="ano" min="1990" max="2050" required>
+                            <label for="ano">Ano</label>
+                            <input type="number" id="ano" name="ano" min="1990" max="2050" placeholder="Ex: 2020">
                         </div>
                         
                         <div class="form-group">
@@ -603,8 +551,8 @@ try {
                         </div>
                         
                         <div class="form-group">
-                            <label for="id_cavalo">Tipo de Cavalo*</label>
-                            <select id="id_cavalo" name="id_cavalo" required>
+                            <label for="id_cavalo">Tipo de Cavalo</label>
+                            <select id="id_cavalo" name="id_cavalo">
                                 <option value="">Selecione um tipo de cavalo</option>
                                 <?php
                                 try {
@@ -729,8 +677,8 @@ try {
     </div>
     
     <!-- View Vehicle Details Modal -->
-    <div class="modal" id="viewVehicleModal">
-        <div class="modal-content" style="max-width: 900px;">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="viewVehicleModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>"<?php echo !$is_modern ? ' style="max-width: 900px;"' : ''; ?>>
             <div class="modal-header">
                 <h2 id="viewModalTitle">Detalhes do Veículo</h2>
                 <span class="close-modal close-view-modal">&times;</span>
@@ -825,7 +773,7 @@ try {
     </div>
     
     <!-- Delete Confirmation Modal -->
-    <div class="modal" id="deleteVehicleModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="deleteVehicleModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Confirmar Exclusão</h2>
@@ -843,7 +791,7 @@ try {
     </div>
     
     <!-- Modal de Ajuda -->
-    <div class="modal" id="helpVehiclesModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpVehiclesModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Ajuda - Gestão de Veículos</h2>
@@ -900,14 +848,14 @@ try {
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeModal('helpVehiclesModal')">Fechar</button>
+                <button type="button" class="btn-secondary" onclick="closeModalById('helpVehiclesModal')">Fechar</button>
             </div>
         </div>
     </div>
     
     <!-- Modal para exibir foto do veículo -->
-    <div class="modal" id="fotoVeiculoModal" style="display:none;">
-        <div class="modal-content" style="max-width: 600px;">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="fotoVeiculoModal" style="display:none;">
+        <div class="modal-content<?php echo $is_modern ? ' fornc-modal--photo' : ''; ?>"<?php echo !$is_modern ? ' style="max-width: 600px;"' : ''; ?>>
             <div class="modal-header">
                 <h2>Foto do Veículo</h2>
                 <span class="close-modal" id="closeFotoVeiculoModal">&times;</span>
@@ -919,6 +867,7 @@ try {
     </div>
     
     <!-- JavaScript Files -->
+    <?php sf_render_api_scripts(); ?>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <script src="../js/vehicles.js"></script>
@@ -962,5 +911,7 @@ try {
         }
     });
     </script>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html>

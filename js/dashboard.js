@@ -1,6 +1,21 @@
 /**
  * Dashboard UI and functionality
  */
+(function (g) {
+    g.sfApiUrl = g.sfApiUrl || function (rel) {
+        rel = String(rel || '').replace(/^\//, '');
+        var b = typeof g.__SF_API_BASE__ === 'string' && g.__SF_API_BASE__ !== ''
+            ? String(g.__SF_API_BASE__).replace(/\/+$/, '')
+            : '';
+        if (b) return b + '/' + rel;
+        try { return new URL('../api/' + rel, g.location.href).href; }
+        catch (e) { return '../api/' + rel; }
+    };
+    g.sfAppBase = g.sfAppBase || function () {
+        var b = typeof g.__SF_APP_BASE__ === 'string' ? String(g.__SF_APP_BASE__).replace(/\/+$/, '') : '';
+        return b;
+    };
+})(typeof window !== 'undefined' ? window : this);
 
 // Array global para armazenar requisições AJAX ativas
 window.activeAjaxRequests = [];
@@ -72,29 +87,26 @@ function initDashboard() {
                 saveCurrentLayout();
             }
         });
-    }
-    
-    // Load saved layout
-    const savedLayout = localStorage.getItem('dashboardLayout');
-    if (savedLayout) {
-        try {
-            const layout = JSON.parse(savedLayout);
-            // Apply saved layout
-            layout.forEach(item => {
-                const card = document.querySelector(`[data-card-id="${item.id}"]`);
-                if (card) {
-                    dashboardGrid.appendChild(card);
-                }
-            });
-        } catch (error) {
-            console.error('Error loading saved layout:', error);
+
+        const savedLayout = localStorage.getItem('dashboardLayout');
+        if (savedLayout) {
+            try {
+                const layout = JSON.parse(savedLayout);
+                layout.forEach(item => {
+                    const card = document.querySelector(`[data-card-id="${item.id}"]`);
+                    if (card) {
+                        dashboardGrid.appendChild(card);
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading saved layout:', error);
+            }
         }
-    }
-    
-    // Load compact layout preference
-    const compactLayout = localStorage.getItem('dashboardCompactLayout');
-    if (compactLayout === 'true') {
-        dashboardGrid.classList.add('compact-layout');
+
+        const compactLayout = localStorage.getItem('dashboardCompactLayout');
+        if (compactLayout === 'true') {
+            dashboardGrid.classList.add('compact-layout');
+        }
     }
     
     // Dashboard card hover effects
@@ -146,7 +158,7 @@ function setupLogoutHandler() {
         logoutLink.addEventListener('click', function(e) {
             e.preventDefault();
             // Redirecionar diretamente para o logout
-            window.location.href = '/sistema-frotas/logout.php';
+            window.location.href = (typeof sfAppBase === 'function' && sfAppBase() !== '' ? sfAppBase() + '/' : '/') + 'logout.php';
         });
     }
 }
@@ -155,7 +167,7 @@ function setupLogoutHandler() {
  * Load dashboard data using AJAX
  */
 function loadDashboardData() {
-    fetch('/sistema-frotas/api/dashboard_data.php')
+    fetch(sfApiUrl('dashboard_data.php'))
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');
@@ -355,10 +367,13 @@ function loadDetailedCardData(cardId) {
             }
         })
         .catch(error => {
+            const msg = (typeof sfSafeErrorMessage === 'function')
+                ? sfSafeErrorMessage(error, 'Falha ao carregar.')
+                : ((error && error.message) || 'Falha ao carregar.');
             contentContainer.innerHTML = `
                 <div class="error-message">
                     <i class="fas fa-exclamation-triangle"></i>
-                    <p>Erro ao carregar dados: ${error.message}</p>
+                    <p>Erro ao carregar dados: ${msg}</p>
                 </div>
             `;
         });
@@ -904,7 +919,7 @@ function initFinancialChart() {
     // Destroy existing chart if it exists
     destroyChartIfExists('financialChart');
 
-    fetch('/sistema-frotas/api/financial_analytics.php')
+    fetch(sfApiUrl('financial_analytics.php'))
         .then(response => {
             if (!response.ok) {
                 throw new Error('Network response was not ok');

@@ -12,12 +12,13 @@
 
 // Bloquear acesso direto: configurar em pages/configuracoes.php
 if (count(get_included_files()) === 1 && php_sapi_name() !== 'cli') {
+    require_once __DIR__ . '/sf_paths.php';
     header('HTTP/1.1 403 Forbidden');
     header('Content-Type: text/html; charset=UTF-8');
     echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Acesso restrito</title></head><body>';
     echo '<p><strong>Acesso direto não permitido.</strong></p>';
     echo '<p>Para configurar a consulta de multas no DETRAN, acesse: ';
-    echo '<a href="' . (isset($_SERVER['REQUEST_SCHEME']) ? $_SERVER['REQUEST_SCHEME'] : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/sistema-frotas/pages/configuracoes.php">Configurações do Sistema</a> ';
+    echo '<a href="' . htmlspecialchars((isset($_SERVER['REQUEST_SCHEME']) ? $_SERVER['REQUEST_SCHEME'] : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . sf_app_url('pages/configuracoes.php'), ENT_QUOTES, 'UTF-8') . '">Configurações do Sistema</a> ';
     echo 'e use a seção <strong>Consulta de Multas (DETRAN)</strong>.</p>';
     echo '</body></html>';
     exit;

@@ -84,7 +84,7 @@ class FiscalEventManager {
                 throw new Exception("Evento não encontrado");
             }
             
-            // Simular envio para SEFAZ (em produção, seria uma chamada real)
+            // Enviar para SEFAZ (nesta fase a integração ainda não está implementada)
             $resultadoSefaz = $this->enviarParaSefaz($evento);
             
             // Atualizar status do evento
@@ -94,13 +94,22 @@ class FiscalEventManager {
             $this->atualizarStatusDocumento($evento['documento_tipo'], $evento['documento_id'], $resultadoSefaz['status']);
             
             // Registrar log
-            $this->registrarLog($evento['documento_tipo'], $evento['documento_id'], 'evento_processado', 'sucesso', "Evento processado com status: {$resultadoSefaz['status']}", $evento['usuario_id']);
-            
+            $this->registrarLog(
+                $evento['documento_tipo'],
+                $evento['documento_id'],
+                'evento_processado',
+                ($resultadoSefaz['status'] === 'aceito') ? 'sucesso' : 'pendente',
+                "Evento processado com status: {$resultadoSefaz['status']}",
+                $evento['usuario_id']
+            );
+
+            $aceito = ($resultadoSefaz['status'] === 'aceito');
             return [
-                'success' => true,
+                'success' => $aceito,
                 'status' => $resultadoSefaz['status'],
                 'protocolo' => $resultadoSefaz['protocolo'],
-                'message' => "Evento processado com sucesso"
+                'message' => $aceito ? "Evento processado com sucesso" : "Integração SEFAZ não implementada; evento ficou pendente.",
+                'erro' => $aceito ? null : ($resultadoSefaz['erro'] ?? null),
             ];
             
         } catch (Exception $e) {
@@ -251,22 +260,15 @@ class FiscalEventManager {
     }
     
     /**
-     * 🌐 Simular envio para SEFAZ (em produção seria real)
+     * 🌐 Envio para SEFAZ (sem mocks)
+     * Observação: esta classe hoje não executa a integração real de eventos.
      */
     private function enviarParaSefaz($evento) {
-        // Simulação de resposta da SEFAZ
-        $protocolos = [
-            'cancelamento' => 'PROT-' . strtoupper(substr(md5(uniqid()), 0, 8)),
-            'encerramento' => 'PROT-' . strtoupper(substr(md5(uniqid()), 0, 8)),
-            'cce' => 'PROT-' . strtoupper(substr(md5(uniqid()), 0, 8))
-        ];
-        
-        $protocolo = $protocolos[$evento['tipo_evento']] ?? 'PROT-' . strtoupper(substr(md5(uniqid()), 0, 8));
-        
         return [
-            'status' => 'aceito',
-            'protocolo' => $protocolo,
-            'xml_retorno' => '<?xml version="1.0" encoding="UTF-8"?><retorno><protocolo>' . $protocolo . '</protocolo><status>aceito</status></retorno>'
+            'status' => 'pendente',
+            'protocolo' => null,
+            'xml_retorno' => null,
+            'erro' => 'Integração SEFAZ de eventos fiscais não implementada no modo atual.'
         ];
     }
     

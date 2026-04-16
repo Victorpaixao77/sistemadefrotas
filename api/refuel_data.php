@@ -224,8 +224,26 @@ try {
             $stmt_count->execute();
             $total = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
             
-            // Ordena por data mais recente e adiciona paginação
-            $sql .= " ORDER BY a.data_abastecimento DESC, a.id DESC LIMIT :limit OFFSET :offset";
+            $sortKey = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'data_abastecimento';
+            $allowedSort = [
+                'data_abastecimento' => 'a.data_abastecimento',
+                'veiculo_placa' => 'v.placa',
+                'motorista_nome' => 'm.nome',
+                'posto' => 'a.posto',
+                'litros' => 'a.litros',
+                'valor_litro' => 'a.valor_litro',
+                'valor_total' => 'a.valor_total',
+                'km_atual' => 'a.km_atual',
+                'forma_pagamento' => 'a.forma_pagamento',
+                'tipo_combustivel' => 'a.tipo_combustivel',
+                'litros_arla' => 'a.litros_arla',
+                'rota' => 'CONCAT(COALESCE(co.nome, ""), " ", COALESCE(cd.nome, ""))',
+                'id' => 'a.id',
+            ];
+            $orderCol = $allowedSort[$sortKey] ?? 'a.data_abastecimento';
+            $dir = (isset($_GET['dir']) && strtoupper(trim((string) $_GET['dir'])) === 'ASC') ? 'ASC' : 'DESC';
+
+            $sql .= ' ORDER BY ' . $orderCol . ' ' . $dir . ', a.id DESC LIMIT :limit OFFSET :offset';
             $params[':limit'] = $limit;
             $params[':offset'] = $offset;
             

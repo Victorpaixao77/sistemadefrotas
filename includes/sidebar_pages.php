@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../includes/config.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/sf_paths.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 $empresa_id = $_SESSION['empresa_id'] ?? null;
@@ -60,8 +61,77 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
     // Para páginas na raiz
     $base_path = '';
 }
+
+// Navegação ativa: destaca o item da página atual no menu lateral
+if (!function_exists('sf_sidebar_script_path')) {
+    function sf_sidebar_script_path(): string {
+        return str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    }
+}
+if (!function_exists('sf_sidebar_url_path')) {
+    function sf_sidebar_url_path(string $href): string {
+        $p = parse_url($href, PHP_URL_PATH);
+        if (is_string($p) && $p !== '') {
+            return str_replace('\\', '/', $p);
+        }
+        return str_replace('\\', '/', $href);
+    }
+}
+if (!function_exists('sf_sidebar_is_active')) {
+    function sf_sidebar_is_active(string $href): bool {
+        $cur = sf_sidebar_script_path();
+        $target = sf_sidebar_url_path($href);
+        if ($cur === '' || $target === '') {
+            return false;
+        }
+        if ($cur === $target) {
+            return true;
+        }
+        if (strlen($target) >= 2 && substr($cur, -strlen($target)) === $target) {
+            return true;
+        }
+        return false;
+    }
+}
+if (!function_exists('sf_sidebar_active')) {
+    function sf_sidebar_active(string $href): string {
+        return sf_sidebar_is_active($href) ? ' active' : '';
+    }
+}
+if (!function_exists('sf_sidebar_any_active')) {
+    function sf_sidebar_any_active(array $rels): bool {
+        foreach ($rels as $rel) {
+            if (sf_sidebar_is_active(sf_app_url($rel))) {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+if (!function_exists('sf_sidebar_aria_current')) {
+    function sf_sidebar_aria_current(string $href): string {
+        return sf_sidebar_is_active($href) ? ' aria-current="page"' : '';
+    }
+}
+if (!function_exists('sf_sidebar_active_rels')) {
+    /** Marca ativo se SCRIPT_NAME coincidir com qualquer rota em $rels (ex.: página legada + moderna). */
+    function sf_sidebar_active_rels(array $rels): string {
+        return sf_sidebar_any_active($rels) ? ' active' : '';
+    }
+}
+if (!function_exists('sf_sidebar_aria_current_rels')) {
+    function sf_sidebar_aria_current_rels(array $rels): string {
+        return sf_sidebar_any_active($rels) ? ' aria-current="page"' : '';
+    }
+}
+
+$sf_open_fiscal = sf_sidebar_any_active(['fiscal/pages/nfe.php', 'fiscal/pages/cte.php', 'fiscal/pages/mdfe.php', 'fiscal/index.php']);
+$sf_open_fin = sf_sidebar_any_active(['pages/contas_pagar.php', 'pages/despesas_fixas.php', 'pages/financiamento.php', 'pages/multas.php', 'pages/comissoes.php']);
+$sf_open_pneus = sf_sidebar_any_active(['pages/pneus.php', 'pages/estoque_pneus.php', 'pages/gestao_interativa.php', 'pages/manutencao_pneus.php']);
+$sf_open_gm = sf_sidebar_any_active(['pages/gestao_motoristas.php', 'pages/checklists.php', 'pages/rotas_motoristas.php', 'pages/abastecimentos_motoristas.php', 'pages/mapa_frota.php']);
 ?>
 <!-- Sidebar Navigation -->
+<a href="#conteudo-principal" class="skip-to-main"><?php echo htmlspecialchars('Pular para o conteúdo principal'); ?></a>
 <div class="sidebar">
     <script>
     (function() {
@@ -99,16 +169,16 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                 <span class="app-name"><?php echo htmlspecialchars($nome_personalizado); ?></span>
             </div>
         </div>
-        <button class="sidebar-toggle">
-            <i class="fas fa-chevron-left"></i>
+        <button type="button" class="sidebar-toggle" aria-label="Recolher ou expandir menu lateral">
+            <i class="fas fa-chevron-left" aria-hidden="true"></i>
         </button>
     </div>
     
     <div class="sidebar-content">
-        <nav class="sidebar-nav">
+        <nav class="sidebar-nav" id="sidebar-nav" aria-label="Menu principal do sistema">
             <ul class="sidebar-nav-list">
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/index.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('index.php')); ?>" class="sidebar-link<?php echo sf_sidebar_active(sf_app_url('index.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('index.php')); ?>>
                         <div class="sidebar-link-icon">
                             <i class="fas fa-tachometer-alt"></i>
                         </div>
@@ -116,7 +186,7 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/empresa.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/empresa.php')); ?>" class="sidebar-link<?php echo sf_sidebar_active(sf_app_url('pages/empresa.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/empresa.php')); ?>>
                         <div class="sidebar-link-icon">
                             <i class="fas fa-building"></i>
                         </div>
@@ -124,7 +194,7 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/vehicles.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/vehicles.php')); ?>" class="sidebar-link<?php echo sf_sidebar_active(sf_app_url('pages/vehicles.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/vehicles.php')); ?>>
                         <div class="sidebar-link-icon">
                             <i class="fas fa-truck"></i>
                         </div>
@@ -132,7 +202,7 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/motorists.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/motorists.php')); ?>" class="sidebar-link<?php echo sf_sidebar_active(sf_app_url('pages/motorists.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/motorists.php')); ?>>
                         <div class="sidebar-link-icon">
                             <i class="fas fa-user-tie"></i>
                         </div>
@@ -140,7 +210,15 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/routes.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/fornecedores_moderno.php')); ?>" class="sidebar-link<?php echo sf_sidebar_active_rels(['pages/fornecedores_moderno.php', 'pages/fornecedores.php']); ?>"<?php echo sf_sidebar_aria_current_rels(['pages/fornecedores_moderno.php', 'pages/fornecedores.php']); ?>>
+                        <div class="sidebar-link-icon">
+                            <i class="fas fa-truck-loading"></i>
+                        </div>
+                        <span class="sidebar-link-text">Fornecedores</span>
+                    </a>
+                </li>
+                <li class="sidebar-nav-item">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/routes.php')); ?>" class="sidebar-link<?php echo sf_sidebar_active(sf_app_url('pages/routes.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/routes.php')); ?>>
                         <div class="sidebar-link-icon">
                             <i class="fas fa-route"></i>
                         </div>
@@ -148,7 +226,7 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/abastecimentos.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/abastecimentos.php')); ?>" class="sidebar-link<?php echo sf_sidebar_active(sf_app_url('pages/abastecimentos.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/abastecimentos.php')); ?>>
                         <div class="sidebar-link-icon">
                             <i class="fas fa-gas-pump"></i>
                         </div>
@@ -156,7 +234,7 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                     </a>
                 </li>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/manutencoes.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/manutencoes.php')); ?>" class="sidebar-link<?php echo sf_sidebar_active(sf_app_url('pages/manutencoes.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/manutencoes.php')); ?>>
                         <div class="sidebar-link-icon">
                             <i class="fas fa-tools"></i>
                         </div>
@@ -164,27 +242,27 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                     </a>
                 </li>
                 <?php if (can_access_fiscal_system()): ?>
-                <li class="sidebar-nav-item">
-                    <a href="#" class="sidebar-link sidebar-dropdown-toggle">
+                <li class="sidebar-nav-item<?php echo $sf_open_fiscal ? ' sidebar-nav-item--section-active' : ''; ?>">
+                    <a href="#" class="sidebar-link sidebar-dropdown-toggle<?php echo $sf_open_fiscal ? ' active' : ''; ?>">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-receipt"></i>
                         </div>
                         <span class="sidebar-link-text">Sistema Fiscal</span>
-                        <i class="fas fa-chevron-down dropdown-icon"></i>
+                        <i class="fas fa-chevron-down dropdown-icon<?php echo $sf_open_fiscal ? ' rotate' : ''; ?>"></i>
                     </a>
-                    <ul class="sidebar-dropdown">
+                    <ul class="sidebar-dropdown"<?php echo $sf_open_fiscal ? ' data-dropdown-open="1" style="display:block"' : ''; ?>>
                         <li>
-                            <a href="/sistema-frotas/fiscal/pages/nfe.php">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('fiscal/pages/nfe.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('fiscal/pages/nfe.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('fiscal/pages/nfe.php')); ?>>
                                 <i class="fas fa-receipt"></i> Gestão de NF-e
                             </a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/fiscal/pages/cte.php">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('fiscal/pages/cte.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('fiscal/pages/cte.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('fiscal/pages/cte.php')); ?>>
                                 <i class="fas fa-truck"></i> Gestão de CT-e
                             </a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/fiscal/pages/mdfe.php">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('fiscal/pages/mdfe.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('fiscal/pages/mdfe.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('fiscal/pages/mdfe.php')); ?>>
                                 <i class="fas fa-file-alt"></i> Gestão de MDF-e
                             </a>
                         </li>
@@ -193,37 +271,37 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                 <?php endif; ?>
                 
                 <!-- Menu Financeiro - sempre visível -->
-                <li class="sidebar-nav-item">
-                    <a href="#" class="sidebar-link sidebar-dropdown-toggle">
+                <li class="sidebar-nav-item<?php echo $sf_open_fin ? ' sidebar-nav-item--section-active' : ''; ?>">
+                    <a href="#" class="sidebar-link sidebar-dropdown-toggle<?php echo $sf_open_fin ? ' active' : ''; ?>">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-money-bill-wave"></i>
                         </div>
                         <span class="sidebar-link-text">Financeiro</span>
-                        <i class="fas fa-chevron-down dropdown-icon"></i>
+                        <i class="fas fa-chevron-down dropdown-icon<?php echo $sf_open_fin ? ' rotate' : ''; ?>"></i>
                     </a>
-                    <ul class="sidebar-dropdown">
+                    <ul class="sidebar-dropdown"<?php echo $sf_open_fin ? ' data-dropdown-open="1" style="display:block"' : ''; ?>>
                         <li>
-                            <a href="/sistema-frotas/pages/contas_pagar.php">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/contas_pagar.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/contas_pagar.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/contas_pagar.php')); ?>>
                                 <i class="fas fa-file-invoice-dollar"></i> Contas a Pagar
                             </a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/despesas_fixas.php">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/despesas_fixas.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/despesas_fixas.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/despesas_fixas.php')); ?>>
                                 <i class="fas fa-receipt"></i> Despesas Fixas
                             </a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/financiamento.php">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/financiamento.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/financiamento.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/financiamento.php')); ?>>
                                 <i class="fas fa-hand-holding-usd"></i> Financiamento
                             </a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/multas.php">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/multas.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/multas.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/multas.php')); ?>>
                                 <i class="fas fa-ticket-alt"></i> Multas
                             </a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/comissoes.php">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/comissoes.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/comissoes.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/comissoes.php')); ?>>
                                 <i class="fas fa-wallet"></i> Comissão
                             </a>
                         </li>
@@ -231,32 +309,32 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                 </li>
                 
                 <?php if (can_access_tire_management()): ?>
-                <li class="sidebar-nav-item">
-                    <a href="#" class="sidebar-link sidebar-dropdown-toggle">
+                <li class="sidebar-nav-item<?php echo $sf_open_pneus ? ' sidebar-nav-item--section-active' : ''; ?>">
+                    <a href="#" class="sidebar-link sidebar-dropdown-toggle<?php echo $sf_open_pneus ? ' active' : ''; ?>">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-circle"></i>
                         </div>
                         <span class="sidebar-link-text">Gestão de Pneus</span>
-                        <i class="fas fa-chevron-down dropdown-icon"></i>
+                        <i class="fas fa-chevron-down dropdown-icon<?php echo $sf_open_pneus ? ' rotate' : ''; ?>"></i>
                     </a>
-                    <ul class="sidebar-dropdown">
+                    <ul class="sidebar-dropdown"<?php echo $sf_open_pneus ? ' data-dropdown-open="1" style="display:block"' : ''; ?>>
                         <li>
-                            <a href="/sistema-frotas/pages/pneus.php" class="sidebar-link">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/pneus.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/pneus.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/pneus.php')); ?>>
                                 <i class="fas fa-truck"></i> Pneus
                             </a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/estoque_pneus.php" class="sidebar-link">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/estoque_pneus.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/estoque_pneus.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/estoque_pneus.php')); ?>>
                                 <i class="fas fa-warehouse"></i> Estoque de Pneus
                             </a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/gestao_interativa.php" class="sidebar-link">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/gestao_interativa.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/gestao_interativa.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/gestao_interativa.php')); ?>>
                                 <i class="fas fa-truck"></i> Gestão Interativa
                             </a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/manutencao_pneus.php" class="sidebar-link">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/manutencao_pneus.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/manutencao_pneus.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/manutencao_pneus.php')); ?>>
                                 <i class="fas fa-tools"></i> Manutenção de Pneus
                             </a>
                         </li>
@@ -264,33 +342,38 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                 </li>
                 <?php endif; ?>
                 <?php if (can_approve_refuels()): ?>
-                <li class="sidebar-nav-item">
-                    <a href="#" class="sidebar-link sidebar-dropdown-toggle">
+                <li class="sidebar-nav-item<?php echo $sf_open_gm ? ' sidebar-nav-item--section-active' : ''; ?>">
+                    <a href="#" class="sidebar-link sidebar-dropdown-toggle<?php echo $sf_open_gm ? ' active' : ''; ?>">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-users"></i>
                         </div>
                         <span class="sidebar-link-text">Gestão de Motoristas</span>
-                        <i class="fas fa-chevron-down dropdown-icon"></i>
+                        <i class="fas fa-chevron-down dropdown-icon<?php echo $sf_open_gm ? ' rotate' : ''; ?>"></i>
                     </a>
-                    <ul class="sidebar-dropdown">
+                    <ul class="sidebar-dropdown"<?php echo $sf_open_gm ? ' data-dropdown-open="1" style="display:block"' : ''; ?>>
                         <li>
-                            <a href="/sistema-frotas/pages/gestao_motoristas.php" class="sidebar-link">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/gestao_motoristas.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/gestao_motoristas.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/gestao_motoristas.php')); ?>>
                                 <i class="fas fa-clipboard-check"></i> Aprovações
                             </a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/checklists.php" class="sidebar-link">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/checklists.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/checklists.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/checklists.php')); ?>>
                                 <i class="fas fa-clipboard-list"></i> Checklists
                             </a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/rotas_motoristas.php" class="sidebar-link">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/rotas_motoristas.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/rotas_motoristas.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/rotas_motoristas.php')); ?>>
                                 <i class="fas fa-route"></i> Rotas
                             </a>
                         </li>
                         <li>
-                            <a href="/sistema-frotas/pages/abastecimentos_motoristas.php" class="sidebar-link">
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/abastecimentos_motoristas.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/abastecimentos_motoristas.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/abastecimentos_motoristas.php')); ?>>
                                 <i class="fas fa-gas-pump"></i> Abastecimentos
+                            </a>
+                        </li>
+                        <li>
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/mapa_frota.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/mapa_frota.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/mapa_frota.php')); ?>>
+                                <i class="fas fa-map-marker-alt"></i> Mapa GPS
                             </a>
                         </li>
                     </ul>
@@ -298,7 +381,7 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                 <?php endif; ?>
                 <?php if (can_access_lucratividade()): ?>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/lucratividade.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/lucratividade.php')); ?>" class="sidebar-link<?php echo sf_sidebar_active(sf_app_url('pages/lucratividade.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/lucratividade.php')); ?>>
                         <div class="sidebar-link-icon">
                             <i class="fas fa-chart-line"></i>
                         </div>
@@ -309,7 +392,7 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                 
                 <?php if (can_access_advanced_reports()): ?>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/relatorios.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/relatorios.php')); ?>" class="sidebar-link<?php echo sf_sidebar_active(sf_app_url('pages/relatorios.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/relatorios.php')); ?>>
                         <div class="sidebar-link-icon">
                             <i class="fas fa-file-alt"></i>
                         </div>
@@ -320,7 +403,7 @@ if (strpos($current_path, '/fiscal/pages/') !== false) {
                 
                 <?php if (can_manage_system_settings()): ?>
                 <li class="sidebar-nav-item">
-                    <a href="/sistema-frotas/pages/configuracoes.php" class="sidebar-link">
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/configuracoes.php')); ?>" class="sidebar-link<?php echo sf_sidebar_active(sf_app_url('pages/configuracoes.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/configuracoes.php')); ?>>
                         <div class="sidebar-link-icon">
                             <i class="fas fa-cog"></i>
                         </div>

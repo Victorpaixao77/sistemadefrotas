@@ -9,6 +9,7 @@ require_once __DIR__ . '/../../includes/config.php';
 require_once __DIR__ . '/../../includes/db_connect.php';
 require_once __DIR__ . '/../../includes/functions.php';
 require_once __DIR__ . '/CryptoManager.php';
+require_once __DIR__ . '/FiscalPhpExtensions.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/CteDebug.php';
 
@@ -37,6 +38,8 @@ class CTeService
                 'Pacote nfephp-org/sped-cte não encontrado. Execute: composer require nfephp-org/sped-cte'
             );
         }
+
+        fiscal_require_soap_for_sefaz();
 
         configure_session();
         if (session_status() === PHP_SESSION_NONE) {
@@ -133,6 +136,62 @@ class CTeService
                 error_log('Erro em CTeService::consultarPorChave: ' . $e->getMessage());
             }
             return ['success' => false, 'message' => 'Erro na consulta SEFAZ: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Emite (autoriza) um CT-e modelo 57 a partir do XML cteProc (não assinado).
+     * Retorna também o XML assinado para auditoria/localização do erro.
+     */
+    public function emitirCTe(string $cteProcXml): array
+    {
+        try {
+            if (empty($cteProcXml)) {
+                return ['success' => false, 'message' => 'XML do CT-e vazio.'];
+            }
+
+            // signCTe assina e adiciona QR quando aplicável (dependendo do modelo/tpCTe/modal).
+            $signed = $this->tools->signCTe($cteProcXml);
+            $responseSoap = $this->tools->sefazEnviaCTe($signed);
+
+            return [
+                'success' => true,
+                'signed_xml' => $signed,
+                'response_xml' => $responseSoap,
+            ];
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Envia evento oficial de cancelamento para CT-e.
+     *
+     * @param string $chave 44 dígitos
+     * @param string $justificativa Justificativa do cancelamento
+     * @param string $nProt Número do protocolo de autorização do CT-e
+     */
+    public function enviarCancelamentoCTe(string $chave, string $justificativa, string $nProt): array
+    {
+        try {
+            if (empty($chave) || strlen(preg_replace('/\D/', '', $chave)) !== 44) {
+                return ['success' => false, 'message' => 'Chave do CT-e inválida (precisa 44 dígitos).'];
+            }
+            if (empty($justificativa)) {
+                return ['success' => false, 'message' => 'Justificativa é obrigatória no cancelamento.'];
+            }
+            if (empty($nProt)) {
+                return ['success' => false, 'message' => 'Protocolo de autorização (nProt) é obrigatório no cancelamento.'];
+            }
+
+            $responseSoap = $this->tools->sefazCancela($chave, $justificativa, $nProt);
+
+            return [
+                'success' => true,
+                'response_xml' => $responseSoap,
+            ];
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 

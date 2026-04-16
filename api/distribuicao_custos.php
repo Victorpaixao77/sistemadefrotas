@@ -45,8 +45,7 @@ try {
         COALESCE(SUM(comissao), 0) as valor
     FROM rotas 
     WHERE empresa_id = :empresa_id
-      AND MONTH(data_rota) = :mes
-      AND YEAR(data_rota) = :ano
+      AND ((MONTH(data_rota) = :mes AND YEAR(data_rota) = :ano) OR (MONTH(data_saida) = :mes AND YEAR(data_saida) = :ano))
     
     UNION ALL
     

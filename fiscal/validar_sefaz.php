@@ -152,7 +152,7 @@ include '../includes/header.php';
                                     <div class="alert alert-warning">
                                         <i class="fas fa-exclamation-triangle"></i>
                                         Nenhum certificado digital ativo encontrado. 
-                                        <a href="../pages/configuracoes.php" class="alert-link">Configure um certificado A1</a>.
+                                        <a href="<?php echo htmlspecialchars(sf_app_url('pages/configuracoes.php')); ?>" class="alert-link">Configure um certificado A1</a>.
                                     </div>
                                 <?php endif; ?>
                             </div>

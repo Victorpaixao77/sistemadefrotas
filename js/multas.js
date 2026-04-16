@@ -1,4 +1,16 @@
 // Multas.js - Gerenciamento de Multas
+(function (g) {
+    g.sfApiUrl = g.sfApiUrl || function (rel) {
+        rel = String(rel || '').replace(/^\//, '');
+        var b = typeof g.__SF_API_BASE__ === 'string' && g.__SF_API_BASE__ !== ''
+            ? String(g.__SF_API_BASE__).replace(/\/+$/, '')
+            : '';
+        if (b) return b + '/' + rel;
+        try { return new URL('../api/' + rel, g.location.href).href; }
+        catch (e) { return '../api/' + rel; }
+    };
+})(typeof window !== 'undefined' ? window : this);
+
 document.addEventListener('DOMContentLoaded', function() {
     initializeMultas();
     initializeMultasCharts();
@@ -82,7 +94,7 @@ function initializeDenatranConsulta() {
 
     // Pré-preencher CPF do usuário (quem consulta) com o valor das Configurações
     if (cpfUsuarioInput) {
-        fetch('../api/configuracoes.php?action=get_config_denatran', { credentials: 'include' })
+        fetch(sfApiUrl('configuracoes.php?action=get_config_denatran'), { credentials: 'include' })
             .then(function(r) { return r.json(); })
             .then(function(res) {
                 if (res.success && res.data && res.data.cpf_usuario && res.data.cpf_usuario.length === 11) {
@@ -153,7 +165,7 @@ function consultarDenatran() {
     if (msgEl) msgEl.textContent = 'Carregando...';
     if (tbody) tbody.innerHTML = '';
 
-    fetch('../api/denatran_infracoes.php?' + params.toString(), { method: 'GET' })
+    fetch(sfApiUrl('denatran_infracoes.php?' + params.toString()), { method: 'GET' })
         .then(function(res) { return res.json(); })
         .then(function(data) {
             if (msgEl) msgEl.textContent = data.message || (data.success ? 'Consulta concluída.' : 'Erro na consulta.');
@@ -204,7 +216,7 @@ function initializeMultasCharts() {
 }
 
 function loadMultasPorMesChart() {
-    fetch('../api/multas_analytics.php?action=multas_por_mes')
+    fetch(sfApiUrl('multas_analytics.php?action=multas_por_mes'))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -217,7 +229,7 @@ function loadMultasPorMesChart() {
 }
 
 function loadValorPorMesChart() {
-    fetch('../api/multas_analytics.php?action=valor_por_mes')
+    fetch(sfApiUrl('multas_analytics.php?action=valor_por_mes'))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -230,7 +242,7 @@ function loadValorPorMesChart() {
 }
 
 function loadMultasPorMotoristaChart() {
-    fetch('../api/multas_analytics.php?action=multas_por_motorista')
+    fetch(sfApiUrl('multas_analytics.php?action=multas_por_motorista'))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -243,7 +255,7 @@ function loadMultasPorMotoristaChart() {
 }
 
 function loadPontosPorMotoristaChart() {
-    fetch('../api/multas_analytics.php?action=pontos_por_motorista')
+    fetch(sfApiUrl('multas_analytics.php?action=pontos_por_motorista'))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -546,7 +558,7 @@ function openNewMultaModal() {
 
 function editMulta(multaId) {
     // Buscar dados da multa
-    fetch(`../api/multas.php?action=get&id=${multaId}`)
+    fetch(sfApiUrl(`multas.php?action=get&id=${multaId}`))
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -610,12 +622,17 @@ function saveMulta() {
 
     // Adicionar action ao FormData
     formData.append('action', action);
+    if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+        formData.append('csrf_token', window.__SF_CSRF__);
+    }
 
     console.log('Enviando requisição para:', '../api/multas.php');
     
-    fetch('../api/multas.php', {
+    fetch(sfApiUrl('multas.php'), {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include',
+        headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
     })
     .then(response => {
         console.log('Response status:', response.status);
@@ -689,10 +706,15 @@ function confirmDeleteMulta() {
     const formData = new FormData();
     formData.append('action', 'delete');
     formData.append('id', multaId);
+    if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+        formData.append('csrf_token', window.__SF_CSRF__);
+    }
 
-    fetch('../api/multas.php', {
+    fetch(sfApiUrl('multas.php'), {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include',
+        headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
     })
     .then(response => response.json())
     .then(data => {
@@ -725,8 +747,12 @@ function closeDeleteModal() {
 }
 
 function showFilters() {
-    // Implementar filtros
-    showAlert('Funcionalidade de filtros em desenvolvimento', 'info');
+    const wrap = document.querySelector('.fornc-toolbar') || document.querySelector('.filter-section');
+    if (wrap) {
+        wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        wrap.classList.add('highlight-filter');
+        setTimeout(function () { wrap.classList.remove('highlight-filter'); }, 1000);
+    }
 }
 
 function exportMultas() {

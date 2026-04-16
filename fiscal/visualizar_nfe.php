@@ -39,7 +39,7 @@ $select = array_intersect($columns, [
     'id', 'numero_nfe', 'serie_nfe', 'chave_acesso', 'data_emissao', 'data_entrada',
     'cliente_razao_social', 'cliente_cnpj', 'cliente_nome_fantasia', 'valor_total',
     'status', 'protocolo_autorizacao', 'observacoes', 'tipo_operacao',
-    'xml_nfe', 'pdf_nfe', 'xml_path', 'created_at', 'updated_at'
+    'xml_nfe', 'pdf_nfe', 'created_at', 'updated_at'
 ]);
 $select = array_values($select);
 $sql = "SELECT " . implode(", ", $select) . " FROM fiscal_nfe_clientes WHERE id = :id AND empresa_id = :empresa_id LIMIT 1";
@@ -52,16 +52,21 @@ if (!$nfe) {
     exit;
 }
 
-$tem_xml = !empty($nfe['xml_nfe']) || (!empty($nfe['xml_path']) && file_exists(__DIR__ . '/../uploads/nfe_xml/' . basename($nfe['xml_path'] ?? '')));
+$tem_xml = !empty($nfe['xml_nfe']);
+$chave_nfe_digits = preg_replace('/\D/', '', $nfe['chave_acesso'] ?? '');
+$chave_ok_download = strlen($chave_nfe_digits) === 44;
+/** XML pode ser obtido do banco ou baixado na SEFAZ (mesma lógica da API) — não esconder o botão só porque xml_nfe está vazio */
+$pode_baixar_xml = $tem_xml || $chave_ok_download;
 $tem_pdf = !empty($nfe['pdf_nfe']) && file_exists(__DIR__ . '/../' . $nfe['pdf_nfe']);
+$pode_gerar_pdf = $tem_pdf || $tem_xml || $chave_ok_download;
 
 // URL completa (scheme + host + path) para o download funcionar e o cookie ser enviado
 $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 $fiscal_base = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
 $base_url = $scheme . '://' . $host . $fiscal_base;
-$url_download_xml = $base_url . '/api/download_nfe_xml.php';
-$url_download_pdf = $base_url . '/api/download_nfe_pdf.php';
+$url_download_xml = $base_url . '/api/download_nfe_xml.php?id=' . (int)$id . '&_=' . time();
+$url_download_pdf = $base_url . '/api/download_nfe_pdf.php?id=' . (int)$id;
 
 $page_title = "NF-e " . ($nfe['numero_nfe'] ?? $id);
 ?>
@@ -158,26 +163,20 @@ $page_title = "NF-e " . ($nfe['numero_nfe'] ?? $id);
 
                         <div class="nfe-actions">
                             <a href="pages/nfe.php" class="btn-back"><i class="fas fa-arrow-left"></i> Voltar</a>
-                            <?php if ($tem_xml): ?>
-                            <form method="post" action="<?php echo htmlspecialchars($url_download_xml); ?>" target="_blank" style="display:inline;">
-                                <input type="hidden" name="id" value="<?php echo (int)$id; ?>">
-                                <button type="submit" class="btn-download"><i class="fas fa-file-code"></i> Download XML</button>
-                            </form>
+                            <?php if ($pode_baixar_xml): ?>
+                            <a href="<?php echo htmlspecialchars($url_download_xml); ?>" class="btn-download" target="_blank" rel="noopener noreferrer"><i class="fas fa-file-code"></i> Download XML</a>
+                            <?php if (!$tem_xml && $chave_ok_download): ?>
+                            <p class="form-text" style="margin-top:8px;width:100%;">Se ainda não houver XML salvo, o sistema tentará baixá-lo na SEFAZ (certificado da empresa como destinatário).</p>
+                            <?php endif; ?>
                             <?php else: ?>
-                            <span class="btn-download disabled"><i class="fas fa-file-code"></i> XML não disponível</span>
-                            <p class="form-text" style="margin-top:8px;">Para notas consultadas apenas pela SEFAZ, o XML não fica armazenado. Envie o XML pela opção &quot;Upload XML&quot; na recepção para guardar o arquivo.</p>
+                            <span class="btn-download disabled"><i class="fas fa-file-code"></i> XML indisponível</span>
+                            <p class="form-text" style="margin-top:8px;">É necessária a chave de acesso (44 dígitos) ou XML já armazenado.</p>
                             <?php endif; ?>
                             <?php if ($tem_pdf): ?>
-                            <form method="post" action="<?php echo htmlspecialchars($url_download_pdf); ?>" target="_blank" style="display:inline;">
-                                <input type="hidden" name="id" value="<?php echo (int)$id; ?>">
-                                <button type="submit" class="btn-download"><i class="fas fa-file-pdf"></i> Download PDF</button>
-                            </form>
-                            <?php elseif ($tem_xml): ?>
-                            <form method="post" action="<?php echo htmlspecialchars($url_download_pdf); ?>" target="_blank" style="display:inline;">
-                                <input type="hidden" name="id" value="<?php echo (int)$id; ?>">
-                                <button type="submit" class="btn-download"><i class="fas fa-file-pdf"></i> Gerar / Download PDF</button>
-                            </form>
-                            <p class="form-text" style="margin-top:4px;">PDF gerado a partir do XML (DANFE simplificado).</p>
+                            <a href="<?php echo htmlspecialchars($url_download_pdf); ?>" class="btn-download" target="_blank" rel="noopener noreferrer"><i class="fas fa-file-pdf"></i> Download PDF</a>
+                            <?php elseif ($pode_gerar_pdf): ?>
+                            <a href="<?php echo htmlspecialchars($url_download_pdf); ?>" class="btn-download" target="_blank" rel="noopener noreferrer"><i class="fas fa-file-pdf"></i> Gerar / Download PDF</a>
+                            <p class="form-text" style="margin-top:4px;">DANFE oficial quando houver XML (SEFAZ ou banco).</p>
                             <?php else: ?>
                             <span class="btn-download disabled"><i class="fas fa-file-pdf"></i> PDF não disponível</span>
                             <?php endif; ?>

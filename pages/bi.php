@@ -32,7 +32,17 @@ $empresa_id = $_SESSION['empresa_id'];
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="icon" type="image/png" href="../logo.png">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.js"></script>
+    <script>
+    (function () {
+        if (typeof Chart === 'undefined') return;
+        /* Chart.js 2.9.x: sem @kurkle/color / árvore de merge da v4 — evita RangeError em pilha em alguns ambientes */
+        /* duration 0 pode pular o 1º desenho em alguns navegadores; 1ms força um frame sem “animação” visível */
+        Chart.defaults.global.animation.duration = 1;
+        Chart.defaults.global.responsive = false;
+        Chart.defaults.global.maintainAspectRatio = false;
+    })();
+    </script>
     <style>
         /* Conteúdo BI respeitando a largura da tela (sidebar aberta/fechada) */
         .main-content { min-width: 0; overflow-x: hidden; }
@@ -46,8 +56,8 @@ $empresa_id = $_SESSION['empresa_id'];
         .bi-table-card { min-width: 0; max-width: 100%; box-sizing: border-box; }
 
         /* BI usa as variáveis do sistema (--bg-primary, --card-bg, etc.) */
-        .bi-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
-        .bi-header h1 { font-size: 1.5rem; font-weight: 600; margin: 0; color: var(--text-primary); }
+        /* Sem título duplicado: o nome da página vem do header superior (.header-title) */
+        .bi-header { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 0.75rem; margin-bottom: var(--gutter); }
         .bi-filtros { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
         .bi-filtros .bi-filtro-item { display: flex; align-items: center; gap: 0.35rem; }
         .bi-filtros .bi-filtro-item label { font-size: 0.8rem; color: var(--text-muted); margin: 0; white-space: nowrap; }
@@ -55,39 +65,276 @@ $empresa_id = $_SESSION['empresa_id'];
         .bi-filtros #filtro-visao { min-width: 180px; }
         .bi-filtros #filtro-ano { width: 4.5rem; }
         .bi-filtros #filtro-mes { width: 5rem; }
-        .bi-filtros #btn-aplicar { padding: 0.45rem 0.9rem; border-radius: var(--btn-border-radius); border: none; background: var(--accent-primary); color: #fff; font-weight: 600; cursor: pointer; font-size: 0.9rem; white-space: nowrap; }
-        .bi-filtros #btn-aplicar:hover { filter: brightness(1.1); }
+        .bi-filtros #btn-aplicar { padding: 0.45rem 0.9rem; border-radius: var(--btn-border-radius); border: none; background: var(--accent-primary); color: #fff; font-weight: 600; cursor: pointer; font-size: 0.9rem; white-space: nowrap; transition: filter 0.2s ease, transform 0.2s ease; }
+        .bi-filtros #btn-aplicar:hover { filter: brightness(1.08); }
+        .bi-filtros #btn-aplicar:active { transform: scale(0.98); }
+        .bi-toolbar {
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            background: var(--card-bg, var(--bg-secondary));
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+            box-shadow: var(--card-shadow, 0 1px 3px rgba(0, 0, 0, 0.06));
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+        .bi-context-line {
+            margin: 0;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+            padding-top: 0.45rem;
+            border-top: 1px solid var(--border-color);
+        }
+        .bi-filtros select:focus-visible,
+        .bi-filtros #btn-aplicar:focus-visible,
+        .bi-filtros #btn-mes-atual:focus-visible {
+            outline: 2px solid var(--accent-primary);
+            outline-offset: 2px;
+        }
+        .bi-filtros select { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        .bi-filtros select:hover { border-color: color-mix(in srgb, var(--accent-primary) 45%, var(--border-color)); }
+        @media (prefers-reduced-motion: reduce) {
+            .bi-filtros select,
+            .bi-filtros #btn-aplicar,
+            #btn-mes-atual,
+            body.page-bi #bi-kpis .dashboard-card,
+            body.page-bi #bi-charts .analytics-card,
+            body.page-bi .bi-chart-embed.analytics-card,
+            .btn-action-indicators {
+                transition: none !important;
+            }
+            .bi-filtros #btn-aplicar:active { transform: none; }
+            .btn-action-indicators:hover { transform: none; }
+            .bi-loading .fa-spinner { animation: none !important; opacity: 0.9; }
+        }
         .bi-layout { display: block; }
         .bi-content { max-width: 100%; }
-        .bi-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
-        .bi-kpi { background: var(--card-bg); border-radius: var(--card-border-radius); padding: 1rem; border: 1px solid var(--border-color); text-align: center; }
-        .bi-kpi .bi-kpi-value { font-size: 1.4rem; font-weight: 700; color: var(--accent-primary); }
-        .bi-kpi .bi-kpi-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
-        .bi-kpi .bi-kpi-variacoes { margin-top: 0.2rem; min-height: 1.2em; }
-        .bi-kpi i { font-size: 1.2rem; color: var(--text-muted); margin-bottom: 0.25rem; }
-        .bi-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
-        @media (max-width: 900px) { .bi-charts { grid-template-columns: 1fr; } }
-        .bi-chart-card { background: var(--card-bg); border-radius: var(--card-border-radius); padding: 1rem; border: 1px solid var(--border-color); }
-        .bi-chart-card h3 { font-size: 0.95rem; margin: 0 0 1rem 0; color: var(--text-primary); }
-        .bi-chart-card canvas { max-height: 220px; }
-        .bi-chart-full { grid-column: 1 / -1; }
+
+        /* Mesmo ritmo visual de pages/routes.php (body.routes-modern + routes-modern-page), sem importar routes.css */
+        body.page-bi .dashboard-content.routes-modern-page {
+            --forn-table-stripe: rgba(0, 0, 0, 0.035);
+            padding-top: 8px;
+        }
+        body.page-bi #bi-kpis.dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.45rem;
+            margin-bottom: 0.65rem;
+        }
+        @media (max-width: 1100px) {
+            body.page-bi #bi-kpis.dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        body.page-bi #bi-kpis .dashboard-card {
+            background: var(--card-bg, var(--bg-secondary));
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: var(--card-shadow, 0 1px 3px rgba(0, 0, 0, 0.08));
+            padding: 0.5rem 0.65rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        body.page-bi #bi-kpis .dashboard-card:hover {
+            border-color: color-mix(in srgb, var(--accent-primary) 40%, var(--border-color));
+            box-shadow: var(--card-shadow, 0 1px 3px rgba(0, 0, 0, 0.08)), 0 6px 18px rgba(0, 0, 0, 0.06);
+        }
+        body.page-bi #bi-kpis .dashboard-card .card-header { padding: 0; border-bottom: none; }
+        body.page-bi #bi-kpis .dashboard-card .card-header h3 {
+            font-size: 0.58rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin: 0;
+            font-weight: 700;
+        }
+        body.page-bi #bi-kpis .dashboard-card .card-body { padding: 0; }
+        body.page-bi #bi-kpis .metric { gap: 0.1rem; align-items: flex-start; text-align: left; }
+        body.page-bi #bi-kpis .metric-value {
+            font-size: 0.95rem;
+            line-height: 1.2;
+            color: var(--text-primary);
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.01em;
+        }
+        body.page-bi #bi-kpis .bi-kpi-variacoes { margin-top: 0.15rem; min-height: 1em; }
+
+        body.page-bi #bi-charts.analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+        @media (max-width: 768px) {
+            body.page-bi #bi-charts.analytics-grid { grid-template-columns: 1fr; }
+        }
+        body.page-bi #bi-charts > .bi-drill-hint {
+            grid-column: 1 / -1;
+            margin: 0 0 8px 0;
+            padding: 0.55rem 0.75rem;
+            font-size: 0.8rem;
+            line-height: 1.45;
+            color: var(--text-secondary);
+            background: color-mix(in srgb, var(--accent-primary) 8%, var(--card-bg, var(--bg-secondary)));
+            border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, var(--border-color));
+            border-radius: 8px;
+        }
+        body.page-bi #bi-charts .analytics-card {
+            background: var(--card-bg, var(--bg-secondary));
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: none;
+            overflow: hidden;
+            max-width: 100%;
+            box-sizing: border-box;
+            padding: 0;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        body.page-bi #bi-charts .analytics-card:hover {
+            border-color: color-mix(in srgb, var(--accent-primary) 35%, var(--border-color));
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+        }
+        body.page-bi #bi-charts .analytics-card .card-header { padding: 8px 10px; border-bottom: 1px solid var(--border-color); }
+        body.page-bi #bi-charts .analytics-card .card-header h3 {
+            font-size: 0.78rem;
+            margin: 0;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        body.page-bi #bi-charts .analytics-card .card-header.card-header--actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        body.page-bi #bi-charts .analytics-card .card-header.card-header--actions h3 { flex: 1 1 auto; min-width: 0; }
+        body.page-bi #bi-charts .analytics-card .card-body.bi-chart-body {
+            height: 240px;
+            padding: 10px;
+            box-sizing: border-box;
+            position: relative;
+        }
+        body.page-bi #bi-charts .analytics-card .card-body.bi-chart-body canvas {
+            display: block;
+            width: 100% !important;
+            height: 220px !important;
+            max-width: 100%;
+            max-height: 220px;
+            box-sizing: border-box;
+            transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+        }
+        body.page-bi #bi-charts .bi-chart-full { grid-column: 1 / -1; }
+        body.page-bi #bi-charts .bi-chart-full .card-body.bi-chart-body {
+            height: 292px;
+        }
+        body.page-bi #bi-charts .bi-chart-full .card-body.bi-chart-body canvas {
+            height: 268px !important;
+            max-height: 268px;
+        }
+
+        /* Gráficos pizza / blocos embutidos (fora do grid principal): mesmo cartão Rotas */
+        body.page-bi .bi-chart-embed.analytics-card {
+            background: var(--card-bg, var(--bg-secondary));
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: none;
+            overflow: hidden;
+            padding: 0;
+            max-width: 100%;
+            box-sizing: border-box;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        body.page-bi .bi-chart-embed.analytics-card:hover {
+            border-color: color-mix(in srgb, var(--accent-primary) 35%, var(--border-color));
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+        }
+        body.page-bi .bi-chart-embed.analytics-card .card-body--pie {
+            min-height: 200px;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        body.page-bi .bi-chart-embed.analytics-card .card-body--pie canvas.bi-canvas-pie {
+            height: 200px !important;
+            max-height: 200px;
+        }
+        body.page-bi .bi-chart-embed.analytics-card .card-header {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        body.page-bi .bi-chart-embed.analytics-card .card-header h3 {
+            font-size: 0.78rem;
+            margin: 0;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        body.page-bi .bi-chart-embed.analytics-card .card-body.bi-chart-body {
+            height: 240px;
+            padding: 10px;
+            box-sizing: border-box;
+            position: relative;
+        }
+        body.page-bi .bi-chart-embed.analytics-card .card-body.bi-chart-body canvas {
+            display: block;
+            width: 100% !important;
+            height: 220px !important;
+            max-width: 100%;
+            max-height: 220px;
+            box-sizing: border-box;
+            transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+        }
         .bi-table-card { background: var(--card-bg); border-radius: var(--card-border-radius); padding: 1rem; border: 1px solid var(--border-color); overflow-x: auto; }
         .bi-table-card h3 { font-size: 0.95rem; margin: 0 0 1rem 0; color: var(--text-primary); }
         .bi-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         .bi-table th, .bi-table td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); }
         .bi-table th { color: var(--text-muted); font-weight: 600; }
         .bi-table tr:hover { background: var(--bg-tertiary); }
-        .bi-loading { text-align: center; padding: 2rem; color: var(--text-muted); }
+        .bi-loading {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            min-height: 140px;
+            margin-bottom: 1rem;
+            padding: 1.25rem 1.5rem;
+            text-align: center;
+            color: var(--text-muted);
+            background: var(--card-bg, var(--bg-secondary));
+            border: 1px dashed color-mix(in srgb, var(--accent-primary) 38%, var(--border-color));
+            border-radius: 12px;
+            box-shadow: var(--card-shadow, 0 1px 3px rgba(0, 0, 0, 0.06));
+        }
+        .bi-loading .fa-spinner { color: var(--accent-primary); font-size: 1.35rem; }
         .bi-error { background: rgba(239,68,68,0.15); color: var(--accent-danger); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
 
         /* Indicadores de Desempenho (tela dedicada no BI) */
         .bi-indicadores-section { margin-top: 0; }
         .bi-indicadores-section h2 { font-size: 1.25rem; margin: 0 0 1rem 0; color: var(--text-primary); }
-        .bi-indicadores-box { background: var(--bg-secondary); border-radius: 8px; padding: 20px; border: 1px solid var(--border-color); overflow-x: auto; max-width: 100%; box-sizing: border-box; }
-        .bi-indicadores-actions { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px; gap: 10px; }
-        .btn-action-indicators { padding: 8px 15px; background: #007bff; border: none; border-radius: 4px; cursor: pointer; color: white; white-space: nowrap; transition: all 0.2s ease; }
-        .btn-action-indicators:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .btn-action-indicators:last-of-type { background: #28a745; }
+        .bi-indicadores-box { background: var(--bg-secondary); border-radius: 8px; padding: var(--gutter); border: 1px solid var(--border-color); overflow-x: auto; max-width: 100%; box-sizing: border-box; }
+        .bi-indicadores-actions { display: flex; justify-content: flex-end; align-items: center; margin-bottom: var(--gutter); gap: 10px; }
+        .btn-action-indicators { padding: 8px 15px; background: var(--accent-primary, #3b82f6); border: none; border-radius: 6px; cursor: pointer; color: #fff; white-space: nowrap; transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease; }
+        .btn-action-indicators:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); filter: brightness(1.05); }
+        .btn-action-indicators:focus-visible { outline: 2px solid var(--accent-primary, #2563eb); outline-offset: 2px; }
+        .btn-action-indicators:last-of-type { background: var(--accent-success, #10b981); }
+        .btn-action-indicators.bi-btn-export-png {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        .btn-action-indicators.bi-btn-export-png:hover {
+            filter: brightness(1.06);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
         .indicators-table { font-size: 0.9rem; table-layout: auto; width: 100%; border-collapse: collapse; min-width: 1200px; max-width: none; }
         .indicators-table th { background: var(--bg-tertiary); color: var(--text-primary); font-weight: 600; padding: 12px 8px; text-align: center; border: 1px solid var(--border-color); white-space: nowrap; }
         .indicators-table td { padding: 12px 8px; border: 1px solid var(--border-color); text-align: right; background: var(--bg-secondary); white-space: nowrap; }
@@ -108,9 +355,10 @@ $empresa_id = $_SESSION['empresa_id'];
         .variation.neutral { background: rgba(158, 158, 158, 0.1); color: #9e9e9e; }
 
         /* Indicadores de Saúde da Frota (só na Visão Geral) */
-        .bi-saude-frota { margin-bottom: 1.5rem; }
+        .bi-saude-frota { margin-bottom: var(--gutter); }
         .bi-saude-frota h3 { font-size: 0.9rem; color: var(--text-muted); margin: 0 0 0.75rem 0; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; }
         .bi-saude-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1rem; }
+        body.page-bi .bi-saude-cards { gap: 10px; margin-bottom: 10px; }
         @media (max-width: 900px) { .bi-saude-cards { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 500px) { .bi-saude-cards { grid-template-columns: 1fr; } }
         .bi-saude-card { background: var(--card-bg); border-radius: var(--card-border-radius); padding: 1rem; border: 1px solid var(--border-color); text-align: center; }
@@ -141,7 +389,7 @@ $empresa_id = $_SESSION['empresa_id'];
         .bi-alertas { font-size: 0.9rem; color: var(--text-primary); }
         .bi-aviso-incompletos { background: rgba(245,158,11,0.15); border: 1px solid #f59e0b; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-primary); }
         .bi-aviso-incompletos a { color: var(--accent-primary); }
-        .bi-ponto-equilibrio { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; border: 1px solid var(--border-color); margin-top: 1rem; }
+        .bi-ponto-equilibrio { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; border: 1px solid var(--border-color); margin-top: var(--gutter); }
         .bi-ponto-equilibrio h4 { font-size: 0.95rem; margin: 0 0 0.5rem 0; color: var(--text-primary); }
         .bi-tendencias { margin-top: 0.5rem; font-size: 0.85rem; color: var(--text-secondary); }
         .bi-simulador-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.75rem; }
@@ -149,16 +397,29 @@ $empresa_id = $_SESSION['empresa_id'];
         .bi-simulador-field { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
         .bi-simulador-field label { font-size: 0.9rem; color: var(--text-muted); min-width: 140px; }
         .bi-simulador-field input { width: 80px; padding: 0.4rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); }
-        .bi-simulador-result { margin-top: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; font-size: 0.95rem; }
+        .bi-simulador-result { margin-top: var(--gutter); padding: 1rem; background: var(--bg-tertiary); border-radius: 8px; font-size: 0.95rem; }
         .bi-simulador-result .impacto { font-weight: 700; font-size: 1.05rem; }
         .bi-custo-km-veiculos { overflow-x: auto; margin-top: 0.5rem; }
         .bi-table-total { background: var(--bg-tertiary); font-weight: 600; }
         .bi-table-total td { border-top: 2px solid var(--border-color); }
-        #btn-mes-atual { padding: 0.45rem 0.9rem; border-radius: var(--btn-border-radius); border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; font-size: 0.9rem; white-space: nowrap; }
+        #btn-mes-atual { padding: 0.45rem 0.9rem; border-radius: var(--btn-border-radius); border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; font-size: 0.9rem; white-space: nowrap; transition: background 0.2s ease, border-color 0.2s ease, filter 0.2s ease; }
         #btn-mes-atual:hover { filter: brightness(0.95); }
+
+        .bi-drill-hint { font-size: 0.8rem; color: var(--text-muted); }
+        .bi-drill-modal { display: none; position: fixed; inset: 0; z-index: 10050; align-items: center; justify-content: center; padding: 1rem; box-sizing: border-box; }
+        .bi-drill-modal.is-open { display: flex; }
+        .bi-drill-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.45); }
+        .bi-drill-dialog { position: relative; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--card-border-radius); max-width: min(960px, 100%); width: 100%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 12px 40px rgba(0,0,0,0.25); }
+        .bi-drill-header { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem 1rem; border-bottom: 1px solid var(--border-color); }
+        .bi-drill-header h3 { margin: 0; font-size: 1rem; color: var(--text-primary); }
+        .bi-drill-close { border: none; background: transparent; color: var(--text-muted); font-size: 1.5rem; line-height: 1; cursor: pointer; padding: 0 0.25rem; border-radius: 6px; transition: color 0.2s ease, background 0.2s ease; }
+        .bi-drill-close:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+        .bi-drill-close:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+        .bi-drill-body { padding: 0.75rem 1rem 1rem; overflow: auto; flex: 1; min-height: 0; }
+        .bi-drill-body .bi-table { font-size: 0.8rem; }
     </style>
 </head>
-<body>
+<body class="page-bi">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include __DIR__ . '/../includes/sidebar_pages.php'; ?>
@@ -167,9 +428,9 @@ $empresa_id = $_SESSION['empresa_id'];
             <!-- Top Header -->
             <?php include __DIR__ . '/../includes/header.php'; ?>
             <!-- Page Content -->
-            <div class="dashboard-content">
+            <main id="bi-main" class="dashboard-content routes-modern-page" role="main" aria-label="Painel BI Frota">
                 <div class="bi-header">
-                    <h1><i class="fas fa-chart-line"></i> BI Frota</h1>
+                    <div class="bi-toolbar" role="region" aria-label="Filtros do relatório BI">
                     <div class="bi-filtros">
                         <div class="bi-filtro-item">
                             <label for="filtro-visao">Visão</label>
@@ -200,20 +461,25 @@ $empresa_id = $_SESSION['empresa_id'];
                                 <?php } ?>
                             </select>
                         </div>
-                        <button type="button" id="btn-aplicar"><i class="fas fa-sync-alt"></i> Aplicar</button>
-                        <button type="button" id="btn-mes-atual" title="Mês atual"><i class="fas fa-calendar-day"></i> Mês atual</button>
+                        <button type="button" id="btn-aplicar" aria-label="Aplicar filtros e atualizar o painel"><i class="fas fa-sync-alt" aria-hidden="true"></i> Aplicar</button>
+                        <button type="button" id="btn-mes-atual" title="Mês atual" aria-label="Usar mês e ano atuais nos filtros"><i class="fas fa-calendar-day" aria-hidden="true"></i> Mês atual</button>
+                    </div>
+                    <p class="bi-context-line" id="bi-context-line" aria-live="polite"></p>
                     </div>
                 </div>
 
-                <div class="bi-layout">
+                <div class="bi-layout" id="bi-main-content">
                     <div class="bi-content">
-                        <div id="bi-loading" class="bi-loading"><i class="fas fa-spinner fa-spin"></i> Carregando indicadores...</div>
-                        <div id="bi-error" class="bi-error" style="display:none;"></div>
+                        <div id="bi-loading" class="bi-loading" role="status" aria-live="polite" aria-busy="false" aria-label="Carregando dados do BI">
+                            <i class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+                            <span>Carregando indicadores…</span>
+                        </div>
+                        <div id="bi-error" class="bi-error" style="display:none;" role="alert" aria-live="assertive" tabindex="-1"></div>
                         <div id="bi-aviso-incompletos" class="bi-aviso-incompletos" style="display:none;"></div>
 
                         <div id="bi-saude-frota" class="bi-saude-frota" style="display:none;">
                             <h3><i class="fas fa-heartbeat"></i> Indicadores de Saúde da Frota</h3>
-                            <div id="bi-score-frota-wrap" class="bi-score-frota-wrap" style="display:none; margin-bottom: 1rem;"></div>
+                            <div id="bi-score-frota-wrap" class="bi-score-frota-wrap" style="display:none; margin-bottom: var(--gutter);"></div>
                             <div class="bi-saude-cards" id="bi-saude-cards"></div>
                             <div class="bi-semaforo-wrap" id="bi-semaforo-wrap">
                                 <span class="bi-semaforo-label">Desempenho (margem operacional):</span>
@@ -221,36 +487,55 @@ $empresa_id = $_SESSION['empresa_id'];
                                 <span class="bi-semaforo-texto" id="bi-semaforo-texto"></span>
                             </div>
                         </div>
-                        <div id="bi-kpis" class="bi-kpis" style="display:none;"></div>
-                        <div id="bi-charts" class="bi-charts" style="display:none;">
-                        <div class="bi-chart-card bi-chart-full" id="wrapChartRotasTempo">
-                            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.5rem;">
-                                <h3 id="tituloChartRotasTempo" style="margin:0;">Rotas e Faturamento ao longo do tempo</h3>
-                                <button type="button" id="btn-exportar-grafico-png" class="btn-action-indicators" style="background:#6c757d; font-size:0.85rem;"><i class="fas fa-image"></i> Exportar PNG</button>
+                        <div id="bi-kpis" class="dashboard-grid" style="display:none;"></div>
+                        <div id="bi-charts" class="analytics-grid" style="display:none;" role="region" aria-label="Gráficos do painel">
+                        <p class="bi-drill-hint"><i class="fas fa-mouse-pointer" aria-hidden="true"></i> <span>Clique em um mês nos gráficos de evolução para ver o detalhamento.</span></p>
+                        <div class="analytics-card bi-chart-card bi-chart-full" id="wrapChartRotasTempo">
+                            <div class="card-header card-header--actions">
+                                <h3 id="tituloChartRotasTempo">Rotas e Faturamento ao longo do tempo</h3>
+                                <button type="button" id="btn-exportar-grafico-png" class="btn-action-indicators bi-btn-export-png" style="font-size:0.85rem;" aria-label="Exportar gráfico principal em imagem PNG"><i class="fas fa-image" aria-hidden="true"></i> Exportar PNG</button>
                             </div>
-                            <canvas id="chartRotasTempo"></canvas>
+                            <div class="card-body bi-chart-body">
+                                <canvas id="chartRotasTempo"></canvas>
+                            </div>
                         </div>
-                        <div class="bi-chart-card" id="wrapChartFreteMensal">
-                            <h3 id="tituloChartFreteMensal">Faturamento por mês (Frete)</h3>
-                            <canvas id="chartFreteMensal"></canvas>
+                        <div class="analytics-card bi-chart-card" id="wrapChartFreteMensal">
+                            <div class="card-header">
+                                <h3 id="tituloChartFreteMensal">Faturamento por mês (Frete)</h3>
+                            </div>
+                            <div class="card-body bi-chart-body">
+                                <canvas id="chartFreteMensal"></canvas>
+                            </div>
                         </div>
-                        <div class="bi-chart-card" id="wrapChartKmMensal">
-                            <h3 id="tituloChartKmMensal">Km rodados por mês</h3>
-                            <canvas id="chartKmMensal"></canvas>
+                        <div class="analytics-card bi-chart-card" id="wrapChartKmMensal">
+                            <div class="card-header">
+                                <h3 id="tituloChartKmMensal">Km rodados por mês</h3>
+                            </div>
+                            <div class="card-body bi-chart-body">
+                                <canvas id="chartKmMensal"></canvas>
+                            </div>
                         </div>
-                        <div class="bi-chart-card bi-chart-full" id="wrapChartAbastTempo" style="display:none;">
-                            <h3>Abastecimentos e Gasto ao longo do tempo</h3>
-                            <canvas id="chartAbastTempo"></canvas>
+                        <div class="analytics-card bi-chart-card bi-chart-full" id="wrapChartAbastTempo" style="display:none;">
+                            <div class="card-header">
+                                <h3>Abastecimentos e Gasto ao longo do tempo</h3>
+                            </div>
+                            <div class="card-body bi-chart-body">
+                                <canvas id="chartAbastTempo"></canvas>
+                            </div>
                         </div>
-                        <div class="bi-chart-card bi-chart-full" id="wrapChartTopVeiculos">
-                            <h3 id="tituloChartTopVeiculos">Top veículos (rotas e km)</h3>
-                            <canvas id="chartTopVeiculos"></canvas>
+                        <div class="analytics-card bi-chart-card bi-chart-full" id="wrapChartTopVeiculos">
+                            <div class="card-header">
+                                <h3 id="tituloChartTopVeiculos">Top veículos (rotas e km)</h3>
+                            </div>
+                            <div class="card-body bi-chart-body">
+                                <canvas id="chartTopVeiculos"></canvas>
+                            </div>
                         </div>
                         </div>
-                        <div id="bi-table-wrap" class="bi-table-card" style="display:none; margin-top: 1rem;">
+                        <div id="bi-table-wrap" class="bi-table-card" style="display:none; margin-top: var(--gutter);">
                             <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.5rem; margin-bottom:0.75rem;">
                                 <h3 id="bi-table-titulo" style="margin:0;">Panorama mensal (últimos 12 meses)</h3>
-                                <button type="button" id="btn-exportar-tabela-csv" class="btn-action-indicators" style="background:#0d6efd;"><i class="fas fa-file-csv"></i> Exportar CSV</button>
+                                <button type="button" id="btn-exportar-tabela-csv" class="btn-action-indicators" aria-label="Exportar tabela de panorama mensal em CSV"><i class="fas fa-file-csv" aria-hidden="true"></i> Exportar CSV</button>
                             </div>
                             <table class="bi-table" id="bi-tabela">
                                 <thead><tr><th>Mês</th></tr></thead>
@@ -259,43 +544,54 @@ $empresa_id = $_SESSION['empresa_id'];
                         </div>
 
                         <!-- Blocos extras por visão (ranking rotas, consumo, manut, desp tipo, fixas, insights IA) -->
-                        <div id="bi-ranking-rotas" class="bi-extra-block bi-table-card" style="display:none; margin-top: 1rem;">
+                        <div id="bi-ranking-rotas" class="bi-extra-block bi-table-card" style="display:none; margin-top: var(--gutter);">
                             <h3><i class="fas fa-trophy"></i> Ranking de rotas (mais e menos lucrativas)</h3>
                             <div id="bi-ranking-rotas-content"></div>
                         </div>
-                        <div id="bi-abast-extra" class="bi-extra-block bi-table-card" style="display:none; margin-top: 1rem;">
+                        <div id="bi-abast-extra" class="bi-extra-block bi-table-card" style="display:none; margin-top: var(--gutter);">
                             <h3><i class="fas fa-tachometer-alt"></i> Consumo e custo</h3>
                             <div id="bi-abast-extra-cards"></div>
-                            <div id="bi-abast-alertas" class="bi-alertas" style="margin-top: 1rem;"></div>
+                            <div id="bi-abast-alertas" class="bi-alertas" style="margin-top: var(--gutter);"></div>
                         </div>
-                        <div id="bi-manut-extra" class="bi-extra-block bi-table-card" style="display:none; margin-top: 1rem;">
+                        <div id="bi-manut-extra" class="bi-extra-block bi-table-card" style="display:none; margin-top: var(--gutter);">
                             <h3><i class="fas fa-wrench"></i> Custo por KM, tipo e estimativa</h3>
                             <div id="bi-manut-extra-content"></div>
-                            <div class="bi-chart-card" style="margin-top: 1rem;"><canvas id="chartManutPreventivaCorretiva" height="200"></canvas></div>
-                            <div id="bi-veiculos-criticos" style="margin-top: 1rem;"></div>
+                            <div class="bi-chart-embed analytics-card bi-chart-card" style="margin-top: var(--gutter);">
+                                <div class="card-header"><h3>Preventiva vs corretiva</h3></div>
+                                <div class="card-body card-body--pie">
+                                    <canvas id="chartManutPreventivaCorretiva" class="bi-canvas-pie"></canvas>
+                                </div>
+                            </div>
+                            <div id="bi-veiculos-criticos" style="margin-top: var(--gutter);"></div>
                         </div>
-                        <div id="bi-desp-viagem-extra" class="bi-extra-block bi-table-card" style="display:none; margin-top: 1rem;">
+                        <div id="bi-desp-viagem-extra" class="bi-extra-block bi-table-card" style="display:none; margin-top: var(--gutter);">
                             <h3><i class="fas fa-road"></i> Despesa por KM e por tipo</h3>
                             <div id="bi-desp-viagem-extra-content"></div>
-                            <div class="bi-chart-card" style="margin-top: 1rem;"><canvas id="chartDespViagemTipos" height="200"></canvas></div>
+                            <div class="bi-chart-embed analytics-card bi-chart-card" style="margin-top: var(--gutter);">
+                                <div class="card-header"><h3>Despesas por tipo</h3></div>
+                                <div class="card-body card-body--pie">
+                                    <p id="bi-desp-viagem-pie-msg" class="bi-text-muted" style="display:none; margin:0; padding:0 0 0.5rem 0;">Nenhuma despesa de viagem por tipo no período (valores zerados ou sem lançamentos).</p>
+                                    <canvas id="chartDespViagemTipos" class="bi-canvas-pie"></canvas>
+                                </div>
+                            </div>
                         </div>
-                        <div id="bi-desp-fixas-extra" class="bi-extra-block bi-table-card" style="display:none; margin-top: 1rem;">
+                        <div id="bi-desp-fixas-extra" class="bi-extra-block bi-table-card" style="display:none; margin-top: var(--gutter);">
                             <h3><i class="fas fa-file-invoice-dollar"></i> Impacto das despesas fixas</h3>
                             <div id="bi-desp-fixas-extra-content"></div>
                         </div>
-                        <div id="bi-alertas-periodo" class="bi-extra-block bi-table-card" style="display:none; margin-top: 1rem;">
+                        <div id="bi-alertas-periodo" class="bi-extra-block bi-table-card" style="display:none; margin-top: var(--gutter);">
                             <h3><i class="fas fa-exclamation-triangle"></i> Alertas ativos no período</h3>
                             <div id="bi-alertas-periodo-content" class="bi-alertas-list"></div>
                         </div>
-                        <div id="bi-ponto-equilibrio" class="bi-extra-block bi-table-card" style="display:none; margin-top: 1rem;">
+                        <div id="bi-ponto-equilibrio" class="bi-extra-block bi-table-card" style="display:none; margin-top: var(--gutter);">
                             <h3><i class="fas fa-balance-scale"></i> Ponto de equilíbrio (break-even)</h3>
                             <div id="bi-ponto-equilibrio-content" class="bi-ponto-equilibrio"></div>
                         </div>
-                        <div id="bi-tendencias" class="bi-extra-block bi-table-card" style="display:none; margin-top: 1rem;">
+                        <div id="bi-tendencias" class="bi-extra-block bi-table-card" style="display:none; margin-top: var(--gutter);">
                             <h3><i class="fas fa-chart-line"></i> Tendências</h3>
                             <div id="bi-tendencias-content" class="bi-tendencias"></div>
                         </div>
-                        <div id="bi-simulador" class="bi-extra-block bi-table-card" style="display:none; margin-top: 1rem;">
+                        <div id="bi-simulador" class="bi-extra-block bi-table-card" style="display:none; margin-top: var(--gutter);">
                             <h3><i class="fas fa-calculator"></i> Simulador &quot;E se…&quot;</h3>
                             <p class="bi-text-muted" style="margin:0 0 0.5rem 0; font-size:0.9rem;">Simule o impacto no lucro do período alterando combustível ou comissão.</p>
                             <div id="bi-simulador-content">
@@ -314,16 +610,18 @@ $empresa_id = $_SESSION['empresa_id'];
                                 <div id="bi-simulador-result" class="bi-simulador-result" style="display:none;"></div>
                             </div>
                         </div>
-                        <div id="bi-custo-km-hist" class="bi-extra-block bi-table-card" style="display:none; margin-top: 1rem;">
+                        <div id="bi-custo-km-hist" class="bi-extra-block bi-table-card" style="display:none; margin-top: var(--gutter);">
                             <h3><i class="fas fa-tachometer-alt"></i> Custo por KM – histórico e por veículo</h3>
-                            <div class="bi-chart-card" style="margin-bottom: 1rem;">
-                                <h4 style="font-size:0.95rem; margin:0 0 0.5rem 0;">Evolução do custo/km (mês a mês)</h4>
-                                <canvas id="chartCustoKmHist" height="200"></canvas>
+                            <div class="bi-chart-embed analytics-card bi-chart-card" style="margin-bottom: var(--gutter);">
+                                <div class="card-header"><h3>Evolução do custo/km (mês a mês)</h3></div>
+                                <div class="card-body bi-chart-body">
+                                    <canvas id="chartCustoKmHist"></canvas>
+                                </div>
                             </div>
                             <h4 style="font-size:0.95rem; margin:0.5rem 0;">Por veículo (período)</h4>
                             <div id="bi-custo-km-veiculos-content" class="bi-custo-km-veiculos"></div>
                         </div>
-                        <div id="bi-insights-ia" class="bi-extra-block bi-table-card" style="display:none; margin-top: 1rem;">
+                        <div id="bi-insights-ia" class="bi-extra-block bi-table-card" style="display:none; margin-top: var(--gutter);">
                             <h3><i class="fas fa-robot"></i> Insights automáticos</h3>
                             <div id="bi-insights-ia-content" class="bi-insights-list"></div>
                         </div>
@@ -333,8 +631,8 @@ $empresa_id = $_SESSION['empresa_id'];
                             <h2><i class="fas fa-chart-line"></i> Indicadores de Desempenho</h2>
                             <div class="bi-indicadores-box">
                                 <div class="bi-indicadores-actions">
-                                    <button type="button" id="btn-indicadores-atualizar" class="btn-action-indicators"><i class="fas fa-sync-alt"></i> Atualizar</button>
-                                    <button type="button" id="btn-indicadores-excel" class="btn-action-indicators"><i class="fas fa-file-excel"></i> Excel</button>
+                                    <button type="button" id="btn-indicadores-atualizar" class="btn-action-indicators" aria-label="Atualizar indicadores de desempenho"><i class="fas fa-sync-alt" aria-hidden="true"></i> Atualizar</button>
+                                    <button type="button" id="btn-indicadores-excel" class="btn-action-indicators" aria-label="Exportar indicadores para Excel"><i class="fas fa-file-excel" aria-hidden="true"></i> Excel</button>
                                 </div>
                                 <div id="indicatorsLoading" style="text-align: center; padding: 40px;">
                                     <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: var(--text-secondary);"></i>
@@ -351,15 +649,26 @@ $empresa_id = $_SESSION['empresa_id'];
                                         <tbody id="indicatorsTableBody"></tbody>
                                     </table>
                                 </div>
-                                <div id="bi-indicadores-alertas" class="bi-indicadores-alertas" style="margin-top: 1rem; display: none;"></div>
+                                <div id="bi-indicadores-alertas" class="bi-indicadores-alertas" style="margin-top: var(--gutter); display: none;"></div>
+                            </div>
+                        </div>
+
+                        <div id="bi-drill-modal" class="bi-drill-modal" role="dialog" aria-modal="true" aria-labelledby="bi-drill-title" aria-hidden="true">
+                            <div class="bi-drill-backdrop" id="bi-drill-backdrop"></div>
+                            <div class="bi-drill-dialog">
+                                <div class="bi-drill-header">
+                                    <h3 id="bi-drill-title">Detalhes</h3>
+                                    <button type="button" class="bi-drill-close" id="bi-drill-close" aria-label="Fechar">&times;</button>
+                                </div>
+                                <div id="bi-drill-body" class="bi-drill-body"></div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </main>
 
-                <!-- Footer -->
-                <?php include __DIR__ . '/../includes/footer.php'; ?>
-            </div>
+            <!-- Footer: irmão de .dashboard-content (igual rotas/outras páginas) para colar na base do main-content -->
+            <?php include __DIR__ . '/../includes/footer.php'; ?>
         </div>
     </div>
 
@@ -371,18 +680,204 @@ $empresa_id = $_SESSION['empresa_id'];
     var baseUrl = '../api';
     var charts = {};
 
+    function biFiltroPeriodoQuery() {
+        var a = document.getElementById('filtro-ano');
+        var m = document.getElementById('filtro-mes');
+        var ano = (a && a.value) ? String(a.value).trim() : '';
+        var mes = (m && m.value) ? String(m.value).trim() : '';
+        var q = '';
+        if (ano) q += '&ano=' + encodeURIComponent(ano);
+        if (mes !== '') q += '&mes=' + encodeURIComponent(mes);
+        return q;
+    }
+
+    function biHtmlEsc(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+    function biDrillFormatCell(key, val) {
+        if (val == null || val === '') return '—';
+        var k = (key || '').toLowerCase();
+        if (k === 'id' || k === 'rota_id') return biHtmlEsc(String(val));
+        var n = Number(val);
+        if (!isNaN(n) && String(val).trim() !== '') {
+            if (/valor|frete|comissao|pedagio|caixinha|descarga|total_despviagem/.test(k)) return biHtmlEsc(formatMoney(n));
+            if (k === 'litros' || k.indexOf('litro') === 0) return biHtmlEsc(n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 }));
+            if (/distancia|km_atual|_km$/.test(k)) return biHtmlEsc(n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }));
+            return biHtmlEsc(formatNum(n));
+        }
+        return biHtmlEsc(String(val));
+    }
+    function biRenderDrillTable(json) {
+        var cols = json.columns || [];
+        var rows = json.rows || [];
+        if (!rows.length) return '<p class="bi-text-muted">Nenhum registro neste mês.</p>';
+        
+        // LIMITA a 200 registros para evitar stack overflow no navegador
+        var maxRows = 200;
+        var totalRows = rows.length;
+        var displayRows = rows.slice(0, maxRows);
+        var hasMore = totalRows > maxRows;
+        
+        var thead = '<thead><tr>' + cols.map(function(c) { return '<th>' + biHtmlEsc(c.label) + '</th>'; }).join('') + '</tr></thead>';
+        var tbody = '<tbody>' + displayRows.map(function(row) {
+            return '<tr>' + cols.map(function(c) {
+                return '<td>' + biDrillFormatCell(c.key, row[c.key]) + '</td>';
+            }).join('') + '</tr>';
+        }).join('') + '</tbody>';
+        
+        var warning = hasMore ? '<p class="bi-drill-hint" style="color:#f59e0b; margin-top:0.5rem;"><i class="fas fa-exclamation-triangle"></i> Exibindo ' + maxRows + ' de ' + totalRows + ' registros. Para ver todos, atualize os filtros ou exporte os dados.</p>' : '';
+        
+        return '<div style="overflow-x:auto;"><table class="bi-table">' + thead + tbody + '</table></div>' + warning;
+    }
+    function biCloseDrillModal() {
+        var modal = document.getElementById('bi-drill-modal');
+        if (modal) {
+            modal.classList.remove('is-open');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+    }
+    function biFetchDrillIntoModal(pageTitle, url) {
+        var modal = document.getElementById('bi-drill-modal');
+        var title = document.getElementById('bi-drill-title');
+        var body = document.getElementById('bi-drill-body');
+        if (!modal || !title || !body) return;
+        title.textContent = pageTitle;
+        body.innerHTML = '<div class="bi-loading" style="padding:1.5rem;"><i class="fas fa-spinner fa-spin"></i> Carregando…</div>';
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        var safe = (typeof sfSafeErrorMessage === 'function')
+            ? sfSafeErrorMessage
+            : function (e, f) { var m = (e && e.message) ? String(e.message) : (f || ''); return /maximum call stack|stack size exceeded/i.test(m) ? 'Erro no navegador. Atualize a página.' : (m || f || 'Erro'); };
+        fetch(url, { credentials: 'same-origin' })
+            .then(function(r) { return r.json(); })
+            .then(function(json) {
+                if (!json.success) {
+                    var em = json.message || json.error || 'Erro ao carregar';
+                    body.innerHTML = '<p class="bi-error">' + biHtmlEsc(safe(em, 'Erro ao carregar')) + '</p>';
+                    return;
+                }
+                body.innerHTML = biRenderDrillTable(json);
+            })
+            .catch(function(err) {
+                body.innerHTML = '<p class="bi-error">' + biHtmlEsc(safe(err, 'Falha ao carregar. Tente novamente.')) + '</p>';
+            });
+    }
+    function biOpenDrillModal(serie, mesAno, mesLabel) {
+        var sl = { rotas: 'Rotas', abastecimentos: 'Abastecimentos', manutencoes: 'Manutenções', despesas_viagem: 'Despesas de viagem', despesas_fixas: 'Despesas fixas (pagas)' };
+        var pageTitle = (sl[serie] || 'Detalhes') + ' — ' + (mesLabel || mesAno);
+        var url = baseUrl + '/bi_drill_down.php?serie=' + encodeURIComponent(serie) + '&mes_ano=' + encodeURIComponent(mesAno);
+        biFetchDrillIntoModal(pageTitle, url);
+    }
+    function biClickElemIndex(el) {
+        if (!el) return null;
+        if (el.index != null) return el.index;
+        if (el._index != null) return el._index;
+        return null;
+    }
+    function biBindDrill(chart, ctx) {
+        if (!chart || !ctx || !ctx.mesAnos || !ctx.serie) return;
+        chart.options = chart.options || {};
+        chart.options.interaction = chart.options.interaction || {};
+        chart.options.interaction.mode = 'index';
+        chart.options.interaction.intersect = false;
+        chart.options.tooltips = chart.options.tooltips || {};
+        chart.options.tooltips.mode = 'index';
+        chart.options.tooltips.intersect = false;
+        chart.options.onClick = function(evt, elements) {
+            if (!elements || !elements.length) return;
+            var i = biClickElemIndex(elements[0]);
+            if (i == null) return;
+            var mes = ctx.mesAnos[i];
+            if (!mes) return;
+            var lab = (ctx.labels && ctx.labels[i]) ? ctx.labels[i] : mes;
+            biOpenDrillModal(ctx.serie, mes, lab);
+        };
+    }
+    function biBindDrillTopVeiculo(chart, serieApi, ids, placaLabels) {
+        if (!chart || !ids || !ids.length) return;
+        chart.options = chart.options || {};
+        chart.options.interaction = chart.options.interaction || {};
+        chart.options.interaction.mode = 'index';
+        chart.options.interaction.intersect = false;
+        chart.options.tooltips = chart.options.tooltips || {};
+        chart.options.tooltips.mode = 'index';
+        chart.options.tooltips.intersect = false;
+        var pq = biFiltroPeriodoQuery();
+        chart.options.onClick = function(evt, elements) {
+            if (!elements || !elements.length) return;
+            var idx = biClickElemIndex(elements[0]);
+            if (idx == null) return;
+            var vid = ids[idx];
+            if (vid == null || vid === '') return;
+            var lab = (placaLabels && placaLabels[idx]) ? placaLabels[idx] : ('Veículo ' + vid);
+            var url = baseUrl + '/bi_drill_down.php?serie=' + encodeURIComponent(serieApi) + '&veiculo_id=' + encodeURIComponent(vid) + pq;
+            biFetchDrillIntoModal(lab + ' — detalhes', url);
+        };
+    }
+    function biBindDrillPieDesp(chart) {
+        if (!chart) return;
+        var labelsPie = ['Pedágio', 'Alimentação', 'Hospedagem', 'Outros'];
+        var pq = biFiltroPeriodoQuery();
+        chart.options = chart.options || {};
+        chart.options.onClick = function(evt, elements) {
+            if (!elements || !elements.length) return;
+            var ix = biClickElemIndex(elements[0]);
+            if (ix == null) return;
+            var url = baseUrl + '/bi_drill_down.php?serie=desp_viagem_pie&slice=' + encodeURIComponent(ix) + pq;
+            biFetchDrillIntoModal('Despesas de viagem — ' + (labelsPie[ix] != null ? labelsPie[ix] : ('Fatia ' + ix)), url);
+        };
+    }
+    function biBindDrillManutPie(chart) {
+        if (!chart) return;
+        var labs = ['Preventiva', 'Corretiva'];
+        var tipos = ['preventiva', 'corretiva'];
+        var pq = biFiltroPeriodoQuery();
+        chart.options = chart.options || {};
+        chart.options.onClick = function(evt, elements) {
+            if (!elements || !elements.length) return;
+            var ix = biClickElemIndex(elements[0]);
+            if (ix == null) return;
+            var tp = tipos[ix] || 'preventiva';
+            var url = baseUrl + '/bi_drill_down.php?serie=manut_pie&tipo_pie=' + encodeURIComponent(tp) + pq;
+            biFetchDrillIntoModal('Manutenções — ' + (labs[ix] != null ? labs[ix] : tp), url);
+        };
+    }
+
+    function biCoerceNumber(v) {
+        if (v == null || v === '') return NaN;
+        if (typeof v === 'number') return isFinite(v) ? v : NaN;
+        if (typeof v === 'string') {
+            var t = v.replace(/\s/g, '').replace(',', '.');
+            var n = parseFloat(t);
+            return isFinite(n) ? n : NaN;
+        }
+        if (typeof v === 'object') return NaN;
+        try {
+            var x = Number(v);
+            return isFinite(x) ? x : NaN;
+        } catch (e) { return NaN; }
+    }
     function formatMoney(v) {
-        if (v == null) return '—';
-        return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        if (v == null || v === '') return '—';
+        var n = biCoerceNumber(v);
+        if (isNaN(n)) return '—';
+        return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
     function formatNum(v) {
-        if (v == null) return '—';
-        return Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+        if (v == null || v === '') return '—';
+        var n = biCoerceNumber(v);
+        if (isNaN(n)) return '—';
+        return n.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
     }
     function variacaoPct(atual, anterior) {
-        if (anterior == null || anterior === 0) return null;
-        var pct = ((atual - anterior) / Math.abs(anterior)) * 100;
-        return pct;
+        var a = biCoerceNumber(atual);
+        var ant = biCoerceNumber(anterior);
+        if (isNaN(a) || isNaN(ant) || ant === 0) return null;
+        return ((a - ant) / Math.abs(ant)) * 100;
     }
     function badgeVariacao(pct, label) {
         if (pct == null || isNaN(pct)) return '';
@@ -393,12 +888,39 @@ $empresa_id = $_SESSION['empresa_id'];
     }
 
     function showLoading(show) {
-        document.getElementById('bi-loading').style.display = show ? 'block' : 'none';
-        document.getElementById('bi-error').style.display = 'none';
+        var loadingEl = document.getElementById('bi-loading');
+        var mainEl = document.getElementById('bi-main-content');
+        var errorEl = document.getElementById('bi-error');
+        
+        if (show) {
+            if (loadingEl) {
+                loadingEl.style.display = 'flex';
+                loadingEl.style.opacity = '1';
+                loadingEl.setAttribute('aria-busy', 'true');
+            }
+            if (mainEl) mainEl.style.opacity = '0.3';
+            if (errorEl) errorEl.style.display = 'none';
+        } else {
+            if (loadingEl) {
+                loadingEl.setAttribute('aria-busy', 'false');
+                loadingEl.style.opacity = '0';
+                setTimeout(function() { loadingEl.style.display = 'none'; }, 300);
+            }
+            if (mainEl) {
+                mainEl.style.opacity = '1';
+                mainEl.style.transition = 'opacity 0.3s ease';
+            }
+        }
     }
     function showError(msg) {
-        document.getElementById('bi-error').textContent = msg;
-        document.getElementById('bi-error').style.display = 'block';
+        var errEl = document.getElementById('bi-error');
+        if (errEl) {
+            errEl.textContent = msg;
+            errEl.style.display = 'block';
+            try {
+                errEl.focus();
+            } catch (e) { /* ignore */ }
+        }
         document.getElementById('bi-kpis').style.display = 'none';
         document.getElementById('bi-charts').style.display = 'none';
         document.getElementById('bi-table-wrap').style.display = 'none';
@@ -418,11 +940,12 @@ $empresa_id = $_SESSION['empresa_id'];
     function kpiCard(icon, value, label, attr, ref, comp) {
         var variacoes = '';
         if (comp && comp.mes_anterior && comp.mesmo_mes_ano_anterior && ref) {
-            var v1 = variacaoPct(Number(ref[attr]), Number(comp.mes_anterior[attr]));
-            var v2 = variacaoPct(Number(ref[attr]), Number(comp.mesmo_mes_ano_anterior[attr]));
+            var v1 = variacaoPct(biCoerceNumber(ref[attr]), biCoerceNumber(comp.mes_anterior[attr]));
+            var v2 = variacaoPct(biCoerceNumber(ref[attr]), biCoerceNumber(comp.mesmo_mes_ano_anterior[attr]));
             variacoes = '<div class="bi-kpi-variacoes">' + badgeVariacao(v1, 'vs mês ant.') + badgeVariacao(v2, 'vs ano ant.') + '</div>';
         }
-        return '<div class="bi-kpi">' + (icon ? '<i class="' + icon + '"></i>' : '') + '<div class="bi-kpi-value">' + value + '</div>' + variacoes + '<div class="bi-kpi-label">' + label + '</div></div>';
+        var h3 = (icon ? '<i class="' + icon + '" style="margin-right:0.35em;opacity:0.85;"></i>' : '') + label;
+        return '<div class="dashboard-card"><div class="card-header"><h3>' + h3 + '</h3></div><div class="card-body"><div class="metric"><span class="metric-value">' + value + '</span>' + variacoes + '</div></div></div>';
     }
     function renderKPIs(data, visao) {
         visao = visao || 'geral';
@@ -430,7 +953,10 @@ $empresa_id = $_SESSION['empresa_id'];
         var comp = data.comparacao || null;
         var ref = hist.length > 0 ? hist[hist.length - 1] : null;
         function sum(attr) {
-            return hist.reduce(function (acc, row) { return acc + (Number(row[attr]) || 0); }, 0);
+            return hist.reduce(function (acc, row) {
+                var n = biCoerceNumber(row[attr]);
+                return acc + (isNaN(n) ? 0 : n);
+            }, 0);
         }
         var totalRotas = sum('total_rotas');
         var totalKm = sum('total_km_rodados');
@@ -546,11 +1072,261 @@ $empresa_id = $_SESSION['empresa_id'];
         }
     }
 
+    function biChartCssVar(name, fallback) {
+        try {
+            var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            return v || fallback;
+        } catch (e) { return fallback; }
+    }
+    function biChartPalette() {
+        var light = document.documentElement.classList.contains('light-theme');
+        return {
+            tick: biChartCssVar('--text-secondary', light ? '#64748b' : '#94a3b8'),
+            grid: biChartCssVar('--border-color', light ? 'rgba(15, 23, 42, 0.12)' : 'rgba(148, 163, 184, 0.22)'),
+            legend: biChartCssVar('--text-secondary', light ? '#64748b' : '#94a3b8')
+        };
+    }
+    function biEnrichScales(scales) {
+        if (!scales) return scales;
+        var pal = biChartPalette();
+        function paintAxes(axes, isX) {
+            if (!axes || !axes.length) return;
+            axes.forEach(function (ax) {
+                ax.ticks = ax.ticks || {};
+                if (ax.ticks.fontColor === undefined) ax.ticks.fontColor = pal.tick;
+                if (isX) {
+                    if (ax.ticks.maxRotation === undefined) ax.ticks.maxRotation = 48;
+                    if (ax.ticks.minRotation === undefined) ax.ticks.minRotation = 0;
+                    if (ax.ticks.autoSkip === undefined) ax.ticks.autoSkip = true;
+                }
+                ax.gridLines = ax.gridLines || {};
+                var skipFill = ax.gridLines.drawOnChartArea === false;
+                if (!skipFill) {
+                    if (ax.gridLines.color === undefined) ax.gridLines.color = pal.grid;
+                    if (ax.gridLines.zeroLineColor === undefined) ax.gridLines.zeroLineColor = pal.grid;
+                }
+            });
+        }
+        paintAxes(scales.xAxes, true);
+        paintAxes(scales.yAxes, false);
+        return scales;
+    }
+    function biChartOptions(scales) {
+        var pal = biChartPalette();
+        var light = document.documentElement.classList.contains('light-theme');
+        biEnrichScales(scales);
+        return {
+            responsive: false,
+            maintainAspectRatio: false,
+            animation: { duration: 1 },
+            legend: {
+                display: true,
+                position: 'bottom',
+                labels: { fontColor: pal.legend, boxWidth: 11, padding: 12 }
+            },
+            tooltips: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: light ? 'rgba(30, 41, 59, 0.96)' : 'rgba(15, 24, 36, 0.94)',
+                titleFontColor: '#f8fafc',
+                titleFontStyle: 'bold',
+                bodyFontColor: '#e2e8f0',
+                borderColor: pal.grid,
+                borderWidth: 1,
+                cornerRadius: 8,
+                xPadding: 10,
+                yPadding: 8
+            },
+            scales: scales
+        };
+    }
+    function biChartPieOptions() {
+        var pal = biChartPalette();
+        var light = document.documentElement.classList.contains('light-theme');
+        return {
+            responsive: false,
+            maintainAspectRatio: false,
+            animation: { duration: 1 },
+            legend: {
+                display: true,
+                position: 'bottom',
+                labels: { fontColor: pal.legend, boxWidth: 12, padding: 12 }
+            },
+            tooltips: {
+                backgroundColor: light ? 'rgba(30, 41, 59, 0.96)' : 'rgba(15, 24, 36, 0.94)',
+                titleFontColor: '#f8fafc',
+                bodyFontColor: '#e2e8f0',
+                borderColor: pal.grid,
+                borderWidth: 1,
+                cornerRadius: 8,
+                callbacks: {
+                    label: function (item, data) {
+                        var label = data.labels[item.index] || '';
+                        var val = data.datasets[0].data[item.index];
+                        var n = Number(val);
+                        var s = isNaN(n) ? String(val) : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        return label + ': R$ ' + s;
+                    }
+                }
+            }
+        };
+    }
+
+    var BI_CHART_CANVAS_IDS = ['chartRotasTempo','chartFreteMensal','chartKmMensal','chartAbastTempo','chartTopVeiculos','chartDespViagemTipos','chartCustoKmHist','chartManutPreventivaCorretiva'];
     function destroyCharts() {
-        ['chartRotasTempo','chartFreteMensal','chartKmMensal','chartAbastTempo','chartTopVeiculos','chartDespViagemTipos','chartCustoKmHist','chartManutPreventivaCorretiva'].forEach(function(id) {
-            if (charts[id]) { charts[id].destroy(); charts[id] = null; }
+        BI_CHART_CANVAS_IDS.forEach(function(id) {
+            if (charts[id]) {
+                try { charts[id].destroy(); } catch (e) {}
+                charts[id] = null;
+            }
+            var el = document.getElementById(id);
+            if (!el || typeof Chart === 'undefined') return;
+            var oc = null;
+            if (typeof Chart.getChart === 'function') {
+                try { oc = Chart.getChart(el); } catch (e0) {}
+            }
+            if (!oc && el.chart) oc = el.chart;
+            if (!oc && el.getContext) {
+                try {
+                    var cx = el.getContext('2d');
+                    if (cx && cx.chart) oc = cx.chart;
+                } catch (e1) {}
+            }
+            if (oc) {
+                try { oc.destroy(); } catch (e2) {}
+            }
+            if (id === 'chartDespViagemTipos' && el) {
+                el.style.display = '';
+                var pm0 = document.getElementById('bi-desp-viagem-pie-msg');
+                if (pm0) pm0.style.display = 'none';
+            }
         });
     }
+
+    var biChartsResizeObserver = null;
+    var biChartsResizeDebounce = null;
+    function biEnsureChartsResizeObserver() {
+        if (typeof ResizeObserver === 'undefined') return;
+        if (biChartsResizeObserver) {
+            try { biChartsResizeObserver.disconnect(); } catch (eRo) {}
+            biChartsResizeObserver = null;
+        }
+        biChartsResizeObserver = new ResizeObserver(function () {
+            if (biChartsResizeDebounce) clearTimeout(biChartsResizeDebounce);
+            biChartsResizeDebounce = setTimeout(function () {
+                biReflowBiCharts();
+            }, 60);
+        });
+        try {
+            var grid = document.getElementById('bi-charts');
+            if (grid) biChartsResizeObserver.observe(grid);
+            var main = document.querySelector('.main-content');
+            if (main) biChartsResizeObserver.observe(main);
+        } catch (eOb) {}
+    }
+
+    /* Chart.js 2.9 + responsive:false: o bitmap usa canvas.width/height; CSS sozinho não redimensiona o desenho */
+    function biElementOrAncestorHidden(el) {
+        if (!el) return true;
+        try {
+            var p = el;
+            while (p && p !== document.documentElement) {
+                if (p.nodeType !== 1) {
+                    p = p.parentElement;
+                    continue;
+                }
+                var st = window.getComputedStyle(p);
+                if (st.display === 'none' || st.visibility === 'hidden' || parseFloat(st.opacity || '1') === 0) return true;
+                p = p.parentElement;
+            }
+        } catch (e) { return true; }
+        return false;
+    }
+    /** Largura segura quando o card ainda está em painel display:none (evita bitmap largura total da página). */
+    function biFallbackCanvasWidth(canvasEl) {
+        var full = false;
+        try {
+            var card = canvasEl.closest && canvasEl.closest('.bi-chart-card');
+            if (card && card.classList && card.classList.contains('bi-chart-full')) full = true;
+        } catch (e) {}
+        var grid = document.getElementById('bi-charts');
+        var gridOk = grid && !biElementOrAncestorHidden(grid) && grid.clientWidth > 80;
+        var gw = gridOk ? grid.clientWidth : 0;
+        if (gw) {
+            var gap = 10;
+            var col = Math.max(220, Math.floor((gw - gap) / 2) - 20);
+            if (full) return Math.max(280, Math.min(gw - 32, 1200));
+            return Math.max(240, Math.min(col, 720));
+        }
+        var mc = document.querySelector('.dashboard-content') || document.querySelector('.main-content');
+        var mw = (mc && mc.clientWidth > 80) ? mc.clientWidth : 640;
+        if (full) return Math.max(280, Math.min(mw - 48, 1200));
+        return Math.max(240, Math.min(Math.floor((mw - 64) / 2), 720));
+    }
+    function biCanvasHeightPx(canvasEl, id) {
+        if (id === 'chartDespViagemTipos' || id === 'chartManutPreventivaCorretiva') return 200;
+        try {
+            if (canvasEl && canvasEl.closest && canvasEl.closest('#bi-charts')) {
+                var card = canvasEl.closest('.bi-chart-card');
+                if (card && card.classList && card.classList.contains('bi-chart-full')) return 268;
+            }
+        } catch (e) { /* ignore */ }
+        return 220;
+    }
+
+    function biPrepCanvas(canvasEl, heightPx) {
+        if (!canvasEl) return;
+        var h = heightPx || 220;
+        var wrap = canvasEl.closest ? canvasEl.closest('.bi-chart-card') : null;
+        if (!wrap) wrap = canvasEl.parentElement;
+        var w = 0;
+        if (wrap && wrap.clientWidth > 80 && !biElementOrAncestorHidden(wrap)) w = Math.floor(wrap.clientWidth);
+        if (!w || w < 80) w = biFallbackCanvasWidth(canvasEl);
+        w = Math.max(220, Math.min(w, 1200));
+        canvasEl.style.width = '100%';
+        canvasEl.style.height = h + 'px';
+        canvasEl.style.maxHeight = h + 'px';
+        canvasEl.width = w;
+        canvasEl.height = h;
+    }
+    function biPrepAllBiChartCanvases() {
+        BI_CHART_CANVAS_IDS.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            biPrepCanvas(el, biCanvasHeightPx(el, id));
+        });
+    }
+    function biReflowBiCharts() {
+        BI_CHART_CANVAS_IDS.forEach(function(id) {
+            var el = document.getElementById(id);
+            if (!el || !charts[id]) return;
+            biPrepCanvas(el, biCanvasHeightPx(el, id));
+            try {
+                if (charts[id] && typeof charts[id].resize === 'function') charts[id].resize();
+            } catch (e) { /* ignore */ }
+        });
+        BI_CHART_CANVAS_IDS.forEach(function(id) {
+            var ch = charts[id];
+            if (!ch || typeof ch.update !== 'function') return;
+            try { ch.update(); } catch (e2) { /* ignore */ }
+        });
+    }
+    /** Reflow após sidebar (.main-content transition ~300ms) e segundo frame — evita canvas “vazio” até mover o mouse */
+    function biScheduleChartLayoutStabilize() {
+        function run() {
+            biReflowBiCharts();
+        }
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(run);
+            });
+        } else {
+            setTimeout(run, 0);
+        }
+        setTimeout(run, 320);
+        setTimeout(run, 600);
+    }
+
     function simuladorUpdate() {
         var wrap = document.getElementById('bi-simulador-content');
         if (!wrap || !wrap.dataset.frete) return;
@@ -577,7 +1353,12 @@ $empresa_id = $_SESSION['empresa_id'];
     function renderExtraBlocks(data, visao) {
         hideAllExtraBlocks();
         var hist = data.historico_mensal || [];
-        function sum(attr) { return hist.reduce(function (acc, row) { return acc + (Number(row[attr]) || 0); }, 0); }
+        function sum(attr) {
+            return hist.reduce(function (acc, row) {
+                var n = biCoerceNumber(row[attr]);
+                return acc + (isNaN(n) ? 0 : n);
+            }, 0);
+        }
         var totalKm = sum('total_km_rodados');
         var totalFrete = sum('total_frete');
         var totalComissao = sum('total_comissao');
@@ -587,7 +1368,10 @@ $empresa_id = $_SESSION['empresa_id'];
         var lucro = sum('lucro_operacional');
         var gastoAbast = sum('total_gasto_abastecimentos');
         var totalManut = sum('total_manutencoes');
-        var totalLitros = hist.reduce(function(acc, row) { return acc + (Number(row.total_litros) || 0); }, 0);
+        var totalLitros = hist.reduce(function(acc, row) {
+            var n = biCoerceNumber(row.total_litros);
+            return acc + (isNaN(n) ? 0 : n);
+        }, 0);
 
         if (visao === 'rotas' && data.ranking_rotas) {
             var r = data.ranking_rotas;
@@ -694,20 +1478,28 @@ $empresa_id = $_SESSION['empresa_id'];
             }
             document.getElementById('bi-simulador').style.display = 'block';
 
-            var histCustoKm = (data.historico_mensal || []).map(function(m) {
-                var ct = (Number(m.total_gasto_abastecimentos) || 0) + (Number(m.total_manutencoes) || 0) + (Number(m.total_despesas_viagem) || 0) + (Number(m.total_despesas_fixas) || 0);
-                var km = Number(m.total_km_rodados) || 0;
+            var hmCusto = data.historico_mensal || [];
+            if (hmCusto.length > 120) hmCusto = hmCusto.slice(-120);
+            var histCustoKm = hmCusto.map(function(m) {
+                var ct = (biCoerceNumber(m.total_gasto_abastecimentos) || 0) + (biCoerceNumber(m.total_manutencoes) || 0) + (biCoerceNumber(m.total_despesas_viagem) || 0) + (biCoerceNumber(m.total_despesas_fixas) || 0);
+                var km = biCoerceNumber(m.total_km_rodados) || 0;
                 return km > 0 ? ct / km : 0;
             });
-            var labelsCustoKm = (data.labels || (data.historico_mensal || []).map(function(x) { return x.mes_nome || x.mes_ano; })) || [];
+            var labelsCustoKm = hmCusto.map(function(x) { return x.mes_nome || x.mes_ano; });
+            var wrapCustoHist = document.getElementById('bi-custo-km-hist');
+            if (wrapCustoHist) wrapCustoHist.style.display = 'block';
+            if (wrapCustoHist) void wrapCustoHist.offsetWidth;
             var canvasCustoKm = document.getElementById('chartCustoKmHist');
             if (canvasCustoKm && labelsCustoKm.length) {
                 if (charts.chartCustoKmHist) { charts.chartCustoKmHist.destroy(); charts.chartCustoKmHist = null; }
+                biPrepCanvas(canvasCustoKm, biCanvasHeightPx(canvasCustoKm, 'chartCustoKmHist'));
+                var mesAnosC = hmCusto.map(function(x) { return x.mes_ano || ''; });
                 charts.chartCustoKmHist = new Chart(canvasCustoKm, {
                     type: 'line',
                     data: { labels: labelsCustoKm, datasets: [{ label: 'Custo/km (R$)', data: histCustoKm, borderColor: '#0d9488', backgroundColor: 'rgba(13,148,136,0.1)', fill: true }] },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
+                biBindDrill(charts.chartCustoKmHist, { mesAnos: mesAnosC, labels: labelsCustoKm, serie: 'rotas' });
             }
             var topV = data.veiculos_top || [], abastV = data.veiculos_top_abastecimento || [], manutV = data.veiculos_top_manutencao || [];
             var byId = {};
@@ -717,7 +1509,6 @@ $empresa_id = $_SESSION['empresa_id'];
             var veiculosCustoKm = Object.keys(byId).map(function(k) { var v = byId[k]; v.custo_km = (v.total_km > 0) ? ((v.gasto_abast + v.gasto_manut) / v.total_km) : 0; return v; }).filter(function(v) { return v.total_km > 0 || (v.gasto_abast + v.gasto_manut) > 0; }).sort(function(a, b) { return b.custo_km - a.custo_km; });
             var elCustoVeic = document.getElementById('bi-custo-km-veiculos-content');
             if (elCustoVeic) elCustoVeic.innerHTML = veiculosCustoKm.length ? '<table class="bi-table"><thead><tr><th>Veículo</th><th>KM</th><th>Gasto abast. + manut.</th><th>Custo/km (R$)</th></tr></thead><tbody>' + veiculosCustoKm.map(function(v) { return '<tr><td>' + (v.placa || v.modelo || '-') + '</td><td>' + formatNum(v.total_km) + '</td><td>' + formatMoney(v.gasto_abast + v.gasto_manut) + '</td><td>' + formatMoney(v.custo_km) + '</td></tr>'; }).join('') + '</tbody></table>' : '<p class="bi-text-muted">Nenhum dado de veículo no período.</p>';
-            document.getElementById('bi-custo-km-hist').style.display = 'block';
 
             if (data.historico_mensal && data.historico_mensal.length >= 2) {
                 var insights = [];
@@ -757,11 +1548,22 @@ $empresa_id = $_SESSION['empresa_id'];
     function renderCharts(data, visao) {
         visao = visao || 'geral';
         destroyCharts();
+        var _biChartsWrap = document.getElementById('bi-charts');
+        if (_biChartsWrap) {
+            _biChartsWrap.style.display = 'grid';
+            void _biChartsWrap.offsetWidth;
+        }
+        biPrepAllBiChartCanvases();
         var hist = data.historico_mensal || [];
-        var labels = (data.labels || hist.map(function(x) { return x.mes_nome || x.mes_ano; })) || [];
+        if (hist.length > 120) hist = hist.slice(-120);
+        var labels = hist.map(function(x) { return x.mes_nome || x.mes_ano; });
 
         var wrapAbast = document.getElementById('wrapChartAbastTempo');
         if (wrapAbast) wrapAbast.style.display = (visao === 'geral') ? 'block' : 'none';
+        var wrapTopVeiculos = document.getElementById('wrapChartTopVeiculos');
+        if (wrapTopVeiculos) {
+            wrapTopVeiculos.style.display = (visao === 'despesas_viagem' || visao === 'despesas_fixas') ? 'none' : '';
+        }
 
         if (visao === 'manutencao') {
             document.getElementById('tituloChartRotasTempo').textContent = 'Custo de manutenção por mês';
@@ -772,10 +1574,10 @@ $empresa_id = $_SESSION['empresa_id'];
                         labels: labels,
                         datasets: [
                             { label: 'Custo (R$)', data: hist.map(function(x) { return x.total_manutencoes || 0; }), backgroundColor: 'rgba(239,68,68,0.6)', borderColor: '#ef4444', borderWidth: 1 },
-                            { label: 'Qtde', data: hist.map(function(x) { return x.quantidade_manutencoes || 0; }), backgroundColor: 'rgba(245,158,11,0.6)', borderColor: '#f59e0b', borderWidth: 1, yAxisID: 'y1' }
+                            { label: 'Qtde', data: hist.map(function(x) { return x.quantidade_manutencoes || 0; }), backgroundColor: 'rgba(245,158,11,0.6)', borderColor: '#f59e0b', borderWidth: 1, yAxisID: 'y-axis-2' }
                         ]
                     },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true }, y1: { position: 'right', beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ id: 'y-axis-1', position: 'left', ticks: { beginAtZero: true } }, { id: 'y-axis-2', position: 'right', ticks: { beginAtZero: true }, gridLines: { drawOnChartArea: false } }] })
                 });
             }
             document.getElementById('tituloChartFreteMensal').textContent = 'Custo por mês (R$)';
@@ -783,7 +1585,7 @@ $empresa_id = $_SESSION['empresa_id'];
                 charts.chartFreteMensal = new Chart(document.getElementById('chartFreteMensal'), {
                     type: 'line',
                     data: { labels: labels, datasets: [{ label: 'Custo', data: hist.map(function(x) { return x.total_manutencoes || 0; }), borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true }] },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
             }
             document.getElementById('tituloChartKmMensal').textContent = 'Quantidade de manutenções por mês';
@@ -791,7 +1593,7 @@ $empresa_id = $_SESSION['empresa_id'];
                 charts.chartKmMensal = new Chart(document.getElementById('chartKmMensal'), {
                     type: 'bar',
                     data: { labels: labels, datasets: [{ label: 'Manutenções', data: hist.map(function(x) { return x.quantidade_manutencoes || 0; }), backgroundColor: 'rgba(245,158,11,0.7)' }] },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
             }
             if (charts.chartDespViagemTipos) { charts.chartDespViagemTipos.destroy(); charts.chartDespViagemTipos = null; }
@@ -799,7 +1601,7 @@ $empresa_id = $_SESSION['empresa_id'];
             document.getElementById('tituloChartTopVeiculos').textContent = 'Top veículos (custo manutenção)';
             if (document.getElementById('chartTopVeiculos') && veiculosManut.length) {
                 charts.chartTopVeiculos = new Chart(document.getElementById('chartTopVeiculos'), {
-                    type: 'bar',
+                    type: 'horizontalBar',
                     data: {
                         labels: veiculosManut.map(function(v) { return v.placa || v.modelo || 'N/A'; }),
                         datasets: [
@@ -807,7 +1609,7 @@ $empresa_id = $_SESSION['empresa_id'];
                             { label: 'Qtde', data: veiculosManut.map(function(v) { return v.total_manutencoes || 0; }), backgroundColor: 'rgba(245,158,11,0.7)' }
                         ]
                     },
-                    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: true, scales: { x: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{ ticks: { beginAtZero: true } }], yAxes: [{}] })
                 });
             }
             var pc = data.manut_preventiva_corretiva || { preventiva: { valor: 0 }, corretiva: { valor: 0 } };
@@ -821,7 +1623,7 @@ $empresa_id = $_SESSION['empresa_id'];
                         labels: ['Preventiva (R$)', 'Corretiva (R$)'],
                         datasets: [{ data: [vPrev, vCorr], backgroundColor: ['#10b981', '#ef4444'] }]
                     },
-                    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'right' } } }
+                    options: biChartPieOptions()
                 });
             }
         } else if (visao === 'despesas_viagem') {
@@ -830,7 +1632,7 @@ $empresa_id = $_SESSION['empresa_id'];
                 charts.chartRotasTempo = new Chart(document.getElementById('chartRotasTempo'), {
                     type: 'bar',
                     data: { labels: labels, datasets: [{ label: 'Desp. viagem (R$)', data: hist.map(function(x) { return x.total_despesas_viagem || 0; }), backgroundColor: 'rgba(59,130,246,0.7)' }] },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
             }
             document.getElementById('tituloChartFreteMensal').textContent = 'Evolução (R$)';
@@ -838,7 +1640,7 @@ $empresa_id = $_SESSION['empresa_id'];
                 charts.chartFreteMensal = new Chart(document.getElementById('chartFreteMensal'), {
                     type: 'line',
                     data: { labels: labels, datasets: [{ label: 'Desp. viagem', data: hist.map(function(x) { return x.total_despesas_viagem || 0; }), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true }] },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
             }
             document.getElementById('tituloChartKmMensal').textContent = 'Por mês';
@@ -846,7 +1648,7 @@ $empresa_id = $_SESSION['empresa_id'];
                 charts.chartKmMensal = new Chart(document.getElementById('chartKmMensal'), {
                     type: 'bar',
                     data: { labels: labels, datasets: [{ label: 'R$', data: hist.map(function(x) { return x.total_despesas_viagem || 0; }), backgroundColor: 'rgba(16,185,129,0.7)' }] },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
             }
             document.getElementById('tituloChartTopVeiculos').textContent = 'Despesas de viagem';
@@ -858,17 +1660,28 @@ $empresa_id = $_SESSION['empresa_id'];
             var outros = Number(tipos.descarga || 0) + Number(tipos.borracharia || 0) + Number(tipos.eletrica_mecanica || 0) + Number(tipos.adiantamento || 0);
             var labelsPie = ['Pedágio', 'Alimentação', 'Hospedagem', 'Outros'];
             var dadosPie = [pedagio, alimentacao, hospedagem, outros];
+            var somaPie = dadosPie.reduce(function (a, b) { return a + (Number(b) || 0); }, 0);
             var ctx = document.getElementById('chartDespViagemTipos');
+            var pieMsg = document.getElementById('bi-desp-viagem-pie-msg');
+            if (pieMsg) {
+                pieMsg.style.display = somaPie > 0 ? 'none' : 'block';
+            }
             if (ctx) {
-                if (charts.chartDespViagemTipos) charts.chartDespViagemTipos.destroy();
-                charts.chartDespViagemTipos = new Chart(ctx, {
-                    type: 'pie',
-                    data: {
-                        labels: labelsPie,
-                        datasets: [{ data: dadosPie, backgroundColor: ['#3b82f6','#10b981','#f59e0b','#8b5cf6'] }]
-                    },
-                    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'right' } } }
-                });
+                if (charts.chartDespViagemTipos) {
+                    try { charts.chartDespViagemTipos.destroy(); } catch (ePie) {}
+                    charts.chartDespViagemTipos = null;
+                }
+                ctx.style.display = somaPie > 0 ? '' : 'none';
+                if (somaPie > 0) {
+                    charts.chartDespViagemTipos = new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: labelsPie,
+                            datasets: [{ data: dadosPie, backgroundColor: ['#3b82f6','#10b981','#f59e0b','#8b5cf6'] }]
+                        },
+                        options: biChartPieOptions()
+                    });
+                }
             }
         } else if (visao === 'despesas_fixas') {
             document.getElementById('tituloChartRotasTempo').textContent = 'Despesas fixas pagas por mês';
@@ -879,10 +1692,10 @@ $empresa_id = $_SESSION['empresa_id'];
                         labels: labels,
                         datasets: [
                             { label: 'Valor (R$)', data: hist.map(function(x) { return x.total_despesas_fixas || 0; }), backgroundColor: 'rgba(139,92,246,0.7)' },
-                            { label: 'Qtde', data: hist.map(function(x) { return x.quantidade_despesas_fixas || 0; }), backgroundColor: 'rgba(236,72,153,0.6)', yAxisID: 'y1' }
+                            { label: 'Qtde', data: hist.map(function(x) { return x.quantidade_despesas_fixas || 0; }), backgroundColor: 'rgba(236,72,153,0.6)', yAxisID: 'y-axis-2' }
                         ]
                     },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true }, y1: { position: 'right', beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ id: 'y-axis-1', position: 'left', ticks: { beginAtZero: true } }, { id: 'y-axis-2', position: 'right', ticks: { beginAtZero: true }, gridLines: { drawOnChartArea: false } }] })
                 });
             }
             document.getElementById('tituloChartFreteMensal').textContent = 'Total pago por mês';
@@ -890,7 +1703,7 @@ $empresa_id = $_SESSION['empresa_id'];
                 charts.chartFreteMensal = new Chart(document.getElementById('chartFreteMensal'), {
                     type: 'line',
                     data: { labels: labels, datasets: [{ label: 'Desp. fixas (R$)', data: hist.map(function(x) { return x.total_despesas_fixas || 0; }), borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true }] },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
             }
             document.getElementById('tituloChartKmMensal').textContent = 'Quantidade por mês';
@@ -898,7 +1711,7 @@ $empresa_id = $_SESSION['empresa_id'];
                 charts.chartKmMensal = new Chart(document.getElementById('chartKmMensal'), {
                     type: 'bar',
                     data: { labels: labels, datasets: [{ label: 'Qtde', data: hist.map(function(x) { return x.quantidade_despesas_fixas || 0; }), backgroundColor: 'rgba(236,72,153,0.7)' }] },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
             }
             document.getElementById('tituloChartTopVeiculos').textContent = 'Despesas fixas';
@@ -914,10 +1727,10 @@ $empresa_id = $_SESSION['empresa_id'];
                         labels: labels,
                         datasets: [
                             { label: 'Qtde Abast.', data: hist.map(function(x) { return x.total_abastecimentos || 0; }), backgroundColor: 'rgba(79,156,249,0.7)', borderColor: '#4f9cf9', borderWidth: 1 },
-                            { label: 'Gasto (R$)', data: hist.map(function(x) { return x.total_gasto_abastecimentos || 0; }), backgroundColor: 'rgba(52,211,153,0.7)', borderColor: '#34d399', borderWidth: 1, yAxisID: 'y1' }
+                            { label: 'Gasto (R$)', data: hist.map(function(x) { return x.total_gasto_abastecimentos || 0; }), backgroundColor: 'rgba(52,211,153,0.7)', borderColor: '#34d399', borderWidth: 1, yAxisID: 'y-axis-2' }
                         ]
                     },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true }, y1: { position: 'right', beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ id: 'y-axis-1', position: 'left', ticks: { beginAtZero: true } }, { id: 'y-axis-2', position: 'right', ticks: { beginAtZero: true }, gridLines: { drawOnChartArea: false } }] })
                 });
             }
             document.getElementById('tituloChartFreteMensal').textContent = 'Gasto com abastecimento por mês';
@@ -925,7 +1738,7 @@ $empresa_id = $_SESSION['empresa_id'];
                 charts.chartFreteMensal = new Chart(document.getElementById('chartFreteMensal'), {
                     type: 'line',
                     data: { labels: labels, datasets: [{ label: 'Gasto (R$)', data: hist.map(function(x) { return x.total_gasto_abastecimentos || 0; }), borderColor: '#4f9cf9', backgroundColor: 'rgba(79,156,249,0.1)', fill: true }] },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
             }
             document.getElementById('tituloChartKmMensal').textContent = 'Quantidade de abastecimentos por mês';
@@ -933,14 +1746,14 @@ $empresa_id = $_SESSION['empresa_id'];
                 charts.chartKmMensal = new Chart(document.getElementById('chartKmMensal'), {
                     type: 'bar',
                     data: { labels: labels, datasets: [{ label: 'Abastecimentos', data: hist.map(function(x) { return x.total_abastecimentos || 0; }), backgroundColor: 'rgba(245,158,11,0.7)', borderColor: '#f59e0b', borderWidth: 1 }] },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
             }
             var veiculosAbast = data.veiculos_top_abastecimento || [];
             document.getElementById('tituloChartTopVeiculos').textContent = 'Top veículos (abastecimento)';
             if (document.getElementById('chartTopVeiculos') && veiculosAbast.length) {
                 charts.chartTopVeiculos = new Chart(document.getElementById('chartTopVeiculos'), {
-                    type: 'bar',
+                    type: 'horizontalBar',
                     data: {
                         labels: veiculosAbast.map(function(v) { return v.placa || v.modelo || 'N/A'; }),
                         datasets: [
@@ -948,7 +1761,7 @@ $empresa_id = $_SESSION['empresa_id'];
                             { label: 'Gasto (R$)', data: veiculosAbast.map(function(v) { return v.total_gasto || 0; }), backgroundColor: 'rgba(52,211,153,0.7)' }
                         ]
                     },
-                    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: true, scales: { x: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{ ticks: { beginAtZero: true } }], yAxes: [{}] })
                 });
             }
         } else {
@@ -960,10 +1773,10 @@ $empresa_id = $_SESSION['empresa_id'];
                         labels: labels,
                         datasets: [
                             { label: 'Qtde Rotas', data: hist.map(function(x) { return x.total_rotas || 0; }), backgroundColor: 'rgba(79,156,249,0.7)', borderColor: '#4f9cf9', borderWidth: 1 },
-                            { label: 'Frete (R$)', data: hist.map(function(x) { return x.total_frete || 0; }), backgroundColor: 'rgba(52,211,153,0.7)', borderColor: '#34d399', borderWidth: 1, yAxisID: 'y1' }
+                            { label: 'Frete (R$)', data: hist.map(function(x) { return x.total_frete || 0; }), backgroundColor: 'rgba(52,211,153,0.7)', borderColor: '#34d399', borderWidth: 1, yAxisID: 'y-axis-2' }
                         ]
                     },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true }, y1: { position: 'right', beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ id: 'y-axis-1', position: 'left', ticks: { beginAtZero: true } }, { id: 'y-axis-2', position: 'right', ticks: { beginAtZero: true }, gridLines: { drawOnChartArea: false } }] })
                 });
             }
             document.getElementById('tituloChartFreteMensal').textContent = 'Faturamento por mês (Frete)';
@@ -971,7 +1784,7 @@ $empresa_id = $_SESSION['empresa_id'];
                 charts.chartFreteMensal = new Chart(document.getElementById('chartFreteMensal'), {
                     type: 'line',
                     data: { labels: labels, datasets: [{ label: 'Frete', data: hist.map(function(x) { return x.total_frete || 0; }), borderColor: '#4f9cf9', backgroundColor: 'rgba(79,156,249,0.1)', fill: true }] },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
             }
             if (visao === 'rotas') {
@@ -987,7 +1800,7 @@ $empresa_id = $_SESSION['empresa_id'];
                             return km > 0 ? (luc / km) : 0;
                         }), backgroundColor: 'rgba(34,197,94,0.7)', borderColor: '#22c55e', borderWidth: 1 }]
                     },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
             }
         } else {
@@ -996,7 +1809,7 @@ $empresa_id = $_SESSION['empresa_id'];
                 charts.chartKmMensal = new Chart(document.getElementById('chartKmMensal'), {
                     type: 'bar',
                     data: { labels: labels, datasets: [{ label: 'Km', data: hist.map(function(x) { return x.total_km_rodados || 0; }), backgroundColor: 'rgba(245,158,11,0.7)', borderColor: '#f59e0b', borderWidth: 1 }] },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ ticks: { beginAtZero: true } }] })
                 });
             }
         }
@@ -1007,17 +1820,17 @@ $empresa_id = $_SESSION['empresa_id'];
                         labels: labels,
                         datasets: [
                             { label: 'Qtde Abast.', data: hist.map(function(x) { return x.total_abastecimentos || 0; }), backgroundColor: 'rgba(167,139,250,0.7)', borderColor: '#a78bfa', borderWidth: 1 },
-                            { label: 'Gasto (R$)', data: hist.map(function(x) { return x.total_gasto_abastecimentos || 0; }), backgroundColor: 'rgba(239,68,68,0.5)', borderColor: '#ef4444', borderWidth: 1, yAxisID: 'y1' }
+                            { label: 'Gasto (R$)', data: hist.map(function(x) { return x.total_gasto_abastecimentos || 0; }), backgroundColor: 'rgba(239,68,68,0.5)', borderColor: '#ef4444', borderWidth: 1, yAxisID: 'y-axis-2' }
                         ]
                     },
-                    options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true }, y1: { position: 'right', beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{}], yAxes: [{ id: 'y-axis-1', position: 'left', ticks: { beginAtZero: true } }, { id: 'y-axis-2', position: 'right', ticks: { beginAtZero: true }, gridLines: { drawOnChartArea: false } }] })
                 });
             }
             var veiculos = data.veiculos_top || [];
             document.getElementById('tituloChartTopVeiculos').textContent = 'Top veículos (rotas e km)';
             if (document.getElementById('chartTopVeiculos') && veiculos.length) {
                 charts.chartTopVeiculos = new Chart(document.getElementById('chartTopVeiculos'), {
-                    type: 'bar',
+                    type: 'horizontalBar',
                     data: {
                         labels: veiculos.map(function(v) { return v.placa || v.modelo || 'N/A'; }),
                         datasets: [
@@ -1025,11 +1838,62 @@ $empresa_id = $_SESSION['empresa_id'];
                             { label: 'Km', data: veiculos.map(function(v) { return v.total_km || 0; }), backgroundColor: 'rgba(52,211,153,0.7)' }
                         ]
                     },
-                    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: true, scales: { x: { beginAtZero: true } } }
+                    options: biChartOptions({ xAxes: [{ ticks: { beginAtZero: true } }], yAxes: [{}] })
                 });
             }
         }
-        document.getElementById('bi-charts').style.display = 'grid';
+        (function biAttachDrills() {
+            var mesAnos = hist.map(function(x) { return x.mes_ano || ''; });
+            function bind(ch, serie) { biBindDrill(ch, { mesAnos: mesAnos, labels: labels, serie: serie }); }
+            if (visao === 'manutencao') {
+                bind(charts.chartRotasTempo, 'manutencoes');
+                bind(charts.chartFreteMensal, 'manutencoes');
+                bind(charts.chartKmMensal, 'manutencoes');
+            } else if (visao === 'despesas_viagem') {
+                bind(charts.chartRotasTempo, 'despesas_viagem');
+                bind(charts.chartFreteMensal, 'despesas_viagem');
+                bind(charts.chartKmMensal, 'despesas_viagem');
+            } else if (visao === 'despesas_fixas') {
+                bind(charts.chartRotasTempo, 'despesas_fixas');
+                bind(charts.chartFreteMensal, 'despesas_fixas');
+                bind(charts.chartKmMensal, 'despesas_fixas');
+            } else if (visao === 'abastecimento') {
+                bind(charts.chartRotasTempo, 'abastecimentos');
+                bind(charts.chartFreteMensal, 'abastecimentos');
+                bind(charts.chartKmMensal, 'abastecimentos');
+            } else {
+                bind(charts.chartRotasTempo, 'rotas');
+                bind(charts.chartFreteMensal, 'rotas');
+                bind(charts.chartKmMensal, 'rotas');
+                if (visao === 'geral' && charts.chartAbastTempo) bind(charts.chartAbastTempo, 'abastecimentos');
+            }
+        })();
+        (function biAttachExtraDrills() {
+            if (visao === 'geral' && charts.chartTopVeiculos) {
+                var vt = data.veiculos_top || [];
+                if (vt.length) {
+                    var idsG = vt.map(function(v) { return v.id; });
+                    var labsG = vt.map(function(v) { return v.placa || v.modelo || 'N/A'; });
+                    biBindDrillTopVeiculo(charts.chartTopVeiculos, 'rotas_veiculo', idsG, labsG);
+                }
+            } else if (visao === 'abastecimento' && charts.chartTopVeiculos) {
+                var va = data.veiculos_top_abastecimento || [];
+                if (va.length) {
+                    biBindDrillTopVeiculo(charts.chartTopVeiculos, 'abast_veiculo', va.map(function(v) { return v.id; }), va.map(function(v) { return v.placa || v.modelo || 'N/A'; }));
+                }
+            } else if (visao === 'manutencao' && charts.chartTopVeiculos) {
+                var vm = data.veiculos_top_manutencao || [];
+                if (vm.length) {
+                    biBindDrillTopVeiculo(charts.chartTopVeiculos, 'manut_veiculo', vm.map(function(v) { return v.id; }), vm.map(function(v) { return v.placa || v.modelo || 'N/A'; }));
+                }
+            }
+            if (visao === 'despesas_viagem' && charts.chartDespViagemTipos) biBindDrillPieDesp(charts.chartDespViagemTipos);
+            if (visao === 'manutencao' && charts.chartManutPreventivaCorretiva) biBindDrillManutPie(charts.chartManutPreventivaCorretiva);
+        })();
+        var _biGrid = document.getElementById('bi-charts');
+        if (_biGrid) _biGrid.style.display = 'grid';
+        biEnsureChartsResizeObserver();
+        biScheduleChartLayoutStabilize();
     }
 
     function formatCurrencyInd(value) {
@@ -1091,7 +1955,7 @@ $empresa_id = $_SESSION['empresa_id'];
         { block: 'custos', name: 'Gasto abastecimentos', desc: 'Total gasto com combustível (incl. ARLA)', getValue: function(d) { return d.total_gasto_abastecimentos; }, format: function(v) { return formatCurrencyInd(v); }, type: 'currency', showVariation: true },
         { block: 'custos', name: 'Despesas de viagem (total)', desc: 'Total de despesas de viagem', getValue: function(d) { return d.total_despesas_viagem; }, format: function(v) { return formatCurrencyInd(v); }, type: 'currency', showVariation: true }
     ];
-    var BLOCK_LABELS = { financeiro: '🔹 Financeiro', operacional: '🔹 Operacional', custos: '🔹 Custos' };
+    var BLOCK_LABELS = { financeiro: 'Financeiro', operacional: 'Operacional', custos: 'Custos' };
     function buildIndicatorsTable(data) {
         if (!data || data.length === 0) return;
         var table = document.getElementById('indicatorsTable');
@@ -1172,14 +2036,14 @@ $empresa_id = $_SESSION['empresa_id'];
             var ult = data[data.length - 1];
             var alertas = [];
             var margem = (ult.total_frete > 0) ? ((ult.lucro_operacional || 0) / ult.total_frete) * 100 : 0;
-            if (margem < 0) alertas.push('📉 Margem operacional negativa no último mês.');
+            if (margem < 0) alertas.push('Margem operacional negativa no último mês.');
             if (data.length >= 2) {
                 var ant = data[data.length - 2];
                 var freteAnt = ant.total_frete || 0;
                 var freteUlt = ult.total_frete || 0;
                 if (freteAnt > 0 && freteUlt < freteAnt) {
                     var queda = ((freteAnt - freteUlt) / freteAnt * 100).toFixed(0);
-                    alertas.push('📉 Queda de faturamento de ' + queda + '% em relação ao mês anterior.');
+                    alertas.push('Queda de faturamento de ' + queda + '% em relação ao mês anterior.');
                 }
             }
             var custoKm = (ult.total_km_rodados > 0) ? ((ult.total_gasto_abastecimentos || 0) + (ult.total_manutencoes || 0) + (ult.total_despesas_viagem || 0)) / ult.total_km_rodados : 0;
@@ -1192,12 +2056,12 @@ $empresa_id = $_SESSION['empresa_id'];
                 });
                 mediaCustoKm = somaKm > 0 ? soma / somaKm : 0;
             }
-            if (mediaCustoKm > 0 && custoKm > mediaCustoKm * 1.2) alertas.push('⚠️ Custo por KM no último mês acima da média do período.');
+            if (mediaCustoKm > 0 && custoKm > mediaCustoKm * 1.2) alertas.push('Custo por KM no último mês acima da média do período.');
             if (alertas.length > 0) {
-                alertasEl.innerHTML = '<h4 style="margin:0 0 0.5rem 0;">🔹 Alertas</h4><ul style="margin:0; padding-left:1.2rem;">' + alertas.map(function(a) { return '<li>' + a + '</li>'; }).join('') + '</ul>';
+                alertasEl.innerHTML = '<h4 style="margin:0 0 0.5rem 0;">Alertas</h4><ul style="margin:0; padding-left:1.2rem;">' + alertas.map(function(a) { return '<li>' + a + '</li>'; }).join('') + '</ul>';
                 alertasEl.style.display = 'block';
             } else {
-                alertasEl.innerHTML = '<h4 style="margin:0 0 0.5rem 0;">🔹 Alertas</h4><p class="bi-text-muted">Nenhum alerta no período.</p>';
+                alertasEl.innerHTML = '<h4 style="margin:0 0 0.5rem 0;">Alertas</h4><p class="bi-text-muted">Nenhum alerta no período.</p>';
                 alertasEl.style.display = 'block';
             }
         }
@@ -1330,7 +2194,12 @@ $empresa_id = $_SESSION['empresa_id'];
         var thead = document.querySelector('#bi-tabela thead tr');
         var tbody = document.querySelector('#bi-tabela tbody');
         var titulo = document.getElementById('bi-table-titulo');
-        function sum(attr) { return hist.reduce(function(acc, row) { return acc + (Number(row[attr]) || 0); }, 0); }
+        function sum(attr) {
+            return hist.reduce(function(acc, row) {
+                var n = biCoerceNumber(row[attr]);
+                return acc + (isNaN(n) ? 0 : n);
+            }, 0);
+        }
         var semDados = '<tr><td colspan="20" class="bi-text-muted" style="text-align:center; padding:2rem;">Nenhum dado no período selecionado.</td></tr>';
 
         if (visao === 'abastecimento') {
@@ -1421,7 +2290,15 @@ $empresa_id = $_SESSION['empresa_id'];
             var mesInd = (document.getElementById('filtro-mes') && document.getElementById('filtro-mes').value) ? String(document.getElementById('filtro-mes').value).trim() : '';
             var urlInd = baseUrl + '/performance_indicators.php?visao=geral' + (anoInd ? '&ano=' + encodeURIComponent(anoInd) : '') + (mesInd ? '&mes=' + encodeURIComponent(mesInd) : '');
             fetch(urlInd, { credentials: 'same-origin' })
-                .then(function(r) { return r.json(); })
+                .then(function(r) {
+                    if (!r.ok) {
+                        return r.text().then(function(t) {
+                            var snip = (t || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+                            throw new Error(snip ? ('HTTP ' + r.status + ': ' + snip) : ('HTTP ' + r.status));
+                        });
+                    }
+                    return r.json();
+                })
                 .then(function(json) {
                     showLoading(false);
                     if (json.success !== true || !json.data) {
@@ -1440,7 +2317,15 @@ $empresa_id = $_SESSION['empresa_id'];
                     var containerEl = document.getElementById('indicatorsTableContainer');
                     if (loadingEl) loadingEl.style.display = 'block';
                     if (containerEl) containerEl.style.display = 'none';
-                    buildIndicatorsTable(hist);
+                    try {
+                        buildIndicatorsTable(hist);
+                    } catch (indErr) {
+                        if (typeof window !== 'undefined' && window.__SF_DEBUG__) console.error('BI indicadores:', indErr);
+                        var im = (typeof sfSafeErrorMessage === 'function') ? sfSafeErrorMessage(indErr, 'Falha ao montar tabela.') : ((indErr && indErr.message) || 'Falha ao montar tabela.');
+                        showError('Erro ao montar indicadores: ' + im);
+                        if (loadingEl) loadingEl.style.display = 'none';
+                        return;
+                    }
                     if (loadingEl) loadingEl.style.display = 'none';
                     if (containerEl) containerEl.style.display = 'block';
                     if (json.data && typeof showAvisoDadosIncompletos === 'function') showAvisoDadosIncompletos(json.data);
@@ -1448,7 +2333,9 @@ $empresa_id = $_SESSION['empresa_id'];
                 })
                 .catch(function(err) {
                     showLoading(false);
-                    showError('Erro ao carregar dados: ' + err.message);
+                    if (typeof window !== 'undefined' && window.__SF_DEBUG__) console.error('BI indicadores fetch:', err);
+                    var em = (typeof sfSafeErrorMessage === 'function') ? sfSafeErrorMessage(err, 'Falha ao carregar.') : (err && err.message) || 'Falha ao carregar.';
+                    showError('Erro ao carregar dados: ' + em);
                 });
             return;
         }
@@ -1457,7 +2344,15 @@ $empresa_id = $_SESSION['empresa_id'];
         var mes = (document.getElementById('filtro-mes') && document.getElementById('filtro-mes').value) ? String(document.getElementById('filtro-mes').value).trim() : '';
         var url = baseUrl + '/performance_indicators.php?visao=' + encodeURIComponent(visao) + (ano ? '&ano=' + encodeURIComponent(ano) : '') + (mes ? '&mes=' + encodeURIComponent(mes) : '');
         fetch(url, { credentials: 'same-origin' })
-            .then(function(r) { return r.json(); })
+            .then(function(r) {
+                if (!r.ok) {
+                    return r.text().then(function(t) {
+                        var snip = (t || '').replace(/\s+/g, ' ').trim().slice(0, 180);
+                        throw new Error(snip ? ('HTTP ' + r.status + ': ' + snip) : ('HTTP ' + r.status));
+                    });
+                }
+                return r.json();
+            })
             .then(function(json) {
                 showLoading(false);
                 if (json.success !== true || !json.data) {
@@ -1466,16 +2361,41 @@ $empresa_id = $_SESSION['empresa_id'];
                 }
                 var dataFiltrada = ano ? json.data : aplicarFiltroPeriodo(json.data);
                 var v = json.visao || visao;
-                showAvisoDadosIncompletos(json.data);
-                renderKPIs(dataFiltrada, v);
-                renderCharts(dataFiltrada, v);
-                renderTable(dataFiltrada, v);
-                renderExtraBlocks(json.data, v);
-                if (typeof updateUrlFromFilters === 'function') updateUrlFromFilters();
+                var rawPayload = json.data;
+                setTimeout(function () {
+                    try {
+                        showAvisoDadosIncompletos(rawPayload);
+                        renderKPIs(dataFiltrada, v);
+                        renderCharts(dataFiltrada, v);
+                        renderTable(dataFiltrada, v);
+                        renderExtraBlocks(rawPayload, v);
+                        if (typeof requestAnimationFrame === 'function') {
+                            requestAnimationFrame(function () {
+                                requestAnimationFrame(biReflowBiCharts);
+                            });
+                        } else {
+                            setTimeout(biReflowBiCharts, 50);
+                        }
+                        if (typeof updateUrlFromFilters === 'function') updateUrlFromFilters();
+                    } catch (renderErr) {
+                        if (typeof window !== 'undefined' && window.__SF_DEBUG__) {
+                            console.error('BI render:', renderErr);
+                        }
+                        var rm = '';
+                        try {
+                            rm = (renderErr && renderErr.message) ? String(renderErr.message) : String(renderErr);
+                        } catch (e) { rm = 'Erro desconhecido.'; }
+                        showError('Erro ao montar o BI: ' + rm.slice(0, 500));
+                    }
+                }, 0);
             })
             .catch(function(err) {
                 showLoading(false);
-                showError('Erro ao carregar dados: ' + err.message);
+                if (typeof window !== 'undefined' && window.__SF_DEBUG__) {
+                    console.error('BI fetch/json:', err);
+                }
+                var em = (typeof sfSafeErrorMessage === 'function') ? sfSafeErrorMessage(err, 'Falha ao carregar.') : (err && err.message) || 'Falha ao carregar.';
+                showError('Erro ao carregar dados: ' + em);
             });
     }
 
@@ -1492,6 +2412,28 @@ $empresa_id = $_SESSION['empresa_id'];
         if (params.ano && a) a.value = params.ano;
         if (params.mes !== undefined && m) m.value = params.mes === '' ? '' : params.mes;
     }
+    function updateBiContextLine() {
+        var v = document.getElementById('filtro-visao');
+        var a = document.getElementById('filtro-ano');
+        var m = document.getElementById('filtro-mes');
+        var el = document.getElementById('bi-context-line');
+        if (!el) return;
+        var visaoLabel = (v && v.options[v.selectedIndex]) ? v.options[v.selectedIndex].text : 'Geral';
+        var anoTxt = (a && a.value) ? String(a.value).trim() : '';
+        var mesTxt = 'Todos os meses';
+        if (m && m.value !== '' && m.value != null) {
+            var mi = parseInt(String(m.value), 10);
+            if (!isNaN(mi) && mi >= 1 && mi <= 12) {
+                var d = new Date(2000, mi - 1, 1);
+                mesTxt = d.toLocaleString('pt-BR', { month: 'long' });
+                mesTxt = mesTxt.charAt(0).toUpperCase() + mesTxt.slice(1);
+            }
+        }
+        var parts = [visaoLabel];
+        if (anoTxt) parts.push('Ano ' + anoTxt);
+        parts.push(mesTxt);
+        el.textContent = parts.join(' · ');
+    }
     function updateUrlFromFilters() {
         var v = document.getElementById('filtro-visao');
         var a = document.getElementById('filtro-ano');
@@ -1501,6 +2443,7 @@ $empresa_id = $_SESSION['empresa_id'];
         var mes = (m && m.value) ? m.value : '';
         var q = '?visao=' + encodeURIComponent(visao) + (ano ? '&ano=' + encodeURIComponent(ano) : '') + (mes ? '&mes=' + encodeURIComponent(mes) : '');
         if (window.history && window.history.replaceState) window.history.replaceState({}, '', window.location.pathname + q);
+        updateBiContextLine();
     }
     document.getElementById('btn-aplicar').addEventListener('click', function() { loadData(); updateUrlFromFilters(); });
     var filtroVisao = document.getElementById('filtro-visao');
@@ -1527,13 +2470,35 @@ $empresa_id = $_SESSION['empresa_id'];
     if (btnExportTabela) btnExportTabela.addEventListener('click', exportTableToCsv);
     var btnExportGrafico = document.getElementById('btn-exportar-grafico-png');
     if (btnExportGrafico) btnExportGrafico.addEventListener('click', exportChartToPng);
+    var btnDrillClose = document.getElementById('bi-drill-close');
+    var bdBackdrop = document.getElementById('bi-drill-backdrop');
+    if (btnDrillClose) btnDrillClose.addEventListener('click', biCloseDrillModal);
+    if (bdBackdrop) bdBackdrop.addEventListener('click', biCloseDrillModal);
+    document.addEventListener('keydown', function(ev) {
+        if (ev.key === 'Escape') {
+            var modal = document.getElementById('bi-drill-modal');
+            if (modal && modal.classList.contains('is-open')) biCloseDrillModal();
+        } else if (ev.ctrlKey && ev.key === 'r') {
+            ev.preventDefault();
+            loadData();
+        }
+    });
     var simDiesel = document.getElementById('sim-diesel-pct');
     var simComissao = document.getElementById('sim-comissao-pct');
     if (simDiesel) simDiesel.addEventListener('input', function() { if (typeof simuladorUpdate === 'function') simuladorUpdate(); });
     if (simComissao) simComissao.addEventListener('input', function() { if (typeof simuladorUpdate === 'function') simuladorUpdate(); });
+    /* Após theme.js (applyBiChartColors em timeouts escalonados), refaz bitmap/resize — evita canvas vazio ou desalinhado */
+    window.addEventListener('sf-theme-changed', function () {
+        setTimeout(function () {
+            biScheduleChartLayoutStabilize();
+        }, 50);
+    });
     applyParamsFromUrl();
+    updateBiContextLine();
     loadData();
 })();
     </script>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html>

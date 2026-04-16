@@ -13,6 +13,47 @@
  * 🏷️  Prefixo: fiscal_ (para organização do banco)
  */
 
+/** Parse resposta fetch → { ok, status, data } (quando fiscal_api_fetch.js não está no bundle). */
+async function fiscalJsonEnvelope(response) {
+    const text = await response.text();
+    let data = {};
+    if (text) {
+        try {
+            const parsed = JSON.parse(text);
+            data = (parsed && typeof parsed === 'object') ? parsed : { _nonObject: parsed };
+        } catch (e) {
+            data = { parse_error: true, raw: text };
+        }
+    }
+    return { ok: response.ok, status: response.status, data };
+}
+
+function fiscalDocumentosV2ErrorMessage(data, httpStatus) {
+    if (typeof fiscalApiErrorMessage === 'function') {
+        return fiscalApiErrorMessage(data, httpStatus);
+    }
+    const st = typeof httpStatus === 'number' ? httpStatus : 0;
+    if (st === 429 || (data && String(data.code || '') === 'rate_limited')) {
+        if (data && typeof data.error === 'string' && data.error.trim()) return data.error;
+        if (data && typeof data.message === 'string' && data.message.trim()) return data.message;
+        return 'Muitas requisições em pouco tempo. Aguarde alguns minutos e tente novamente.';
+    }
+    if (!data || typeof data !== 'object') return 'Não foi possível interpretar a resposta do servidor.';
+    if (data.message && typeof data.message === 'string') return data.message;
+    if (typeof data.error === 'string') return data.error;
+    if (data.erros && Array.isArray(data.erros)) return data.erros.join(' ');
+    return 'Erro desconhecido.';
+}
+
+/** POST documentos_fiscais_v2: usa fiscalApiFetch (CSRF) se existir. */
+async function fiscalDocumentosV2Fetch(url, init) {
+    if (typeof fiscalApiFetch === 'function') {
+        return fiscalApiFetch(url, init);
+    }
+    const response = await fetch(url, Object.assign({ credentials: 'same-origin' }, init || {}));
+    return fiscalJsonEnvelope(response);
+}
+
 class FiscalSystem {
     constructor() {
         this.empresaId = 1; // Será obtido dinamicamente
@@ -34,6 +75,7 @@ class FiscalSystem {
         this.setupDocumentTabs();
         this.setupModals();
         this.checkSefazStatus();
+        this.checkQueueStatus();
     }
 
     /**
@@ -48,6 +90,7 @@ class FiscalSystem {
         // Configurar atualizações automáticas
         setInterval(() => {
             this.updateDashboardKPIs();
+            this.checkQueueStatus();
         }, 30000); // Atualizar a cada 30 segundos
     }
 
@@ -56,7 +99,7 @@ class FiscalSystem {
      */
     async loadFiscalDashboard() {
         try {
-            const response = await fetch('/sistema-frotas/fiscal/api/fiscal_dashboard.php', {
+            const response = await fetch(sfAppUrl('fiscal/api/fiscal_dashboard.php'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -166,7 +209,7 @@ class FiscalSystem {
      */
     async loadRecentDocuments() {
         try {
-            const response = await fetch('/sistema-frotas/fiscal/api/fiscal_documents.php', {
+            const response = await fetch(sfAppUrl('fiscal/api/fiscal_documents.php'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -474,7 +517,7 @@ class FiscalSystem {
      */
     async checkSefazStatus() {
         try {
-            const response = await fetch('/sistema-frotas/fiscal/api/fiscal_sefaz_status.php', {
+            const response = await fetch(sfAppUrl('fiscal/api/fiscal_sefaz_status.php'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -499,18 +542,71 @@ class FiscalSystem {
      * 🔄 Atualizar status SEFAZ
      */
     updateSefazStatus(status) {
-        const statusElement = document.getElementById('sefazStatus');
+        const statusElement = document.getElementById('statusSefaz') || document.getElementById('sefazStatus');
         if (!statusElement) return;
 
-        const statusClass = status === 'online' ? 'status-success' : 'status-danger';
-        const statusText = status === 'online' ? 'Online' : 'Offline';
-        const statusIcon = status === 'online' ? 'fa-check-circle' : 'fa-times-circle';
+        const statusValue = (status && typeof status === 'object') ? (status.status || 'offline') : status;
+        const statusClass = statusValue === 'online' ? 'status-success' : 'status-danger';
+        const statusText = statusValue === 'online' ? 'Online' : 'Offline';
+        const statusIcon = statusValue === 'online' ? 'fa-check-circle' : 'fa-times-circle';
 
         statusElement.innerHTML = `
             <span class="status-badge ${statusClass}">
                 <i class="fas ${statusIcon}"></i> ${statusText}
             </span>
         `;
+
+        const syncEl = document.getElementById('ultimaSincronizacao');
+        if (syncEl && status && typeof status === 'object' && status.ultima_sincronizacao) {
+            syncEl.textContent = status.ultima_sincronizacao;
+        }
+    }
+
+    /**
+     * 📦 Consultar status da fila fiscal (jobs assíncronos)
+     */
+    async checkQueueStatus() {
+        try {
+            const formData = new FormData();
+            formData.append('action', 'status_fila_fiscal');
+
+            const url = sfAppUrl('fiscal/api/documentos_fiscais_v2.php');
+            const res = await fiscalDocumentosV2Fetch(url, {
+                method: 'POST',
+                body: formData
+            });
+            const data = res.data || {};
+
+            if (res.status === 429 || (data && String(data.code || '') === 'rate_limited')) {
+                console.warn('Fila fiscal (limite):', fiscalDocumentosV2ErrorMessage(data, res.status));
+                return;
+            }
+            if (!res.ok) {
+                console.error('❌ Erro HTTP fila fiscal:', res.status, fiscalDocumentosV2ErrorMessage(data, res.status));
+                return;
+            }
+            if (data && data.success && data.fila) {
+                this.updateQueueStatus(data.fila);
+            }
+        } catch (error) {
+            console.error('❌ Erro ao consultar fila fiscal:', error);
+        }
+    }
+
+    /**
+     * 🔢 Atualizar KPI da fila fiscal
+     */
+    updateQueueStatus(fila) {
+        const pendentes = Number(fila.pendente || 0);
+        const processando = Number(fila.processando || 0);
+        const erro = Number(fila.erro || 0);
+        const falha = Number(fila.falha || 0);
+        const sucesso = Number(fila.sucesso || 0);
+        const total = pendentes + processando + erro + falha + sucesso;
+
+        this.updateElementIfExists('queueTotal', total);
+        this.updateElementIfExists('queuePendentes', pendentes + processando);
+        this.updateElementIfExists('queueErros', erro + falha);
     }
 
     /**
@@ -557,7 +653,7 @@ class FiscalSystem {
      */
     async loadMotoristasVeiculos() {
         try {
-            const response = await fetch('/sistema-frotas/fiscal/api/fiscal_motoristas_veiculos.php', {
+            const response = await fetch(sfAppUrl('fiscal/api/fiscal_motoristas_veiculos.php'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -629,11 +725,21 @@ class FiscalSystem {
      * ❌ Cancelar documento
      */
     async cancelarDocumento(type, id) {
-        const justificativa = prompt('Digite a justificativa para o cancelamento:');
+        let justificativa;
+        if (typeof window.fiscalPromptAsync === 'function') {
+            justificativa = await window.fiscalPromptAsync(
+                'Cancelar documento',
+                'Informe a justificativa do cancelamento. A SEFAZ costuma exigir pelo menos 15 caracteres.',
+                { minLength: 15, rows: 5, placeholder: 'Justificativa do cancelamento.' }
+            );
+        } else {
+            const p = window.prompt('Digite a justificativa para o cancelamento:');
+            justificativa = p == null ? null : String(p).trim();
+        }
         if (!justificativa) return;
 
         try {
-            const response = await fetch('/sistema-frotas/fiscal/api/fiscal_events.php', {
+            const response = await fetch(sfAppUrl('fiscal/api/fiscal_events.php'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -666,10 +772,13 @@ class FiscalSystem {
      * 🔒 Encerrar MDF-e
      */
     async encerrarMDFe(id) {
-        if (!confirm('Tem certeza que deseja encerrar este MDF-e?')) return;
+        const ok = typeof window.fiscalConfirmAsync === 'function'
+            ? await window.fiscalConfirmAsync('Encerrar MDF-e', 'Tem certeza que deseja encerrar este MDF-e?')
+            : window.confirm('Tem certeza que deseja encerrar este MDF-e?');
+        if (!ok) return;
 
         try {
-            const response = await fetch('/sistema-frotas/fiscal/api/fiscal_events.php', {
+            const response = await fetch(sfAppUrl('fiscal/api/fiscal_events.php'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -715,7 +824,7 @@ class FiscalSystem {
         formData.append('action', 'importar_xml');
 
         try {
-            const response = await fetch('/sistema-frotas/fiscal/api/fiscal_nfe.php', {
+            const response = await fetch(sfAppUrl('fiscal/api/fiscal_nfe.php'), {
                 method: 'POST',
                 body: formData
             });
@@ -746,7 +855,7 @@ class FiscalSystem {
         formData.append('action', 'emitir');
 
         try {
-            const response = await fetch('/sistema-frotas/fiscal/api/fiscal_cte.php', {
+            const response = await fetch(sfAppUrl('fiscal/api/fiscal_cte.php'), {
                 method: 'POST',
                 body: formData
             });
@@ -777,7 +886,7 @@ class FiscalSystem {
         formData.append('action', 'emitir');
 
         try {
-            const response = await fetch('/sistema-frotas/fiscal/api/fiscal_mdfe.php', {
+            const response = await fetch(sfAppUrl('fiscal/api/fiscal_mdfe.php'), {
                 method: 'POST',
                 body: formData
             });
@@ -848,10 +957,8 @@ class FiscalSystem {
      * 💬 Mostrar mensagem
      */
     showMessage(message, type = 'info') {
-        // Implementar sistema de notificações
         console.log(`${type.toUpperCase()}: ${message}`);
-        
-        // Usar SweetAlert2 se disponível
+
         if (typeof Swal !== 'undefined') {
             Swal.fire({
                 title: type === 'success' ? '✅ Sucesso!' : 
@@ -862,10 +969,16 @@ class FiscalSystem {
                 timer: type === 'success' ? 3000 : undefined,
                 timerProgressBar: type === 'success'
             });
-        } else {
-            // Fallback para alert simples
-            alert(`${type.toUpperCase()}: ${message}`);
+            return;
         }
+
+        if (typeof window.fiscalToast === 'function') {
+            const map = { success: 'success', error: 'danger', warning: 'warning', info: 'info' };
+            window.fiscalToast(String(message), map[type] || 'info');
+            return;
+        }
+
+        console.warn(`[${type}]`, message);
     }
 }
 
@@ -891,4 +1004,36 @@ function emitirMDFe() {
     if (window.fiscalSystem) {
         window.fiscalSystem.emitirMDFe();
     }
+}
+
+/**
+ * Abrir modais a partir dos botões "Quick Actions" do index.
+ * (Essas funções são chamadas via onclick no HTML.)
+ */
+function showImportarNFEModal() {
+    const el = document.getElementById('importNFEModal');
+    if (!el || typeof bootstrap === 'undefined') return;
+    new bootstrap.Modal(el).show();
+}
+
+function showEmitirCTeModal() {
+    const el = document.getElementById('emitirCTeModal');
+    if (!el || typeof bootstrap === 'undefined') return;
+    new bootstrap.Modal(el).show();
+}
+
+function showEmitirMDFeModal() {
+    const el = document.getElementById('emitirMDFeModal');
+    if (!el || typeof bootstrap === 'undefined') return;
+    new bootstrap.Modal(el).show();
+}
+
+/**
+ * Observação: o modal "Consultar Status" depende de existir no HTML.
+ * Se ainda não existir, a função não faz nada.
+ */
+function showConsultarStatusModal() {
+    const el = document.getElementById('consultarStatusModal');
+    if (!el || typeof bootstrap === 'undefined') return;
+    new bootstrap.Modal(el).show();
 }

@@ -41,7 +41,7 @@ class GoogleMapsManager {
             }
 
             const script = document.createElement('script');
-            script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&libraries=places,geometry&loading=async`;
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${this.apiKey}&libraries=places,geometry,marker&loading=async`;
             script.async = true;
             script.defer = true;
             

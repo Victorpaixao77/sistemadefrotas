@@ -5,6 +5,8 @@
 require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
+require_once '../includes/csrf.php';
+require_once '../includes/api_json.php';
 
 // Configura a sessão antes de iniciá-la
 configure_session();
@@ -45,7 +47,8 @@ try {
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
                 throw new Exception('Método não permitido');
             }
-            
+            api_require_csrf_json();
+
             $data = json_decode(file_get_contents('php://input'), true);
             echo json_encode(addMotorist($data));
             break;
@@ -54,7 +57,7 @@ try {
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
                 throw new Exception('Método não permitido');
             }
-            
+            api_require_csrf_json();
             $id = isset($_GET['id']) ? $_GET['id'] : null;
             if (!$id) {
                 throw new Exception('ID do motorista não fornecido');
@@ -68,7 +71,7 @@ try {
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
                 throw new Exception('Método não permitido');
             }
-            
+            api_require_csrf_json();
             $id = isset($_GET['id']) ? $_GET['id'] : null;
             if (!$id) {
                 throw new Exception('ID do motorista não fornecido');

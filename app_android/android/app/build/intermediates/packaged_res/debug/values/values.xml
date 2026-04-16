@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Frotas Motorista</string>
+    <string name="gps_background_denied">Sem permissão de segundo plano: o GPS pode parar quando outro app estiver em foco.</string>
+    <string name="gps_background_ok">Localização em segundo plano permitida (recomendado para rastreamento contínuo).</string>
+    <string name="gps_notif_channel_name">Rastreamento GPS</string>
+    <string name="gps_notif_text">Enviando posição para a frota</string>
+    <string name="gps_notif_title">Rastreamento ativo</string>
+    <style name="Theme.SistemaFrotasMotorista" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

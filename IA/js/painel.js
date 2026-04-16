@@ -1,5 +1,5 @@
-// Configurações
-const API_URL = '/sistema-frotas/IA/api.php';
+// Configurações (sfAppUrl vem de includes/sf_api_base.php)
+var API_URL = typeof sfAppUrl === 'function' ? sfAppUrl('IA/api.php') : '/IA/api.php';
 
 // Função para fazer requisições à API
 async function fetchAPI(route, method = 'GET', data = null) {

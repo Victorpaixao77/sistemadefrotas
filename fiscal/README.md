@@ -60,7 +60,7 @@ fiscal/
 - **Frameworks**: Bootstrap 5, SweetAlert2
 - **APIs**: RESTful com JSON
 - **Segurança**: Criptografia AES-256, Hash SHA-256
-- **Integração**: Web Services SEFAZ (simulado)
+- **Integração**: Web Services SEFAZ (dependente de implementação no ambiente)
 
 ## 🗄️ **Estrutura do Banco de Dados**
 

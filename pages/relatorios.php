@@ -1428,7 +1428,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $dataFim = date('Y-m-t', mktime(0, 0, 0, $month, 1, $year));
             
             // Redirecionar para a API fiscal com caminho absoluto
-            $url = "/sistema-frotas/fiscal/api/relatorios_fiscais.php?" . http_build_query([
+            $url = sf_app_url('fiscal/api/relatorios_fiscais.php') . '?' . http_build_query([
                 'action' => 'gerar_relatorio',
                 'tipo' => $tipoFiscal,
                 'formato' => $format,
@@ -1629,12 +1629,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border-radius: 8px;
             border: 1px solid var(--border-color);
             padding: 20px;
-            transition: transform 0.2s;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+            transition: box-shadow 0.2s ease;
         }
         
         .report-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: var(--card-shadow);
         }
         
         .report-card h3 {
@@ -1689,6 +1689,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: white;
         }
         
+        .report-actions button:focus-visible,
+        .report-actions a.btn-pdf:focus-visible {
+            outline: 2px solid var(--accent-primary, #3b82f6);
+            outline-offset: 2px;
+        }
+        
         .report-form {
             display: none;
             position: fixed;
@@ -1708,6 +1714,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         .form-group {
             margin-bottom: 15px;
+        }
+        
+        .report-form fieldset.report-form-periodo {
+            border: none;
+            padding: 0;
+            margin: 0 0 4px 0;
+        }
+        
+        .report-form fieldset.report-form-periodo legend {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            padding: 0;
         }
         
         .form-group label {
@@ -1731,6 +1751,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             justify-content: flex-end;
             gap: 10px;
             margin-top: 20px;
+        }
+        
+        .report-form .btn-primary:focus-visible,
+        .report-form .btn-secondary:focus-visible {
+            outline: 2px solid var(--accent-primary, #3b82f6);
+            outline-offset: 2px;
         }
         
         .overlay {
@@ -1771,9 +1797,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding-bottom: calc(var(--gutter) * 2) !important;
         }
         
-        .dashboard-header {
-            max-width: 100%;
-            box-sizing: border-box;
+        /* Título da página vem do header superior (.header-title) */
+        .relatorios-lead {
+            margin: 0 0 1.25rem 0;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.45;
+            max-width: 40rem;
         }
         
         .dashboard-section h2 {
@@ -1781,15 +1811,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             font-size: 1.5rem;
             margin-bottom: 20px;
             padding-bottom: 10px;
-            border-bottom: 2px solid var(--primary-color);
+            border-bottom: 2px solid var(--accent-primary, #3b82f6);
             display: flex;
             align-items: center;
             gap: 10px;
         }
         
         .dashboard-section h2 i {
-            color: var(--primary-color);
+            color: var(--accent-primary, #3b82f6);
             font-size: 1.3rem;
+        }
+        
+        @media (prefers-reduced-motion: reduce) {
+            .report-card {
+                transition: none !important;
+            }
         }
     </style>
 </head>
@@ -1805,9 +1841,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <!-- Page Content -->
             <div class="dashboard-content">
-                <div class="dashboard-header">
-                    <h1>Relatórios</h1>
-                </div>
+                <p class="relatorios-lead" id="relatorios-descricao">Escolha o relatório e exporte em <strong>PDF</strong> ou <strong>Excel</strong>.</p>
                 
                 <!-- Seção de Relatórios Operacionais -->
                 <div class="dashboard-section">
@@ -2546,46 +2580,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
     
     <!-- Report Form Modal -->
-    <div class="overlay" id="overlay"></div>
-    <div class="report-form" id="reportForm">
-        <h2>Gerar Relatório</h2>
+    <div class="overlay" id="overlay" aria-hidden="true"></div>
+    <div class="report-form" id="reportForm" role="dialog" aria-modal="true" aria-labelledby="reportFormModalTitle" aria-hidden="true">
+        <h2 id="reportFormModalTitle">Gerar Relatório</h2>
         <form id="generateReportForm" method="POST">
             <input type="hidden" id="reportType" name="report_type">
             <input type="hidden" id="reportFormat" name="format">
             
-            <div class="form-group">
-                <label for="month">Mês</label>
-                <select id="month" name="month" required>
-                    <option value="1">Janeiro</option>
-                    <option value="2">Fevereiro</option>
-                    <option value="3">Março</option>
-                    <option value="4">Abril</option>
-                    <option value="5">Maio</option>
-                    <option value="6">Junho</option>
-                    <option value="7">Julho</option>
-                    <option value="8">Agosto</option>
-                    <option value="9">Setembro</option>
-                    <option value="10">Outubro</option>
-                    <option value="11">Novembro</option>
-                    <option value="12">Dezembro</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="year">Ano</label>
-                <select id="year" name="year" required>
-                    <?php
-                    $currentYear = date('Y');
-                    for ($year = $currentYear; $year >= $currentYear - 5; $year--) {
-                        echo "<option value=\"$year\">$year</option>";
-                    }
-                    ?>
-                </select>
-            </div>
+            <fieldset class="report-form-periodo">
+                <legend>Período do relatório</legend>
+                <div class="form-group">
+                    <label for="month">Mês</label>
+                    <select id="month" name="month" required aria-required="true">
+                        <option value="1">Janeiro</option>
+                        <option value="2">Fevereiro</option>
+                        <option value="3">Março</option>
+                        <option value="4">Abril</option>
+                        <option value="5">Maio</option>
+                        <option value="6">Junho</option>
+                        <option value="7">Julho</option>
+                        <option value="8">Agosto</option>
+                        <option value="9">Setembro</option>
+                        <option value="10">Outubro</option>
+                        <option value="11">Novembro</option>
+                        <option value="12">Dezembro</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="year">Ano</label>
+                    <select id="year" name="year" required aria-required="true">
+                        <?php
+                        $currentYear = date('Y');
+                        for ($year = $currentYear; $year >= $currentYear - 5; $year--) {
+                            echo "<option value=\"$year\">$year</option>";
+                        }
+                        ?>
+                    </select>
+                </div>
+            </fieldset>
             
             <div class="form-actions">
                 <button type="button" class="btn-secondary" onclick="hideReportForm()">Cancelar</button>
-                <button type="submit" class="btn-primary">Gerar Relatório</button>
+                <button type="submit" class="btn-primary" id="reportFormSubmitBtn" aria-label="Confirmar e gerar relatório com o período selecionado">Gerar Relatório</button>
             </div>
         </form>
     </div>
@@ -2602,18 +2639,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         function showReportForm(reportType, format) {
             document.getElementById('reportType').value = reportType;
             document.getElementById('reportFormat').value = format;
-            document.getElementById('reportForm').classList.add('active');
-            document.getElementById('overlay').classList.add('active');
+            var formEl = document.getElementById('reportForm');
+            var overlayEl = document.getElementById('overlay');
+            formEl.classList.add('active');
+            overlayEl.classList.add('active');
+            formEl.setAttribute('aria-hidden', 'false');
+            overlayEl.setAttribute('aria-hidden', 'false');
             
             // Set current month and year as default
             const now = new Date();
             document.getElementById('month').value = now.getMonth() + 1;
             document.getElementById('year').value = now.getFullYear();
+            
+            requestAnimationFrame(function() {
+                var m = document.getElementById('month');
+                if (m) m.focus({ preventScroll: true });
+            });
         }
         
         function hideReportForm() {
-            document.getElementById('reportForm').classList.remove('active');
-            document.getElementById('overlay').classList.remove('active');
+            var formEl = document.getElementById('reportForm');
+            var overlayEl = document.getElementById('overlay');
+            formEl.classList.remove('active');
+            overlayEl.classList.remove('active');
+            formEl.setAttribute('aria-hidden', 'true');
+            overlayEl.setAttribute('aria-hidden', 'true');
         }
         
         // Função para relatórios fiscais - com seleção de período
@@ -2621,17 +2671,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Usar o mesmo modal dos outros relatórios
             document.getElementById('reportType').value = 'fiscal_' + reportType;
             document.getElementById('reportFormat').value = format;
-            document.getElementById('reportForm').classList.add('active');
-            document.getElementById('overlay').classList.add('active');
+            var formEl = document.getElementById('reportForm');
+            var overlayEl = document.getElementById('overlay');
+            formEl.classList.add('active');
+            overlayEl.classList.add('active');
+            formEl.setAttribute('aria-hidden', 'false');
+            overlayEl.setAttribute('aria-hidden', 'false');
             
             // Set current month and year as default
             const now = new Date();
             document.getElementById('month').value = now.getMonth() + 1;
             document.getElementById('year').value = now.getFullYear();
+            
+            requestAnimationFrame(function() {
+                var m = document.getElementById('month');
+                if (m) m.focus({ preventScroll: true });
+            });
         }
         
         // Close form when clicking overlay
         document.getElementById('overlay').addEventListener('click', hideReportForm);
+        
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            var formEl = document.getElementById('reportForm');
+            if (!formEl || !formEl.classList.contains('active')) return;
+            hideReportForm();
+        });
+        
+        (function initRelatoriosReportActions() {
+            function apply() {
+                document.querySelectorAll('.report-card').forEach(function (card) {
+                    var h3 = card.querySelector('h3');
+                    var title = h3 ? h3.textContent.replace(/\s+/g, ' ').trim() : 'Relatório';
+                    card.querySelectorAll('.report-actions button.btn-pdf, .report-actions button.btn-excel').forEach(function (btn) {
+                        btn.setAttribute('type', 'button');
+                        var vis = (btn.textContent || '').replace(/\s+/g, ' ').trim();
+                        btn.setAttribute('aria-label', title + (vis ? ' — ' + vis : ''));
+                    });
+                    card.querySelectorAll('.report-actions a.btn-pdf[href]').forEach(function (a) {
+                        var vis = (a.textContent || '').replace(/\s+/g, ' ').trim();
+                        a.setAttribute('aria-label', (vis || 'Abrir') + ' (' + title + ')');
+                    });
+                });
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', apply);
+            } else {
+                apply();
+            }
+        })();
         
         // Handle form submission
         document.getElementById('generateReportForm').addEventListener('submit', function(e) {
@@ -2662,6 +2751,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 const modal = document.createElement('div');
                 modal.className = 'modal fade';
                 modal.id = 'autoReportModal';
+                modal.setAttribute('data-sf-modal-no-global-escape', 'true');
                 modal.innerHTML = `
                     <div class="modal-dialog modal-xl">
                         <div class="modal-content">
@@ -2885,5 +2975,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             window.loadPerformanceIndicators = function() { window.location.href = 'bi.php?visao=geral'; };
         })();
     </script>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html> 

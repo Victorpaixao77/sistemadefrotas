@@ -3,6 +3,7 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php'; // Add database connection
+require_once '../includes/sf_api_base.php';
 
 // Configure session before starting it
 configure_session();
@@ -19,6 +20,9 @@ $conn = getConnection();
 // Set page title
 $page_title = "Financiamentos";
 
+// Layout moderno (fornc-page); ?classic=1 para o layout anterior
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
+
 // Por página: 5, 10, 25, 50, 100 — padrão 10
 $per_page = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
 if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
@@ -26,12 +30,27 @@ if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
 }
 
 // Função para buscar financiamentos do banco de dados
-function getFinanciamentos($page = 1, $per_page = 10) {
+function getFinanciamentos($page = 1, $per_page = 10, $sort_field = 'data_proxima_parcela', $sort_dir = 'DESC') {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
         $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
         $offset = ($page - 1) * $limit;
+
+        $allowedSort = [
+            'contrato' => 'f.contrato',
+            'veiculo' => 'v.placa',
+            'banco_nome' => 'b.nome',
+            'valor_total' => 'f.valor_total',
+            'numero_parcelas' => 'f.numero_parcelas',
+            'data_proxima_parcela' => 'f.data_proxima_parcela',
+            'status_nome' => 'sp.nome',
+        ];
+        if (!isset($allowedSort[$sort_field])) {
+            $sort_field = 'data_proxima_parcela';
+        }
+        $orderCol = $allowedSort[$sort_field];
+        $dir = ($sort_dir === 'ASC') ? 'ASC' : 'DESC';
         
         // Primeiro, conta o total de registros
         $sql_count = "SELECT COUNT(*) as total FROM financiamentos WHERE empresa_id = :empresa_id";
@@ -47,7 +66,7 @@ function getFinanciamentos($page = 1, $per_page = 10) {
                LEFT JOIN bancos b ON f.banco_id = b.id 
                LEFT JOIN status_pagamento sp ON f.status_pagamento_id = sp.id 
                WHERE f.empresa_id = :empresa_id 
-               ORDER BY f.data_proxima_parcela DESC, f.id DESC
+               ORDER BY " . $orderCol . " " . $dir . ", f.id DESC
                LIMIT :limit OFFSET :offset";
         
         $stmt = $conn->prepare($sql);
@@ -312,12 +331,37 @@ function getChartData($conn, $mes = null, $ano = null) {
 // Pegar a página atual da URL ou definir como 1
 $pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 
+$fin_sort = isset($_GET['sort']) ? preg_replace('/[^a-z_]/', '', (string) $_GET['sort']) : 'data_proxima_parcela';
+$fin_dir = (isset($_GET['dir']) && strtoupper((string) $_GET['dir']) === 'ASC') ? 'ASC' : 'DESC';
+
+function financiamento_sort_link_url($field, $fin_sort, $fin_dir, $per_page, $is_modern) {
+    $next_dir = 'DESC';
+    if ($fin_sort === $field) {
+        $next_dir = $fin_dir === 'ASC' ? 'DESC' : 'ASC';
+    } else {
+        $text_like = ['contrato', 'veiculo', 'banco_nome', 'status_nome'];
+        $next_dir = in_array($field, $text_like, true) ? 'ASC' : 'DESC';
+    }
+    $q = ['page' => 1, 'per_page' => $per_page, 'sort' => $field, 'dir' => $next_dir];
+    if (!$is_modern) {
+        $q['classic'] = '1';
+    }
+    return '?' . http_build_query($q);
+}
+
+function financiamento_sort_indicator($field, $fin_sort, $fin_dir) {
+    if ($fin_sort !== $field) {
+        return '⇅';
+    }
+    return $fin_dir === 'ASC' ? '▲' : '▼';
+}
+
 // Pegar o mês e ano dos filtros
 $mes_filtro = isset($_GET['mes']) ? intval($_GET['mes']) : null;
 $ano_filtro = isset($_GET['ano']) ? intval($_GET['ano']) : null;
 
 // Buscar financiamentos com paginação
-$resultado = getFinanciamentos($pagina_atual, $per_page);
+$resultado = getFinanciamentos($pagina_atual, $per_page, $fin_sort, $fin_dir);
 $financiamentos = $resultado['financiamentos'];
 $total_paginas = $resultado['total_paginas'];
 
@@ -343,14 +387,22 @@ error_log("Chart Data: " . print_r($chart_data, true));
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
     
     <!-- Chart.js for analytics -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body.financiamento-modern .dashboard-header { display: none; }
+        body.financiamento-modern .dashboard-content.fornc-page { overflow-x: auto; }
+        body.financiamento-modern #financiamentosTable.fornc-table { min-width: 920px; }
+    </style>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'financiamento-modern' : ''; ?>">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
@@ -361,7 +413,98 @@ error_log("Chart Data: " . print_r($chart_data, true));
             <?php include '../includes/header.php'; ?>
             
             <!-- Page Content -->
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <?php if ($is_modern): ?>
+                <p class="fornc-modern-hint">
+                    Financiamentos de veículos e parcelas. Use <code>?classic=1</code> para o layout anterior.
+                </p>
+                <div class="fornc-kpi-strip">
+                    <div class="fornc-kpi-cell"><span class="lbl">Total financiado</span><span class="val" id="totalFinanciado">R$ <?php echo number_format($metricas['total_financiado'], 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Total pago</span><span class="val" id="totalPago">R$ <?php echo number_format($metricas['total_pago'], 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">Em aberto</span><span class="val" id="totalAberto">R$ <?php echo number_format($metricas['total_aberto'], 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><span class="lbl">% quitação</span><span class="val" id="percentualQuitacao"><?php echo $metricas['percentual_quitacao']; ?>%</span></div>
+                </div>
+                <p class="fornc-kpi-summary">Métricas conforme filtros de mês/ano (quando aplicados).</p>
+
+                <div class="fornc-toolbar">
+                    <div class="fornc-search-block">
+                        <label for="searchFinanciamento">Busca rápida</label>
+                        <div class="fornc-search-inner">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <input type="text" id="searchFinanciamento" placeholder="Buscar financiamento..." autocomplete="off">
+                        </div>
+                    </div>
+                    <div class="fornc-filters-inline">
+                        <div class="fg">
+                            <label for="statusFilter">Status</label>
+                            <select id="statusFilter">
+                            <option value="">Todos os status</option>
+                            <option value="Em dia">Em dia</option>
+                            <option value="Atrasado">Atrasado</option>
+                            <option value="Quitado">Quitado</option>
+                            <option value="Cancelado">Cancelado</option>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="bancoFilter">Banco</label>
+                            <select id="bancoFilter">
+                            <option value="">Todos os bancos</option>
+                            <option value="Banco A">Banco A</option>
+                            <option value="Banco B">Banco B</option>
+                            <option value="Banco C">Banco C</option>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="mesFilter">Mês</label>
+                            <select id="mesFilter">
+                            <option value="">Todos os meses</option>
+                            <?php
+                            for ($i = 1; $i <= 12; $i++) {
+                                $selected = ($i == $mes_filtro) ? 'selected' : '';
+                                echo "<option value='$i' $selected>" . date('F', mktime(0, 0, 0, $i, 1)) . "</option>";
+                            }
+                            ?>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="anoFilter">Ano</label>
+                            <select id="anoFilter">
+                            <option value="">Todos os anos</option>
+                            <?php
+                            $ano_atual = date('Y');
+                            for ($i = $ano_atual; $i >= $ano_atual - 5; $i--) {
+                                $selected = ($i == $ano_filtro) ? 'selected' : '';
+                                echo "<option value='$i' $selected>$i</option>";
+                            }
+                            ?>
+                        </select>
+                        </div>
+                        <div class="fg">
+                            <label for="per_page_fin">Por página</label>
+                            <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.35rem;">
+                                <input type="hidden" name="page" value="1">
+                                <?php if ($mes_filtro) { echo '<input type="hidden" name="mes" value="'.(int)$mes_filtro.'">'; } ?>
+                                <?php if ($ano_filtro) { echo '<input type="hidden" name="ano" value="'.(int)$ano_filtro.'">'; } ?>
+                                <select name="per_page" id="per_page_fin" class="filter-per-page" onchange="this.form.submit()">
+                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                            </select>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="fornc-btn-row">
+                        <button type="button" id="addFinanciamentoBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Novo financiamento</button>
+                        <button type="button" class="fornc-btn fornc-btn--accent" id="applyFinancingFilters" title="Aplicar filtros"><i class="fas fa-search"></i> Pesquisar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn" title="Filtros (período)"><i class="fas fa-sliders-h"></i> Opções</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="clearFinancingFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
+                        <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar"><i class="fas fa-file-export"></i> Exportar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                    </div>
+                </div>
+                <?php else: ?>
                 <div class="dashboard-header">
                     <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
@@ -378,44 +521,6 @@ error_log("Chart Data: " . print_r($chart_data, true));
                             <button id="helpBtn" class="btn-help" title="Ajuda">
                                 <i class="fas fa-question-circle"></i>
                             </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Help Modal -->
-                <div id="helpModal" class="modal">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h2>Ajuda - Financiamentos</h2>
-                            <span class="close">&times;</span>
-                        </div>
-                        <div class="modal-body">
-                            <h3>O que é o módulo de Financiamentos?</h3>
-                            <p>O módulo de Financiamentos permite gerenciar todos os financiamentos de veículos da sua frota, incluindo:</p>
-                            <ul>
-                                <li>Cadastro de novos financiamentos</li>
-                                <li>Acompanhamento de parcelas</li>
-                                <li>Controle de pagamentos</li>
-                                <li>Análise de custos e métricas</li>
-                            </ul>
-
-                            <h3>Como funciona?</h3>
-                            <p>Para utilizar o módulo:</p>
-                            <ol>
-                                <li>Clique em "Novo Financiamento" para cadastrar um novo financiamento</li>
-                                <li>Preencha os dados do veículo, banco e condições do financiamento</li>
-                                <li>O sistema gerará automaticamente o plano de parcelas</li>
-                                <li>Acompanhe os pagamentos e status das parcelas no dashboard</li>
-                            </ol>
-
-                            <h3>Dicas importantes:</h3>
-                            <ul>
-                                <li>Mantenha os dados do financiamento sempre atualizados</li>
-                                <li>Registre os pagamentos assim que forem realizados</li>
-                                <li>Utilize os filtros para encontrar financiamentos específicos</li>
-                                <li>Acompanhe os gráficos para análise de custos e tendências</li>
-                                <li>Exporte relatórios para análise detalhada dos dados</li>
-                            </ul>
                         </div>
                     </div>
                 </div>
@@ -482,6 +587,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
                         <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.5rem;">
                             <span class="filter-label">Por página</span>
                             <input type="hidden" name="page" value="1">
+                            <input type="hidden" name="classic" value="1">
                             <?php if ($mes_filtro) { echo '<input type="hidden" name="mes" value="'.(int)$mes_filtro.'">'; } ?>
                             <?php if ($ano_filtro) { echo '<input type="hidden" name="ano" value="'.(int)$ano_filtro.'">'; } ?>
                             <select name="per_page" class="filter-per-page" onchange="this.form.submit()">
@@ -536,12 +642,22 @@ error_log("Chart Data: " . print_r($chart_data, true));
                         </button>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- Financing Table -->
-                <div class="data-table-container">
-                    <table class="data-table" id="financiamentosTable">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>">
+                    <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="financiamentosTable">
                         <thead>
                             <tr>
+                                <?php if ($is_modern): ?>
+                                <th class="sortable<?php echo $fin_sort === 'contrato' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(financiamento_sort_link_url('contrato', $fin_sort, $fin_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Contrato <span class="sort-ind"><?php echo htmlspecialchars(financiamento_sort_indicator('contrato', $fin_sort, $fin_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $fin_sort === 'veiculo' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(financiamento_sort_link_url('veiculo', $fin_sort, $fin_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Veículo <span class="sort-ind"><?php echo htmlspecialchars(financiamento_sort_indicator('veiculo', $fin_sort, $fin_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $fin_sort === 'banco_nome' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(financiamento_sort_link_url('banco_nome', $fin_sort, $fin_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Banco <span class="sort-ind"><?php echo htmlspecialchars(financiamento_sort_indicator('banco_nome', $fin_sort, $fin_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $fin_sort === 'valor_total' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(financiamento_sort_link_url('valor_total', $fin_sort, $fin_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Valor Total <span class="sort-ind"><?php echo htmlspecialchars(financiamento_sort_indicator('valor_total', $fin_sort, $fin_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $fin_sort === 'numero_parcelas' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(financiamento_sort_link_url('numero_parcelas', $fin_sort, $fin_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Parcelas <span class="sort-ind"><?php echo htmlspecialchars(financiamento_sort_indicator('numero_parcelas', $fin_sort, $fin_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $fin_sort === 'data_proxima_parcela' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(financiamento_sort_link_url('data_proxima_parcela', $fin_sort, $fin_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Próx. Vencimento <span class="sort-ind"><?php echo htmlspecialchars(financiamento_sort_indicator('data_proxima_parcela', $fin_sort, $fin_dir)); ?></span></a></th>
+                                <th class="sortable<?php echo $fin_sort === 'status_nome' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(financiamento_sort_link_url('status_nome', $fin_sort, $fin_dir, $per_page, $is_modern)); ?>" class="th-sort-link">Status <span class="sort-ind"><?php echo htmlspecialchars(financiamento_sort_indicator('status_nome', $fin_sort, $fin_dir)); ?></span></a></th>
+                                <?php else: ?>
                                 <th>Contrato</th>
                                 <th>Veículo</th>
                                 <th>Banco</th>
@@ -549,6 +665,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
                                 <th>Parcelas</th>
                                 <th>Próx. Vencimento</th>
                                 <th>Status</th>
+                                <?php endif; ?>
                                 <th>Ações</th>
                             </tr>
                         </thead>
@@ -595,10 +712,18 @@ error_log("Chart Data: " . print_r($chart_data, true));
                 $total_reg_fin = (int)($resultado['total'] ?? 0);
                 $prev_fin = ['page' => max(1, $pagina_atual - 1), 'per_page' => $per_page];
                 $next_fin = ['page' => min($total_paginas, $pagina_atual + 1), 'per_page' => $per_page];
+                if ($fin_sort !== 'data_proxima_parcela' || $fin_dir !== 'DESC') {
+                    $prev_fin['sort'] = $fin_sort;
+                    $prev_fin['dir'] = $fin_dir;
+                    $next_fin['sort'] = $fin_sort;
+                    $next_fin['dir'] = $fin_dir;
+                }
                 if ($mes_filtro) { $prev_fin['mes'] = $mes_filtro; $next_fin['mes'] = $mes_filtro; }
                 if ($ano_filtro) { $prev_fin['ano'] = $ano_filtro; $next_fin['ano'] = $ano_filtro; }
+                if (!$is_modern) { $prev_fin['classic'] = '1'; $next_fin['classic'] = '1'; }
                 ?>
-                <div class="pagination">
+                <?php if ($is_modern): ?><div class="fornc-pagination-bar"><?php endif; ?>
+                <div class="pagination<?php echo $is_modern ? ' fornc-modern-pagination' : ''; ?>">
                     <a href="?<?php echo htmlspecialchars(http_build_query($prev_fin)); ?>" class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>" id="prevPageFin">
                         <i class="fas fa-chevron-left"></i>
                     </a>
@@ -607,6 +732,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
+                <?php if ($is_modern): ?></div><?php endif; ?>
                 
                 <!-- Financing Analytics -->
                 <div class="analytics-section">
@@ -659,9 +785,47 @@ error_log("Chart Data: " . print_r($chart_data, true));
         </div>
     </div>
     
-    <!-- Add/Edit Financing Modal -->
-    <div class="modal" id="financiamentoModal">
+    <!-- Help Modal -->
+    <div id="helpModal" class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>">
         <div class="modal-content">
+            <div class="modal-header">
+                <h2>Ajuda - Financiamentos</h2>
+                <span class="close close-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <h3>O que é o módulo de Financiamentos?</h3>
+                <p>O módulo de Financiamentos permite gerenciar todos os financiamentos de veículos da sua frota, incluindo:</p>
+                <ul>
+                    <li>Cadastro de novos financiamentos</li>
+                    <li>Acompanhamento de parcelas</li>
+                    <li>Controle de pagamentos</li>
+                    <li>Análise de custos e métricas</li>
+                </ul>
+
+                <h3>Como funciona?</h3>
+                <p>Para utilizar o módulo:</p>
+                <ol>
+                    <li>Clique em "Novo Financiamento" para cadastrar um novo financiamento</li>
+                    <li>Preencha os dados do veículo, banco e condições do financiamento</li>
+                    <li>O sistema gerará automaticamente o plano de parcelas</li>
+                    <li>Acompanhe os pagamentos e status das parcelas no dashboard</li>
+                </ol>
+
+                <h3>Dicas importantes:</h3>
+                <ul>
+                    <li>Mantenha os dados do financiamento sempre atualizados</li>
+                    <li>Registre os pagamentos assim que forem realizados</li>
+                    <li>Utilize os filtros para encontrar financiamentos específicos</li>
+                    <li>Acompanhe os gráficos para análise de custos e tendências</li>
+                    <li>Exporte relatórios para análise detalhada dos dados</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Financing Modal -->
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="financiamentoModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2 id="modalTitle">Adicionar Financiamento</h2>
                 <span class="close-modal">&times;</span>
@@ -783,8 +947,8 @@ error_log("Chart Data: " . print_r($chart_data, true));
     </div>
     
     <!-- View Financing Modal -->
-    <div class="modal" id="viewFinanciamentoModal">
-        <div class="modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="viewFinanciamentoModal">
+        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2>Detalhes do Financiamento</h2>
                 <span class="close-modal">&times;</span>
@@ -859,8 +1023,8 @@ error_log("Chart Data: " . print_r($chart_data, true));
     </div>
     
     <!-- Modal Registrar Pagamento -->
-    <div class="modal" id="paymentModal">
-        <div class="modal-content payment-modal-content">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="paymentModal">
+        <div class="modal-content payment-modal-content<?php echo $is_modern ? ' fornc-modal--wide' : ''; ?>">
             <div class="modal-header">
                 <h2>Registrar Pagamento</h2>
                 <span class="close-modal">&times;</span>
@@ -934,7 +1098,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
     </div>
     
     <!-- Filter Modal -->
-    <div class="modal" id="filterModal">
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="filterModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Filtros</h2>
@@ -958,7 +1122,23 @@ error_log("Chart Data: " . print_r($chart_data, true));
     <!-- JavaScript Files -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <?php sf_render_api_scripts(); ?>
     <style>
+        body.financiamento-modern #financiamentosTable.fornc-table th.sortable .th-sort-link {
+            color: inherit;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        body.financiamento-modern #financiamentosTable.fornc-table th.sortable .th-sort-link:hover {
+            color: var(--accent-primary, #3b82f6);
+        }
+        body.financiamento-modern #financiamentosTable.fornc-table th.sortable.sorted .th-sort-link {
+            font-weight: 600;
+        }
+        #financiamentosTable .sort-ind { font-size: 0.75rem; opacity: 0.85; }
+
         .payment-modal-content {
             width: 90% !important;
             max-width: 1200px !important;
@@ -977,6 +1157,19 @@ error_log("Chart Data: " . print_r($chart_data, true));
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 20px;
+        }
+
+        /* Modal financeiro (Adicionar/Editar): 2 colunas no desktop */
+        #financiamentoModal .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px 14px;
+            margin-bottom: 4px;
+        }
+        @media (max-width: 640px) {
+            #financiamentoModal .form-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         /* Estilos para paginação */
@@ -1666,7 +1859,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
             saveButton.disabled = true;
             saveButton.textContent = 'Salvando...';
             
-            fetch('../api/financiamentos.php', {
+            fetch(sfApiUrl('financiamentos.php'), {
                 method: 'POST',
                 body: formData,
                 credentials: 'same-origin'
@@ -1709,7 +1902,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
             saveButton.disabled = true;
             saveButton.textContent = 'Registrando...';
             
-            fetch('../api/financiamentos.php', {
+            fetch(sfApiUrl('financiamentos.php'), {
                 method: 'POST',
                 body: formData,
                 credentials: 'same-origin'
@@ -1750,7 +1943,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
         }
         
         function showViewFinanciamentoModal(id) {
-            fetch(`../api/financiamentos.php?id=${id}`, {
+            fetch(sfApiUrl(`financiamentos.php?id=${id}`), {
                 credentials: 'same-origin'
             })
             .then(response => {
@@ -1792,7 +1985,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
         function showDeleteConfirmation(id) {
             if (confirm('Tem certeza que deseja excluir este financiamento?')) {
                 // Envia a requisição de exclusão
-            fetch(`../api/financiamentos.php?id=${id}`, {
+            fetch(sfApiUrl(`financiamentos.php?id=${id}`), {
                     method: 'DELETE',
                     credentials: 'same-origin'
                 })
@@ -1813,7 +2006,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
         }
 
         function carregarParcelas(financiamentoId) {
-            fetch(`../api/financiamentos.php?id=${financiamentoId}&action=parcelas`, {
+            fetch(sfApiUrl(`financiamentos.php?id=${financiamentoId}&action=parcelas`), {
                 credentials: 'same-origin'
             })
             .then(response => {
@@ -1885,7 +2078,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
         }
 
         function carregarFormasPagamento() {
-            fetch('../api/formas_pagamento.php?action=list', {
+            fetch(sfApiUrl('formas_pagamento.php?action=list'), {
                 credentials: 'same-origin'
             })
             .then(response => {
@@ -1918,7 +2111,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
 
         // Função para mostrar o modal de edição
         function showEditFinanciamentoModal(id) {
-            fetch(`../api/financiamentos.php?id=${id}`, {
+            fetch(sfApiUrl(`financiamentos.php?id=${id}`), {
                 credentials: 'same-origin'
             })
             .then(response => {
@@ -1975,7 +2168,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
                 formData.append('numero_parcela', parcela.numero_parcela);
                 formData.append('empresa_id', parcela.empresa_id);
                 
-                fetch('../api/financiamentos.php', {
+                fetch(sfApiUrl('financiamentos.php'), {
                     method: 'POST',
                     body: formData,
                     credentials: 'same-origin'
@@ -2011,5 +2204,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
             window.open('../' + caminho, '_blank');
         }
     </script>
+
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html> 
