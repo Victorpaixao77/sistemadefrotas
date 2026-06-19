@@ -7,44 +7,39 @@ ob_start();
 require_once 'config.php';
 require_once 'functions.php';
 require_once 'db_connect.php';
+require_once __DIR__ . '/maintenance_metrics.php';
 
 try {
-    // Configure session before starting it
     configure_session();
-
-    // Initialize the session
     session_start();
-
-    // Require authentication
     require_authentication();
 
-    // Create database connection
     $conn = getConnection();
 
-    // Get empresa_id from session
     if (!isset($_SESSION['empresa_id'])) {
         throw new Exception('Empresa ID não encontrado na sessão');
     }
-    $empresa_id = $_SESSION['empresa_id'];
+    $empresa_id = (int) $_SESSION['empresa_id'];
 
-    // Período: 3, 6, 12 meses ou ano_atual
-    $period = isset($_GET['period']) ? trim($_GET['period']) : '6';
-    if (!in_array($period, ['3', '6', '12', 'ano_atual'])) $period = '6';
+    $period = isset($_GET['period']) ? trim((string) $_GET['period']) : '6';
+    if (!in_array($period, ['3', '6', '12', 'ano_atual'], true)) {
+        $period = '6';
+    }
 
-    // Get maintenance costs (período aplicado)
-    function getMaintenanceCosts($conn, $empresa_id, $period) {
-        $interval = ($period === 'ano_atual')
-            ? "YEAR(data_manutencao) = YEAR(CURRENT_DATE())"
-            : "data_manutencao >= DATE_SUB(CURRENT_DATE(), INTERVAL " . (int)$period . " MONTH)";
+    $mntInterval = sf_mnt_period_sql($period, 'm.data_manutencao');
+    $prevCase = 'CASE WHEN ' . sf_mnt_sql_is_preventiva('tm') . ' THEN m.valor ELSE 0 END';
+    $corrCase = 'CASE WHEN ' . sf_mnt_sql_is_corretiva('tm') . ' THEN m.valor ELSE 0 END';
+
+    function getMaintenanceCosts($conn, $empresa_id, $period, $mntInterval, $prevCase, $corrCase) {
         $sql = "SELECT 
-                    DATE_FORMAT(data_manutencao, '%Y-%m') as mes,
-                    SUM(CASE WHEN tm.nome = 'Preventiva' THEN m.valor ELSE 0 END) as preventiva,
-                    SUM(CASE WHEN tm.nome = 'Corretiva' THEN m.valor ELSE 0 END) as corretiva
+                    DATE_FORMAT(m.data_manutencao, '%Y-%m') as mes,
+                    SUM({$prevCase}) as preventiva,
+                    SUM({$corrCase}) as corretiva
                 FROM manutencoes m
-                JOIN tipos_manutencao tm ON m.tipo_manutencao_id = tm.id
+                LEFT JOIN tipos_manutencao tm ON m.tipo_manutencao_id = tm.id
                 WHERE m.empresa_id = :empresa_id
-                AND $interval
-                GROUP BY DATE_FORMAT(data_manutencao, '%Y-%m')
+                AND {$mntInterval}
+                GROUP BY DATE_FORMAT(m.data_manutencao, '%Y-%m')
                 ORDER BY mes ASC";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
@@ -52,51 +47,34 @@ try {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // Get maintenance types distribution
-    function getMaintenanceTypes($conn, $empresa_id) {
-        $sql = "SELECT 
-                    tm.nome as tipo,
-                    COUNT(*) as total
+    function getMaintenanceTypes($conn, $empresa_id, $mntInterval) {
+        $sql = "SELECT tm.nome as tipo, COUNT(*) as total
                 FROM manutencoes m
                 JOIN tipos_manutencao tm ON m.tipo_manutencao_id = tm.id
-                WHERE m.empresa_id = :empresa_id
-                GROUP BY tm.nome";
-                
+                WHERE m.empresa_id = :empresa_id AND {$mntInterval}
+                GROUP BY tm.id, tm.nome";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
         $stmt->execute();
-        
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // Get maintenance status distribution
-    function getMaintenanceStatus($conn, $empresa_id) {
-        $sql = "SELECT 
-                    sm.nome as status,
-                    COUNT(*) as total
+    function getMaintenanceStatus($conn, $empresa_id, $mntInterval) {
+        $sql = "SELECT sm.nome as status, COUNT(*) as total
                 FROM manutencoes m
                 JOIN status_manutencao sm ON m.status_manutencao_id = sm.id
-                WHERE m.empresa_id = :empresa_id
-                GROUP BY sm.nome";
-                
+                WHERE m.empresa_id = :empresa_id AND {$mntInterval}
+                GROUP BY sm.id, sm.nome";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
         $stmt->execute();
-        
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // Get monthly evolution (período aplicado)
-    function getMonthlyEvolution($conn, $empresa_id, $period) {
-        $interval = ($period === 'ano_atual')
-            ? "YEAR(data_manutencao) = YEAR(CURRENT_DATE())"
-            : "data_manutencao >= DATE_SUB(CURRENT_DATE(), INTERVAL " . (int)$period . " MONTH)";
-        $sql = "SELECT 
-                    DATE_FORMAT(data_manutencao, '%Y-%m') as mes,
-                    COUNT(*) as total
-                FROM manutencoes
-                WHERE empresa_id = :empresa_id
-                AND $interval
+    function getMonthlyEvolution($conn, $empresa_id, $mntInterval) {
+        $sql = "SELECT DATE_FORMAT(data_manutencao, '%Y-%m') as mes, COUNT(*) as total
+                FROM manutencoes m
+                WHERE m.empresa_id = :empresa_id AND {$mntInterval}
                 GROUP BY DATE_FORMAT(data_manutencao, '%Y-%m')
                 ORDER BY mes ASC";
         $stmt = $conn->prepare($sql);
@@ -105,18 +83,11 @@ try {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // Get top 5 vehicles by maintenance cost (período aplicado)
-    function getTopVehicles($conn, $empresa_id, $period) {
-        $interval = ($period === 'ano_atual')
-            ? "AND m.data_manutencao >= DATE_FORMAT(CURRENT_DATE(), '%Y-01-01')"
-            : "AND m.data_manutencao >= DATE_SUB(CURRENT_DATE(), INTERVAL " . (int)$period . " MONTH)";
-        $sql = "SELECT 
-                    v.placa,
-                    COUNT(*) as total_manutencoes,
-                    SUM(m.valor) as custo_total
+    function getTopVehicles($conn, $empresa_id, $mntInterval) {
+        $sql = "SELECT v.placa, COUNT(*) as total_manutencoes, SUM(m.valor) as custo_total
                 FROM manutencoes m
                 JOIN veiculos v ON m.veiculo_id = v.id
-                WHERE m.empresa_id = :empresa_id $interval
+                WHERE m.empresa_id = :empresa_id AND {$mntInterval}
                 GROUP BY v.id, v.placa
                 ORDER BY custo_total DESC
                 LIMIT 5";
@@ -126,114 +97,51 @@ try {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // Get components with most failures
-    function getComponentFailures($conn, $empresa_id) {
-        $sql = "SELECT 
-                    cm.nome as componente,
-                    COUNT(*) as total_falhas
+    function getComponentFailures($conn, $empresa_id, $mntInterval) {
+        $sql = "SELECT cm.nome as componente, COUNT(*) as total_falhas
                 FROM manutencoes m
                 JOIN componentes_manutencao cm ON m.componente_id = cm.id
-                WHERE m.empresa_id = :empresa_id
+                WHERE m.empresa_id = :empresa_id AND {$mntInterval}
                 GROUP BY cm.id, cm.nome
                 ORDER BY total_falhas DESC
                 LIMIT 10";
-                
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
         $stmt->execute();
-        
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    // Get MTBF and MTTR
-    function getMTBFMTTR($conn, $empresa_id) {
-        $sql = "SELECT 
-                    COALESCE(SUM(v.km_atual), 0) as total_km,
-                    COUNT(DISTINCT m.id) as total_falhas,
-                    SUM(
-                        CASE 
-                            WHEN m.data_conclusao IS NOT NULL 
-                            THEN TIMESTAMPDIFF(HOUR, m.data_manutencao, m.data_conclusao)
-                            WHEN sm.nome = 'Concluída' 
-                            THEN TIMESTAMPDIFF(HOUR, m.data_manutencao, m.data_manutencao)
-                            ELSE TIMESTAMPDIFF(HOUR, m.data_manutencao, CURRENT_TIMESTAMP)
-                        END
-                    ) as total_horas_manutencao
-                FROM manutencoes m
-                LEFT JOIN veiculos v ON m.veiculo_id = v.id
-                LEFT JOIN status_manutencao sm ON m.status_manutencao_id = sm.id
-                WHERE m.empresa_id = :empresa_id 
-                AND m.data_manutencao >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)";
-                
-        $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        $stmt->execute();
-        
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        return [
-            'mtbf' => $result['total_falhas'] > 0 ? ($result['total_km'] / $result['total_falhas']) : 0,
-            'mttr' => $result['total_falhas'] > 0 ? ($result['total_horas_manutencao'] / $result['total_falhas']) : 0
-        ];
-    }
+    $maintenanceCosts = getMaintenanceCosts($conn, $empresa_id, $period, $mntInterval, $prevCase, $corrCase);
+    $maintenanceTypes = getMaintenanceTypes($conn, $empresa_id, $mntInterval);
+    $maintenanceStatus = getMaintenanceStatus($conn, $empresa_id, $mntInterval);
+    $monthlyEvolution = getMonthlyEvolution($conn, $empresa_id, $mntInterval);
+    $topVehicles = getTopVehicles($conn, $empresa_id, $mntInterval);
+    $componentFailures = getComponentFailures($conn, $empresa_id, $mntInterval);
+    $mtbfMttr = sf_mnt_compute_mtbf_mttr($conn, $empresa_id, $period);
+    $custoKmData = sf_mnt_compute_custo_km($conn, $empresa_id, $period);
 
-    // Get cost per kilometer
-    function getCostPerKm($conn, $empresa_id) {
-        $sql = "SELECT 
-                    SUM(m.valor) as custo_total,
-                    COALESCE(SUM(v.km_atual), 0) as km_total
-                FROM manutencoes m
-                LEFT JOIN veiculos v ON m.veiculo_id = v.id
-                WHERE m.empresa_id = :empresa_id";
-                
-        $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        $stmt->execute();
-        
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        return $result['km_total'] > 0 ? ($result['custo_total'] / $result['km_total']) : 0;
-    }
-
-    // Get all data (período usado em custos, evolução, top veículos, MTBF/MTTR)
-    $maintenanceCosts = getMaintenanceCosts($conn, $empresa_id, $period);
-    $maintenanceTypes = getMaintenanceTypes($conn, $empresa_id);
-    $maintenanceStatus = getMaintenanceStatus($conn, $empresa_id);
-    $monthlyEvolution = getMonthlyEvolution($conn, $empresa_id, $period);
-    $topVehicles = getTopVehicles($conn, $empresa_id, $period);
-    $componentFailures = getComponentFailures($conn, $empresa_id);
-    $mtbfMttr = getMTBFMTTR($conn, $empresa_id, $period);
-    $costPerKm = getCostPerKm($conn, $empresa_id);
-
-    // Format data for charts
-    $costChartData = [
-        'labels' => [],
-        'preventiva' => [],
-        'corretiva' => []
-    ];
-
+    $costChartData = ['labels' => [], 'preventiva' => [], 'corretiva' => []];
     foreach ($maintenanceCosts as $cost) {
         $date = new DateTime($cost['mes'] . '-01');
         $costChartData['labels'][] = $date->format('M/Y');
-        $costChartData['preventiva'][] = floatval($cost['preventiva']);
-        $costChartData['corretiva'][] = floatval($cost['corretiva']);
+        $costChartData['preventiva'][] = (float) $cost['preventiva'];
+        $costChartData['corretiva'][] = (float) $cost['corretiva'];
     }
 
     $typeChartData = [
         'labels' => array_column($maintenanceTypes, 'tipo'),
-        'data' => array_column($maintenanceTypes, 'total')
+        'data' => array_column($maintenanceTypes, 'total'),
     ];
 
-    // Clear any output buffers
     while (ob_get_level()) {
         ob_end_clean();
     }
 
-    // Return JSON response
     header('Content-Type: application/json');
     echo json_encode([
         'success' => true,
         'period' => $period,
+        'period_label' => sf_mnt_period_label($period),
         'costs' => $costChartData,
         'types' => $typeChartData,
         'status' => $maintenanceStatus,
@@ -242,22 +150,16 @@ try {
         'components' => $componentFailures,
         'mtbf' => $mtbfMttr['mtbf'],
         'mttr' => $mtbfMttr['mttr'],
-        'cost_per_km' => $costPerKm
+        'cost_per_km' => $custoKmData['custo_km'],
     ]);
-
 } catch (Exception $e) {
-    // Clear any output buffers
     while (ob_get_level()) {
         ob_end_clean();
     }
-
-    // Log the error
     error_log('Error in get_maintenance_data.php: ' . $e->getMessage());
-
-    // Return error response
     header('Content-Type: application/json');
     echo json_encode([
         'success' => false,
-        'error' => 'Erro ao carregar dados: ' . $e->getMessage()
+        'error' => 'Erro ao carregar dados de manutenção.',
     ]);
-} 
+}

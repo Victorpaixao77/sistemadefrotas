@@ -7,6 +7,7 @@ require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/permissions.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 
 configure_session();
 session_start();
@@ -32,6 +33,7 @@ $empresa_id = $_SESSION['empresa_id'];
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="icon" type="image/png" href="../logo.png">
+    <?php sf_page_help_css('..'); ?>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.js"></script>
     <script>
     (function () {
@@ -68,6 +70,16 @@ $empresa_id = $_SESSION['empresa_id'];
         .bi-filtros #btn-aplicar { padding: 0.45rem 0.9rem; border-radius: var(--btn-border-radius); border: none; background: var(--accent-primary); color: #fff; font-weight: 600; cursor: pointer; font-size: 0.9rem; white-space: nowrap; transition: filter 0.2s ease, transform 0.2s ease; }
         .bi-filtros #btn-aplicar:hover { filter: brightness(1.08); }
         .bi-filtros #btn-aplicar:active { transform: scale(0.98); }
+        .bi-filtros #helpBtn {
+            padding: 0.45rem 0.65rem;
+            border-radius: var(--btn-border-radius);
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--accent-primary);
+            cursor: pointer;
+            font-size: 0.95rem;
+            line-height: 1;
+        }
         .bi-toolbar {
             width: 100%;
             max-width: 100%;
@@ -143,8 +155,24 @@ $empresa_id = $_SESSION['empresa_id'];
             border-color: color-mix(in srgb, var(--accent-primary) 40%, var(--border-color));
             box-shadow: var(--card-shadow, 0 1px 3px rgba(0, 0, 0, 0.08)), 0 6px 18px rgba(0, 0, 0, 0.06);
         }
-        body.page-bi #bi-kpis .dashboard-card .card-header { padding: 0; border-bottom: none; }
+        body.page-bi #bi-kpis .dashboard-card .card-header {
+            padding: 0;
+            border-bottom: none;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            min-width: 0;
+        }
+        body.page-bi #bi-kpis .dashboard-card .card-header .kpi-card-icon {
+            flex-shrink: 0;
+            font-size: 0.62rem;
+            color: var(--accent-primary);
+            opacity: 0.92;
+            line-height: 1;
+        }
         body.page-bi #bi-kpis .dashboard-card .card-header h3 {
+            flex: 1;
+            min-width: 0;
             font-size: 0.58rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -417,6 +445,31 @@ $empresa_id = $_SESSION['empresa_id'];
         .bi-drill-close:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
         .bi-drill-body { padding: 0.75rem 1rem 1rem; overflow: auto; flex: 1; min-height: 0; }
         .bi-drill-body .bi-table { font-size: 0.8rem; }
+
+        /* Resumo executivo por IA */
+        .bi-resumo-ia { border: 1px solid var(--border-color); border-radius: 12px; background: var(--card-bg, var(--bg-secondary)); padding: 0.85rem 1rem; margin-bottom: var(--gutter); }
+        .bi-resumo-ia-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+        .bi-resumo-ia-head h3 { margin: 0; font-size: 1rem; display: flex; align-items: center; gap: 0.45rem; }
+        .bi-resumo-ia-head h3 i { color: var(--accent-primary, #3b82f6); }
+        .bi-resumo-ia-texto { font-size: 0.92rem; line-height: 1.55; color: var(--text-primary); }
+        .bi-resumo-ia-texto.bi-text-muted { color: var(--text-muted); }
+
+        /* Impressão / salvar em PDF: mostra só o conteúdo do BI */
+        @media print {
+            .sidebar, .main-header, header.main-header, .bi-toolbar, .footer,
+            #bi-drill-modal, .scroll-to-top, .bi-drill-hint, #btn-imprimir,
+            .btn-action-indicators, .bi-btn-export-png, #btn-exportar-tabela-csv {
+                display: none !important;
+            }
+            .main-content { margin-left: 0 !important; width: 100% !important; }
+            #bi-main, .dashboard-content { padding: 0 !important; }
+            .bi-chart-card, .analytics-card, .bi-table-card, .dashboard-card,
+            .bi-saude-frota, #bi-kpis > * {
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+            body { background: #fff !important; }
+        }
     </style>
 </head>
 <body class="page-bi">
@@ -463,6 +516,8 @@ $empresa_id = $_SESSION['empresa_id'];
                         </div>
                         <button type="button" id="btn-aplicar" aria-label="Aplicar filtros e atualizar o painel"><i class="fas fa-sync-alt" aria-hidden="true"></i> Aplicar</button>
                         <button type="button" id="btn-mes-atual" title="Mês atual" aria-label="Usar mês e ano atuais nos filtros"><i class="fas fa-calendar-day" aria-hidden="true"></i> Mês atual</button>
+                        <button type="button" id="btn-imprimir" title="Imprimir / salvar em PDF" aria-label="Imprimir ou salvar o painel em PDF"><i class="fas fa-file-pdf" aria-hidden="true"></i> PDF</button>
+                        <button type="button" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
                     </div>
                     <p class="bi-context-line" id="bi-context-line" aria-live="polite"></p>
                     </div>
@@ -476,6 +531,14 @@ $empresa_id = $_SESSION['empresa_id'];
                         </div>
                         <div id="bi-error" class="bi-error" style="display:none;" role="alert" aria-live="assertive" tabindex="-1"></div>
                         <div id="bi-aviso-incompletos" class="bi-aviso-incompletos" style="display:none;"></div>
+
+                        <div id="bi-resumo-ia" class="bi-resumo-ia" style="display:none;">
+                            <div class="bi-resumo-ia-head">
+                                <h3><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i> Resumo executivo (IA)</h3>
+                                <button type="button" id="btn-resumo-ia" class="btn-action-indicators" aria-label="Gerar resumo executivo com IA"><i class="fas fa-bolt" aria-hidden="true"></i> Gerar resumo</button>
+                            </div>
+                            <div id="bi-resumo-ia-texto" class="bi-resumo-ia-texto bi-text-muted" aria-live="polite">Clique em “Gerar resumo” para uma análise dos números deste período pela IA.</div>
+                        </div>
 
                         <div id="bi-saude-frota" class="bi-saude-frota" style="display:none;">
                             <h3><i class="fas fa-heartbeat"></i> Indicadores de Saúde da Frota</h3>
@@ -658,7 +721,10 @@ $empresa_id = $_SESSION['empresa_id'];
                             <div class="bi-drill-dialog">
                                 <div class="bi-drill-header">
                                     <h3 id="bi-drill-title">Detalhes</h3>
-                                    <button type="button" class="bi-drill-close" id="bi-drill-close" aria-label="Fechar">&times;</button>
+                                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                                        <button type="button" class="btn-action-indicators" id="bi-drill-export" style="display:none; font-size:0.85rem;" aria-label="Exportar detalhamento em CSV"><i class="fas fa-file-csv" aria-hidden="true"></i> Exportar CSV</button>
+                                        <button type="button" class="bi-drill-close" id="bi-drill-close" aria-label="Fechar">&times;</button>
+                                    </div>
                                 </div>
                                 <div id="bi-drill-body" class="bi-drill-body"></div>
                             </div>
@@ -679,6 +745,9 @@ $empresa_id = $_SESSION['empresa_id'];
 (function() {
     var baseUrl = '../api';
     var charts = {};
+    var biLastDrill = null; // dados do último drill aberto (para exportar CSV completo)
+    var biLastData = null;  // últimos dados carregados (para o resumo por IA)
+    var biLastVisao = 'geral';
 
     function biFiltroPeriodoQuery() {
         var a = document.getElementById('filtro-ano');
@@ -704,7 +773,7 @@ $empresa_id = $_SESSION['empresa_id'];
         if (k === 'id' || k === 'rota_id') return biHtmlEsc(String(val));
         var n = Number(val);
         if (!isNaN(n) && String(val).trim() !== '') {
-            if (/valor|frete|comissao|pedagio|caixinha|descarga|total_despviagem/.test(k)) return biHtmlEsc(formatMoney(n));
+            if (/valor|frete|comissao|pedagio|caixinha|descarga|outros|total_despviagem/.test(k)) return biHtmlEsc(formatMoney(n));
             if (k === 'litros' || k.indexOf('litro') === 0) return biHtmlEsc(n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 }));
             if (/distancia|km_atual|_km$/.test(k)) return biHtmlEsc(n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 }));
             return biHtmlEsc(formatNum(n));
@@ -746,6 +815,9 @@ $empresa_id = $_SESSION['empresa_id'];
         var body = document.getElementById('bi-drill-body');
         if (!modal || !title || !body) return;
         title.textContent = pageTitle;
+        biLastDrill = null;
+        var expBtn = document.getElementById('bi-drill-export');
+        if (expBtn) expBtn.style.display = 'none';
         body.innerHTML = '<div class="bi-loading" style="padding:1.5rem;"><i class="fas fa-spinner fa-spin"></i> Carregando…</div>';
         modal.classList.add('is-open');
         modal.setAttribute('aria-hidden', 'false');
@@ -761,10 +833,74 @@ $empresa_id = $_SESSION['empresa_id'];
                     return;
                 }
                 body.innerHTML = biRenderDrillTable(json);
+                // Guarda os dados completos e habilita a exportação CSV (todas as linhas, não só as 200 exibidas)
+                var rows = json.rows || [];
+                if (rows.length) {
+                    biLastDrill = { columns: json.columns || [], rows: rows, title: pageTitle };
+                    var eb = document.getElementById('bi-drill-export');
+                    if (eb) eb.style.display = '';
+                }
             })
             .catch(function(err) {
                 body.innerHTML = '<p class="bi-error">' + biHtmlEsc(safe(err, 'Falha ao carregar. Tente novamente.')) + '</p>';
             });
+    }
+
+    function biExportDrillCsv() {
+        if (!biLastDrill || !biLastDrill.rows.length) return;
+        var cols = biLastDrill.columns;
+        var rows = biLastDrill.rows;
+        function cell(v) {
+            if (v == null) return '';
+            var s = String(v).replace(/"/g, '""');
+            return /[";\n]/.test(s) ? '"' + s + '"' : s;
+        }
+        var lines = [cols.map(function (c) { return cell(c.label); }).join(';')];
+        rows.forEach(function (r) {
+            lines.push(cols.map(function (c) { return cell(r[c.key]); }).join(';'));
+        });
+        var csv = '﻿' + lines.join('\r\n'); // BOM para Excel pt-BR
+        var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        var a = document.createElement('a');
+        var fname = 'bi_detalhe_' + (biLastDrill.title || 'dados').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') + '.csv';
+        a.href = URL.createObjectURL(blob);
+        a.download = fname;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+    }
+
+    function biShowResumoCard(show) {
+        var c = document.getElementById('bi-resumo-ia');
+        if (c) c.style.display = show ? '' : 'none';
+    }
+
+    function biGerarResumoIA() {
+        if (!biLastData) return;
+        var btn = document.getElementById('btn-resumo-ia');
+        var out = document.getElementById('bi-resumo-ia-texto');
+        var ano = (document.getElementById('filtro-ano') || {}).value || '';
+        var mes = (document.getElementById('filtro-mes') || {}).value || '';
+        if (btn) { btn.disabled = true; btn.dataset.html = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando…'; }
+        if (out) { out.classList.add('bi-text-muted'); out.textContent = 'A IA está analisando os números deste período…'; }
+        var headers = (typeof sfMutationHeaders === 'function') ? sfMutationHeaders({ 'Content-Type': 'application/json' }) : { 'Content-Type': 'application/json' };
+        if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__ && !headers['X-CSRF-Token']) headers['X-CSRF-Token'] = window.__SF_CSRF__;
+        fetch(baseUrl + '/bi_resumo_ia.php', {
+            method: 'POST', credentials: 'same-origin', headers: headers,
+            body: JSON.stringify({ visao: biLastVisao, ano: ano, mes: mes, dados: biLastData })
+        })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (o) {
+            var d = o.d || {};
+            if (o.ok && d.success) {
+                if (out) { out.classList.remove('bi-text-muted'); out.textContent = d.resumo; }
+            } else if (out) {
+                out.classList.add('bi-text-muted');
+                out.textContent = d.message || d.error || 'Não foi possível gerar o resumo.';
+            }
+        })
+        .catch(function () { if (out) out.textContent = 'Erro de comunicação ao gerar o resumo.'; })
+        .then(function () { if (btn) { btn.disabled = false; if (btn.dataset.html) btn.innerHTML = btn.dataset.html; } });
     }
     function biOpenDrillModal(serie, mesAno, mesLabel) {
         var sl = { rotas: 'Rotas', abastecimentos: 'Abastecimentos', manutencoes: 'Manutenções', despesas_viagem: 'Despesas de viagem', despesas_fixas: 'Despesas fixas (pagas)' };
@@ -944,8 +1080,9 @@ $empresa_id = $_SESSION['empresa_id'];
             var v2 = variacaoPct(biCoerceNumber(ref[attr]), biCoerceNumber(comp.mesmo_mes_ano_anterior[attr]));
             variacoes = '<div class="bi-kpi-variacoes">' + badgeVariacao(v1, 'vs mês ant.') + badgeVariacao(v2, 'vs ano ant.') + '</div>';
         }
-        var h3 = (icon ? '<i class="' + icon + '" style="margin-right:0.35em;opacity:0.85;"></i>' : '') + label;
-        return '<div class="dashboard-card"><div class="card-header"><h3>' + h3 + '</h3></div><div class="card-body"><div class="metric"><span class="metric-value">' + value + '</span>' + variacoes + '</div></div></div>';
+        var iconClass = (icon && String(icon).trim()) ? icon : 'fas fa-chart-column';
+        var iconHtml = '<i class="' + iconClass + ' kpi-card-icon" aria-hidden="true"></i>';
+        return '<div class="dashboard-card"><div class="card-header">' + iconHtml + '<h3>' + label + '</h3></div><div class="card-body"><div class="metric"><span class="metric-value">' + value + '</span>' + variacoes + '</div></div></div>';
     }
     function renderKPIs(data, visao) {
         visao = visao || 'geral';
@@ -980,10 +1117,10 @@ $empresa_id = $_SESSION['empresa_id'];
         if (visao === 'geral') {
             html = kpiCard('fas fa-route', formatNum(totalRotas), 'Total Rotas', 'total_rotas', ref, comp)
                 + kpiCard('fas fa-tachometer-alt', formatNum(totalKm), 'Km rodados', 'total_km_rodados', ref, comp)
-                + kpiCard('', formatMoney(totalFrete), 'Faturamento (Frete)', 'total_frete', ref, comp)
+                + kpiCard('fas fa-sack-dollar', formatMoney(totalFrete), 'Faturamento (Frete)', 'total_frete', ref, comp)
                 + kpiCard('fas fa-hand-holding-usd', formatMoney(totalComissao), 'Comissão', 'total_comissao', ref, comp)
                 + kpiCard('fas fa-gas-pump', formatNum(totalAbast), 'Abastecimentos', 'total_abastecimentos', ref, comp)
-                + kpiCard('', formatMoney(gastoAbast), 'Gasto Abast.', 'total_gasto_abastecimentos', ref, comp)
+                + kpiCard('fas fa-wallet', formatMoney(gastoAbast), 'Gasto Abast.', 'total_gasto_abastecimentos', ref, comp)
                 + kpiCard('fas fa-road', formatMoney(totalDespViagem), 'Desp. viagem', 'total_despesas_viagem', ref, comp)
                 + kpiCard('fas fa-tools', formatMoney(totalManut), 'Manutenção', 'total_manutencoes', ref, comp)
                 + kpiCard('fas fa-file-invoice-dollar', formatMoney(totalDespFixas), 'Desp. fixas', 'total_despesas_fixas', ref, comp)
@@ -992,14 +1129,14 @@ $empresa_id = $_SESSION['empresa_id'];
         } else if (visao === 'rotas') {
             html = kpiCard('fas fa-route', formatNum(totalRotas), 'Total Rotas', 'total_rotas', ref, comp)
                 + kpiCard('fas fa-tachometer-alt', formatNum(totalKm), 'Km rodados', 'total_km_rodados', ref, comp)
-                + kpiCard('', formatMoney(totalFrete), 'Faturamento (Frete)', 'total_frete', ref, comp)
+                + kpiCard('fas fa-sack-dollar', formatMoney(totalFrete), 'Faturamento (Frete)', 'total_frete', ref, comp)
                 + kpiCard('fas fa-hand-holding-usd', formatMoney(totalComissao), 'Comissão', 'total_comissao', ref, comp)
                 + kpiCard('fas fa-coins', formatMoney(ticket), 'Ticket médio', null, ref, comp)
                 + kpiCard('fas fa-chart-line', formatMoney(lucro), 'Lucro oper.', 'lucro_operacional', ref, comp);
         } else if (visao === 'manutencao') {
             var custoKmManut = totalKm > 0 ? totalManut / totalKm : 0;
             html = kpiCard('fas fa-tools', formatNum(qtdManut), 'Total Manutenções', 'quantidade_manutencoes', ref, comp)
-                + kpiCard('', formatMoney(totalManut), 'Custo Total', 'total_manutencoes', ref, comp)
+                + kpiCard('fas fa-screwdriver-wrench', formatMoney(totalManut), 'Custo Total', 'total_manutencoes', ref, comp)
                 + kpiCard('fas fa-coins', formatMoney(mediaManut), 'Média por manut.', null, ref, comp)
                 + kpiCard('fas fa-tachometer-alt', formatMoney(custoKmManut), 'Custo/KM', null, ref, comp)
                 + kpiCard('fas fa-truck', formatNum((data.veiculos_top_manutencao || []).length), 'Veículos', null, ref, comp);
@@ -1009,11 +1146,11 @@ $empresa_id = $_SESSION['empresa_id'];
                 + kpiCard('fas fa-coins', formatMoney(totalRotas > 0 ? totalDespViagem / totalRotas : 0), 'Média por rota', null, ref, comp);
         } else if (visao === 'despesas_fixas') {
             html = kpiCard('fas fa-file-invoice-dollar', formatNum(qtdDespFixas), 'Qtde Desp. Fixas', 'quantidade_despesas_fixas', ref, comp)
-                + kpiCard('', formatMoney(totalDespFixas), 'Total Pago', 'total_despesas_fixas', ref, comp)
+                + kpiCard('fas fa-sack-dollar', formatMoney(totalDespFixas), 'Total Pago', 'total_despesas_fixas', ref, comp)
                 + kpiCard('fas fa-coins', formatMoney(mediaDespFixas), 'Média por despesa', null, ref, comp);
         } else {
             html = kpiCard('fas fa-gas-pump', formatNum(totalAbast), 'Total Abastecimentos', 'total_abastecimentos', ref, comp)
-                + kpiCard('', formatMoney(gastoAbast), 'Gasto Total', 'total_gasto_abastecimentos', ref, comp)
+                + kpiCard('fas fa-wallet', formatMoney(gastoAbast), 'Gasto Total', 'total_gasto_abastecimentos', ref, comp)
                 + kpiCard('fas fa-coins', formatMoney(mediaAbast), 'Média por abast.', null, ref, comp)
                 + kpiCard('fas fa-truck', formatNum(veiculosAbast), 'Veículos', null, ref, comp);
         }
@@ -1657,7 +1794,7 @@ $empresa_id = $_SESSION['empresa_id'];
             var pedagio = Number(tipos.pedagios || 0);
             var alimentacao = Number(tipos.caixinha || 0);
             var hospedagem = Number(tipos.estacionamento || 0) + Number(tipos.lavagem || 0);
-            var outros = Number(tipos.descarga || 0) + Number(tipos.borracharia || 0) + Number(tipos.eletrica_mecanica || 0) + Number(tipos.adiantamento || 0);
+            var outros = Number(tipos.descarga || 0) + Number(tipos.borracharia || 0) + Number(tipos.eletrica_mecanica || 0) + Number(tipos.adiantamento || 0) + Number(tipos.outros || 0);
             var labelsPie = ['Pedágio', 'Alimentação', 'Hospedagem', 'Outros'];
             var dadosPie = [pedagio, alimentacao, hospedagem, outros];
             var somaPie = dadosPie.reduce(function (a, b) { return a + (Number(b) || 0); }, 0);
@@ -2308,6 +2445,7 @@ $empresa_id = $_SESSION['empresa_id'];
                     document.getElementById('bi-kpis').style.display = 'none';
                     document.getElementById('bi-charts').style.display = 'none';
                     document.getElementById('bi-table-wrap').style.display = 'none';
+                    biShowResumoCard(false);
                     var saudeFrota = document.getElementById('bi-saude-frota');
                     if (saudeFrota) saudeFrota.style.display = 'none';
                     hideAllExtraBlocks();
@@ -2369,6 +2507,8 @@ $empresa_id = $_SESSION['empresa_id'];
                         renderCharts(dataFiltrada, v);
                         renderTable(dataFiltrada, v);
                         renderExtraBlocks(rawPayload, v);
+                        biLastData = dataFiltrada; biLastVisao = v;
+                        biShowResumoCard(true);
                         if (typeof requestAnimationFrame === 'function') {
                             requestAnimationFrame(function () {
                                 requestAnimationFrame(biReflowBiCharts);
@@ -2462,6 +2602,10 @@ $empresa_id = $_SESSION['empresa_id'];
         loadData();
         updateUrlFromFilters();
     });
+    var btnImprimir = document.getElementById('btn-imprimir');
+    if (btnImprimir) btnImprimir.addEventListener('click', function () { window.print(); });
+    var btnResumoIa = document.getElementById('btn-resumo-ia');
+    if (btnResumoIa) btnResumoIa.addEventListener('click', biGerarResumoIA);
     var btnIndAtualizar = document.getElementById('btn-indicadores-atualizar');
     if (btnIndAtualizar) btnIndAtualizar.addEventListener('click', loadPerformanceIndicators);
     var btnIndExcel = document.getElementById('btn-indicadores-excel');
@@ -2474,6 +2618,8 @@ $empresa_id = $_SESSION['empresa_id'];
     var bdBackdrop = document.getElementById('bi-drill-backdrop');
     if (btnDrillClose) btnDrillClose.addEventListener('click', biCloseDrillModal);
     if (bdBackdrop) bdBackdrop.addEventListener('click', biCloseDrillModal);
+    var btnDrillExport = document.getElementById('bi-drill-export');
+    if (btnDrillExport) btnDrillExport.addEventListener('click', biExportDrillCsv);
     document.addEventListener('keydown', function(ev) {
         if (ev.key === 'Escape') {
             var modal = document.getElementById('bi-drill-modal');
@@ -2500,5 +2646,7 @@ $empresa_id = $_SESSION['empresa_id'];
     </script>
 
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php $sf_help_key = 'bi'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html>

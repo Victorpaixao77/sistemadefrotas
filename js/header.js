@@ -22,13 +22,14 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 }
 
 /**
- * Inicializar dropdown de notificações
+ * Inicializar dropdown de notificações operacionais
  */
 function initNotifications() {
     const notificationBtn = document.getElementById('notificationBtn');
     const badge = document.getElementById('notificationBadge');
+    const sf = window.sfNotif;
 
-    if (!notificationBtn) return;
+    if (!notificationBtn || !sf) return;
 
     const notificationDropdown = document.getElementById('notificationDropdown');
     if (!notificationDropdown) return;
@@ -36,60 +37,39 @@ function initNotifications() {
     const notificationClearBtn = notificationDropdown.querySelector('.notification-clear-btn');
     const notificationList = notificationDropdown.querySelector('.notification-list');
 
-    // Carregar notificações no carregamento inicial da página
-    carregarNotificacoesIA(false);
+    sf.bindItemClicks(notificationList);
 
-    // Função para carregar notificações (padrão: só não lidas, todas se true)
-    function carregarNotificacoesIA(verTodas = false) {
-        const url = verTodas ? sfAppUrl('notificacoes/notificacoes.php?todas=1') : sfAppUrl('notificacoes/notificacoes.php');
-        fetch(url, {
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
+    notificationList.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-notif-acao]');
+        if (!btn) return;
+        e.preventDefault();
+        e.stopPropagation();
+        sf.runAction(btn.getAttribute('data-notif-acao'), btn.getAttribute('data-notif-ref'), btn.getAttribute('data-notif-id'))
+            .then(data => { if (data && data.success) carregarNotificacoesOperacional(false); });
+    });
+
+    function carregarNotificacoesOperacional(verTodas = false) {
+        const url = sf.buildListUrl('operacional', verTodas);
+        fetch(url, { credentials: 'same-origin' })
         .then(res => {
-            if (!res.ok) {
-                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-            }
+            if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
             return res.json();
         })
         .then(data => {
             if (!notificationList) return;
             notificationList.innerHTML = '';
-            let unreadCount = 0;
-            
+
             if (data.success && data.notificacoes && data.notificacoes.length) {
-                data.notificacoes.forEach(n => {
-                    let iconClass = 'info';
-                    if (n.tipo === 'manutencao') iconClass = 'warning';
-                    if (n.tipo === 'alerta') iconClass = 'warning';
-                    if (n.tipo === 'pneu') iconClass = 'success';
-                    const unread = n.lida == 0 ? 'unread' : 'lida';
-                    if (unread === 'unread') unreadCount++;
-                    notificationList.innerHTML += `
-                        <div class="notification-item ${unread}">
-                            <div class="notification-icon ${iconClass}">
-                                <i class="fas fa-bell"></i>
-                            </div>
-                            <div class="notification-content">
-                                <div class="notification-title">${n.titulo}</div>
-                                <div class="notification-text">${n.mensagem}</div>
-                                <div class="notification-time">${new Date(n.data_criacao).toLocaleString('pt-BR')}</div>
-                            </div>
-                        </div>
-                    `;
-                });
+                const html = data.notificacoes.map(n => sf.renderItem(n, { showIaTip: false })).join('');
+                notificationList.innerHTML = html;
+            } else if (data.sistema_ativo === false) {
+                notificationList.innerHTML = '<div style="padding:16px;color:#b8c2d0">Notificações desativadas nas configurações.</div>';
             } else {
-                notificationList.innerHTML = '<div style="padding:16px;color:#b8c2d0">Nenhuma notificação encontrada.</div>';
+                notificationList.innerHTML = '<div style="padding:16px;color:#b8c2d0">Nenhuma notificação operacional.</div>';
             }
-            
-            // Usar o total real de notificações não lidas se disponível
-            const totalReal = data.total_real_nao_lidas || unreadCount;
-            if (badge) {
-                badge.textContent = totalReal;
-                badge.style.display = totalReal > 0 ? 'flex' : 'none';
-            }
+
+            const total = data.total_nao_lidas ?? data.total_real_nao_lidas ?? 0;
+            sf.updateBadge(badge, total);
         })
         .catch(error => {
             console.error('Erro ao carregar notificações:', error);
@@ -104,65 +84,73 @@ function initNotifications() {
         });
     }
 
-    // Toggle do dropdown de notificações
+    window.carregarNotificacoesOperacional = carregarNotificacoesOperacional;
+
+    sf.refreshBadges();
+
     notificationBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
         notificationDropdown.classList.toggle('show');
-        var isOpen = notificationDropdown.classList.contains('show');
+        const isOpen = notificationDropdown.classList.contains('show');
         notificationBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-        if (isOpen) {
-            carregarNotificacoesIA(false);
-        }
+        if (isOpen) carregarNotificacoesOperacional(false);
     });
 
-    // 'Ver todas' mostra todas as notificações
-    const viewAllLink = document.querySelector('.view-all-link');
+    const viewAllLink = notificationDropdown.querySelector('.notification-footer a.view-all-link')
+        || notificationDropdown.querySelector('a.view-all-link');
     if (viewAllLink) {
         viewAllLink.addEventListener('click', function(e) {
             e.preventDefault();
-            carregarNotificacoesIA(true);
+            e.stopPropagation();
+            carregarNotificacoesOperacional(true);
+            notificationDropdown.classList.add('show');
+            notificationBtn.setAttribute('aria-expanded', 'true');
+            if (notificationList) notificationList.scrollTop = 0;
         });
     }
 
-    // Fechar o dropdown ao clicar fora dele
     document.addEventListener('click', function(e) {
-        if (notificationDropdown.classList.contains('show') && 
-            !notificationDropdown.contains(e.target) && 
+        if (notificationDropdown.classList.contains('show') &&
+            !notificationDropdown.contains(e.target) &&
             e.target !== notificationBtn) {
             notificationDropdown.classList.remove('show');
             notificationBtn.setAttribute('aria-expanded', 'false');
         }
     });
 
-    // Prevenir o fechamento ao clicar dentro do dropdown
     notificationDropdown.addEventListener('click', function(e) {
         e.stopPropagation();
     });
 
-    // Limpar notificações regulares (marca como lidas no banco e visual)
     if (notificationClearBtn) {
         notificationClearBtn.addEventListener('click', function() {
-            fetch(sfAppUrl('notificacoes/limpar_notificacoes.php'), { method: 'POST' })
+            fetch(sfAppUrl('notificacoes/limpar_notificacoes.php'), {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: sf.mutationHeaders()
+            })
                 .then(res => res.json())
                 .then(data => {
                     if (data.success) {
-                        notificationList.innerHTML = '<div style="padding:16px;color:#b8c2d0">Nenhuma notificação encontrada.</div>';
-                        badge.textContent = '0';
-                        badge.style.display = 'none';
-                        
-                        // Atualiza também o badge de IA se existir
-                        const iaBadge = document.getElementById('iaNotificationBadge');
-                        if (iaBadge) {
-                            // Recarrega as notificações de IA para atualizar o contador
-                            if (typeof window.carregarIANotificacoes === 'function') {
-                                window.carregarIANotificacoes();
-                            }
-                        }
+                        notificationList.innerHTML = '<div style="padding:16px;color:#b8c2d0">Nenhuma notificação operacional.</div>';
+                        sf.updateBadge(badge, data.operacional ?? 0);
+                        sf.updateBadge(document.getElementById('iaNotificationBadge'), data.ia ?? 0);
                     }
                 });
         });
     }
+
+    function verificarPendenciasHeader() {
+        fetch(sfAppUrl('notificacoes/sync_all.php'), { credentials: 'same-origin' })
+            .then(res => res.json())
+            .then(data => { if (data.success) sf.refreshBadges(); })
+            .catch(err => console.error('sync notificacoes:', err));
+    }
+
+    verificarPendenciasHeader();
+    setInterval(verificarPendenciasHeader, 5 * 60 * 1000);
+    setInterval(function () { sf.refreshBadges(); }, 2 * 60 * 1000);
 }
 
 /**

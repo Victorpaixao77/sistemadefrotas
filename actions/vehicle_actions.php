@@ -26,13 +26,27 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
 // Handle POST requests
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $action = $_POST['action'] ?? '';
-    
+
+    // CSRF apenas para mutações (não bloquear leitura 'get')
+    if (in_array($action, ['create', 'update', 'delete'], true)) {
+        require_once '../includes/csrf.php';
+        $csrf = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? null);
+        if (!csrf_token_validate(is_string($csrf) ? $csrf : null)) {
+            http_response_code(403);
+            echo json_encode([
+                'success' => false,
+                'message' => 'Sessão expirada ou token CSRF inválido. Recarregue a página.'
+            ]);
+            exit;
+        }
+    }
+
     switch ($action) {
         case 'create':
         case 'update':
             handleSaveVehicle();
             break;
-            
+
         case 'delete':
             handleDeleteVehicle();
             break;
@@ -255,25 +269,19 @@ function handleSaveVehicle() {
             'success' => true,
             'message' => $id ? 'Veículo atualizado com sucesso!' : 'Veículo cadastrado com sucesso!',
             'id' => $vehicle_id,
-            'debug' => [
-                'foto_uploaded' => isset($data['foto_veiculo']),
-                'documento_uploaded' => isset($data['documento']),
-                'foto_path' => $data['foto_veiculo'] ?? null,
-                'documento_path' => $data['documento'] ?? null
-            ]
         ];
         
     } catch(PDOException $e) {
         error_log("vehicle_actions.php - ERRO PDO: " . $e->getMessage());
         $response = [
             'success' => false,
-            'message' => 'Erro ao salvar veículo: ' . $e->getMessage()
+            'message' => 'Erro ao salvar veículo. Tente novamente.'
         ];
     } catch(Exception $e) {
         error_log("vehicle_actions.php - ERRO: " . $e->getMessage());
         $response = [
             'success' => false,
-            'message' => $e->getMessage()
+            'message' => 'Não foi possível salvar o veículo.'
         ];
     }
     

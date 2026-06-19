@@ -197,6 +197,13 @@ function can_approve_refuels() {
 }
 
 /**
+ * Mapa GPS da frota (painel web) — mesmo critério do menu Gestão de Motoristas.
+ */
+function can_view_fleet_map() {
+    return can_approve_refuels();
+}
+
+/**
  * Verifica se o usuário pode visualizar dados financeiros detalhados
  * @return bool
  */
@@ -269,6 +276,12 @@ function require_permission($permission, $redirect_url = '../index.php?error=acc
         case 'approve_refuels':
             $has_permission = can_approve_refuels();
             break;
+        case 'view_fleet_map':
+            $has_permission = can_view_fleet_map();
+            break;
+        case 'access_tire_management':
+            $has_permission = can_access_tire_management();
+            break;
         default:
             $has_permission = false;
     }
@@ -322,6 +335,7 @@ function get_user_permissions() {
         'can_access_advanced_reports' => can_access_advanced_reports(),
         'can_manage_system_settings' => can_manage_system_settings(),
         'can_approve_refuels' => can_approve_refuels(),
+        'can_access_tire_management' => can_access_tire_management(),
         'can_view_financial_data' => can_view_financial_data(),
         'permission_level' => get_user_permission_level()
     ];

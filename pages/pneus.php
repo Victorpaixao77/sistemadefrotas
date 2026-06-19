@@ -1,6 +1,7 @@
 <?php
 // Include configuration and functions first
 require_once '../includes/config.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
 
 // Configure session before starting it
@@ -11,6 +12,8 @@ session_start();
 
 // Check authentication
 require_authentication();
+require_once '../includes/permissions.php';
+require_permission('access_tire_management');
 
 // Set page title
 $page_title = "Pneus";
@@ -32,6 +35,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
     <?php if ($is_modern): ?>
     <link rel="stylesheet" href="../css/fornc-modern-page.css">
     <?php endif; ?>
+    <link rel="stylesheet" href="../css/pneus_timeline.css">
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
@@ -95,6 +99,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
         body.pneus-modern .dashboard-grid { display: none; }
         body.pneus-modern .filter-section { display: none; }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'pneus-modern' : ''; ?>">
     <div class="app-container">
@@ -132,11 +137,12 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
 
                 <?php if ($is_modern): ?>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Total</span><span class="val" id="pneusKpiTotal">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Em uso</span><span class="val" id="pneusKpiEmUso">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Vida útil média</span><span class="val" id="pneusKpiVidaMedia">0%</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Em alerta</span><span class="val" id="pneusKpiAlerta">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-dot fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total</span></div><span class="val" id="pneusKpiTotal">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-truck-moving fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Em uso</span></div><span class="val" id="pneusKpiEmUso">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-percent fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Vida útil média</span></div><span class="val" id="pneusKpiVidaMedia">0%</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-triangle-exclamation fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Em alerta</span></div><span class="val" id="pneusKpiAlerta">0</span></div>
                 </div>
+                <div id="sfPneusInsights"></div>
                 <div class="fornc-toolbar">
                     <div class="fornc-search-block">
                         <label for="searchTire">Busca rápida</label>
@@ -193,6 +199,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-circle-dot kpi-card-icon" aria-hidden="true"></i>
                             <h3>Total de Pneus</h3>
                         </div>
                         <div class="card-body">
@@ -205,6 +212,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-truck kpi-card-icon" aria-hidden="true"></i>
                             <h3>Pneus em Uso</h3>
                         </div>
                         <div class="card-body">
@@ -217,6 +225,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-battery-three-quarters kpi-card-icon" aria-hidden="true"></i>
                             <h3>Vida Útil</h3>
                         </div>
                         <div class="card-body">
@@ -229,6 +238,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-bell kpi-card-icon" aria-hidden="true"></i>
                             <h3>Pneus em Alerta</h3>
                         </div>
                         <div class="card-body">
@@ -396,6 +406,44 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                             <label for="sulco_inicial">Sulco Inicial (mm)*</label>
                             <input type="number" step="0.01" id="sulco_inicial" name="sulco_inicial" required>
                         </div>
+
+                        <div class="form-group">
+                            <label for="valor_compra">Valor de compra (R$)</label>
+                            <input type="number" step="0.01" id="valor_compra" name="valor_compra" min="0">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="nota_fiscal">Nota fiscal</label>
+                            <input type="text" id="nota_fiscal" name="nota_fiscal" maxlength="60">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="garantia_ate">Garantia até</label>
+                            <input type="date" id="garantia_ate" name="garantia_ate">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="carcaca_codigo">Código da carcaça</label>
+                            <input type="text" id="carcaca_codigo" name="carcaca_codigo" maxlength="60" placeholder="Opcional — padrão: nº série">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="tipo_rodado_ideal">Posição ideal</label>
+                            <select id="tipo_rodado_ideal" name="tipo_rodado_ideal">
+                                <option value="qualquer">Qualquer</option>
+                                <option value="direcional">Direcional</option>
+                                <option value="tracao">Tração</option>
+                                <option value="livre">Livre</option>
+                                <option value="implemento">Implemento</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="filial_id">Filial / unidade</label>
+                            <select id="filial_id" name="filial_id">
+                                <option value="">— Matriz / não informado —</option>
+                            </select>
+                        </div>
                         
                         <div class="form-group">
                             <label for="numero_recapagens">Número de Recapagens</label>
@@ -455,6 +503,10 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                         <div class="detail-grid" id="detailUso"></div>
                     </section>
                     <section class="detail-section">
+                        <h3><i class="fas fa-coins"></i> Custo por km</h3>
+                        <div class="detail-grid" id="detailCustoKm"></div>
+                    </section>
+                    <section class="detail-section">
                         <h3><i class="fas fa-retweet"></i> Recapagens</h3>
                         <div class="detail-grid" id="detailRecapagens"></div>
                     </section>
@@ -463,7 +515,9 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                         <div id="detailManutencoes"></div>
                     </section>
                     <section class="detail-section" id="sectionMovimentacoes">
-                        <h3><i class="fas fa-history"></i> Histórico de movimentações</h3>
+                        <h3><i class="fas fa-history"></i> Histórico visual (timeline)</h3>
+                        <div id="detailTimelineVis"></div>
+                        <h3 style="margin-top:1rem"><i class="fas fa-list"></i> Movimentações (tabela)</h3>
                         <p class="detail-text" id="detailMovimentacoesMsg">Carregando...</p>
                         <div id="detailMovimentacoesTable"></div>
                     </section>
@@ -496,6 +550,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn-secondary" onclick="closeAllModals()">Fechar</button>
+                <button type="button" class="btn-secondary" id="btnFichaFromDetails"><i class="fas fa-id-card"></i> Ficha completa</button>
                 <button type="button" class="btn-primary" id="btnEditFromDetails"><i class="fas fa-edit"></i> Editar pneu</button>
             </div>
         </div>
@@ -530,6 +585,16 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                 }).catch(() => {
                     document.getElementById('debugBannerText').textContent = 'Erro ao verificar API.';
                 });
+            }
+            const qs = new URLSearchParams(window.location.search);
+            const pneuId = qs.get('pneu_id');
+            if (pneuId) {
+                const id = parseInt(pneuId, 10);
+                if (qs.get('edit') === '1') {
+                    showEditTireModal(id);
+                } else {
+                    showTireDetails(id);
+                }
             }
         });
         
@@ -652,8 +717,9 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                     <td><span class="status-badge status-${tire.status_id}">${tire.status_nome}</span></td>
                     <td>
                         <div class="action-buttons">
-                            <button class="btn-action view" onclick="showTireDetails(${tire.id})"><i class="fas fa-eye"></i></button>
-                            <button class="btn-action edit" onclick="showEditTireModal(${tire.id})"><i class="fas fa-edit"></i></button>
+                            <button class="btn-action view" onclick="showTireDetails(${tire.id})" title="Detalhes"><i class="fas fa-eye"></i></button>
+                            <button class="btn-action" onclick="PneuTimeline.openFichaModal(${tire.id})" title="Ficha completa"><i class="fas fa-id-card"></i></button>
+                            <button class="btn-action edit" onclick="showEditTireModal(${tire.id})" title="Editar"><i class="fas fa-edit"></i></button>
                             <button class="btn-action delete" onclick="showDeleteConfirmation(${tire.id})"><i class="fas fa-trash"></i></button>
                         </div>
                     </td>
@@ -698,6 +764,19 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                     statusData.data.forEach(status => {
                         statusSelect.innerHTML += `<option value="${status.id}">${status.nome}</option>`;
                     });
+                }
+                const filialRes = await fetch('../includes/get_tire_data.php?type=filiais');
+                const filialData = await filialRes.json();
+                if (filialData.success) {
+                    const filialSelect = document.getElementById('filial_id');
+                    if (filialSelect) {
+                        const cur = filialSelect.value;
+                        filialSelect.innerHTML = '<option value="">— Matriz / não informado —</option>';
+                        filialData.data.forEach(function (f) {
+                            filialSelect.innerHTML += `<option value="${f.id}">${f.nome}</option>`;
+                        });
+                        if (cur) filialSelect.value = cur;
+                    }
                 }
             } catch (error) {
                 console.error('Erro ao carregar dados:', error);
@@ -774,14 +853,14 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
             window._tireDetailsId = tireId;
 
             try {
-                const [tireRes, manutRes, movRes] = await Promise.all([
+                const [tireRes, manutRes, timelineRes] = await Promise.all([
                     fetch(`../includes/get_tires.php?id=${tireId}`),
                     fetch(`../api/pneu_manutencao_data.php?action=list_by_pneu&pneu_id=${tireId}`),
-                    fetch(`../api/pneu_movimentacoes_debug.php?action=by_pneu&pneu_id=${tireId}`)
+                    fetch(`../api/pneus.php?action=timeline&pneu_id=${tireId}`)
                 ]);
                 const tireData = await tireRes.json();
                 const manutData = await manutRes.json();
-                const movData = await movRes.json();
+                const timelineData = await timelineRes.json();
                 const tire = tireData.success && tireData.data ? tireData.data : null;
                 const manutencoes = manutData.success && manutData.data ? manutData.data : [];
 
@@ -818,6 +897,15 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                 ];
                 document.getElementById('detailUso').innerHTML = uso.map(([l, v]) => '<div class="detail-item"><span class="detail-label">' + l + '</span><span class="detail-value">' + (v || '-') + '</span></div>').join('');
 
+                const ck = timelineData.custo_km || {};
+                const custoKmHtml = [
+                    ['Custo total', ck.custo_total != null ? 'R$ ' + Number(ck.custo_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '-'],
+                    ['KM rodado', formatNumber(ck.km_rodado)],
+                    ['Custo/km', ck.custo_km != null ? ('R$ ' + Number(ck.custo_km).toFixed(4) + '/km') : '-'],
+                    ['Sulco atual (mm)', ck.sulco_atual_mm != null ? ck.sulco_atual_mm : '-']
+                ];
+                document.getElementById('detailCustoKm').innerHTML = custoKmHtml.map(([l, v]) => '<div class="detail-item"><span class="detail-label">' + l + '</span><span class="detail-value">' + (v || '-') + '</span></div>').join('');
+
                 // Recapagens
                 const recap = [
                     ['Número de recapagens', tire.numero_recapagens != null ? tire.numero_recapagens : '0'],
@@ -840,22 +928,26 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                 document.getElementById('detailManutencoes').innerHTML = manutHtml;
 
                 // Histórico de movimentações (pneu_movimentacoes)
+                const movimentacoes = (timelineData.success && timelineData.timeline) ? timelineData.timeline : [];
                 const sectionMov = document.getElementById('sectionMovimentacoes');
                 const msgMov = document.getElementById('detailMovimentacoesMsg');
                 const tableMov = document.getElementById('detailMovimentacoesTable');
-                if (movData.table_exists === false) {
-                    msgMov.textContent = 'Tabela de movimentações não criada. Execute sql/create_pneu_movimentacoes.sql para ativar o histórico único.';
+                if (!timelineData.success) {
+                    msgMov.textContent = 'Não foi possível carregar o histórico de movimentações.';
                     msgMov.style.display = 'block';
                     tableMov.innerHTML = '';
-                } else if (!movData.movimentacoes || movData.movimentacoes.length === 0) {
+                } else if (movimentacoes.length === 0) {
                     msgMov.textContent = 'Nenhuma movimentação registrada para este pneu. As movimentações são geradas ao cadastrar, alocar, remover ou registrar manutenção.';
                     msgMov.style.display = 'block';
                     tableMov.innerHTML = '';
                 } else {
                     msgMov.style.display = 'none';
+                    if (window.PneuTimeline) {
+                        PneuTimeline.render(document.getElementById('detailTimelineVis'), movimentacoes);
+                    }
                     const labels = { entrada_estoque: 'Entrada estoque', instalacao: 'Instalação', remocao: 'Remoção', deslocamento: 'Deslocamento', recapagem: 'Recapagem', manutencao: 'Manutenção', descarte: 'Descarte' };
                     tableMov.innerHTML = '<table class="data-table"><thead><tr><th>Tipo</th><th>Data</th><th>Veículo</th><th>KM odômetro</th><th>KM rodado</th><th>Sulco (mm)</th><th>Custo</th><th>Obs.</th></tr></thead><tbody>' +
-                        movData.movimentacoes.map(m => {
+                        movimentacoes.map(m => {
                             const tipo = labels[m.tipo] || m.tipo;
                             const data = m.data_movimentacao ? formatDate(m.data_movimentacao) : '-';
                             const custo = m.custo != null && m.custo > 0 ? 'R$ ' + Number(m.custo).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '-';
@@ -876,7 +968,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                     if (showDebug) {
                         document.getElementById('debugTireJson').textContent = JSON.stringify(tireData, null, 2);
                         document.getElementById('debugManutJson').textContent = JSON.stringify(manutData, null, 2);
-                        document.getElementById('debugMovPneuJson').textContent = JSON.stringify(movData, null, 2);
+                        document.getElementById('debugMovPneuJson').textContent = JSON.stringify(timelineData, null, 2);
                         try {
                             const statusRes = await fetch('../api/pneu_movimentacoes_debug.php?action=status');
                             const statusData = await statusRes.json();
@@ -896,6 +988,12 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
         }
 
         function setupTireDetailsModal() {
+            document.getElementById('btnFichaFromDetails').addEventListener('click', function() {
+                const id = window._tireDetailsId;
+                if (id && window.PneuTimeline) {
+                    PneuTimeline.openFichaModal(id);
+                }
+            });
             document.getElementById('btnEditFromDetails').addEventListener('click', function() {
                 const id = window._tireDetailsId;
                 if (id) {
@@ -919,10 +1017,23 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
             };
         }
 
+        function pneusCsrfHeaders(extra) {
+            const h = Object.assign({}, extra || {});
+            if (!h['Content-Type'] && !h['content-type']) {
+                h['Content-Type'] = 'application/json';
+            }
+            if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+                h['X-CSRF-Token'] = window.__SF_CSRF__;
+            }
+            return h;
+        }
+
         async function deleteTire(tireId) {
             try {
-                const response = await fetch(`../includes/delete_tire.php?id=${tireId}`, {
-                    method: 'DELETE'
+                const response = await fetch('../includes/delete_tire.php', {
+                    method: 'POST',
+                    headers: pneusCsrfHeaders(),
+                    body: JSON.stringify({ id: tireId })
                 });
                 const result = await response.json();
                 
@@ -963,9 +1074,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                 
                 const response = await fetch('../includes/save_tire.php', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: pneusCsrfHeaders(),
                     body: JSON.stringify(data)
                 });
                 
@@ -986,10 +1095,20 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
 
         async function loadDashboardMetrics() {
             try {
-                const response = await fetch('../includes/get_tire_metrics.php');
-                const data = await response.json();
+                const [metricsRes, summaryRes] = await Promise.all([
+                    fetch('../includes/get_tire_metrics.php'),
+                    fetch('../api/pneus.php?action=summary')
+                ]);
+                const data = await metricsRes.json();
+                const summary = await summaryRes.json();
                 if (data.success) {
-                    updateDashboardMetrics(data.data);
+                    const m = data.data;
+                    if (summary.success && summary.data) {
+                        m.total_pneus = summary.data.total_pneus ?? m.total_pneus;
+                        m.total_em_uso = summary.data.em_uso ?? m.total_em_uso;
+                        m.pneus_alerta = summary.data.alerta_sulco ?? m.pneus_alerta;
+                    }
+                    updateDashboardMetrics(m);
                 }
             } catch (error) {
                 console.error('Erro ao carregar métricas:', error);
@@ -1030,24 +1149,14 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
             if (kpiAlerta) kpiAlerta.textContent = metrics.pneus_alerta;
         }
 
-        // Função para configurar botão de ajuda
+        // Função para configurar botão de ajuda — aberto por js/sf_page_help.js
         function setupHelpButton() {
-            const helpBtn = document.getElementById('helpBtn');
-            if (helpBtn) {
-                helpBtn.addEventListener('click', function() {
-                    const helpModal = document.getElementById('helpPneusModal');
-                    if (helpModal) {
-                        helpModal.style.display = 'block';
-                    }
-                });
-            }
-
-            // Close modal: tire modal usa closeAllModals para reabilitar campos e permitir reabrir; help modal só esconde
             document.querySelectorAll('.close-modal').forEach(button => {
                 button.addEventListener('click', function() {
                     const modal = this.closest('.modal');
                     if (modal) {
-                        if (modal.id === 'helpPneusModal') {
+                        if (modal.id === 'helpModal') {
+                            modal.classList.remove('active');
                             modal.style.display = 'none';
                         } else {
                             closeAllModals();
@@ -1056,10 +1165,9 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                 });
             });
 
-            // Close modal when clicking outside (usar closeAllModals para reabilitar campos e permitir reabrir)
             document.querySelectorAll('.modal').forEach(modal => {
                 modal.addEventListener('click', function(event) {
-                    if (event.target === this) {
+                    if (event.target === this && this.id !== 'helpModal') {
                         closeAllModals();
                     }
                 });
@@ -1082,65 +1190,31 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
     </script>
     
     <!-- Modal de Ajuda -->
-    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpPneusModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Ajuda - Gestão de Pneus</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="help-section">
-                    <h3>Visão Geral</h3>
-                    <p>A página de Pneus permite gerenciar todo o estoque de pneus da empresa. Aqui você pode cadastrar, editar, visualizar e excluir pneus, além de acompanhar métricas importantes de vida útil e status.</p>
-                </div>
-
-                <div class="help-section">
-                    <h3>Funcionalidades Principais</h3>
-                    <ul>
-                        <li><strong>Novo Pneu:</strong> Cadastre um novo pneu com informações completas como marca, modelo, dimensões e DOT.</li>
-                        <li><strong>Filtros:</strong> Use os filtros para encontrar pneus específicos por status, marca ou através da busca por texto.</li>
-                        <li><strong>Relatórios:</strong> Visualize relatórios e estatísticas de vida útil dos pneus.</li>
-                        <li><strong>Alocação:</strong> Gerencie a alocação de pneus para veículos específicos.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Indicadores (KPIs)</h3>
-                    <ul>
-                        <li><strong>Total de Pneus:</strong> Número total de pneus no estoque.</li>
-                        <li><strong>Pneus em Uso:</strong> Quantidade de pneus atualmente alocados em veículos.</li>
-                        <li><strong>Vida Útil Média:</strong> Percentual médio de vida útil dos pneus.</li>
-                        <li><strong>Pneus em Alerta:</strong> Quantidade de pneus que precisam de atenção.</li>
-                        <li><strong>Distribuição por Status:</strong> Gráfico mostrando a distribuição por status dos pneus.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Ações Disponíveis</h3>
-                    <ul>
-                        <li><strong>Visualizar:</strong> Veja detalhes completos do pneu, incluindo histórico de uso e especificações.</li>
-                        <li><strong>Editar:</strong> Modifique informações de um pneu existente.</li>
-                        <li><strong>Excluir:</strong> Remova um pneu do sistema (ação irreversível).</li>
-                        <li><strong>Alocar:</strong> Atribua pneus a veículos específicos.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Dicas Úteis</h3>
-                    <ul>
-                        <li>Mantenha o DOT (Data de Fabricação) sempre atualizado para controle de vida útil.</li>
-                        <li>Monitore a vida útil dos pneus para planejar substituições preventivas.</li>
-                        <li>Configure alertas para pneus que estão próximos do fim da vida útil.</li>
-                        <li>Utilize os filtros para encontrar pneus específicos rapidamente.</li>
-                        <li>Acompanhe as métricas para otimizar o uso dos pneus.</li>
-                        <li>Mantenha um registro detalhado da alocação de pneus por veículo.</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeModal('helpPneusModal')">Fechar</button>
-            </div>
-        </div>
-    </div>
+    <?php $sf_help_key = 'pneus'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <script src="../js/pneus_timeline.js?v=1.1"></script>
+    <script src="../js/sf_insights.js?v=1.3"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.SFInsights && document.getElementById('sfPneusInsights')) {
+            SFInsights.init({
+                mountId: 'sfPneusInsights',
+                insightsUrl: '../api/pneus_insights.php',
+                resumoUrl: '../api/pneus_resumo_ia.php',
+                title: 'Insights de pneus',
+                sectionTitle: 'Alertas da frota',
+                emptyOk: 'Nenhum alerta relevante no momento.',
+                stats: function (j) {
+                    var s = j.summary || {};
+                    return [
+                        { label: 'em uso', value: s.em_uso || 0, tone: 'info' },
+                        { label: 'estoque', value: s.estoque_disponivel || 0, tone: 'ok' },
+                        { label: 'alerta sulco', value: s.alerta_sulco || 0, tone: (s.alerta_sulco || 0) > 0 ? 'erro' : 'ok' }
+                    ];
+                }
+            });
+        }
+    });
+    </script>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

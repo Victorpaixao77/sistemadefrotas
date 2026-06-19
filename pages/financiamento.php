@@ -2,6 +2,7 @@
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/db_connect.php'; // Add database connection
 require_once '../includes/sf_api_base.php';
 
@@ -401,6 +402,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
         body.financiamento-modern .dashboard-content.fornc-page { overflow-x: auto; }
         body.financiamento-modern #financiamentosTable.fornc-table { min-width: 920px; }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'financiamento-modern' : ''; ?>">
     <div class="app-container">
@@ -419,10 +421,10 @@ error_log("Chart Data: " . print_r($chart_data, true));
                     Financiamentos de veículos e parcelas. Use <code>?classic=1</code> para o layout anterior.
                 </p>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Total financiado</span><span class="val" id="totalFinanciado">R$ <?php echo number_format($metricas['total_financiado'], 2, ',', '.'); ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Total pago</span><span class="val" id="totalPago">R$ <?php echo number_format($metricas['total_pago'], 2, ',', '.'); ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Em aberto</span><span class="val" id="totalAberto">R$ <?php echo number_format($metricas['total_aberto'], 2, ',', '.'); ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">% quitação</span><span class="val" id="percentualQuitacao"><?php echo $metricas['percentual_quitacao']; ?>%</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-hand-holding-dollar fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total financiado</span></div><span class="val" id="totalFinanciado">R$ <?php echo number_format($metricas['total_financiado'], 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total pago</span></div><span class="val" id="totalPago">R$ <?php echo number_format($metricas['total_pago'], 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-folder-open fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Em aberto</span></div><span class="val" id="totalAberto">R$ <?php echo number_format($metricas['total_aberto'], 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-percent fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">% quitação</span></div><span class="val" id="percentualQuitacao"><?php echo $metricas['percentual_quitacao']; ?>%</span></div>
                 </div>
                 <p class="fornc-kpi-summary">Métricas conforme filtros de mês/ano (quando aplicados).</p>
 
@@ -529,6 +531,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-file-contract kpi-card-icon" aria-hidden="true"></i>
                             <h3>Valor Total Financiado</h3>
                         </div>
                         <div class="card-body">
@@ -541,6 +544,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-circle-check kpi-card-icon" aria-hidden="true"></i>
                             <h3>Valor Total Pago</h3>
                         </div>
                         <div class="card-body">
@@ -553,6 +557,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-scale-balanced kpi-card-icon" aria-hidden="true"></i>
                             <h3>Valor em Aberto</h3>
                         </div>
                         <div class="card-body">
@@ -565,6 +570,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-percent kpi-card-icon" aria-hidden="true"></i>
                             <h3>Percentual de Quitação</h3>
                         </div>
                         <div class="card-body">
@@ -643,9 +649,19 @@ error_log("Chart Data: " . print_r($chart_data, true));
                     </div>
                 </div>
                 <?php endif; ?>
+                <?php
+                $fin_modern_empty = !empty($is_modern) && empty($financiamentos);
+                ?>
+                <?php if (!empty($is_modern)): ?>
+                <div class="fornc-empty-state<?php echo $fin_modern_empty ? ' visible' : ''; ?>" id="finEmptyState" role="status" aria-live="polite">
+                    <p class="fornc-empty-state-title">Nenhum financiamento encontrado</p>
+                    <p class="fornc-empty-state-hint">Ajuste os filtros ou cadastre um novo contrato de financiamento.</p>
+                    <button type="button" class="fornc-btn fornc-btn--primary" onclick="document.getElementById('addFinanciamentoBtn').click()"><i class="fas fa-plus"></i> Cadastrar primeiro financiamento</button>
+                </div>
+                <?php endif; ?>
                 
                 <!-- Financing Table -->
-                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>" id="finTableWrap"<?php echo $fin_modern_empty ? ' style="display:none"' : ''; ?>>
                     <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="financiamentosTable">
                         <thead>
                             <tr>
@@ -698,7 +714,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
-                            <?php else: ?>
+                            <?php elseif (empty($is_modern)): ?>
                                 <tr>
                                     <td colspan="8" class="text-center">Nenhum financiamento encontrado</td>
                                 </tr>
@@ -785,44 +801,6 @@ error_log("Chart Data: " . print_r($chart_data, true));
         </div>
     </div>
     
-    <!-- Help Modal -->
-    <div id="helpModal" class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Ajuda - Financiamentos</h2>
-                <span class="close close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <h3>O que é o módulo de Financiamentos?</h3>
-                <p>O módulo de Financiamentos permite gerenciar todos os financiamentos de veículos da sua frota, incluindo:</p>
-                <ul>
-                    <li>Cadastro de novos financiamentos</li>
-                    <li>Acompanhamento de parcelas</li>
-                    <li>Controle de pagamentos</li>
-                    <li>Análise de custos e métricas</li>
-                </ul>
-
-                <h3>Como funciona?</h3>
-                <p>Para utilizar o módulo:</p>
-                <ol>
-                    <li>Clique em "Novo Financiamento" para cadastrar um novo financiamento</li>
-                    <li>Preencha os dados do veículo, banco e condições do financiamento</li>
-                    <li>O sistema gerará automaticamente o plano de parcelas</li>
-                    <li>Acompanhe os pagamentos e status das parcelas no dashboard</li>
-                </ol>
-
-                <h3>Dicas importantes:</h3>
-                <ul>
-                    <li>Mantenha os dados do financiamento sempre atualizados</li>
-                    <li>Registre os pagamentos assim que forem realizados</li>
-                    <li>Utilize os filtros para encontrar financiamentos específicos</li>
-                    <li>Acompanhe os gráficos para análise de custos e tendências</li>
-                    <li>Exporte relatórios para análise detalhada dos dados</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-
     <!-- Add/Edit Financing Modal -->
     <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="financiamentoModal">
         <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
@@ -1296,11 +1274,6 @@ error_log("Chart Data: " . print_r($chart_data, true));
         function initializePage() {
             document.getElementById('addFinanciamentoBtn').addEventListener('click', showAddFinanciamentoModal);
             setupTableButtons();
-            
-            // Add help button click handler
-            document.getElementById('helpBtn').addEventListener('click', function() {
-                document.getElementById('helpModal').classList.add('active');
-            });
         }
         
         function setupTableButtons() {
@@ -1374,6 +1347,11 @@ error_log("Chart Data: " . print_r($chart_data, true));
                 mesSelect.addEventListener('change', filterFinanciamentos);
             }
 
+            const anoSelect = document.getElementById('anoFilter');
+            if (anoSelect) {
+                anoSelect.addEventListener('change', filterFinanciamentos);
+            }
+
             if (applyFiltersBtn) {
                 applyFiltersBtn.addEventListener('click', filterFinanciamentos);
             }
@@ -1384,9 +1362,17 @@ error_log("Chart Data: " . print_r($chart_data, true));
                     if (statusSelect) statusSelect.value = '';
                     if (bancoSelect) bancoSelect.value = '';
                     if (mesSelect) mesSelect.value = '';
+                    const anoSelect = document.getElementById('anoFilter');
+                    if (anoSelect) anoSelect.value = '';
                     filterFinanciamentos();
                 });
             }
+
+            document.querySelectorAll('#exportBtn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    exportVisibleTableCsv('financiamentosTable', 'financiamentos.csv');
+                });
+            });
             
             // Add filter button click handler
             document.getElementById('filterBtn').addEventListener('click', function() {
@@ -1418,16 +1404,60 @@ error_log("Chart Data: " . print_r($chart_data, true));
             }
         }
         
+        function finMesAnoMatches(vencimentoText, mesFilter, anoFilter) {
+            if (!mesFilter && !anoFilter) return true;
+            const parts = String(vencimentoText || '').trim().split('/');
+            if (parts.length !== 3) return false;
+            const mm = parseInt(parts[1], 10);
+            const yyyy = parts[2];
+            if (mesFilter && parseInt(mesFilter, 10) !== mm) return false;
+            if (anoFilter && String(anoFilter) !== yyyy) return false;
+            return true;
+        }
+
+        function exportVisibleTableCsv(tableId, filename) {
+            const table = document.getElementById(tableId);
+            if (!table) return;
+            const lines = [];
+            const headerCells = table.querySelectorAll('thead th');
+            const skipLast = headerCells.length > 0;
+            const headers = [];
+            headerCells.forEach(function(th, idx) {
+                if (skipLast && idx === headerCells.length - 1) return;
+                headers.push('"' + String(th.textContent || '').trim().replace(/"/g, '""') + '"');
+            });
+            if (headers.length) lines.push(headers.join(';'));
+            table.querySelectorAll('tbody tr').forEach(function(row) {
+                if (row.style.display === 'none') return;
+                const cols = [];
+                row.querySelectorAll('td').forEach(function(td, idx) {
+                    if (skipLast && idx === row.querySelectorAll('td').length - 1) return;
+                    cols.push('"' + String(td.textContent || '').trim().replace(/"/g, '""') + '"');
+                });
+                if (cols.length) lines.push(cols.join(';'));
+            });
+            const blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename || 'export.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(a.href);
+        }
+        
         function filterFinanciamentos() {
             const searchInput = document.getElementById('searchFinanciamento');
             const statusSelect = document.getElementById('statusFilter');
             const bancoSelect = document.getElementById('bancoFilter');
             const mesSelect = document.getElementById('mesFilter');
+            const anoSelect = document.getElementById('anoFilter');
 
             const searchText = searchInput ? searchInput.value.toLowerCase() : '';
             const statusFilter = statusSelect ? statusSelect.value : '';
             const bancoFilter = bancoSelect ? bancoSelect.value : '';
             const mesFilter = mesSelect ? mesSelect.value : '';
+            const anoFilter = anoSelect ? anoSelect.value : '';
             
             const tableRows = document.querySelectorAll('#financiamentosTable tbody tr');
             
@@ -1438,10 +1468,10 @@ error_log("Chart Data: " . print_r($chart_data, true));
                 const status = row.cells[6].textContent.trim();
                 const vencimento = row.cells[5].textContent;
                 
-                const matchesSearch = contrato.includes(searchText) || veiculo.includes(searchText);
-                const matchesStatus = statusFilter === '' || status === statusFilter;
-                const matchesBanco = bancoFilter === '' || banco === bancoFilter;
-                const matchesMes = mesFilter === '' || vencimento.includes(mesFilter);
+                const matchesSearch = !searchText || contrato.includes(searchText) || veiculo.includes(searchText);
+                const matchesStatus = !statusFilter || status === statusFilter;
+                const matchesBanco = !bancoFilter || banco === bancoFilter;
+                const matchesMes = finMesAnoMatches(vencimento, mesFilter, anoFilter);
                 
                 if (matchesSearch && matchesStatus && matchesBanco && matchesMes) {
                     row.style.display = '';
@@ -2206,5 +2236,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
     </script>
 
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php $sf_help_key = 'financiamento'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

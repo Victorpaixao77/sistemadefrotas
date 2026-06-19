@@ -62,28 +62,80 @@ function pneu_movimentacao_inserir(PDO $pdo, array $data) {
     if ($observacoes === '') {
         $observacoes = null;
     }
-    $sql = "INSERT INTO pneu_movimentacoes (
-                empresa_id, pneu_id, tipo, veiculo_id, eixo_id, posicao_id,
-                km_odometro, km_rodado, sulco_mm, custo, fornecedor_id, observacoes
-            ) VALUES (
-                :empresa_id, :pneu_id, :tipo, :veiculo_id, :eixo_id, :posicao_id,
-                :km_odometro, :km_rodado, :sulco_mm, :custo, :fornecedor_id, :observacoes
-            )";
+    $usuario_id = isset($data['usuario_id']) ? (int) $data['usuario_id'] : null;
+    $ip_origem = isset($data['ip_origem']) ? trim((string) $data['ip_origem']) : null;
+    $motivo_remocao_id = isset($data['motivo_remocao_id']) ? (int) $data['motivo_remocao_id'] : null;
+    $filial_id = isset($data['filial_id']) ? (int) $data['filial_id'] : null;
+    if ($usuario_id === null && function_exists('pneus_audit_context')) {
+        if (!function_exists('pneus_column_exists')) {
+            require_once __DIR__ . '/pneus_helpers.php';
+        }
+        $ctx = pneus_audit_context();
+        $usuario_id = $ctx['usuario_id'];
+        if ($ip_origem === null) {
+            $ip_origem = $ctx['ip_origem'];
+        }
+    }
+    $cols = ['empresa_id', 'pneu_id', 'tipo', 'veiculo_id', 'eixo_id', 'posicao_id',
+        'km_odometro', 'km_rodado', 'sulco_mm', 'custo', 'fornecedor_id', 'observacoes'];
+    $vals = [':empresa_id', ':pneu_id', ':tipo', ':veiculo_id', ':eixo_id', ':posicao_id',
+        ':km_odometro', ':km_rodado', ':sulco_mm', ':custo', ':fornecedor_id', ':observacoes'];
+    $params = [
+        ':empresa_id' => $empresa_id,
+        ':pneu_id' => $pneu_id,
+        ':tipo' => $tipo,
+        ':veiculo_id' => $veiculo_id,
+        ':eixo_id' => $eixo_id,
+        ':posicao_id' => $posicao_id,
+        ':km_odometro' => $km_odometro,
+        ':km_rodado' => $km_rodado,
+        ':sulco_mm' => $sulco_mm,
+        ':custo' => $custo,
+        ':fornecedor_id' => $fornecedor_id,
+        ':observacoes' => $observacoes,
+    ];
+    if (!function_exists('pneus_column_exists')) {
+        require_once __DIR__ . '/pneus_helpers.php';
+    }
+    if (pneus_column_exists($pdo, 'pneu_movimentacoes', 'usuario_id')) {
+        $cols[] = 'usuario_id';
+        $vals[] = ':usuario_id';
+        $params[':usuario_id'] = $usuario_id;
+    }
+    if (pneus_column_exists($pdo, 'pneu_movimentacoes', 'ip_origem')) {
+        $cols[] = 'ip_origem';
+        $vals[] = ':ip_origem';
+        $params[':ip_origem'] = $ip_origem;
+    }
+    if (pneus_column_exists($pdo, 'pneu_movimentacoes', 'motivo_remocao_id') && $motivo_remocao_id > 0) {
+        $cols[] = 'motivo_remocao_id';
+        $vals[] = ':motivo_remocao_id';
+        $params[':motivo_remocao_id'] = $motivo_remocao_id;
+    }
+    if (pneus_column_exists($pdo, 'pneu_movimentacoes', 'filial_id') && $filial_id > 0) {
+        $cols[] = 'filial_id';
+        $vals[] = ':filial_id';
+        $params[':filial_id'] = $filial_id;
+    }
+    $sql = 'INSERT INTO pneu_movimentacoes (' . implode(', ', $cols) . ') VALUES (' . implode(', ', $vals) . ')';
     try {
         $stmt = $pdo->prepare($sql);
-        $stmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
-        $stmt->bindValue(':pneu_id', $pneu_id, PDO::PARAM_INT);
-        $stmt->bindValue(':tipo', $tipo, PDO::PARAM_STR);
-        $stmt->bindValue(':veiculo_id', $veiculo_id, PDO::PARAM_INT);
-        $stmt->bindValue(':eixo_id', $eixo_id, PDO::PARAM_INT);
-        $stmt->bindValue(':posicao_id', $posicao_id, PDO::PARAM_INT);
-        $stmt->bindValue(':km_odometro', $km_odometro, PDO::PARAM_INT);
-        $stmt->bindValue(':km_rodado', $km_rodado, PDO::PARAM_INT);
-        $stmt->bindValue(':sulco_mm', $sulco_mm, $sulco_mm !== null ? PDO::PARAM_STR : PDO::PARAM_NULL);
-        $stmt->bindValue(':custo', $custo, PDO::PARAM_STR);
-        $stmt->bindValue(':fornecedor_id', $fornecedor_id, PDO::PARAM_INT);
-        $stmt->bindValue(':observacoes', $observacoes, PDO::PARAM_STR);
+        foreach ($params as $k => $v) {
+            if ($k === ':sulco_mm') {
+                $stmt->bindValue($k, $v, $v !== null ? PDO::PARAM_STR : PDO::PARAM_NULL);
+            } elseif (in_array($k, [':empresa_id', ':pneu_id', ':veiculo_id', ':eixo_id', ':posicao_id', ':km_odometro', ':km_rodado', ':fornecedor_id', ':usuario_id', ':motivo_remocao_id', ':filial_id'], true)) {
+                $stmt->bindValue($k, $v, $v !== null ? PDO::PARAM_INT : PDO::PARAM_NULL);
+            } else {
+                $stmt->bindValue($k, $v, $v !== null ? PDO::PARAM_STR : PDO::PARAM_NULL);
+            }
+        }
         $stmt->execute();
+        if (file_exists(__DIR__ . '/pneus_repository.php')) {
+            require_once __DIR__ . '/pneus_repository.php';
+            if ($sulco_mm !== null && function_exists('pneus_atualizar_sulco_registro')) {
+                pneus_atualizar_sulco_registro($pdo, $pneu_id, $sulco_mm);
+            }
+        }
         return true;
     } catch (PDOException $e) {
         if (function_exists('error_log')) {

@@ -2,6 +2,7 @@
 // Incluir arquivos de configuração e funções
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
+require_once 'includes/remember_token.php';
 
 // Iniciar a sessão, se ainda não estiver iniciada
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -30,9 +31,14 @@ if (ini_get("session.use_cookies")) {
     );
 }
 
-// Limpar o cookie "Lembre-me" se existir (apenas o de login automático)
+// Revogar o token "Lembre-me" no banco e limpar o cookie.
 if (isset($_COOKIE['remember_user'])) {
-    setcookie("remember_user", "", time() - 3600, "/", "", false, true);
+    try {
+        sf_remember_clear(getConnection());
+    } catch (Throwable $e) {
+        error_log('Logout remember clear: ' . $e->getMessage());
+        setcookie("remember_user", "", time() - 3600, "/", "", false, true);
+    }
 }
 
 // NÃO limpar o cookie 'saved_login' - ele deve permanecer para restaurar o formulário

@@ -63,6 +63,100 @@ interface ApiService {
     @POST("checklists.php")
     suspend fun criarChecklist(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<ApiResponse<IdResponse>>
 
+    @GET("ocorrencias.php")
+    suspend fun ocorrencias(@Query("limite") limite: Int? = null): Response<ApiResponse<OcorrenciasResponse>>
+
+    @POST("ocorrencias.php")
+    suspend fun criarOcorrencia(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<ApiResponse<IdResponse>>
+
+    @Multipart
+    @POST("ocorrencias.php")
+    suspend fun criarOcorrenciaMultipart(
+        @PartMap parts: Map<String, @JvmSuppressWildcards RequestBody>,
+        @Part foto: MultipartBody.Part,
+    ): Response<ApiResponse<IdResponse>>
+
+    @POST("evento_auto.php")
+    suspend fun eventoAuto(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<ApiResponse<IdResponse>>
+
+    @GET("abastecimento_insights.php")
+    suspend fun abastecimentoInsights(@Query("dias") dias: Int? = null): Response<ApiResponse<AbastecimentoInsightsResponse>>
+
+    @GET("conferencia_carga.php")
+    suspend fun conferencias(@Query("limite") limite: Int? = null): Response<ApiResponse<ConferenciasResponse>>
+
+    @POST("conferencia_carga.php")
+    suspend fun criarConferencia(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<ApiResponse<IdResponse>>
+
+    @Multipart
+    @POST("conferencia_carga.php")
+    suspend fun criarConferenciaMultipart(
+        @PartMap parts: Map<String, @JvmSuppressWildcards RequestBody>,
+        @Part foto: MultipartBody.Part,
+    ): Response<ApiResponse<IdResponse>>
+
+    @GET("velocidade.php")
+    suspend fun velocidade(
+        @Query("dias") dias: Int? = null,
+        @Query("limite") limite: Int? = null,
+    ): Response<ApiResponse<VelocidadeResponse>>
+
+    @GET("desempenho.php")
+    suspend fun desempenho(@Query("dias") dias: Int? = null): Response<ApiResponse<DesempenhoResponse>>
+
+    @Multipart
+    @POST("ocr_documento.php")
+    suspend fun ocrDocumento(
+        @Part("tipo") tipo: RequestBody,
+        @Part image: MultipartBody.Part,
+    ): Response<ApiResponse<OcrDocumentoResponse>>
+
+    @GET("pedagios.php")
+    suspend fun pedagios(@Query("limite") limite: Int? = null): Response<ApiResponse<PedagiosResponse>>
+
+    @POST("pedagios.php")
+    suspend fun criarPedagio(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<ApiResponse<IdResponse>>
+
+    @Multipart
+    @POST("pedagios.php")
+    suspend fun criarPedagioMultipart(
+        @PartMap parts: Map<String, @JvmSuppressWildcards RequestBody>,
+        @Part foto: MultipartBody.Part,
+    ): Response<ApiResponse<IdResponse>>
+
+    @GET("jornada.php")
+    suspend fun jornada(@Query("limite") limite: Int? = null): Response<ApiResponse<JornadaResponse>>
+
+    @POST("jornada.php")
+    suspend fun registrarJornada(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<ApiResponse<IdResponse>>
+
+    @GET("panico.php")
+    suspend fun panico(@Query("limite") limite: Int? = null): Response<ApiResponse<PanicoResponse>>
+
+    @POST("panico.php")
+    suspend fun acionarPanico(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<ApiResponse<IdResponse>>
+
+    @GET("diario.php")
+    suspend fun diario(
+        @Query("dias") dias: Int? = null,
+        @Query("limite") limite: Int? = null,
+    ): Response<ApiResponse<DiarioResponse>>
+
+    @GET("comprovantes_entrega.php")
+    suspend fun comprovantesEntrega(@Query("limite") limite: Int? = null): Response<ApiResponse<ComprovantesResponse>>
+
+    @POST("comprovantes_entrega.php")
+    suspend fun criarComprovanteJson(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<ApiResponse<IdResponse>>
+
+    @Multipart
+    @POST("comprovantes_entrega.php")
+    suspend fun criarComprovanteMultipart(
+        @PartMap parts: Map<String, @JvmSuppressWildcards RequestBody>,
+        @Part fotoNf: MultipartBody.Part?,
+        @Part fotoCarga: MultipartBody.Part?,
+        @Part assinatura: MultipartBody.Part?,
+    ): Response<ApiResponse<IdResponse>>
+
     @GET("despesas.php")
     suspend fun despesas(@Query("rota_id") rotaId: Int): Response<ApiResponse<DespesasWrapper>>
 
@@ -92,6 +186,31 @@ interface ApiService {
         @PartMap parts: Map<String, @JvmSuppressWildcards RequestBody>,
         @Part comprovante: MultipartBody.Part,
     ): Response<ApiResponse<IdResponse>>
+
+    @GET("pneus.php")
+    suspend fun buscarPneuQr(
+        @Query("action") action: String = "buscar_qr",
+        @Query("qr") qr: String,
+    ): Response<ApiResponse<PneuBuscaData>>
+
+    @GET("pneus.php")
+    suspend fun pneusVeiculosMotorista(
+        @Query("action") action: String = "veiculos",
+    ): Response<ApiResponse<VeiculosResponse>>
+
+    @POST("pneus.php")
+    suspend fun registrarInspecaoPneu(
+        @Query("action") action: String = "inspecao",
+        @Body body: Map<String, @JvmSuppressWildcards Any?>,
+    ): Response<ApiResponse<IdResponse>>
+
+    @Multipart
+    @POST("pneus.php")
+    suspend fun uploadFotoPneu(
+        @Query("action") action: String = "upload_foto",
+        @PartMap parts: Map<String, @JvmSuppressWildcards RequestBody>,
+        @Part foto: MultipartBody.Part,
+    ): Response<ApiResponse<IdResponse>>
 }
 
 data class GpsLoteResult(
@@ -109,5 +228,6 @@ data class DespesaItem(
     val estacionamento: Double?, val lavagem: Double?, val borracharia: Double?,
     @com.google.gson.annotations.SerializedName("eletrica_mecanica") val eletricaMecanica: Double?,
     val adiantamento: Double?,
+    val outros: Double?,
     @com.google.gson.annotations.SerializedName("total_despviagem") val totalDespviagem: Double?,
 )

@@ -1,69 +1,57 @@
 <?php
 /**
- * Script de Limpeza Automática de Notificações
- * 
- * Este script deve ser executado via cron job para limpeza automática:
- * 0 2 * * * /usr/bin/php /caminho/para/sistema-frotas/notificacoes/limpeza_automatica.php
- * 
- * Executa diariamente às 2h da manhã
+ * Limpeza automática de notificações (cron).
+ * Ex.: 0 2 * * * php /caminho/sistema-frotas/notificacoes/limpeza_automatica.php
  */
+require_once dirname(__DIR__) . '/includes/db_connect.php';
+require_once dirname(__DIR__) . '/includes/notificacoes_helpers.php';
 
-require_once '../includes/db_connect.php';
-
-// Configurações
-$dias_para_limpeza = 30; // Remover notificações com mais de 30 dias
-$empresas_para_limpar = [1, 2, 3]; // IDs das empresas (ajustar conforme necessário)
+$dias_para_limpeza = 30;
 
 try {
     $conn = getConnection();
-    
+    $empresas = $conn->query('SELECT id FROM empresas ORDER BY id')->fetchAll(PDO::FETCH_COLUMN);
+
     echo "=== LIMPEZA AUTOMÁTICA DE NOTIFICAÇÕES ===\n";
-    echo "Data/Hora: " . date('Y-m-d H:i:s') . "\n\n";
-    
+    echo 'Data/Hora: ' . date('Y-m-d H:i:s') . "\n\n";
+
     $total_removidas = 0;
-    
-    foreach ($empresas_para_limpar as $empresa_id) {
-        // Remover notificações antigas
-        $sql_cleanup = "DELETE FROM notificacoes 
-                        WHERE empresa_id = :empresa_id 
-                        AND data_criacao < DATE_SUB(NOW(), INTERVAL :dias DAY)";
-        
-        $stmt_cleanup = $conn->prepare($sql_cleanup);
-        $stmt_cleanup->execute([
-            'empresa_id' => $empresa_id,
-            'dias' => $dias_para_limpeza
-        ]);
-        
+
+    foreach ($empresas as $empresa_id) {
+        $empresa_id = (int) $empresa_id;
+        if ($empresa_id <= 0) {
+            continue;
+        }
+
+        $stmt_cleanup = $conn->prepare(
+            'DELETE FROM notificacoes
+             WHERE empresa_id = :empresa_id
+             AND lida = 1
+             AND data_criacao < DATE_SUB(NOW(), INTERVAL :dias DAY)'
+        );
+        $stmt_cleanup->execute([':empresa_id' => $empresa_id, ':dias' => $dias_para_limpeza]);
         $removidas = $stmt_cleanup->rowCount();
         $total_removidas += $removidas;
-        
-        echo "Empresa ID {$empresa_id}: {$removidas} notificações removidas\n";
-        
-        // Marcar como lidas notificações de rotas/abastecimentos que não estão mais pendentes
-        $sql_mark_read = "UPDATE notificacoes n 
+
+        $sql_mark_read = "UPDATE notificacoes n
                          LEFT JOIN rotas r ON n.referencia_id = r.id AND n.tipo = 'rota'
                          LEFT JOIN abastecimentos a ON n.referencia_id = a.id AND n.tipo = 'abastecimento'
-                         SET n.lida = 1 
-                         WHERE n.empresa_id = :empresa_id 
+                         SET n.lida = 1
+                         WHERE n.empresa_id = :empresa_id
                          AND n.lida = 0
                          AND ((n.tipo = 'rota' AND (r.status != 'pendente' OR r.id IS NULL))
                               OR (n.tipo = 'abastecimento' AND (a.status != 'pendente' OR a.id IS NULL)))";
-        
-        $stmt_mark_read = $conn->prepare($sql_mark_read);
-        $stmt_mark_read->execute(['empresa_id' => $empresa_id]);
-        
-        $marcadas_lidas = $stmt_mark_read->rowCount();
-        echo "Empresa ID {$empresa_id}: {$marcadas_lidas} notificações marcadas como lidas\n";
+        $stmt_mark = $conn->prepare($sql_mark_read);
+        $stmt_mark->execute([':empresa_id' => $empresa_id]);
+        $marcadas = $stmt_mark->rowCount();
+
+        echo "Empresa {$empresa_id}: {$removidas} removidas, {$marcadas} marcadas como lidas\n";
     }
-    
-    echo "\n=== RESUMO ===\n";
-    echo "Total de notificações removidas: {$total_removidas}\n";
-    echo "Limpeza concluída com sucesso!\n";
-    
-    // Log da limpeza
-    error_log("Limpeza automática de notificações concluída: {$total_removidas} removidas em " . date('Y-m-d H:i:s'));
-    
-} catch (Exception $e) {
-    echo "ERRO: " . $e->getMessage() . "\n";
-    error_log("Erro na limpeza automática de notificações: " . $e->getMessage());
+
+    echo "\nTotal removidas: {$total_removidas}\n";
+    error_log("Limpeza automática notificações: {$total_removidas} removidas em " . date('Y-m-d H:i:s'));
+} catch (Throwable $e) {
+    echo "ERRO\n";
+    error_log('limpeza_automatica notificacoes: ' . $e->getMessage());
+    exit(1);
 }

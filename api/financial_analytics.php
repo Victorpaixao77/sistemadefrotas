@@ -1,165 +1,81 @@
 <?php
-// Financial Analytics API
-
-// Initialize session and include necessary files
+/**
+ * Financial Analytics API — faturamento x despesas (respeita ?period=).
+ */
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/permissions.php';
+require_once '../includes/dashboard_analytics_period.php';
 
-// Configure session before starting it
 configure_session();
-
-// Start session
 session_start();
 
-// Set content type to JSON
 header('Content-Type: application/json');
 
-// Check if user is authenticated
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized access']);
     exit;
 }
 
+if (!can_view_financial_data()) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Sem permissão financeira']);
+    exit;
+}
+
 try {
     $conn = getConnection();
-    $empresa_id = $_SESSION['empresa_id'];
-    $current_year = date('Y');
-    
-    // Get revenue data (completed routes)
-    $revenue_query = "
-        SELECT 
-            MONTH(data_saida) as month,
-            SUM(frete) as total
-        FROM rotas 
-        WHERE empresa_id = :empresa_id 
-        AND YEAR(data_saida) = :year
-        GROUP BY MONTH(data_saida)
-        ORDER BY month";
-    
-    $stmt = $conn->prepare($revenue_query);
-    $stmt->bindParam(':empresa_id', $empresa_id);
-    $stmt->bindParam(':year', $current_year);
-    $stmt->execute();
-    $revenue_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Get expenses data from all sources
-    $expenses_query = "
-        SELECT 
-            month,
-            SUM(total) as total
-        FROM (
-            -- Despesas de Viagem
-            SELECT 
-                MONTH(created_at) as month,
-                SUM(COALESCE(total_despviagem, 0)) as total
-            FROM despesas_viagem
-            WHERE empresa_id = :empresa_id_1 
-            AND YEAR(created_at) = :year_1
-            GROUP BY MONTH(created_at)
-            
-            UNION ALL
-            
-            -- Despesas Fixas
-            SELECT 
-                MONTH(data_pagamento) as month,
-                SUM(valor) as total
-            FROM despesas_fixas
-            WHERE empresa_id = :empresa_id_2 
-            AND YEAR(data_pagamento) = :year_2
-            GROUP BY MONTH(data_pagamento)
-            
-            UNION ALL
-            
-            -- Manutenções de Veículos
-            SELECT 
-                MONTH(data_manutencao) as month,
-                SUM(valor) as total
-            FROM manutencoes
-            WHERE empresa_id = :empresa_id_3 
-            AND YEAR(data_manutencao) = :year_3
-            GROUP BY MONTH(data_manutencao)
-            
-            UNION ALL
-            
-            -- Manutenções de Pneus
-            SELECT 
-                MONTH(data_manutencao) as month,
-                SUM(custo) as total
-            FROM pneu_manutencao
-            WHERE empresa_id = :empresa_id_4 
-            AND YEAR(data_manutencao) = :year_4
-            GROUP BY MONTH(data_manutencao)
-            
-            UNION ALL
-            
-            -- Contas Pagas
-            SELECT 
-                MONTH(data_pagamento) as month,
-                SUM(valor) as total
-            FROM contas_pagar
-            WHERE empresa_id = :empresa_id_5 
-            AND YEAR(data_pagamento) = :year_5
-            GROUP BY MONTH(data_pagamento)
-            
-            UNION ALL
-            
-            -- Parcelas de Financiamento
-            SELECT 
-                MONTH(data_vencimento) as month,
-                SUM(valor) as total
-            FROM parcelas_financiamento
-            WHERE empresa_id = :empresa_id_6 
-            AND YEAR(data_vencimento) = :year_6
-            AND status_id = 2
-            GROUP BY MONTH(data_vencimento)
-        ) as combined_expenses
-        GROUP BY month
-        ORDER BY month";
-    
-    $stmt = $conn->prepare($expenses_query);
-    
-    // Bind parameters for each subquery
-    for ($i = 1; $i <= 6; $i++) {
-        $stmt->bindParam(':empresa_id_' . $i, $empresa_id);
-        $stmt->bindParam(':year_' . $i, $current_year);
+    $empresa_id = (int) $_SESSION['empresa_id'];
+    $ctx = sf_dashboard_analytics_context();
+    $series = sf_dashboard_analytics_series($ctx['d1'], $ctx['d2'], $ctx['bucket']);
+    $revenue = array_fill_keys($series['keys'], 0.0);
+    $expenses = array_fill_keys($series['keys'], 0.0);
+
+    $st = $conn->prepare("
+        SELECT DATE(COALESCE(data_saida, data_rota)) AS d, SUM(frete) AS total
+        FROM rotas
+        WHERE empresa_id = :e AND status = 'aprovado'
+        AND DATE(COALESCE(data_saida, data_rota)) BETWEEN :d1 AND :d2
+        GROUP BY DATE(COALESCE(data_saida, data_rota))
+    ");
+    $st->execute([':e' => $empresa_id, ':d1' => $ctx['d1'], ':d2' => $ctx['d2']]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $k = sf_dashboard_analytics_bucket_key((string) $row['d'], $ctx['bucket']);
+        if ($k !== '' && isset($revenue[$k])) {
+            $revenue[$k] += (float) $row['total'];
+        }
     }
-    
-    $stmt->execute();
-    $expenses_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Process the data
-    $months = range(1, 12);
-    $revenue_by_month = array_fill_keys($months, 0);
-    $expenses_by_month = array_fill_keys($months, 0);
-    
-    // Fill revenue data
-    foreach ($revenue_data as $row) {
-        $revenue_by_month[$row['month']] = (float)$row['total'];
-    }
-    
-    // Fill expenses data
-    foreach ($expenses_data as $row) {
-        $expenses_by_month[$row['month']] = (float)$row['total'];
-    }
-    
-    // Prepare the response
-    $response = [
-        'labels' => array_map(function($month) {
-            return date('M', mktime(0, 0, 0, $month, 1));
-        }, $months),
-        'faturamento' => array_values($revenue_by_month),
-        'despesas' => array_values($expenses_by_month)
+
+    $expenseQueries = [
+        "SELECT DATE(created_at) AS d, SUM(COALESCE(total_despviagem, 0)) AS t FROM despesas_viagem WHERE empresa_id = :e AND DATE(created_at) BETWEEN :d1 AND :d2 GROUP BY DATE(created_at)",
+        "SELECT DATE(data_pagamento) AS d, SUM(valor) AS t FROM despesas_fixas WHERE empresa_id = :e AND data_pagamento IS NOT NULL AND DATE(data_pagamento) BETWEEN :d1 AND :d2 GROUP BY DATE(data_pagamento)",
+        "SELECT DATE(data_manutencao) AS d, SUM(valor) AS t FROM manutencoes WHERE empresa_id = :e AND DATE(data_manutencao) BETWEEN :d1 AND :d2 GROUP BY DATE(data_manutencao)",
+        "SELECT DATE(data_manutencao) AS d, SUM(custo) AS t FROM pneu_manutencao WHERE empresa_id = :e AND DATE(data_manutencao) BETWEEN :d1 AND :d2 GROUP BY DATE(data_manutencao)",
+        "SELECT DATE(data_pagamento) AS d, SUM(valor) AS t FROM contas_pagar WHERE empresa_id = :e AND status_id = 2 AND data_pagamento IS NOT NULL AND DATE(data_pagamento) BETWEEN :d1 AND :d2 GROUP BY DATE(data_pagamento)",
+        "SELECT DATE(data_pagamento) AS d, SUM(pf.valor) AS t FROM parcelas_financiamento pf INNER JOIN financiamentos f ON f.id = pf.financiamento_id WHERE f.empresa_id = :e AND pf.status_id = 2 AND pf.data_pagamento IS NOT NULL AND DATE(pf.data_pagamento) BETWEEN :d1 AND :d2 GROUP BY DATE(pf.data_pagamento)",
+        "SELECT DATE(data_abastecimento) AS d, SUM(valor_total + COALESCE(valor_total_arla, 0)) AS t FROM abastecimentos WHERE empresa_id = :e AND status = 'aprovado' AND DATE(data_abastecimento) BETWEEN :d1 AND :d2 GROUP BY DATE(data_abastecimento)",
     ];
-    
-    echo json_encode($response);
-    
-} catch (Exception $e) {
-    error_log("Financial Analytics API Error: " . $e->getMessage());
-    http_response_code(500);
+
+    foreach ($expenseQueries as $sql) {
+        $st = $conn->prepare($sql);
+        $st->execute([':e' => $empresa_id, ':d1' => $ctx['d1'], ':d2' => $ctx['d2']]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $k = sf_dashboard_analytics_bucket_key((string) $row['d'], $ctx['bucket']);
+            if ($k !== '' && isset($expenses[$k])) {
+                $expenses[$k] += (float) $row['t'];
+            }
+        }
+    }
+
     echo json_encode([
-        'error' => 'Internal server error',
-        'message' => $e->getMessage()
+        'labels' => $series['labels'],
+        'faturamento' => array_values($revenue),
+        'despesas' => array_values($expenses),
+        'period_label' => $ctx['label'],
     ]);
-    exit;
-} 
+} catch (Throwable $e) {
+    error_log('Financial Analytics API Error: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['error' => 'Internal server error']);
+}

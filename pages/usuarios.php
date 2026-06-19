@@ -223,6 +223,109 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
             background: var(--bg-primary) !important;
             color: var(--text-primary) !important;
         }
+
+        /* Barra de busca + filtros */
+        .users-filterbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+            margin-bottom: 0.85rem;
+        }
+        .users-filterbar .uf-search {
+            flex: 1 1 220px;
+            min-width: 180px;
+            position: relative;
+        }
+        .users-filterbar .uf-search i {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted, #94a3b8);
+            font-size: 0.85rem;
+        }
+        .users-filterbar .uf-search input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 0.5rem 0.6rem 0.5rem 2rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+        .users-filterbar select {
+            padding: 0.5rem 0.6rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+        .users-filterbar .uf-count {
+            font-size: 0.78rem;
+            color: var(--text-muted, #94a3b8);
+            margin-left: auto;
+        }
+
+        /* Linha do próprio usuário */
+        .user-row.is-self > td { background: rgba(59, 130, 246, 0.08); }
+        .user-self-tag {
+            display: inline-block;
+            margin-left: 6px;
+            padding: 1px 6px;
+            border-radius: 999px;
+            background: var(--accent-primary, #3b82f6);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 700;
+            vertical-align: middle;
+        }
+
+        /* Botões de ação compactos (substitui estilos inline) */
+        .table .btn-acao { font-size: 10px; }
+        .table .btn-acao + .btn-acao { margin-left: 5px; }
+
+        /* Medidor de senha forte */
+        .pwd-meter { margin-top: 6px; font-size: 0.72rem; }
+        .pwd-meter ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+        .pwd-meter li { color: var(--text-muted, #94a3b8); display: flex; align-items: center; gap: 4px; }
+        .pwd-meter li::before { content: "\f111"; font-family: "Font Awesome 6 Free"; font-weight: 900; font-size: 7px; }
+        .pwd-meter li.ok { color: #16a34a; }
+        .pwd-meter li.ok::before { content: "\f00c"; }
+
+        /* Toast */
+        #uaToastWrap {
+            position: fixed; top: 16px; right: 16px; z-index: 9999;
+            display: flex; flex-direction: column; gap: 8px; max-width: 340px;
+        }
+        .ua-toast {
+            padding: 0.7rem 0.9rem; border-radius: 8px; color: #fff;
+            font-size: 0.85rem; font-weight: 600; box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+            opacity: 0; transform: translateX(20px); transition: opacity .25s ease, transform .25s ease;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .ua-toast.show { opacity: 1; transform: translateX(0); }
+        .ua-toast.success { background: #16a34a; }
+        .ua-toast.error { background: #dc2626; }
+        .ua-toast.info { background: #2563eb; }
+
+        /* Modal de confirmação */
+        .confirm-modal {
+            position: fixed; inset: 0; z-index: 9998; display: none;
+            align-items: center; justify-content: center; background: rgba(0,0,0,0.5);
+        }
+        .confirm-modal.show { display: flex; }
+        .confirm-box {
+            background: var(--card-bg, var(--bg-secondary)); color: var(--text-primary);
+            border-radius: 12px; padding: 1.25rem; max-width: 380px; width: 90%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center;
+        }
+        .confirm-box .ci { font-size: 2rem; color: #dc2626; margin-bottom: 0.5rem; }
+        .confirm-box h4 { margin: 0 0 0.4rem; font-size: 1.05rem; }
+        .confirm-box p { margin: 0 0 1rem; color: var(--text-secondary); font-size: 0.9rem; }
+        .confirm-box .confirm-actions { display: flex; gap: 0.5rem; justify-content: center; }
     </style>
 </head>
 <body>
@@ -232,8 +335,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
             <?php include '../includes/header.php'; ?>
             <div class="dashboard-content">
                 <div class="dashboard-header">
-                    <h1><?php echo $page_title; ?></h1>
-                    <div class="user-permission-info" style="margin-top: 10px;">
+                    <div class="user-permission-info">
                         <span class="badge <?php echo $permissions['is_admin'] ? 'badge-warning' : ($permissions['is_gestor'] ? 'badge-primary' : 'badge-info'); ?>">
                             <?php echo ucfirst($permissions['permission_level']); ?>
                         </span>
@@ -253,33 +355,61 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="dashboard-grid">
                     <div class="dashboard-card" style="grid-column: 1 / -1;">
                         <div class="card-header">
+                            <i class="fas fa-users kpi-card-icon" aria-hidden="true"></i>
                             <h3>Usuários Cadastrados</h3>
                         </div>
                         <div class="card-body">
+                            <div class="users-filterbar">
+                                <div class="uf-search">
+                                    <i class="fas fa-search" aria-hidden="true"></i>
+                                    <input type="text" id="ufSearch" placeholder="Buscar por nome ou e-mail…" autocomplete="off">
+                                </div>
+                                <select id="ufTipo" aria-label="Filtrar por tipo">
+                                    <option value="">Todos os tipos</option>
+                                    <option value="admin">Administrador</option>
+                                    <option value="gestor">Gestor</option>
+                                    <option value="motorista">Motorista</option>
+                                </select>
+                                <select id="ufStatus" aria-label="Filtrar por status">
+                                    <option value="">Todos os status</option>
+                                    <option value="ativo">Ativo</option>
+                                    <option value="inativo">Inativo</option>
+                                </select>
+                                <span class="uf-count" id="ufCount"></span>
+                            </div>
                             <div class="table-responsive">
                                 <table class="table" style="width: 100%; table-layout: fixed;">
                                     <thead>
                                         <tr>
-                                            <th style="width: 20%; text-align: left; padding: 12px 8px;">Nome</th>
-                                            <th style="width: 18%; text-align: left; padding: 12px 8px;">E-mail</th>
-                                            <th style="width: 10%; text-align: center; padding: 12px 8px;">Tipo</th>
-                                            <th style="width: 15%; text-align: center; padding: 12px 8px;">Permissões</th>
+                                            <th style="width: 18%; text-align: left; padding: 12px 8px;">Nome</th>
+                                            <th style="width: 16%; text-align: left; padding: 12px 8px;">E-mail</th>
+                                            <th style="width: 9%; text-align: center; padding: 12px 8px;">Tipo</th>
+                                            <th style="width: 13%; text-align: center; padding: 12px 8px;">Permissões</th>
                                             <th style="width: 8%; text-align: center; padding: 12px 8px;">Status</th>
-                                            <th style="width: 12%; text-align: center; padding: 12px 8px;">Data Cadastro</th>
-                                            <th style="width: 15%; text-align: center; padding: 12px 8px;">Ações</th>
+                                            <th style="width: 11%; text-align: center; padding: 12px 8px;">2FA</th>
+                                            <th style="width: 11%; text-align: center; padding: 12px 8px;">Data Cadastro</th>
+                                            <th style="width: 14%; text-align: center; padding: 12px 8px;">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach ($usuarios as $usuario): ?>
-                                        <tr>
+                                        <?php foreach ($usuarios as $usuario):
+                                            $is_motorista = $usuario['tipo_usuario_sistema'] === 'motorista';
+                                            $row_nome = $is_motorista ? ($usuario['nome_motorista'] ?? '') : ($usuario['nome'] ?? '');
+                                            $row_email = $is_motorista ? trim((string) ($usuario['email_motorista'] ?? '')) : ($usuario['email'] ?? '');
+                                            $row_tipo = $is_motorista ? 'motorista' : ($usuario['tipo_usuario'] ?? '');
+                                            $row_status = $usuario['status'] ?? '';
+                                            $row_proprio = !$is_motorista && (int) $usuario['id'] === (int) ($_SESSION['usuario_id'] ?? 0);
+                                        ?>
+                                        <tr class="user-row<?php echo $row_proprio ? ' is-self' : ''; ?>"
+                                            data-user-id="<?php echo (int) $usuario['id']; ?>"
+                                            data-user-tipo="<?php echo htmlspecialchars($usuario['tipo_usuario_sistema'], ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-nome="<?php echo htmlspecialchars(mb_strtolower($row_nome), ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-email="<?php echo htmlspecialchars(mb_strtolower($row_email), ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-tipo="<?php echo htmlspecialchars($row_tipo, ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-status="<?php echo htmlspecialchars($row_status, ENT_QUOTES, 'UTF-8'); ?>">
                                             <td style="padding: 12px 8px; text-align: left; word-wrap: break-word;">
-                                                <?php 
-                                                if ($usuario['tipo_usuario_sistema'] === 'motorista') {
-                                                    echo htmlspecialchars($usuario['nome_motorista']);
-                                                } else {
-                                                    echo htmlspecialchars($usuario['nome']);
-                                                }
-                                                ?>
+                                                <?php echo htmlspecialchars($row_nome); ?>
+                                                <?php if ($row_proprio): ?><span class="user-self-tag" title="Esta é a sua conta">você</span><?php endif; ?>
                                             </td>
                                             <td style="padding: 12px 8px; text-align: left; word-wrap: break-word;">
                                                 <?php 
@@ -336,13 +466,34 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                                     <?php echo ucfirst($usuario['status']); ?>
                                                 </span>
                                             </td>
+                                            <td style="padding: 12px 8px; text-align: center;">
+                                                <?php if ($usuario['tipo_usuario_sistema'] === 'sistema'):
+                                                    $tfa_on = !empty($usuario['two_factor_enabled']);
+                                                    $eh_proprio = ((int) $usuario['id'] === (int) ($_SESSION['usuario_id'] ?? 0));
+                                                ?>
+                                                    <span class="badge <?php echo $tfa_on ? 'badge-success' : 'badge-secondary'; ?>" style="font-size:10px;">
+                                                        <?php echo $tfa_on ? 'Ativo' : 'Inativo'; ?>
+                                                    </span>
+                                                    <div style="margin-top:4px;">
+                                                        <?php if ($eh_proprio && !$tfa_on): ?>
+                                                            <button class="btn btn-sm btn-primary" style="font-size:10px;" onclick="setup2FA()"><i class="fas fa-qrcode"></i> Configurar</button>
+                                                        <?php elseif ($tfa_on && ($eh_proprio || $can_edit_system_users)): ?>
+                                                            <button class="btn btn-sm btn-danger" style="font-size:10px;" onclick="disable2FA(<?php echo (int) $usuario['id']; ?>, <?php echo $eh_proprio ? 'true' : 'false'; ?>)"><i class="fas fa-shield-halved"></i> Desativar</button>
+                                                        <?php elseif (!$tfa_on): ?>
+                                                            <span class="text-muted" style="font-size:10px;">—</span>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                <?php else: ?>
+                                                    <span class="text-muted" style="font-size:10px;">—</span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td style="padding: 12px 8px; text-align: center;"><?php echo date('d/m/Y H:i', strtotime($usuario['data_cadastro'])); ?></td>
                                             <td style="padding: 12px 8px; text-align: center;">
                                                 <?php if ($usuario['tipo_usuario_sistema'] === 'motorista' || $can_edit_system_users): ?>
-                                                    <button class="btn btn-sm btn-primary" onclick="editarUsuario(<?php echo $usuario['id']; ?>, '<?php echo $usuario['tipo_usuario_sistema']; ?>')" style="margin-right: 5px;">
+                                                    <button class="btn btn-sm btn-primary btn-acao" title="Editar usuário" aria-label="Editar usuário" onclick="editarUsuario(<?php echo $usuario['id']; ?>, '<?php echo $usuario['tipo_usuario_sistema']; ?>')">
                                                     <i class="fas fa-edit"></i>
                                                 </button>
-                                                    <button class="btn btn-sm btn-danger" onclick="excluirUsuario(<?php echo $usuario['id']; ?>, '<?php echo $usuario['tipo_usuario_sistema']; ?>')">
+                                                    <button class="btn btn-sm btn-danger btn-acao" title="Excluir usuário" aria-label="Excluir usuário" onclick="excluirUsuario(<?php echo $usuario['id']; ?>, '<?php echo $usuario['tipo_usuario_sistema']; ?>')">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
                                                 <?php else: ?>
@@ -360,6 +511,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <!-- Cadastro de Usuário Motorista -->
                     <div class="dashboard-card" style="grid-column: 1 / -1;">
                         <div class="card-header">
+                            <i class="fas fa-user-plus kpi-card-icon" aria-hidden="true"></i>
                             <h3>Cadastro de Usuário Motorista</h3>
                         </div>
                         <div class="card-body">
@@ -403,6 +555,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <?php if ($can_create_system_users): ?>
                     <div class="dashboard-card" style="grid-column: 1 / -1;">
                         <div class="card-header">
+                            <i class="fas fa-user-gear kpi-card-icon" aria-hidden="true"></i>
                             <h3>Cadastro de Usuário do Sistema</h3>
                         </div>
                         <div class="card-body">
@@ -427,6 +580,15 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="form-group">
                                     <label for="senha_sistema">Senha</label>
                                     <input type="password" id="senha_sistema" name="senha" class="form-control" required minlength="6">
+                                    <div class="pwd-meter" data-target="senha_sistema">
+                                        <ul>
+                                            <li data-rule="len">8+ caracteres</li>
+                                            <li data-rule="upper">Maiúscula</li>
+                                            <li data-rule="lower">Minúscula</li>
+                                            <li data-rule="num">Número</li>
+                                            <li data-rule="special">Especial</li>
+                                        </ul>
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <label for="confirmar_senha_sistema">Confirmar Senha</label>
@@ -508,7 +670,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </div>
                                 </div>
                                 <div class="form-actions">
-                                    <button type="submit" class="btn btn-success">
+                                    <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-save"></i> Cadastrar Usuário do Sistema
                                     </button>
                                 </div>
@@ -645,6 +807,15 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="form-group">
                         <label for="edit_senha">Nova Senha (deixe em branco para manter a atual)</label>
                         <input type="password" id="edit_senha" name="senha" class="form-control" minlength="6">
+                        <div class="pwd-meter" data-target="edit_senha">
+                            <ul>
+                                <li data-rule="len">8+ caracteres</li>
+                                <li data-rule="upper">Maiúscula</li>
+                                <li data-rule="lower">Minúscula</li>
+                                <li data-rule="num">Número</li>
+                                <li data-rule="special">Especial</li>
+                            </ul>
+                        </div>
                     </div>
                     
                     <div class="form-group">
@@ -697,7 +868,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
         const opt = sel ? sel.options[sel.selectedIndex] : null;
         const em = opt ? (opt.getAttribute('data-email') || '').trim() : '';
         if (!sel || !sel.value || !em) {
-            alert('Selecione um motorista que possua e-mail cadastrado em Motoristas.');
+            uaToast('Selecione um motorista que possua e-mail cadastrado em Motoristas.', 'error');
             return;
         }
         
@@ -705,7 +876,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
         const confirmarSenha = document.getElementById('confirmar_senha_motorista').value;
         
         if (senha !== confirmarSenha) {
-            alert('As senhas não coincidem!');
+            uaToast('As senhas não coincidem!', 'error');
             return;
         }
         
@@ -718,15 +889,15 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Usuário motorista cadastrado com sucesso!');
-                window.location.reload();
+                uaToast('Usuário motorista cadastrado com sucesso!', 'success');
+                setTimeout(function () { window.location.reload(); }, 900);
             } else {
-                alert(data.error || 'Erro ao cadastrar usuário motorista.');
+                uaToast(data.message || data.error || 'Erro ao cadastrar usuário motorista.', 'error');
             }
         })
         .catch(error => {
             console.error('Erro:', error);
-            alert('Erro ao cadastrar usuário motorista.');
+            uaToast('Erro ao cadastrar usuário motorista.', 'error');
         });
     });
 
@@ -738,7 +909,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
         const confirmarSenha = document.getElementById('confirmar_senha_sistema').value;
         
         if (senha !== confirmarSenha) {
-            alert('As senhas não coincidem!');
+            uaToast('As senhas não coincidem!', 'error');
             return;
         }
         
@@ -751,15 +922,15 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Usuário do sistema cadastrado com sucesso!');
-                window.location.reload();
+                uaToast('Usuário do sistema cadastrado com sucesso!', 'success');
+                setTimeout(function () { window.location.reload(); }, 900);
             } else {
-                alert(data.error || 'Erro ao cadastrar usuário do sistema.');
+                uaToast(data.message || data.error || 'Erro ao cadastrar usuário do sistema.', 'error');
             }
         })
         .catch(error => {
             console.error('Erro:', error);
-            alert('Erro ao cadastrar usuário do sistema.');
+            uaToast('Erro ao cadastrar usuário do sistema.', 'error');
         });
     });
 
@@ -771,7 +942,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
         const confirmarSenha = document.getElementById('edit_confirmar_senha') ? document.getElementById('edit_confirmar_senha').value : senha;
         
         if (senha && senha !== confirmarSenha) {
-            alert('As senhas não coincidem!');
+            uaToast('As senhas não coincidem!', 'error');
             return;
         }
         
@@ -786,16 +957,16 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Usuário atualizado com sucesso!');
+                uaToast('Usuário atualizado com sucesso!', 'success');
                 fecharModal();
-                window.location.reload();
+                setTimeout(function () { window.location.reload(); }, 900);
             } else {
-                alert(data.error || 'Erro ao atualizar usuário.');
+                uaToast(data.message || data.error || 'Erro ao atualizar usuário.', 'error');
             }
         })
         .catch(error => {
             console.error('Erro:', error);
-            alert('Erro ao atualizar usuário.');
+            uaToast('Erro ao atualizar usuário.', 'error');
         });
     });
 
@@ -805,7 +976,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
         const canEditSystemUsers = <?php echo $can_edit_system_users ? 'true' : 'false'; ?>;
         
         if (tipoUsuario === 'sistema' && !canEditSystemUsers) {
-            alert('Você não tem permissão para editar usuários do sistema.');
+            uaToast('Você não tem permissão para editar usuários do sistema.', 'error');
             return;
         }
         
@@ -922,12 +1093,12 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 modal.style.display = 'block';
             } else {
-                alert(data.error || 'Erro ao carregar dados do usuário.');
+                uaToast(data.message || data.error || 'Erro ao carregar dados do usuário.', 'error');
             }
         })
         .catch(error => {
             console.error('Erro:', error);
-            alert('Erro ao carregar dados do usuário.');
+            uaToast('Erro ao carregar dados do usuário.', 'error');
         });
     }
 
@@ -937,37 +1108,34 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
         const canEditSystemUsers = <?php echo $can_edit_system_users ? 'true' : 'false'; ?>;
         
         if (tipoUsuario === 'sistema' && !canEditSystemUsers) {
-            alert('Você não tem permissão para excluir usuários do sistema.');
+            uaToast('Você não tem permissão para excluir usuários do sistema.', 'error');
             return;
         }
-        
-        if (confirm('Tem certeza que deseja excluir este usuário?')) {
+
+        uaConfirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.').then(function (ok) {
+            if (!ok) return;
             const apiUrl = tipoUsuario === 'motorista' ? '../api/usuarios_motoristas.php' : '../api/usuarios.php';
-            
+
             fetch(apiUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    action: 'delete',
-                    id: id
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id: id })
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('Usuário excluído com sucesso!');
-                    window.location.reload();
+                    var row = document.querySelector('tr.user-row[data-user-id="' + id + '"][data-user-tipo="' + tipoUsuario + '"]');
+                    if (row) { row.remove(); if (window.uaApplyFilter) window.uaApplyFilter(); }
+                    uaToast('Usuário excluído com sucesso!', 'success');
                 } else {
-                    alert(data.error || 'Erro ao excluir usuário.');
+                    uaToast(data.message || data.error || 'Erro ao excluir usuário.', 'error');
                 }
             })
             .catch(error => {
                 console.error('Erro:', error);
-                alert('Erro ao excluir usuário.');
+                uaToast('Erro ao excluir usuário.', 'error');
             });
-        }
+        });
     }
 
     // Função para fechar modal
@@ -1011,6 +1179,154 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
     });
     </script>
     
+    <!-- Modal de configuração do 2FA -->
+    <div id="modal2FA" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-shield-halved"></i> Autenticação em dois fatores</h3>
+                <button type="button" class="modal-close" onclick="close2FAModal()" aria-label="Fechar">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align:center;">
+                <p style="font-size:13px;">Escaneie o QR Code no <strong>Google Authenticator</strong> ou <strong>Microsoft Authenticator</strong> e digite o código gerado.</p>
+                <div id="qr2fa" style="display:flex;justify-content:center;margin:14px 0;"></div>
+                <p style="font-size:12px;opacity:.8;">Ou insira manualmente esta chave:</p>
+                <code id="secret2fa" style="display:block;word-break:break-all;font-size:12px;margin-bottom:12px;"></code>
+                <div class="form-group" style="text-align:left;">
+                    <label for="code2fa">Código de 6 dígitos</label>
+                    <input type="text" id="code2fa" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="000000" style="width:100%;">
+                </div>
+                <div id="msg2fa" style="font-size:12px;color:#c0392b;min-height:16px;"></div>
+                <button type="button" class="btn btn-primary" onclick="confirm2FA()" style="width:100%;margin-top:8px;">Ativar 2FA</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script>
+    var TFA_API = '../api/usuarios_2fa.php';
+    function setup2FA() {
+        var fd = new FormData(); fd.append('action', 'start');
+        fetch(TFA_API, { method: 'POST', body: fd }).then(function (r) { return r.json(); }).then(function (res) {
+            if (!res.success) { uaToast(res.message || res.error || 'Erro ao iniciar 2FA.', 'error'); return; }
+            var qr = document.getElementById('qr2fa'); qr.innerHTML = '';
+            new QRCode(qr, { text: res.otpauth, width: 180, height: 180 });
+            document.getElementById('secret2fa').textContent = res.secret;
+            document.getElementById('code2fa').value = '';
+            document.getElementById('msg2fa').textContent = '';
+            document.getElementById('modal2FA').style.display = 'flex';
+        }).catch(function () { uaToast('Erro de comunicação.', 'error'); });
+    }
+    function confirm2FA() {
+        var code = (document.getElementById('code2fa').value || '').trim();
+        var fd = new FormData(); fd.append('action', 'confirm'); fd.append('code', code);
+        fetch(TFA_API, { method: 'POST', body: fd }).then(function (r) { return r.json(); }).then(function (res) {
+            if (res.success) { uaToast('2FA ativado com sucesso!', 'success'); setTimeout(function(){ location.reload(); }, 900); }
+            else { document.getElementById('msg2fa').textContent = res.message || res.error || 'Código inválido.'; }
+        }).catch(function () { document.getElementById('msg2fa').textContent = 'Erro de comunicação.'; });
+    }
+    function disable2FA(id, isSelf) {
+        if (!confirm('Desativar a autenticação em dois fatores deste usuário?')) return;
+        var fd = new FormData(); fd.append('action', 'disable'); fd.append('usuario_id', id);
+        fetch(TFA_API, { method: 'POST', body: fd }).then(function (r) { return r.json(); }).then(function (res) {
+            if (res.success) { location.reload(); } else { uaToast(res.message || res.error || 'Erro ao desativar.', 'error'); }
+        }).catch(function () { uaToast('Erro de comunicação.', 'error'); });
+    }
+    function close2FAModal() { document.getElementById('modal2FA').style.display = 'none'; }
+    </script>
+
+    <!-- Toast + modal de confirmação -->
+    <div id="uaToastWrap" aria-live="polite"></div>
+    <div class="confirm-modal" id="uaConfirmModal" role="dialog" aria-modal="true" aria-labelledby="uaConfirmTitle">
+        <div class="confirm-box">
+            <div class="ci"><i class="fas fa-triangle-exclamation"></i></div>
+            <h4 id="uaConfirmTitle">Confirmar exclusão</h4>
+            <p id="uaConfirmMsg">Tem certeza?</p>
+            <div class="confirm-actions">
+                <button type="button" class="btn btn-secondary" id="uaConfirmCancel"><i class="fas fa-times"></i> Cancelar</button>
+                <button type="button" class="btn btn-danger" id="uaConfirmOk"><i class="fas fa-trash"></i> Excluir</button>
+            </div>
+        </div>
+    </div>
+    <script>
+    (function () {
+        // ---- Toast ----
+        window.uaToast = function (msg, type) {
+            var wrap = document.getElementById('uaToastWrap');
+            if (!wrap) { alert(msg); return; }
+            var t = document.createElement('div');
+            t.className = 'ua-toast ' + (type || 'info');
+            var icon = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-info');
+            t.innerHTML = '<i class="fas ' + icon + '"></i><span></span>';
+            t.querySelector('span').textContent = msg;
+            wrap.appendChild(t);
+            requestAnimationFrame(function () { t.classList.add('show'); });
+            setTimeout(function () { t.classList.remove('show'); setTimeout(function () { t.remove(); }, 300); }, 3500);
+        };
+
+        // ---- Confirmação (Promise) ----
+        var modal = document.getElementById('uaConfirmModal');
+        var msgEl = document.getElementById('uaConfirmMsg');
+        var resolver = null;
+        function closeConfirm(val) { if (modal) modal.classList.remove('show'); if (resolver) { resolver(val); resolver = null; } }
+        var ok = document.getElementById('uaConfirmOk');
+        var cancel = document.getElementById('uaConfirmCancel');
+        if (ok) ok.addEventListener('click', function () { closeConfirm(true); });
+        if (cancel) cancel.addEventListener('click', function () { closeConfirm(false); });
+        if (modal) modal.addEventListener('click', function (e) { if (e.target === modal) closeConfirm(false); });
+        window.uaConfirm = function (message) {
+            return new Promise(function (resolve) {
+                resolver = resolve;
+                if (msgEl) msgEl.textContent = message || 'Tem certeza?';
+                if (modal) modal.classList.add('show');
+            });
+        };
+
+        // ---- Busca + filtros da tabela ----
+        function applyFilter() {
+            var s = document.getElementById('ufSearch');
+            var q = (s ? s.value : '').trim().toLowerCase();
+            var tipo = (document.getElementById('ufTipo') || {}).value || '';
+            var status = (document.getElementById('ufStatus') || {}).value || '';
+            var rows = document.querySelectorAll('tr.user-row');
+            var visible = 0;
+            rows.forEach(function (r) {
+                var okQ = !q || (r.getAttribute('data-nome') || '').indexOf(q) >= 0 || (r.getAttribute('data-email') || '').indexOf(q) >= 0;
+                var okT = !tipo || r.getAttribute('data-tipo') === tipo;
+                var okS = !status || r.getAttribute('data-status') === status;
+                var show = okQ && okT && okS;
+                r.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            var c = document.getElementById('ufCount');
+            if (c) c.textContent = visible + ' de ' + rows.length + ' usuário(s)';
+        }
+        window.uaApplyFilter = applyFilter;
+        ['ufSearch', 'ufTipo', 'ufStatus'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener(id === 'ufSearch' ? 'input' : 'change', applyFilter);
+        });
+        applyFilter();
+
+        // ---- Medidor de senha forte ----
+        document.querySelectorAll('.pwd-meter').forEach(function (meter) {
+            var input = document.getElementById(meter.getAttribute('data-target'));
+            if (!input) return;
+            function run() {
+                var v = input.value || '';
+                var rules = {
+                    len: v.length >= 8, upper: /[A-Z]/.test(v), lower: /[a-z]/.test(v),
+                    num: /[0-9]/.test(v), special: /[^A-Za-z0-9]/.test(v)
+                };
+                meter.querySelectorAll('li').forEach(function (li) {
+                    li.classList.toggle('ok', !!rules[li.getAttribute('data-rule')]);
+                });
+            }
+            input.addEventListener('input', run);
+            run();
+        });
+    })();
+    </script>
+
     <?php include '../includes/footer.php'; ?>
 </body>
 </html> 

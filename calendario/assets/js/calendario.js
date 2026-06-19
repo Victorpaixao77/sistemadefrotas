@@ -3,6 +3,37 @@
  * Integrates with fleet management system to show automatic events
  */
 
+function calEscapeHtml(value) {
+    if (value == null) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function calNormalizeCategory(cat) {
+    const map = {
+        cnh: 'CNH', CNH: 'CNH',
+        multas: 'Multas', Multas: 'Multas',
+        contas: 'Contas', Contas: 'Contas',
+        financiamento: 'Financiamento', Financiamento: 'Financiamento',
+        manutencao: 'Manutenção', 'Manutenção': 'Manutenção',
+        personalizado: 'Personalizado', Personalizado: 'Personalizado'
+    };
+    return map[cat] || cat || 'Personalizado';
+}
+
+function calAppUrl(rel) {
+    if (typeof sfAppUrl === 'function') {
+        return sfAppUrl(rel);
+    }
+    const base = (typeof window.__SF_APP_BASE__ === 'string' && window.__SF_APP_BASE__)
+        ? window.__SF_APP_BASE__.replace(/\/+$/, '') : '';
+    rel = String(rel || '').replace(/^\/+/, '');
+    return base ? base + '/' + rel : '/' + rel;
+}
+
 class CalendarManager {
     constructor() {
         this.calendar = null;
@@ -83,7 +114,7 @@ class CalendarManager {
             }
             
             // Modal close button
-            const closeBtn = document.querySelector('.close');
+            const closeBtn = document.querySelector('#eventModal .close-modal');
             if (closeBtn) {
                 closeBtn.addEventListener('click', () => {
                     this.closeEventModal();
@@ -109,6 +140,14 @@ class CalendarManager {
                 console.log('Botão excluir configurado');
             }
             
+            const openSourceBtn = document.getElementById('openSourceLinkBtn');
+            if (openSourceBtn) {
+                openSourceBtn.addEventListener('click', () => {
+                    const url = openSourceBtn.dataset.url;
+                    if (url) window.location.href = url;
+                });
+            }
+
             // Form submission
             const eventForm = document.getElementById('eventForm');
             if (eventForm) {
@@ -121,7 +160,8 @@ class CalendarManager {
             
             // Close modal when clicking outside
             window.addEventListener('click', (e) => {
-                if (e.target.classList.contains('modal')) {
+                const modal = document.getElementById('eventModal');
+                if (modal && e.target === modal) {
                     this.closeEventModal();
                 }
             });
@@ -177,9 +217,18 @@ class CalendarManager {
                 this.openEventModal(info.event);
             },
             eventDrop: (info) => {
+                if (this.isAutomaticEvent(info.event)) {
+                    info.revert();
+                    this.showError('Eventos automáticos não podem ser movidos.');
+                    return;
+                }
                 this.updateEventDate(info.event);
             },
             eventResize: (info) => {
+                if (this.isAutomaticEvent(info.event)) {
+                    info.revert();
+                    return;
+                }
                 this.updateEventDate(info.event);
             },
             select: (info) => {
@@ -201,23 +250,28 @@ class CalendarManager {
     
     setupEventTooltip(info) {
         const event = info.event;
+        const props = event.extendedProps || {};
         const tooltip = document.createElement('div');
         tooltip.className = 'fc-event-tooltip';
-        tooltip.innerHTML = `
-            <div class="tooltip-title">${event.title}</div>
-            <div class="tooltip-category">${this.getCategoryName(event.extendedProps.category)}</div>
-            <div class="tooltip-description">${event.extendedProps.description || ''}</div>
-        `;
-        
+        const titleEl = document.createElement('div');
+        titleEl.className = 'tooltip-title';
+        titleEl.textContent = event.title;
+        const catEl = document.createElement('div');
+        catEl.className = 'tooltip-category';
+        catEl.textContent = this.getCategoryName(props.category);
+        const descEl = document.createElement('div');
+        descEl.className = 'tooltip-description';
+        descEl.textContent = props.description || '';
+        tooltip.appendChild(titleEl);
+        tooltip.appendChild(catEl);
+        tooltip.appendChild(descEl);
+
         info.el.addEventListener('mouseenter', () => {
             document.body.appendChild(tooltip);
             this.positionTooltip(tooltip, info.el);
         });
-        
         info.el.addEventListener('mouseleave', () => {
-            if (tooltip.parentNode) {
-                tooltip.parentNode.removeChild(tooltip);
-            }
+            if (tooltip.parentNode) tooltip.parentNode.removeChild(tooltip);
         });
     }
     
@@ -241,15 +295,7 @@ class CalendarManager {
     }
     
     getCategoryName(category) {
-        const categories = {
-            'cnh': 'CNH',
-            'multas': 'Multas',
-            'contas': 'Contas a Pagar',
-            'financiamento': 'Financiamento',
-            'manutencao': 'Manutenção',
-            'personalizado': 'Personalizado'
-        };
-        return categories[category] || category;
+        return calNormalizeCategory(category);
     }
     
     setupFilters() {
@@ -275,31 +321,79 @@ class CalendarManager {
         }
     }
     
-    applyFilters() {
-        if (!this.calendar) {
-            console.warn('Calendário não inicializado, pulando aplicação de filtros');
-            return;
-        }
-        
-        console.log('=== DEBUG FILTROS ===');
-        console.log('Filtros ativos:', this.filters);
-        console.log('Total de eventos antes do filtro:', this.events.length);
-        
-        const filteredEvents = this.events.filter(event => {
-            const category = event.extendedProps.category;
-            const filterValue = this.filters[category];
-            
-            console.log(`Evento: ${event.title}, Categoria: ${category}, Filtro ativo: ${filterValue}`);
-            
-            return this.filters[category];
+    isAutomaticEvent(event) {
+        if (!event) return false;
+        const props = event.extendedProps || {};
+        if (props.source === 'automatic' || props.source === 'plano') return true;
+        const id = String(event.id || '');
+        return !/^\d+$/.test(id);
+    }
+
+    getEventSourceUrl(props) {
+        if (!props || props.source === 'manual') return null;
+        const cat = calNormalizeCategory(props.category);
+        if (props.multa_id) return calAppUrl('pages/multas.php');
+        if (props.motorista_id && cat === 'CNH') return calAppUrl('pages/motorists.php');
+        if (props.conta_id) return calAppUrl('pages/contas_pagar.php');
+        if (props.parcela_id || props.financiamento_id) return calAppUrl('pages/financiamento.php');
+        if (props.manutencao_id || cat === 'Manutenção') return calAppUrl('pages/manutencoes.php');
+        return null;
+    }
+
+    setModalReadonlyMode(readonly, sourceUrl) {
+        const fields = ['eventTitle', 'eventCategory', 'eventStart', 'eventEnd', 'eventDescription', 'eventColor'];
+        fields.forEach((id) => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = readonly;
         });
-        
-        console.log('Eventos após filtro:', filteredEvents.length);
-        console.log('Eventos filtrados:', filteredEvents);
-        console.log('=== FIM DEBUG FILTROS ===');
-        
+        const notice = document.getElementById('eventAutoNotice');
+        if (notice) notice.style.display = readonly ? 'block' : 'none';
+        const saveBtn = document.getElementById('saveEventBtn');
+        const deleteBtn = document.getElementById('deleteEventBtn');
+        const linkBtn = document.getElementById('openSourceLinkBtn');
+        if (saveBtn) saveBtn.style.display = readonly ? 'none' : 'flex';
+        if (deleteBtn) deleteBtn.style.display = readonly ? 'none' : 'flex';
+        if (linkBtn) {
+            if (readonly && sourceUrl) {
+                linkBtn.style.display = 'flex';
+                linkBtn.dataset.url = sourceUrl;
+            } else {
+                linkBtn.style.display = 'none';
+                delete linkBtn.dataset.url;
+            }
+        }
+    }
+
+    applyFilters() {
+        if (!this.calendar) return;
+
+        const filteredEvents = this.events.filter((event) => {
+            const category = calNormalizeCategory(event.extendedProps?.category);
+            return this.filters[category] !== false;
+        });
+
         this.calendar.removeAllEvents();
         this.calendar.addEventSource(filteredEvents);
+    }
+
+    async fetchEventApi(url, className) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) return [];
+            const data = await response.json();
+            if (!Array.isArray(data)) return [];
+            return data.map((event) => ({
+                ...event,
+                className: className,
+                editable: event.editable === true,
+                extendedProps: {
+                    ...(event.extendedProps || {}),
+                    category: calNormalizeCategory(event.extendedProps?.category)
+                }
+            }));
+        } catch (e) {
+            return [];
+        }
     }
     
     async loadAutomaticEvents() {
@@ -366,253 +460,77 @@ class CalendarManager {
         } catch (error) {
             console.error('Erro ao carregar eventos:', error);
             this.hideLoading();
-            
-            // Fallback: mostrar eventos de teste
-            console.log('Usando eventos de teste como fallback...');
-            this.events = [
-                {
-                    title: 'Teste: CNH Vence em 30 dias',
-                    start: new Date(),
-                    backgroundColor: '#ef4444',
-                    extendedProps: { category: 'cnh' }
-                },
-                {
-                    title: 'Teste: Multa Vence Amanhã',
-                    start: new Date(Date.now() + 24 * 60 * 60 * 1000),
-                    backgroundColor: '#f59e0b',
-                    extendedProps: { category: 'multas' }
-                }
-            ];
-            
-            this.applyFilters();
-            this.showSuccess('Eventos de teste carregados (APIs indisponíveis)');
+            this.showError('Não foi possível carregar os eventos. Tente atualizar a página.');
         }
     }
-    
+
     async loadCNHEvents() {
-        try {
-            const response = await fetch('api/calendario_cnh.php');
-            if (response.ok) {
-                const data = await response.json();
-                return data.map(event => ({
-                    ...event,
-                    className: 'event-cnh',
-                    extendedProps: {
-                        ...event.extendedProps,
-                        category: 'cnh',
-                        source: 'automatic'
-                    }
-                }));
-            }
-        } catch (error) {
-            console.error('Erro ao carregar eventos de CNH:', error);
-        }
-        return [];
+        return this.fetchEventApi('api/calendario_cnh.php', 'event-cnh');
     }
-    
+
     async loadMultasEvents() {
-        try {
-            const response = await fetch('api/calendario_multas.php');
-            if (response.ok) {
-                const data = await response.json();
-                return data.map(event => ({
-                    ...event,
-                    className: 'event-multas',
-                    extendedProps: {
-                        ...event.extendedProps,
-                        category: 'multas',
-                        source: 'automatic'
-                    }
-                }));
-            }
-        } catch (error) {
-            console.error('Erro ao carregar eventos de multas:', error);
-        }
-        return [];
+        return this.fetchEventApi('api/calendario_multas.php', 'event-multas');
     }
-    
+
     async loadContasEvents() {
-        try {
-            const response = await fetch('api/calendario_contas.php');
-            if (response.ok) {
-                const data = await response.json();
-                return data.map(event => ({
-                    ...event,
-                    className: 'event-contas',
-                    extendedProps: {
-                        ...event.extendedProps,
-                        category: 'contas',
-                        source: 'automatic'
-                    }
-                }));
-            }
-        } catch (error) {
-            console.error('Erro ao carregar eventos de contas:', error);
-        }
-        return [];
+        return this.fetchEventApi('api/calendario_contas.php', 'event-contas');
     }
-    
+
     async loadFinanciamentoEvents() {
-        try {
-            const response = await fetch('api/calendario_financiamento.php');
-            if (response.ok) {
-                const data = await response.json();
-                return data.map(event => ({
-                    ...event,
-                    className: 'event-financiamento',
-                    extendedProps: {
-                        ...event.extendedProps,
-                        category: 'financiamento',
-                        source: 'automatic'
-                    }
-                }));
-            }
-        } catch (error) {
-            console.error('Erro ao carregar eventos de financiamento:', error);
-        }
-        return [];
+        return this.fetchEventApi('api/calendario_financiamento.php', 'event-financiamento');
     }
-    
+
     async loadManutencaoEvents() {
-        try {
-            const response = await fetch('api/calendario_manutencao.php');
-            if (response.ok) {
-                const data = await response.json();
-                return data.map(event => ({
-                    ...event,
-                    className: 'event-manutencao',
-                    extendedProps: {
-                        ...event.extendedProps,
-                        category: 'manutencao',
-                        source: 'automatic'
-                    }
-                }));
-            }
-        } catch (error) {
-            console.error('Erro ao carregar eventos de manutenção:', error);
-        }
-        return [];
+        return this.fetchEventApi('api/calendario_manutencao.php', 'event-manutencao');
     }
-    
+
     async loadPersonalEvents() {
-        try {
-            const response = await fetch('api/calendario_personal.php');
-            if (response.ok) {
-                const data = await response.json();
-                console.log('Dados brutos da API:', data);
-                
-                const mappedEvents = data.map(event => {
-                    console.log('Evento original:', event);
-                    console.log('Evento extendedProps:', event.extendedProps);
-                    
-                    const mappedEvent = {
-                        ...event,
-                        className: 'event-personalizado',
-                        extendedProps: {
-                            ...event.extendedProps,
-                            // Manter a categoria real do banco, não sobrescrever
-                            category: event.extendedProps?.category || event.category || 'personalizado',
-                            source: event.extendedProps?.source || 'manual'
-                        }
-                    };
-                    
-                    console.log('Evento mapeado:', mappedEvent);
-                    console.log('Categoria final:', mappedEvent.extendedProps.category);
-                    
-                    return mappedEvent;
-                });
-                
-                console.log('Eventos mapeados finais:', mappedEvents);
-                return mappedEvents;
-            }
-        } catch (error) {
-            console.error('Erro ao carregar eventos personalizados:', error);
-        }
-        return [];
+        return this.fetchEventApi('api/calendario_personal.php', 'event-personalizado');
     }
     
     openEventModal(event = null, start = null, end = null) {
         const modal = document.getElementById('eventModal');
         const modalTitle = document.getElementById('modalTitle');
         const deleteBtn = document.getElementById('deleteEventBtn');
-        
+
         if (event) {
-            // Editing existing event
             this.currentEvent = event;
-            modalTitle.textContent = 'Editar Evento';
-            deleteBtn.style.display = 'block';
-            
-            console.log('=== DEBUG MODAL EDIÇÃO ===');
-            console.log('Evento completo:', event);
-            console.log('Evento ID:', event.id);
-            console.log('Evento Title:', event.title);
-            console.log('Evento extendedProps:', event.extendedProps);
-            console.log('Evento category direto:', event.category);
-            console.log('Evento extendedProps.category:', event.extendedProps?.category);
-            
-            // Fill form with event data
+            const auto = this.isAutomaticEvent(event);
+            modalTitle.textContent = auto ? 'Detalhes do evento' : 'Editar evento';
+            const props = event.extendedProps || {};
+            const sourceUrl = this.getEventSourceUrl(props);
+
             document.getElementById('eventId').value = event.id;
             document.getElementById('eventTitle').value = event.title;
-            
-            // Carregar categoria - tentar diferentes fontes
-            let category = '';
-            if (event.extendedProps && event.extendedProps.category) {
-                category = event.extendedProps.category;
-                console.log('Categoria encontrada em extendedProps.category:', category);
-            } else if (event.category) {
-                category = event.category;
-                console.log('Categoria encontrada em event.category:', category);
-            } else {
-                category = 'Personalizado'; // Categoria padrão
-                console.log('Usando categoria padrão:', category);
-            }
-            console.log('Categoria final selecionada:', category);
-            document.getElementById('eventCategory').value = category;
-            
+            document.getElementById('eventCategory').value = calNormalizeCategory(props.category);
             document.getElementById('eventStart').value = this.formatDateTimeLocal(event.start);
             document.getElementById('eventEnd').value = event.end ? this.formatDateTimeLocal(event.end) : '';
-            
-            // Carregar descrição
-            let description = '';
-            if (event.extendedProps && event.extendedProps.description) {
-                description = event.extendedProps.description;
-            } else if (event.description) {
-                description = event.description;
-            }
-            document.getElementById('eventDescription').value = description;
-            
+            document.getElementById('eventDescription').value = props.description || event.description || '';
             document.getElementById('eventColor').value = event.backgroundColor || '#3788d8';
-            document.getElementById('eventReminder').value = event.extendedProps?.reminder || '0';
-            document.getElementById('eventSource').value = event.extendedProps?.source || 'manual';
-            
-            console.log('=== FIM DEBUG MODAL ===');
+            document.getElementById('eventSource').value = props.source || 'manual';
+
+            this.setModalReadonlyMode(auto, sourceUrl);
+            if (deleteBtn) deleteBtn.style.display = auto ? 'none' : 'flex';
         } else {
-            // Creating new event
             this.currentEvent = null;
-            modalTitle.textContent = 'Novo Evento';
-            deleteBtn.style.display = 'none';
-            
-            // Clear form
+            modalTitle.textContent = 'Novo evento';
+            if (deleteBtn) deleteBtn.style.display = 'none';
+            this.setModalReadonlyMode(false, null);
             document.getElementById('eventForm').reset();
             document.getElementById('eventId').value = '';
             document.getElementById('eventSource').value = 'manual';
-            
-            // Set default dates if provided
-            if (start) {
-                document.getElementById('eventStart').value = this.formatDateTimeLocal(start);
-            }
-            if (end) {
-                document.getElementById('eventEnd').value = this.formatDateTimeLocal(end);
-            }
+            if (start) document.getElementById('eventStart').value = this.formatDateTimeLocal(start);
+            if (end) document.getElementById('eventEnd').value = this.formatDateTimeLocal(end);
         }
-        
-        modal.style.display = 'block';
+
+        modal.classList.add('active');
     }
-    
+
     closeEventModal() {
         const modal = document.getElementById('eventModal');
-        modal.style.display = 'none';
+        if (modal) modal.classList.remove('active');
         this.currentEvent = null;
+        this.setModalReadonlyMode(false, null);
     }
     
     async saveEvent() {
@@ -635,7 +553,6 @@ class CalendarManager {
                 end: document.getElementById('eventEnd').value || null,
                 description: document.getElementById('eventDescription').value.trim() || null,
                 color: document.getElementById('eventColor').value,
-                reminder: document.getElementById('eventReminder').value,
                 source: document.getElementById('eventSource').value
             };
             
@@ -732,23 +649,24 @@ class CalendarManager {
     }
     
     async updateEventDate(event) {
+        if (this.isAutomaticEvent(event)) return;
         try {
-            const formData = {
-                id: event.id,
-                start: this.formatDateTimeLocal(event.start),
-                end: event.end ? this.formatDateTimeLocal(event.end) : null
-            };
-            
-            await fetch('api/calendario_update_date.php', {
+            const response = await fetch('api/calendario_update_date.php', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: event.id,
+                    start: this.formatDateTimeLocal(event.start),
+                    end: event.end ? this.formatDateTimeLocal(event.end) : null
+                })
             });
-            
+            if (!response.ok) {
+                this.showError('Não foi possível mover o evento.');
+                this.loadAutomaticEvents();
+            }
         } catch (error) {
-            console.error('Erro ao atualizar data do evento:', error);
+            this.showError('Erro ao atualizar data do evento.');
+            this.loadAutomaticEvents();
         }
     }
     
@@ -764,58 +682,22 @@ class CalendarManager {
     }
     
     checkUpcomingEvents() {
-        const now = new Date();
-        
-        // Obter o primeiro dia do mês atual
-        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        
-        // Obter o último dia do mês atual
-        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        
-        // Filtrar eventos que estão no mês atual e ainda não passaram
-        let upcomingEvents = this.events.filter(event => {
-            const eventDate = new Date(event.start);
-            
-            // Evento deve estar no mês atual E ainda não ter passado
-            // Usar comparação de data completa (sem hora) para evitar problemas de timezone
-            const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-            const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            
-            return eventDate >= firstDayOfMonth && 
-                   eventDate <= lastDayOfMonth && 
-                   eventDateOnly >= nowDateOnly;
-        });
-        
-        // Remover eventos duplicados baseado no título e data
-        upcomingEvents = this.removeDuplicateEvents(upcomingEvents);
-        
-        // Se não houver eventos futuros no mês, mostrar eventos de hoje
-        if (upcomingEvents.length === 0) {
-            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
-            
-            upcomingEvents = this.events.filter(event => {
-                const eventDate = new Date(event.start);
-                const eventDateOnly = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
-                const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                
-                return eventDateOnly.getTime() === todayOnly.getTime();
-            });
-            
-            // Remover duplicatas dos eventos de hoje também
-            upcomingEvents = this.removeDuplicateEvents(upcomingEvents);
-            
-            if (upcomingEvents.length > 0) {
-                this.showTodayEventsNotification(upcomingEvents);
-                return;
-            }
-        }
-        
-        if (upcomingEvents.length > 0) {
-            this.showUpcomingEventsNotification(upcomingEvents);
-        } else {
-            // Mostrar mensagem informativa se não houver eventos futuros no mês
-            this.showNoUpcomingEventsMessage();
+        const key = 'calendario_critico_' + new Date().toISOString().slice(0, 10);
+        if (sessionStorage.getItem(key)) return;
+
+        const today = new Date();
+        const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const criticalToday = this.removeDuplicateEvents(this.events.filter((event) => {
+            const d = new Date(event.start);
+            const dOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            if (dOnly.getTime() !== todayOnly.getTime()) return false;
+            const p = event.extendedProps || {};
+            return p.priority === 'critical' || p.dias_para_vencimento === 0;
+        }));
+
+        if (criticalToday.length > 0) {
+            sessionStorage.setItem(key, '1');
+            this.showTodayEventsNotification(criticalToday);
         }
     }
     
@@ -905,26 +787,21 @@ class CalendarManager {
         });
 
         Swal.fire({
-            title: 'Eventos de Hoje',
-            html: `<div style="text-align: left; max-height: 300px; overflow-y: auto;">
-                <p>Você tem <strong>${events.length} evento(s)</strong> hoje:</p>
-                <pre style="font-family: inherit; white-space: pre-wrap; font-size: 12px;">${eventList}</pre>
-            </div>`,
-            icon: 'info',
+            title: 'Vencimentos hoje',
+            html: '<div style="text-align:left;max-height:300px;overflow-y:auto"><p><strong>' +
+                calEscapeHtml(String(events.length)) +
+                '</strong> item(ns) crítico(s) hoje:</p><pre style="font-family:inherit;white-space:pre-wrap;font-size:12px">' +
+                calEscapeHtml(eventList) + '</pre></div>',
+            icon: 'warning',
             confirmButtonText: 'OK',
             width: '600px'
         });
     }
 
     showNoUpcomingEventsMessage() {
-        Swal.fire({
-            title: 'Nenhum Evento Futuro no Mês Atual',
-            text: 'Não há eventos futuros no mês atual para mostrar. Você pode adicionar novos eventos clicando no botão "Adicionar Evento".',
-            icon: 'info',
-            confirmButtonText: 'OK'
-        });
+        /* desativado — não interromper o usuário */
     }
-    
+
     showLoading() {
         try {
             console.log('Mostrando loading...');
@@ -1248,15 +1125,8 @@ class CalendarManager {
      * Configurar sincronização automática
      */
     setupAutoSync() {
-        // Sincronizar automaticamente a cada 5 minutos
-        setInterval(() => {
-            console.log('Executando sincronização automática...');
-            this.syncCalendar();
-        }, 5 * 60 * 1000); // 5 minutos
-        
-        // Não sincronizar na inicialização para evitar duplicação
-        // A sincronização inicial já é feita pelo loadAutomaticEvents()
-        console.log('Sincronização automática configurada para cada 5 minutos');
+        // Sync automático desativado — eventos operacionais vêm das APIs ao vivo.
+        // Use "Sync BD" apenas para recriar cópias em calendario_eventos (legado/triggers).
     }
 }
 

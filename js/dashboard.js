@@ -30,8 +30,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Setup logout handler
     setupLogoutHandler();
     
-    // Load dashboard data only if we're on the dashboard page
-    if (document.querySelector('.dashboard-content')) {
+    // Página inicial já renderiza KPIs no servidor; evita API legada com dados fictícios.
+    if (document.querySelector('.dashboard-content') && !document.body.dataset.dashboardHome) {
         loadDashboardData();
     }
 });
@@ -68,44 +68,49 @@ function initDashboard() {
     // Setup event listeners
     setupLogoutHandler();
     
-    // Load initial data
-    loadDashboardData();
+    // Página inicial (index.php): gráficos e KPIs vêm do PHP — não chamar API legada.
+    const isHomeDashboard = document.body && document.body.dataset.dashboardHome === '1';
+    if (!isHomeDashboard) {
+        loadDashboardData();
+    }
     
     // Setup modals
     setupModals();
     
-    // Initialize charts after Chart.js is loaded
-    waitForChartJS();
+    // Initialize charts after Chart.js is loaded (exceto financialChart na home — script inline)
+    if (!isHomeDashboard) {
+        waitForChartJS();
+    }
     
-    // Setup drag and drop for dashboard cards
-    const dashboardGrid = document.getElementById('dashboardGrid');
-    if (dashboardGrid) {
-        new Sortable(dashboardGrid, {
-            animation: 150,
-            ghostClass: 'sortable-ghost',
-            onEnd: function() {
-                saveCurrentLayout();
+    // Drag-and-drop por seção (Operação / Custos / Financeiro). Cada grade é
+    // independente: reordenar só acontece dentro da própria seção.
+    const dashboardGrids = document.querySelectorAll('.dashboard-grid[data-dash-section]');
+    if (dashboardGrids.length) {
+        // Restaura a ordem salva (por seção) antes de ligar o Sortable.
+        let savedLayout = null;
+        try { savedLayout = JSON.parse(localStorage.getItem('dashboardLayoutV2') || 'null'); }
+        catch (e) { savedLayout = null; }
+
+        dashboardGrids.forEach(grid => {
+            const sec = grid.getAttribute('data-dash-section');
+            if (savedLayout && Array.isArray(savedLayout[sec])) {
+                savedLayout[sec].forEach(id => {
+                    const card = grid.querySelector(`[data-card-id="${id}"]`);
+                    if (card) grid.appendChild(card);
+                });
             }
+            new Sortable(grid, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                onEnd: saveCurrentLayout
+            });
         });
 
-        const savedLayout = localStorage.getItem('dashboardLayout');
-        if (savedLayout) {
-            try {
-                const layout = JSON.parse(savedLayout);
-                layout.forEach(item => {
-                    const card = document.querySelector(`[data-card-id="${item.id}"]`);
-                    if (card) {
-                        dashboardGrid.appendChild(card);
-                    }
-                });
-            } catch (error) {
-                console.error('Error loading saved layout:', error);
-            }
-        }
-
-        const compactLayout = localStorage.getItem('dashboardCompactLayout');
-        if (compactLayout === 'true') {
-            dashboardGrid.classList.add('compact-layout');
+        // Modo compacto aplica a todas as seções.
+        if (localStorage.getItem('dashboardCompactLayout') === 'true') {
+            dashboardGrids.forEach(g => g.classList.add('compact-layout'));
+            const btn = document.getElementById('toggleLayoutBtn');
+            if (btn) btn.innerHTML = '<i class="fas fa-expand"></i> Expandir';
         }
     }
     
@@ -119,6 +124,20 @@ function initDashboard() {
         card.addEventListener('mouseleave', () => {
             card.classList.remove('card-hover');
         });
+
+        const href = card.getAttribute('data-href');
+        if (href) {
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('button, a, input, select, textarea, label')) return;
+                window.location.href = href;
+            });
+            card.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    window.location.href = href;
+                }
+            });
+        }
         
         // Expand card on button click
         const expandBtn = card.querySelector('.btn-card-expand');
@@ -191,51 +210,11 @@ function loadDashboardData() {
  * @param {Object} data Dashboard data
  */
 function updateDashboardCards(data) {
-    // Update vehicles card
-    const vehicleCard = document.querySelector('[data-card-id="vehicles"]');
-    if (vehicleCard && data.vehicleCount !== undefined) {
-        vehicleCard.querySelector('.metric-value').textContent = data.vehicleCount;
-    }
-    
-    // Update motorists card
-    const motoristCard = document.querySelector('[data-card-id="motorists"]');
-    if (motoristCard && data.motoristCount !== undefined) {
-        motoristCard.querySelector('.metric-value').textContent = data.motoristCount;
-    }
-    
-    // Update supply card
-    const supplyCard = document.querySelector('[data-card-id="supply"]');
-    if (supplyCard && data.supplyData !== undefined) {
-        supplyCard.querySelector('.metric-value').textContent = data.supplyData.count;
-        if (supplyCard.querySelector('.metric-subtitle')) {
-            supplyCard.querySelector('.metric-subtitle').textContent = `Total: R$ ${data.supplyData.total.toFixed(2).replace('.', ',')}`;
-        }
-    }
-    
-    // Update liquid value card
-    const liquidValueCard = document.querySelector('[data-card-id="liquid-value"]');
-    if (liquidValueCard && data.liquidValue !== undefined) {
-        liquidValueCard.querySelector('.metric-value').textContent = `R$ ${data.liquidValue.toFixed(2).replace('.', ',')}`;
-    }
-    
-    // Update routes card
-    const routesCard = document.querySelector('[data-card-id="routes"]');
-    if (routesCard && data.routes !== undefined) {
-        const completedRoutes = data.routes.completed;
-        const totalRoutes = data.routes.total;
-        const progressPercent = totalRoutes > 0 ? (completedRoutes / totalRoutes) * 100 : 0;
-        
-        routesCard.querySelector('.metric-value').textContent = `${completedRoutes}/${totalRoutes}`;
-        routesCard.querySelector('.progress-fill').style.width = `${progressPercent}%`;
-    }
-    
-    // Update productivity card
-    const productivityCard = document.querySelector('[data-card-id="productivity"]');
-    if (productivityCard && data.productivity !== undefined) {
-        const productivity = data.productivity;
-        productivityCard.querySelector('.metric-value').textContent = `${productivity}%`;
-        productivityCard.querySelector('.progress-fill').style.width = `${productivity}%`;
-    }
+    // Os KPIs do dashboard são renderizados no servidor (PHP) com os valores já
+    // consolidados pelo filtro de período. Esta função foi mantida apenas para
+    // compatibilidade do fluxo de loadDashboardData(); não há cards client-side
+    // para atualizar (os IDs antigos vehicles/motorists/... não existem mais).
+    return;
 }
 
 /**
@@ -825,56 +804,46 @@ function initCostAnalysisChart() {
  * Save current dashboard layout
  */
 function saveCurrentLayout() {
-    const dashboardGrid = document.getElementById('dashboardGrid');
-    if (!dashboardGrid) return;
-    
-    // Get all cards and their IDs
-    const cards = dashboardGrid.querySelectorAll('.dashboard-card');
-    const layout = Array.from(cards).map(card => {
-        return {
-            id: card.getAttribute('data-card-id'),
-            order: Array.from(dashboardGrid.children).indexOf(card)
-        };
+    // Salva a ordem dos cards por seção: { operacao:[ids], custos:[ids], financeiro:[ids] }
+    const layout = {};
+    document.querySelectorAll('.dashboard-grid[data-dash-section]').forEach(grid => {
+        const sec = grid.getAttribute('data-dash-section');
+        layout[sec] = Array.from(grid.querySelectorAll('.dashboard-card'))
+            .map(card => card.getAttribute('data-card-id'))
+            .filter(Boolean);
     });
-    
-    // Save to localStorage
-    localStorage.setItem('dashboardLayout', JSON.stringify(layout));
-    
-    // Also send to server for persistent storage
-    fetch('api/save_layout.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ layout })
-    })
-    .catch(error => {
-        console.error('Error saving layout:', error);
-    });
+    localStorage.setItem('dashboardLayoutV2', JSON.stringify(layout));
 }
 
 /**
  * Restore default dashboard layout
  */
 function restoreDefaultLayout() {
-    // Remove layout from localStorage
+    // Limpa ordem e modo compacto salvos e recarrega para voltar ao padrão.
+    localStorage.removeItem('dashboardLayoutV2');
     localStorage.removeItem('dashboardLayout');
-    
-    // Reload page to restore default
+    localStorage.removeItem('dashboardCompactLayout');
     window.location.reload();
 }
 
 /**
- * Toggle grid layout (compact/expanded)
+ * Toggle grid layout (compact/expanded) — aplica a todas as seções.
  */
 function toggleGridLayout() {
-    const dashboardGrid = document.getElementById('dashboardGrid');
-    if (!dashboardGrid) return;
-    
-    dashboardGrid.classList.toggle('compact-layout');
-    
-    // Save preference
-    localStorage.setItem('dashboardCompactLayout', dashboardGrid.classList.contains('compact-layout'));
+    const grids = document.querySelectorAll('.dashboard-grid[data-dash-section]');
+    if (!grids.length) return;
+
+    const willCompact = !grids[0].classList.contains('compact-layout');
+    grids.forEach(g => g.classList.toggle('compact-layout', willCompact));
+    localStorage.setItem('dashboardCompactLayout', willCompact);
+
+    // Atualiza o rótulo do botão, se existir.
+    const btn = document.getElementById('toggleLayoutBtn');
+    if (btn) {
+        btn.innerHTML = willCompact
+            ? '<i class="fas fa-expand"></i> Expandir'
+            : '<i class="fas fa-compress"></i> Compactar';
+    }
 }
 
 /**

@@ -1,34 +1,18 @@
 /**
  * MDF-e — CSRF, API, UX (toasts, confirmação, busca fornecedor)
- * Carregar após: window.MDFE_CSRF_TOKEN definido em mdfe.php
+ * Carregar após: window.MDFE_CSRF_TOKEN e fiscal_api_fetch.js (mdfe.php)
  */
-function mdfeApiFetch(url, init) {
-    init = init || {};
-    var method = (init.method || 'GET').toUpperCase();
-    var token = (typeof window !== 'undefined' && window.MDFE_CSRF_TOKEN) ? String(window.MDFE_CSRF_TOKEN) : '';
-    if (token && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-        if (!init.headers) init.headers = {};
-        if (typeof Headers !== 'undefined' && init.headers instanceof Headers) {
-            init.headers.set('X-CSRF-Token', token);
-        } else {
-            init.headers['X-CSRF-Token'] = token;
-        }
-    }
-    return fetch(url, init).then(function(response) {
+var mdfeApiFetch = (typeof fiscalApiFetch === 'function') ? fiscalApiFetch : function(url, init) {
+    return fetch(url, init || {}).then(function(response) {
         return response.text().then(function(text) {
             var data = {};
             if (text) {
-                try {
-                    var parsed = JSON.parse(text);
-                    data = (parsed && typeof parsed === 'object') ? parsed : { _nonObject: parsed };
-                } catch (e) {
-                    data = { parse_error: true, raw: text };
-                }
+                try { data = JSON.parse(text); } catch (e) { data = { parse_error: true, raw: text }; }
             }
             return { ok: response.ok, status: response.status, data: data };
         });
     });
-}
+};
 
 function mdfeApiErrorMessage(data, httpStatus) {
     if (typeof window.fiscalApiErrorMessage === 'function') {
@@ -187,6 +171,7 @@ function executarBuscaFornecedorMdfe() {
             setupDocumentosNovoMdfe();
             setupProdutoPredominanteNovoMdfe();
             setupTotalizadoresNovoMdfe();
+            initMdfeChecklistListeners();
 
             var applyBtn = document.getElementById('applyMdfeFilters');
             if (applyBtn) {
@@ -237,6 +222,8 @@ function executarBuscaFornecedorMdfe() {
         var rodPagamentoComponentesDraft = [];
         var rodPagamentoCompPaginaAtual = 1;
         var rodCiotNovoMdfe = [];
+        var rodReboquesNovoMdfe = [];
+        var rodReboqueEditIndex = -1;
         var rodValePedagioEditIndex = -1;
         var rodCiotEditIndex = -1;
         var rodContratanteEditIndex = -1;
@@ -254,6 +241,7 @@ function executarBuscaFornecedorMdfe() {
         var novoMdfeOrigemCteIds = [];
         var novoMdfeOrigemNfeIds = [];
         var mdfeDocsCache = [];
+        var mdfeListTruncationHtml = '';
         var mdfePaginaAtual = 1;
         var mdfePerPage = 10;
         var mdfeSortField = 'data_emissao';
@@ -369,6 +357,9 @@ function executarBuscaFornecedorMdfe() {
             renderCondutoresNovoMDFE();
             rodCiotNovoMdfe = [];
             renderCiotNovoMDFE();
+            rodReboquesNovoMdfe = [];
+            renderReboquesNovoMDFE();
+            limparFormReboqueNovoMDFE();
             rodValesPedagioNovoMdfe = [];
             renderValesPedagioNovoMDFE();
             rodContratantesNovoMdfe = [];
@@ -404,8 +395,27 @@ function executarBuscaFornecedorMdfe() {
 
             setNovoMdfeTab('1');
 
+            var wv = document.getElementById('wizard_veiculo_id');
+            var wm = document.getElementById('wizard_motorista_id');
+            if (wv) wv.value = '';
+            if (wm) wm.value = '';
+
+            fecharPaineisDocumentosWizard();
+
+            setTimeout(function() { atualizarChecklistConformidadeMdfe(false); }, 100);
+
             var modalEl = document.getElementById('novoMDFEWizardModal');
             if (modalEl) {
+                if (!modalEl.dataset.mdfeWizardBound) {
+                    modalEl.dataset.mdfeWizardBound = '1';
+                    modalEl.addEventListener('shown.bs.modal', function() {
+                        document.body.classList.add('mdfe-wizard-modal-open');
+                    });
+                    modalEl.addEventListener('hidden.bs.modal', function() {
+                        document.body.classList.remove('mdfe-wizard-modal-open');
+                        fecharPaineisDocumentosWizard();
+                    });
+                }
                 new bootstrap.Modal(modalEl).show();
             }
         }
@@ -490,55 +500,113 @@ function executarBuscaFornecedorMdfe() {
             abrirModalNovoMDFE();
         }
 
+        function mdfeWizardModalAberto() {
+            var el = document.getElementById('novoMDFEWizardModal');
+            return !!(el && el.classList.contains('show'));
+        }
+
+        function fecharPaineisDocumentosWizard() {
+            ['docPainelVincularCte', 'docPainelVincularNfe', 'docFormWrapNovoMDFE'].forEach(function(id) {
+                var painel = document.getElementById(id);
+                if (painel) painel.classList.add('is-hidden');
+            });
+        }
+
+        function abrirPainelDocumentosWizard(idPainel) {
+            fecharPaineisDocumentosWizard();
+            var painel = document.getElementById(idPainel);
+            if (!painel) return;
+            painel.classList.remove('is-hidden');
+            setNovoMdfeTab('3');
+            setTimeout(function() {
+                painel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                var body = document.querySelector('#novoMDFEWizardModal .modal-body');
+                if (body) {
+                    var top = painel.offsetTop - 12;
+                    if (top > 0) body.scrollTop = top;
+                }
+            }, 80);
+        }
+
+        function mdfePreencherSelectorsHtml(ids, html) {
+            (ids || []).forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.innerHTML = html;
+            });
+        }
+
+        function mdfeAbrirModalSobreWizard(modalEl) {
+            if (!modalEl) return null;
+            var inst = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            modalEl.classList.add('mdfe-modal-stack-top');
+            modalEl.addEventListener('hidden.bs.modal', function onHide() {
+                modalEl.classList.remove('mdfe-modal-stack-top');
+                modalEl.removeEventListener('hidden.bs.modal', onHide);
+                document.querySelectorAll('.modal-backdrop.mdfe-modal-stack-top-backdrop').forEach(function(b) {
+                    b.classList.remove('mdfe-modal-stack-top-backdrop');
+                });
+            });
+            inst.show();
+            setTimeout(function() {
+                var backs = document.querySelectorAll('.modal-backdrop');
+                if (backs.length) backs[backs.length - 1].classList.add('mdfe-modal-stack-top-backdrop');
+            }, 30);
+            return inst;
+        }
+
         function abrirModalSelecionarCTEParaWizard() {
             carregarCtesSistemaParaWizardMdfe().then(function() {
-                var modal = document.getElementById('selecionarCTEWizardModal');
-                if (modal) new bootstrap.Modal(modal).show();
+                if (mdfeWizardModalAberto()) {
+                    abrirPainelDocumentosWizard('docPainelVincularCte');
+                    return;
+                }
+                mdfeAbrirModalSobreWizard(document.getElementById('selecionarCTEWizardModal'));
             });
+        }
+
+        function renderHtmlCteWizardMdfe(data) {
+            if (!data.success || !Array.isArray(data.documentos) || !data.documentos.length) {
+                return '<p class="text-muted mb-0">Nenhum CT-e autorizado disponível.</p>';
+            }
+            var html = '';
+            data.documentos.forEach(function(cte) {
+                var id = cte.id != null && cte.id !== '' ? Number(cte.id) : (cte.cte_id != null ? Number(cte.cte_id) : null);
+                if (id == null || isNaN(id) || id <= 0) return;
+                var dataF = cte.data_emissao ? new Date(cte.data_emissao).toLocaleDateString('pt-BR') : '-';
+                var valor = parseFloat(cte.valor_total || 0).toFixed(2).replace('.', ',');
+                var origem = String(cte.origem_cidade || cte.origem || 'N/A');
+                var destino = String(cte.destino_cidade || cte.destino || 'N/A');
+                html += '<div class="cte-item" onclick="toggleCteWizardMdfeItem(this)">';
+                html += '<input type="checkbox" name="cte_ids_wizard_mdfe[]" value="' + id + '" style="margin-right:8px"';
+                html += ' onclick="event.stopPropagation();" onchange="atualizarTotaisCteWizardSelecionados();"';
+                html += ' data-numero="' + escapeHtmlMdfe(String(cte.numero_cte || '').padStart(6, '0')) + '"';
+                html += ' data-serie="' + escapeHtmlMdfe(String(cte.serie_cte || '')) + '"';
+                html += ' data-chave="' + escapeHtmlMdfe(String(cte.chave_acesso || '')) + '"';
+                html += ' data-valor="' + (cte.valor_total || 0) + '"';
+                html += ' data-peso="' + (cte.peso_total || cte.peso_carga || 0) + '"';
+                html += ' data-origem-uf="' + escapeHtmlMdfe(String(cte.origem_estado || '')) + '"';
+                html += ' data-origem-cidade="' + escapeHtmlMdfe(origem) + '"';
+                html += ' data-destino-uf="' + escapeHtmlMdfe(String(cte.destino_estado || '')) + '"';
+                html += ' data-destino-cidade="' + escapeHtmlMdfe(destino) + '"';
+                html += ' data-nfe-ids="' + escapeHtmlMdfe(String(cte.nfe_ids || '[]')) + '">';
+                html += '<strong>CT-e ' + escapeHtmlMdfe(String(cte.numero_cte || '').padStart(6, '0')) + '</strong> ';
+                html += dataF + ' | ' + escapeHtmlMdfe(origem) + ' → ' + escapeHtmlMdfe(destino) + ' | R$ ' + valor;
+                html += '</div>';
+            });
+            return html || '<p class="text-muted mb-0">Nenhum CT-e autorizado disponível.</p>';
         }
 
         function carregarCtesSistemaParaWizardMdfe() {
             return mdfeApiFetch('../api/documentos_fiscais_v2.php?action=list&tipo=cte&status=autorizado&limit=200')
                 .then(function(res) {
                     var data = res.data || {};
-                    var sel = document.getElementById('cteSelectorWizardMdfe');
-                    if (!sel) return;
-                    if (!data.success || !Array.isArray(data.documentos) || !data.documentos.length) {
-                        sel.innerHTML = '<p class="text-muted mb-0">Nenhum CT-e autorizado disponível.</p>';
-                        atualizarTotaisCteWizardSelecionados();
-                        return;
-                    }
-                    var html = '';
-                    data.documentos.forEach(function(cte) {
-                        var id = cte.id != null && cte.id !== '' ? Number(cte.id) : (cte.cte_id != null ? Number(cte.cte_id) : null);
-                        if (id == null || isNaN(id) || id <= 0) return;
-                        var dataF = cte.data_emissao ? new Date(cte.data_emissao).toLocaleDateString('pt-BR') : '-';
-                        var valor = parseFloat(cte.valor_total || 0).toFixed(2).replace('.', ',');
-                        var origem = String(cte.origem_cidade || cte.origem || 'N/A');
-                        var destino = String(cte.destino_cidade || cte.destino || 'N/A');
-                        html += '<div class="cte-item" onclick="toggleCteWizardMdfeItem(this)">';
-                        html += '<input type="checkbox" name="cte_ids_wizard_mdfe[]" value="' + id + '" style="margin-right:8px"';
-                        html += ' onclick="event.stopPropagation();" onchange="atualizarTotaisCteWizardSelecionados();"';
-                        html += ' data-numero="' + escapeHtmlMdfe(String(cte.numero_cte || '').padStart(6, '0')) + '"';
-                        html += ' data-serie="' + escapeHtmlMdfe(String(cte.serie_cte || '')) + '"';
-                        html += ' data-chave="' + escapeHtmlMdfe(String(cte.chave_acesso || '')) + '"';
-                        html += ' data-valor="' + (cte.valor_total || 0) + '"';
-                        html += ' data-peso="' + (cte.peso_total || cte.peso_carga || 0) + '"';
-                        html += ' data-origem-uf="' + escapeHtmlMdfe(String(cte.origem_estado || '')) + '"';
-                        html += ' data-origem-cidade="' + escapeHtmlMdfe(origem) + '"';
-                        html += ' data-destino-uf="' + escapeHtmlMdfe(String(cte.destino_estado || '')) + '"';
-                        html += ' data-destino-cidade="' + escapeHtmlMdfe(destino) + '"';
-                        html += ' data-nfe-ids="' + escapeHtmlMdfe(String(cte.nfe_ids || '[]')) + '">';
-                        html += '<strong>CT-e ' + escapeHtmlMdfe(String(cte.numero_cte || '').padStart(6, '0')) + '</strong> ';
-                        html += dataF + ' | ' + escapeHtmlMdfe(origem) + ' → ' + escapeHtmlMdfe(destino) + ' | R$ ' + valor;
-                        html += '</div>';
-                    });
-                    sel.innerHTML = html || '<p class="text-muted mb-0">Nenhum CT-e autorizado disponível.</p>';
+                    var html = renderHtmlCteWizardMdfe(data);
+                    mdfePreencherSelectorsHtml(['cteSelectorWizardMdfe', 'cteSelectorWizardMdfeInline'], html);
                     atualizarTotaisCteWizardSelecionados();
                 })
                 .catch(function() {
-                    var sel = document.getElementById('cteSelectorWizardMdfe');
-                    if (sel) sel.innerHTML = '<p class="text-danger mb-0">Erro ao carregar CT-e.</p>';
+                    var err = '<p class="text-danger mb-0">Erro ao carregar CT-e.</p>';
+                    mdfePreencherSelectorsHtml(['cteSelectorWizardMdfe', 'cteSelectorWizardMdfeInline'], err);
                     atualizarTotaisCteWizardSelecionados();
                 });
         }
@@ -552,29 +620,40 @@ function executarBuscaFornecedorMdfe() {
         }
 
         function atualizarTotaisCteWizardSelecionados() {
-            var cbs = document.querySelectorAll('#selecionarCTEWizardModal input[name="cte_ids_wizard_mdfe[]"]:checked');
+            var cbs = document.querySelectorAll(
+                '#selecionarCTEWizardModal input[name="cte_ids_wizard_mdfe[]"]:checked, #docPainelVincularCte input[name="cte_ids_wizard_mdfe[]"]:checked'
+            );
             var totalValor = 0;
             var totalPeso = 0;
             cbs.forEach(function(cb) {
                 totalValor += parseFloat(cb.getAttribute('data-valor') || 0);
                 totalPeso += parseFloat(cb.getAttribute('data-peso') || 0);
             });
-            var qtd = document.getElementById('totalCteWizardSelecionados');
-            var peso = document.getElementById('totalPesoCteWizardSelecionados');
-            var valor = document.getElementById('totalValorCteWizardSelecionados');
-            if (qtd) qtd.value = cbs.length;
-            if (peso) peso.value = totalPeso.toFixed(3);
-            if (valor) valor.value = totalValor.toFixed(2);
+            var qtd = cbs.length;
+            [
+                ['totalCteWizardSelecionados', qtd],
+                ['totalCteWizardSelecionadosInline', qtd],
+                ['totalPesoCteWizardSelecionados', totalPeso.toFixed(3)],
+                ['totalPesoCteWizardSelecionadosInline', totalPeso.toFixed(3)],
+                ['totalValorCteWizardSelecionados', totalValor.toFixed(2)],
+                ['totalValorCteWizardSelecionadosInline', totalValor.toFixed(2)]
+            ].forEach(function(pair) {
+                var el = document.getElementById(pair[0]);
+                if (el) el.value = pair[1];
+            });
         }
 
         function importarCteSelecionadosParaWizardMDFE() {
-            var cbs = document.querySelectorAll('#selecionarCTEWizardModal input[name="cte_ids_wizard_mdfe[]"]:checked');
+            var cbs = document.querySelectorAll(
+                '#selecionarCTEWizardModal input[name="cte_ids_wizard_mdfe[]"]:checked, #docPainelVincularCte input[name="cte_ids_wizard_mdfe[]"]:checked'
+            );
             if (!cbs.length) {
                 mdfeNotify('Selecione pelo menos um CT-e.');
                 return;
             }
 
-            abrirModalNovoMDFE();
+            var wizardJaAberto = mdfeWizardModalAberto();
+            if (!wizardJaAberto) abrirModalNovoMDFE();
 
             var origemUfs = [];
             var origemCidades = [];
@@ -624,13 +703,27 @@ function executarBuscaFornecedorMdfe() {
                         serieNfe: '',
                         valorNfe: 0,
                         chaveCte: chaveCte,
-                        numeroCte: numeroCte
+                        numeroCte: numeroCte,
+                        cteId: cteId > 0 ? cteId : null
                     });
                 }
             });
 
             var finalizarImportacaoCte = function() {
-                docDocumentosNovoMdfe = docs;
+                if (wizardJaAberto) {
+                    docs.forEach(function(novo) {
+                        var chCte = String(novo.chaveCte || '').trim();
+                        var chNfe = String(novo.chaveNfe || '').trim();
+                        var dup = docDocumentosNovoMdfe.some(function(d) {
+                            if (chCte && String(d.chaveCte || '').trim() === chCte) return true;
+                            if (chNfe && String(d.chaveNfe || '').trim() === chNfe) return true;
+                            return false;
+                        });
+                        if (!dup) docDocumentosNovoMdfe.push(novo);
+                    });
+                } else {
+                    docDocumentosNovoMdfe = docs;
+                }
                 renderDocumentosNovoMDFE();
 
                 var totalCteLegacy = document.getElementById('totalCTe');
@@ -686,7 +779,8 @@ function executarBuscaFornecedorMdfe() {
                                 serieNfe: String(nfe.serie_nfe || '').trim(),
                                 valorNfe: Number(nfe.valor_total || 0),
                                 chaveCte: '',
-                                numeroCte: ''
+                                numeroCte: '',
+                                nfeId: idNfe
                             });
                         });
                         finalizarImportacaoCte();
@@ -698,7 +792,7 @@ function executarBuscaFornecedorMdfe() {
 
             if (origemUfs.length === 1) {
                 var ufCarga = document.getElementById('novo_mdfe_uf_carga');
-                if (ufCarga) {
+                if (ufCarga && (!ufCarga.value || !wizardJaAberto)) {
                     ufCarga.value = origemUfs[0];
                     ufCarga.dispatchEvent(new Event('change'));
                     if (origemCidades.length === 1) {
@@ -711,7 +805,7 @@ function executarBuscaFornecedorMdfe() {
             }
             if (destinoUfs.length === 1) {
                 var ufDesc = document.getElementById('novo_mdfe_uf_descarga');
-                if (ufDesc) {
+                if (ufDesc && (!ufDesc.value || !wizardJaAberto)) {
                     ufDesc.value = destinoUfs[0];
                     ufDesc.dispatchEvent(new Event('change'));
                     if (destinoCidades.length === 1) {
@@ -730,17 +824,31 @@ function executarBuscaFornecedorMdfe() {
                 tipoEmitente.dispatchEvent(new Event('change'));
             }
 
-            novoMdfeOrigem = 'cte';
-            novoMdfeOrigemCteIds = cteOrigemIds.slice();
-            novoMdfeOrigemNfeIds = nfeOrigemIds.slice();
+            novoMdfeOrigem = wizardJaAberto && novoMdfeOrigem ? novoMdfeOrigem : 'cte';
+            if (wizardJaAberto) {
+                cteOrigemIds.forEach(function(id) {
+                    if (novoMdfeOrigemCteIds.indexOf(id) === -1) novoMdfeOrigemCteIds.push(id);
+                });
+                nfeOrigemIds.forEach(function(id) {
+                    if (novoMdfeOrigemNfeIds.indexOf(id) === -1) novoMdfeOrigemNfeIds.push(id);
+                });
+            } else {
+                novoMdfeOrigemCteIds = cteOrigemIds.slice();
+                novoMdfeOrigemNfeIds = nfeOrigemIds.slice();
+            }
             atualizarOrigemMdfeHiddenFields();
 
             setNovoMdfeTab('3');
 
-            var modal = document.getElementById('selecionarCTEWizardModal');
-            if (modal) {
-                var inst = bootstrap.Modal.getInstance(modal);
-                if (inst) inst.hide();
+            if (wizardJaAberto) {
+                fecharPaineisDocumentosWizard();
+                mdfeNotify(docs.length + ' CT-e vinculado(s) à lista de documentos.', 'success');
+            } else {
+                var modal = document.getElementById('selecionarCTEWizardModal');
+                if (modal) {
+                    var inst = bootstrap.Modal.getInstance(modal);
+                    if (inst) inst.hide();
+                }
             }
 
             buscarNfesVinculadas();
@@ -748,48 +856,52 @@ function executarBuscaFornecedorMdfe() {
 
         function abrirModalSelecionarNFEParaMDFE() {
             carregarNfesSistemaParaMdfe().then(function() {
-                var modal = document.getElementById('selecionarNFEModal');
-                if (modal) new bootstrap.Modal(modal).show();
+                if (mdfeWizardModalAberto()) {
+                    abrirPainelDocumentosWizard('docPainelVincularNfe');
+                    return;
+                }
+                mdfeAbrirModalSobreWizard(document.getElementById('selecionarNFEModal'));
             });
+        }
+
+        function renderHtmlNfeMdfe(data) {
+            if (!data.success || !Array.isArray(data.documentos) || !data.documentos.length) {
+                return '<p class="text-muted mb-0">Nenhuma NF-e disponível no sistema.</p>';
+            }
+            var html = '';
+            data.documentos.forEach(function(nfe) {
+                var id = nfe.id != null && nfe.id !== '' ? Number(nfe.id) : null;
+                if (id == null || isNaN(id) || id <= 0) return;
+                var dataF = nfe.data_emissao ? new Date(nfe.data_emissao).toLocaleDateString('pt-BR') : '-';
+                var valor = parseFloat(nfe.valor_total || 0).toFixed(2).replace('.', ',');
+                var numero = String(nfe.numero_nfe || '').padStart(9, '0');
+                var chave = String(nfe.chave_acesso || '');
+                html += '<div class="cte-item" onclick="toggleNfeMdfeItem(this)">';
+                html += '<input type="checkbox" name="nfe_ids_mdfe[]" value="' + id + '" style="margin-right:8px"';
+                html += ' onclick="event.stopPropagation();" onchange="atualizarTotaisNfeSelecionadasMdfe();"';
+                html += ' data-numero="' + escapeHtmlMdfe(numero) + '"';
+                html += ' data-serie="' + escapeHtmlMdfe(String(nfe.serie_nfe || '')) + '"';
+                html += ' data-chave="' + escapeHtmlMdfe(chave) + '"';
+                html += ' data-valor="' + (nfe.valor_total || 0) + '"';
+                html += ' data-peso="' + (nfe.peso_carga || 0) + '">';
+                html += '<strong>NF-e ' + escapeHtmlMdfe(numero || '-') + '</strong> ';
+                html += dataF + ' | Chave: ' + escapeHtmlMdfe(chave || '-') + ' | R$ ' + valor;
+                html += '</div>';
+            });
+            return html || '<p class="text-muted mb-0">Nenhuma NF-e disponível no sistema.</p>';
         }
 
         function carregarNfesSistemaParaMdfe() {
             return mdfeApiFetch('../api/documentos_fiscais_v2.php?action=list&tipo=nfe&limit=200')
                 .then(function(res) {
                     var data = res.data || {};
-                    var sel = document.getElementById('nfeSelectorMdfe');
-                    if (!sel) return;
-                    if (!data.success || !Array.isArray(data.documentos) || !data.documentos.length) {
-                        sel.innerHTML = '<p class="text-muted mb-0">Nenhuma NF-e disponível no sistema.</p>';
-                        atualizarTotaisNfeSelecionadasMdfe();
-                        return;
-                    }
-                    var html = '';
-                    data.documentos.forEach(function(nfe) {
-                        var id = nfe.id != null && nfe.id !== '' ? Number(nfe.id) : null;
-                        if (id == null || isNaN(id) || id <= 0) return;
-                        var dataF = nfe.data_emissao ? new Date(nfe.data_emissao).toLocaleDateString('pt-BR') : '-';
-                        var valor = parseFloat(nfe.valor_total || 0).toFixed(2).replace('.', ',');
-                        var numero = String(nfe.numero_nfe || '').padStart(9, '0');
-                        var chave = String(nfe.chave_acesso || '');
-                        html += '<div class="cte-item" onclick="toggleNfeMdfeItem(this)">';
-                        html += '<input type="checkbox" name="nfe_ids_mdfe[]" value="' + id + '" style="margin-right:8px"';
-                        html += ' onclick="event.stopPropagation();" onchange="atualizarTotaisNfeSelecionadasMdfe();"';
-                        html += ' data-numero="' + escapeHtmlMdfe(numero) + '"';
-                        html += ' data-serie="' + escapeHtmlMdfe(String(nfe.serie_nfe || '')) + '"';
-                        html += ' data-chave="' + escapeHtmlMdfe(chave) + '"';
-                        html += ' data-valor="' + (nfe.valor_total || 0) + '"';
-                        html += ' data-peso="' + (nfe.peso_carga || 0) + '">';
-                        html += '<strong>NF-e ' + escapeHtmlMdfe(numero || '-') + '</strong> ';
-                        html += dataF + ' | Chave: ' + escapeHtmlMdfe(chave || '-') + ' | R$ ' + valor;
-                        html += '</div>';
-                    });
-                    sel.innerHTML = html || '<p class="text-muted mb-0">Nenhuma NF-e disponível no sistema.</p>';
+                    var html = renderHtmlNfeMdfe(data);
+                    mdfePreencherSelectorsHtml(['nfeSelectorMdfe', 'nfeSelectorMdfeInline'], html);
                     atualizarTotaisNfeSelecionadasMdfe();
                 })
                 .catch(function() {
-                    var sel = document.getElementById('nfeSelectorMdfe');
-                    if (sel) sel.innerHTML = '<p class="text-danger mb-0">Erro ao carregar NF-e.</p>';
+                    var err = '<p class="text-danger mb-0">Erro ao carregar NF-e.</p>';
+                    mdfePreencherSelectorsHtml(['nfeSelectorMdfe', 'nfeSelectorMdfeInline'], err);
                     atualizarTotaisNfeSelecionadasMdfe();
                 });
         }
@@ -803,25 +915,36 @@ function executarBuscaFornecedorMdfe() {
         }
 
         function atualizarTotaisNfeSelecionadasMdfe() {
-            var cbs = document.querySelectorAll('#selecionarNFEModal input[name="nfe_ids_mdfe[]"]:checked');
+            var cbs = document.querySelectorAll(
+                '#selecionarNFEModal input[name="nfe_ids_mdfe[]"]:checked, #docPainelVincularNfe input[name="nfe_ids_mdfe[]"]:checked'
+            );
             var total = 0;
             cbs.forEach(function(cb) {
                 total += parseFloat(cb.getAttribute('data-valor') || 0);
             });
-            var qtd = document.getElementById('totalNfeSelecionadasMdfe');
-            var valor = document.getElementById('totalValorNfeSelecionadasMdfe');
-            if (qtd) qtd.value = cbs.length;
-            if (valor) valor.value = total.toFixed(2);
+            var qtd = cbs.length;
+            [
+                ['totalNfeSelecionadasMdfe', qtd],
+                ['totalNfeSelecionadasMdfeInline', qtd],
+                ['totalValorNfeSelecionadasMdfe', total.toFixed(2)],
+                ['totalValorNfeSelecionadasMdfeInline', total.toFixed(2)]
+            ].forEach(function(pair) {
+                var el = document.getElementById(pair[0]);
+                if (el) el.value = pair[1];
+            });
         }
 
         function importarNfeSelecionadasParaMDFE() {
-            var cbs = document.querySelectorAll('#selecionarNFEModal input[name="nfe_ids_mdfe[]"]:checked');
+            var cbs = document.querySelectorAll(
+                '#selecionarNFEModal input[name="nfe_ids_mdfe[]"]:checked, #docPainelVincularNfe input[name="nfe_ids_mdfe[]"]:checked'
+            );
             if (!cbs.length) {
                 mdfeNotify('Selecione pelo menos uma NF-e.');
                 return;
             }
 
-            abrirModalNovoMDFE();
+            var wizardJaAberto = mdfeWizardModalAberto();
+            if (!wizardJaAberto) abrirModalNovoMDFE();
 
             var munDesc = ((document.getElementById('novo_mdfe_municipio_descarga') || {}).value || '').trim();
             var adicionados = 0;
@@ -842,7 +965,8 @@ function executarBuscaFornecedorMdfe() {
                     serieNfe: String(cb.getAttribute('data-serie') || '').trim(),
                     valorNfe: Number(cb.getAttribute('data-valor') || 0),
                     chaveCte: '',
-                    numeroCte: ''
+                    numeroCte: '',
+                    nfeId: Number(cb.value || 0) || null
                 });
                 valorTotal += Number(cb.getAttribute('data-valor') || 0);
                 pesoTotal += Number(cb.getAttribute('data-peso') || 0);
@@ -859,7 +983,7 @@ function executarBuscaFornecedorMdfe() {
                 atualizarJsonTotalizadoresNovoMDFE();
             }
             var tipoEmitente = document.getElementById('novo_mdfe_tipo_emitente');
-            if (tipoEmitente) {
+            if (tipoEmitente && (!tipoEmitente.value || !wizardJaAberto)) {
                 tipoEmitente.value = '2';
                 tipoEmitente.dispatchEvent(new Event('change'));
             }
@@ -874,10 +998,14 @@ function executarBuscaFornecedorMdfe() {
             atualizarOrigemMdfeHiddenFields();
             setNovoMdfeTab('3');
 
-            var modal = document.getElementById('selecionarNFEModal');
-            if (modal) {
-                var inst = bootstrap.Modal.getInstance(modal);
-                if (inst) inst.hide();
+            if (wizardJaAberto) {
+                fecharPaineisDocumentosWizard();
+            } else {
+                var modal = document.getElementById('selecionarNFEModal');
+                if (modal) {
+                    var inst = bootstrap.Modal.getInstance(modal);
+                    if (inst) inst.hide();
+                }
             }
 
             if (!munDesc) {
@@ -930,6 +1058,9 @@ function executarBuscaFornecedorMdfe() {
             if (String(tab) === '3') {
                 atualizarMunicipioDescargaDocumentosNovoMDFE();
                 updateCteFieldsVisibilityDocumentosNovoMDFE();
+            }
+            if (String(tab) === '7') {
+                atualizarChecklistConformidadeMdfe(false);
             }
         }
 
@@ -1029,6 +1160,81 @@ function executarBuscaFornecedorMdfe() {
                     '<td>' + nome + '</td>' +
                     '<td>' + cpf + '</td>' +
                     '<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removerCondutorNovoMDFE(' + idx + ')"><i class="fas fa-trash"></i></button></td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        function mostrarFormReboqueNovoMDFE() {
+            rodReboqueEditIndex = -1;
+            limparFormReboqueNovoMDFE();
+            toggleFormMdfeById('rodReboqueFormWrap', true);
+        }
+
+        function limparFormReboqueNovoMDFE() {
+            rodReboqueEditIndex = -1;
+            ['rod_reb_placa', 'rod_reb_renavam', 'rod_reb_tara', 'rod_reb_cap_kg', 'rod_reb_cod_interno'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            var uf = document.getElementById('rod_reb_uf');
+            if (uf) uf.value = '';
+            var tpRod = document.getElementById('rod_reb_tp_rod');
+            if (tpRod) tpRod.value = '01';
+            var tpCar = document.getElementById('rod_reb_tp_car');
+            if (tpCar) tpCar.value = '00';
+            toggleFormMdfeById('rodReboqueFormWrap', false);
+        }
+
+        function cancelarReboqueNovoMDFE() {
+            limparFormReboqueNovoMDFE();
+        }
+
+        function gravarReboqueNovoMDFE() {
+            var placaEl = document.getElementById('rod_reb_placa');
+            if (!placaEl) return;
+            var placa = String(placaEl.value || '').trim().toUpperCase();
+            if (!placa) {
+                mdfeNotify('Informe a placa do reboque.');
+                placaEl.focus();
+                return;
+            }
+            var item = {
+                placa: placa,
+                renavam: ((document.getElementById('rod_reb_renavam') || {}).value || '').trim(),
+                tara: Number(((document.getElementById('rod_reb_tara') || {}).value || 0)),
+                capKg: Number(((document.getElementById('rod_reb_cap_kg') || {}).value || 0)),
+                tpRod: ((document.getElementById('rod_reb_tp_rod') || {}).value || '01'),
+                tpCar: ((document.getElementById('rod_reb_tp_car') || {}).value || '00'),
+                uf: ((document.getElementById('rod_reb_uf') || {}).value || '').trim(),
+                codInterno: ((document.getElementById('rod_reb_cod_interno') || {}).value || '').trim()
+            };
+            if (rodReboqueEditIndex >= 0) rodReboquesNovoMdfe[rodReboqueEditIndex] = item;
+            else rodReboquesNovoMdfe.push(item);
+            renderReboquesNovoMDFE();
+            limparFormReboqueNovoMDFE();
+        }
+
+        function removerReboqueNovoMDFE(index) {
+            rodReboquesNovoMdfe = rodReboquesNovoMdfe.filter(function(_, i) { return i !== Number(index); });
+            renderReboquesNovoMDFE();
+        }
+
+        function renderReboquesNovoMDFE() {
+            var tbody = document.getElementById('rodReboquesTabelaBody');
+            var hidden = document.getElementById('rod_reboques_json');
+            if (!tbody || !hidden) return;
+            hidden.value = JSON.stringify(rodReboquesNovoMdfe);
+            if (!rodReboquesNovoMdfe.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-muted">Nenhum reboque adicionado.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rodReboquesNovoMdfe.map(function(item, idx) {
+                return '<tr>' +
+                    '<td>' + escapeHtmlMdfe(item.placa || '-') + '</td>' +
+                    '<td>' + (item.tara ? String(item.tara) : '-') + '</td>' +
+                    '<td>' + (item.capKg ? String(item.capKg) : '-') + '</td>' +
+                    '<td>' + escapeHtmlMdfe(item.uf || '-') + '</td>' +
+                    '<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removerReboqueNovoMDFE(' + idx + ')"><i class="fas fa-trash"></i></button></td>' +
                     '</tr>';
             }).join('');
         }
@@ -1147,8 +1353,9 @@ function executarBuscaFornecedorMdfe() {
                 return;
             }
             tbody.innerHTML = rodCiotNovoMdfe.map(function(item, idx) {
+                var pefBadge = item.pefOperacaoId ? ' <span class="badge bg-info text-dark" title="CIOT importado do PEF">PEF</span>' : '';
                 return '<tr>' +
-                    '<td>' + escapeHtmlMdfe(item.numeroCiot || '-') + '</td>' +
+                    '<td>' + escapeHtmlMdfe(item.numeroCiot || '-') + pefBadge + '</td>' +
                     '<td>' + (item.valorFrete ? ('R$ ' + formatarValorMoedaMdfe(item.valorFrete)) : '-') + '</td>' +
                     '<td>' + escapeHtmlMdfe(item.cpfCnpjTac || '-') + '</td>' +
                     '<td>' + escapeHtmlMdfe(item.ipef || '-') + '</td>' +
@@ -1156,6 +1363,86 @@ function executarBuscaFornecedorMdfe() {
                     '<button type="button" class="btn btn-sm btn-outline-danger" onclick="excluirCiotNovoMDFE(' + idx + ')"><i class="fas fa-trash"></i></button></td>' +
                     '</tr>';
             }).join('');
+        }
+
+        function pefCiotApiUrlMdfe() {
+            return typeof sfApiUrl === 'function' ? sfApiUrl('pef_ciot.php') : '../../api/pef_ciot.php';
+        }
+
+        function abrirModalImportarCiotPef() {
+            var modalEl = document.getElementById('modalImportarCiotPef');
+            var lista = document.getElementById('importarCiotPefLista');
+            if (!modalEl || !lista) return;
+            lista.innerHTML = '<p class="text-muted"><i class="fas fa-spinner fa-spin"></i> Carregando CIOTs do PEF...</p>';
+            var rotaInput = document.getElementById('novo_mdfe_rota_id');
+            var rotaId = rotaInput && rotaInput.value ? rotaInput.value : '';
+            var url = pefCiotApiUrlMdfe() + '?action=disponiveis_mdfe';
+            if (rotaId) url += '&rota_id=' + encodeURIComponent(rotaId);
+            fetch(url, { credentials: 'same-origin' })
+                .then(function(r) { return r.json(); })
+                .then(function(j) {
+                    var ops = (j && j.success && j.operacoes) ? j.operacoes : [];
+                    if (!ops.length) {
+                        lista.innerHTML = '<p class="text-muted">Nenhum CIOT declarado disponível. Gere um em <strong>CIOT (PEF ANTT)</strong> primeiro.</p>';
+                        return;
+                    }
+                    var html = '<div class="table-responsive"><table class="mdfe-simple-table"><thead><tr>' +
+                        '<th>CIOT</th><th>Valor frete</th><th>CPF/CNPJ TAC</th><th>Declaração</th><th></th></tr></thead><tbody>';
+                    ops.forEach(function(op, i) {
+                        var ciot = op.codigo_identificacao || '-';
+                        var val = op.valor_frete != null ? ('R$ ' + formatarValorMoedaMdfe(op.valor_frete)) : '-';
+                        var tac = op.cpf_cnpj_contratado || '-';
+                        var dt = op.data_declaracao ? String(op.data_declaracao).substring(0, 10) : '-';
+                        html += '<tr><td>' + escapeHtmlMdfe(ciot) + '</td><td>' + val + '</td><td>' + escapeHtmlMdfe(tac) + '</td><td>' + escapeHtmlMdfe(dt) + '</td>' +
+                            '<td><button type="button" class="btn btn-sm btn-primary" onclick="importarCiotPefIndice(' + i + ')">Usar</button></td></tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    lista.innerHTML = html;
+                    window._mdfePefOpsCache = ops;
+                })
+                .catch(function() {
+                    lista.innerHTML = '<p class="text-danger">Erro ao carregar CIOTs do PEF.</p>';
+                });
+            mdfeAbrirModalSobreWizard(modalEl);
+        }
+
+        function importarCiotPefIndice(index) {
+            var ops = window._mdfePefOpsCache || [];
+            var op = ops[Number(index)];
+            if (!op) return;
+            var item = {
+                numeroCiot: String(op.codigo_identificacao || '').replace(/\D/g, ''),
+                valorFrete: Number(op.valor_frete || 0),
+                cpfCnpjTac: String(op.cpf_cnpj_contratado || '').replace(/\D/g, ''),
+                ipef: '',
+                pefOperacaoId: Number(op.id || 0),
+                origem: 'pef'
+            };
+            if (!item.numeroCiot) {
+                mdfeNotify('CIOT sem código válido.', 'error');
+                return;
+            }
+            var dup = rodCiotNovoMdfe.some(function(c) {
+                return (c.pefOperacaoId && c.pefOperacaoId === item.pefOperacaoId) || c.numeroCiot === item.numeroCiot;
+            });
+            if (dup) {
+                mdfeNotify('Este CIOT já está na lista do MDF-e.', 'warning');
+                return;
+            }
+            rodCiotNovoMdfe.push(item);
+            renderCiotNovoMDFE();
+            mdfeNotify('CIOT importado do PEF.', 'success');
+            var modalEl = document.getElementById('modalImportarCiotPef');
+            if (modalEl && typeof bootstrap !== 'undefined') {
+                var inst = bootstrap.Modal.getInstance(modalEl);
+                if (inst) inst.hide();
+            }
+        }
+
+        function downloadMdfePdf(id) {
+            if (!id) return;
+            var url = '../api/download_mdfe_pdf.php?id=' + encodeURIComponent(id) + '&_=' + Date.now();
+            window.open(url, '_blank', 'noopener');
         }
 
         function escapeHtmlMdfe(texto) {
@@ -1736,11 +2023,29 @@ function executarBuscaFornecedorMdfe() {
         }
 
         function mostrarFormDocumentoNovoMDFE(tipoAcao) {
+            setNovoMdfeTab('3');
+            fecharPaineisDocumentosWizard();
             atualizarMunicipioDescargaDocumentosNovoMDFE();
             updateCteFieldsVisibilityDocumentosNovoMDFE();
-            toggleFormMdfeById('docFormWrapNovoMDFE', true);
+            var wrap = document.getElementById('docFormWrapNovoMDFE');
+            if (wrap) wrap.classList.remove('is-hidden');
+            var titulo = document.getElementById('docFormTituloNovoMDFE');
+            var titulos = {
+                adicionar: 'Adicionar NF-e por chave',
+                criar: 'Criar NF-e — informe os dados',
+                buscar: 'Buscar NF-e já emitida no sistema'
+            };
+            if (titulo) {
+                var label = titulos[tipoAcao] || titulos.adicionar;
+                titulo.innerHTML = '<i class="fas fa-file-alt text-primary"></i> ' + escapeHtmlMdfe(label);
+            }
             var acao = document.getElementById('doc_tipo_acao');
             if (acao && tipoAcao) acao.value = tipoAcao;
+            setTimeout(function() {
+                if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                var body = document.querySelector('#novoMDFEWizardModal .modal-body');
+                if (body && wrap) body.scrollTop = Math.max(0, wrap.offsetTop - 16);
+            }, 80);
         }
 
         function limparFormDocumentoNovoMDFE() {
@@ -1753,7 +2058,8 @@ function executarBuscaFornecedorMdfe() {
             });
             atualizarMunicipioDescargaDocumentosNovoMDFE();
             updateCteFieldsVisibilityDocumentosNovoMDFE();
-            toggleFormMdfeById('docFormWrapNovoMDFE', false);
+            var wrap = document.getElementById('docFormWrapNovoMDFE');
+            if (wrap) wrap.classList.add('is-hidden');
         }
 
         function cancelarDocumentoNovoMDFE() {
@@ -2268,6 +2574,131 @@ function executarBuscaFornecedorMdfe() {
             return { erros: erros, warnings: warnings };
         }
 
+        /**
+         * Checklist visual de conformidade da viagem (antes de salvar/enviar MDF-e).
+         * @returns {{ conforme: boolean, itens: Array, erros: string[] }}
+         */
+        function obterChecklistConformidadeMdfe() {
+            var tipoEmitente = obterTipoEmitenteAtualNovoMDFE();
+            var tipoTransportador = obterTipoTransportadorAtualNovoMDFE();
+            var veiculoId = ((document.getElementById('wizard_veiculo_id') || {}).value || '').trim();
+            var motoristaId = ((document.getElementById('wizard_motorista_id') || {}).value || '').trim();
+            var placa = ((document.getElementById('rod_placa') || {}).value || '').trim();
+            var rntrc = ((document.getElementById('rod_rntrc') || {}).value || '').trim();
+            var temVeiculo = !!veiculoId || !!placa;
+            var temMotorista = !!motoristaId || (rodCondutoresNovoMdfe && rodCondutoresNovoMdfe.length > 0);
+            var temCondutorCpf = (rodCondutoresNovoMdfe || []).some(function(c) {
+                return String(c.cpf || '').replace(/\D/g, '').length >= 11;
+            }) || !!motoristaId;
+            var totalDocs = (docDocumentosNovoMdfe || []).length;
+            var temNfe = (docDocumentosNovoMdfe || []).some(function(d) {
+                return !!(d.chaveNfe || '').trim() || !!(d.nfeId);
+            }) || totalDocs > 0 && tipoEmitente === '2';
+            var totalCte = (docDocumentosNovoMdfe || []).filter(function(d) { return !!(d.chaveCte || '').trim(); }).length;
+            var cteIds = (novoMdfeOrigemCteIds || []).filter(function(id) { return Number(id) > 0; });
+            var temCte = totalCte > 0 || cteIds.length > 0;
+            var temCiot = (rodCiotNovoMdfe || []).length > 0;
+            var temVale = (rodValesPedagioNovoMdfe || []).length > 0;
+            var pesoTotal = Number(((document.getElementById('tot_peso_total') || {}).value || 0));
+            var tipoRodado = ((document.getElementById('rod_tipo_rodado') || {}).value || '').trim();
+            var tipoCarroceria = ((document.getElementById('rod_tipo_carroceria') || {}).value || '').trim();
+            var ufCarga = ((document.getElementById('novo_mdfe_uf_carga') || {}).value || '').trim();
+            var ufDesc = ((document.getElementById('novo_mdfe_uf_descarga') || {}).value || '').trim();
+
+            var itens = [];
+            var pushItem = function(id, label, ok, severidade, dica) {
+                itens.push({ id: id, label: label, ok: !!ok, severidade: severidade || (ok ? 'ok' : 'erro'), dica: dica || '' });
+            };
+
+            pushItem('veiculo', 'Veículo informado (frota ou placa)', temVeiculo, temVeiculo ? 'ok' : 'erro', 'Selecione na aba Dados ou informe placa em Rodoviário.');
+            pushItem('motorista', 'Motorista / condutor informado', temMotorista, temMotorista ? 'ok' : 'erro', 'Motorista principal ou condutor na aba Rodoviário.');
+            pushItem('condutor_cpf', 'Condutor com CPF válido', temCondutorCpf, temCondutorCpf ? 'ok' : 'erro');
+            pushItem('uf_rota', 'UF de carga e descarga', !!(ufCarga && ufDesc), (ufCarga && ufDesc) ? 'ok' : 'erro');
+            pushItem('documentos', 'Pelo menos um documento (NF-e ou CT-e)', totalDocs > 0 || temCte || temNfe, (totalDocs > 0 || temCte || temNfe) ? 'ok' : 'erro', 'Aba Documentos.');
+
+            if (tipoEmitente === '1' || tipoEmitente === '3') {
+                pushItem('cte', 'CT-e vinculado', temCte, temCte ? 'ok' : 'erro', 'Obrigatório para prestador de serviço / globalizado.');
+            } else {
+                pushItem('cte', 'CT-e (não aplicável — carga própria)', !temCte, !temCte ? 'ok' : 'erro');
+            }
+
+            if (tipoEmitente === '2' || tipoEmitente === '3') {
+                pushItem('nfe', 'NF-e vinculada', temNfe, temNfe ? 'ok' : 'erro');
+            } else {
+                pushItem('nfe', 'NF-e no manifesto', temNfe, temNfe ? 'ok' : 'aviso', 'Opcional para emitente tipo 1 se houver só CT-e.');
+            }
+
+            if (tipoEmitente === '1' || tipoEmitente === '3') {
+                pushItem('rntrc', 'RNTRC informado', !!rntrc, rntrc ? 'ok' : 'erro');
+            } else {
+                pushItem('rntrc', 'RNTRC', !!rntrc, rntrc ? 'ok' : 'aviso', 'Recomendado mesmo em carga própria.');
+            }
+
+            if (tipoTransportador === '2' && tipoEmitente !== '2' && (rodPagamentosFreteNovoMdfe || []).length > 0) {
+                pushItem('ciot', 'CIOT declarado (TAC com pagamento de frete)', temCiot, temCiot ? 'ok' : 'erro', 'Importe do PEF ANTT ou cadastre manualmente.');
+            } else if (tipoTransportador === '2') {
+                pushItem('ciot', 'CIOT (TAC)', temCiot, temCiot ? 'ok' : 'aviso', 'Obrigatório quando houver pagamento de frete.');
+            } else {
+                pushItem('ciot', 'CIOT ANTT', temCiot, temCiot ? 'ok' : 'aviso', 'Não exigido para frota própria / ETC sem TAC.');
+            }
+
+            pushItem('vale', 'Vale pedágio informado', temVale, temVale ? 'ok' : 'aviso', 'Recomendado em rotas com pedágio (VPO).');
+            pushItem('rodoviario', 'Dados rodoviários (placa, rodado, carroceria)', !!(placa && tipoRodado && tipoCarroceria), (placa && tipoRodado && tipoCarroceria) ? 'ok' : 'erro');
+            pushItem('peso', 'Peso total da carga > 0', pesoTotal > 0, pesoTotal > 0 ? 'ok' : 'erro', 'Aba Totalizadores.');
+
+            var erros = itens.filter(function(i) { return !i.ok && i.severidade === 'erro'; }).map(function(i) { return i.label; });
+            var conforme = erros.length === 0;
+            return { conforme: conforme, itens: itens, erros: erros };
+        }
+
+        function atualizarChecklistConformidadeMdfe(scrollIntoView) {
+            var resultado = obterChecklistConformidadeMdfe();
+            var statusEl = document.getElementById('mdfeChecklistStatus');
+            var listEl = document.getElementById('mdfeChecklistItens');
+            if (!statusEl || !listEl) return resultado;
+
+            if (resultado.conforme) {
+                statusEl.className = 'alert alert-success mb-3';
+                statusEl.innerHTML = '<i class="fas fa-check-circle"></i> <strong>Viagem conforme</strong> — pode salvar o MDF-e.';
+            } else {
+                statusEl.className = 'alert alert-danger mb-3';
+                statusEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i> <strong>Viagem não conforme</strong> — corrija os itens em vermelho antes de salvar.';
+            }
+
+            listEl.innerHTML = resultado.itens.map(function(item) {
+                var icon = item.ok ? 'fa-check-circle text-success' : (item.severidade === 'aviso' ? 'fa-exclamation-circle text-warning' : 'fa-times-circle text-danger');
+                var hint = item.dica ? '<div class="small text-muted">' + escapeHtmlMdfe(item.dica) + '</div>' : '';
+                return '<li class="list-group-item d-flex align-items-start gap-2">' +
+                    '<i class="fas ' + icon + ' mt-1"></i>' +
+                    '<div><div>' + escapeHtmlMdfe(item.label) + '</div>' + hint + '</div></li>';
+            }).join('');
+
+            if (scrollIntoView && document.getElementById('mdfeConformidadePanel')) {
+                document.getElementById('mdfeConformidadePanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            return resultado;
+        }
+
+        function initMdfeChecklistListeners() {
+            var modal = document.getElementById('novoMDFEWizardModal');
+            if (!modal || modal.getAttribute('data-checklist-bound') === '1') return;
+            modal.setAttribute('data-checklist-bound', '1');
+            var debounceTimer;
+            var schedule = function() {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(function() { atualizarChecklistConformidadeMdfe(false); }, 400);
+            };
+            modal.addEventListener('change', schedule);
+            modal.addEventListener('input', schedule);
+            modal.querySelectorAll('.route-tab-btn').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    if (btn.getAttribute('data-route-tab') === '7') {
+                        setTimeout(function() { atualizarChecklistConformidadeMdfe(false); }, 80);
+                    }
+                });
+            });
+        }
+
         function irParaAbaRodoviarioNovoMDFE() {
             var form = document.getElementById('novoMDFEWizardForm');
             if (!form) return;
@@ -2300,8 +2731,9 @@ function executarBuscaFornecedorMdfe() {
                 irParaAbaRodoviarioNovoMDFE();
                 return;
             }
-            if (tabAtual < 6) {
+            if (tabAtual < 7) {
                 setNovoMdfeTab(String(tabAtual + 1));
+                if (tabAtual + 1 === 7) atualizarChecklistConformidadeMdfe(false);
                 return;
             }
             var resultado = validarRegrasFiscaisNovoMDFE();
@@ -2320,6 +2752,102 @@ function executarBuscaFornecedorMdfe() {
             mdfeNotify('Validação fiscal concluída com sucesso. Regras por tipo de emitente atendidas.', 'success');
         }
 
+        function sincronizarHiddensWizardMdfe() {
+            if (typeof atualizarJsonTotalizadoresNovoMDFE === 'function') atualizarJsonTotalizadoresNovoMDFE();
+            renderUfsPercursoNovoMDFE();
+            renderCondutoresNovoMDFE();
+            renderReboquesNovoMDFE();
+            renderDocumentosNovoMDFE();
+            atualizarOrigemMdfeHiddenFields();
+        }
+
+        function salvarNovoMdfeWizard() {
+            var form = document.getElementById('novoMDFEWizardForm');
+            if (!form) return;
+
+            var obrigatorios = [
+                'novo_mdfe_data_emissao',
+                'novo_mdfe_tipo_emitente',
+                'novo_mdfe_tipo_transportador',
+                'novo_mdfe_uf_carga',
+                'novo_mdfe_municipio_carga',
+                'novo_mdfe_uf_descarga',
+                'novo_mdfe_municipio_descarga'
+            ];
+            for (var i = 0; i < obrigatorios.length; i++) {
+                var el = document.getElementById(obrigatorios[i]);
+                if (el && !el.value) {
+                    mdfeNotify('Preencha os campos obrigatórios da aba "Dados do MDF-e".');
+                    setNovoMdfeTab('1');
+                    el.focus();
+                    return;
+                }
+            }
+
+            sincronizarHiddensWizardMdfe();
+
+            var resultado = validarRegrasFiscaisNovoMDFE();
+            if (resultado.erros && resultado.erros.length) {
+                mdfeNotify('Validação fiscal: ' + resultado.erros.join('; '), 'error');
+                return;
+            }
+
+            var checklist = atualizarChecklistConformidadeMdfe(false);
+            if (!checklist.conforme) {
+                mdfeNotify('Checklist de conformidade: ' + checklist.erros.join('; '), 'error');
+                setNovoMdfeTab('7');
+                return;
+            }
+
+            var enviar = function() {
+                var fd = new FormData(form);
+                fd.append('action', 'criar_mdfe');
+                fd.append('modo', 'rascunho');
+                (novoMdfeOrigemCteIds || []).forEach(function(id) {
+                    if (Number(id) > 0) fd.append('cte_ids[]', String(id));
+                });
+
+                var btn = document.getElementById('btnSalvarNovoMdfeWizard');
+                var orig = btn ? btn.innerHTML : '';
+                if (btn) {
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+                    btn.disabled = true;
+                }
+                mdfeApiFetch('../api/documentos_fiscais_v2.php', { method: 'POST', body: fd })
+                    .then(function(res) {
+                        var data = res.data || {};
+                        if (data.success) {
+                            var msg = 'MDF-e criado: #' + (data.numero_mdfe || data.id || '') + '. Status: ' + (data.status || 'rascunho');
+                            if (data.ciot_auto_pef) msg += ' (CIOT importado do PEF pela rota)';
+                            mdfeNotify(msg, 'success');
+                            var modalEl = document.getElementById('novoMDFEWizardModal');
+                            if (modalEl) {
+                                var inst = bootstrap.Modal.getInstance(modalEl);
+                                if (inst) inst.hide();
+                            }
+                            carregarMDFE();
+                        } else {
+                            mdfeNotify(mdfeApiErrorMessage(data, res.status), 'error');
+                        }
+                    })
+                    .catch(function() { mdfeNotify('Erro ao salvar MDF-e. Verifique a conexão.', 'error'); })
+                    .finally(function() {
+                        if (btn) {
+                            btn.innerHTML = orig;
+                            btn.disabled = false;
+                        }
+                    });
+            };
+
+            if (resultado.warnings && resultado.warnings.length) {
+                mdfeConfirmAsync('Avisos de validação', resultado.warnings.join('\n') + '\n\nDeseja salvar mesmo assim?').then(function(ok) {
+                    if (ok) enviar();
+                });
+                return;
+            }
+            enviar();
+        }
+
         function abrirModalCriarMDFE() {
             document.getElementById('cidadeCarregamento').innerHTML = '<option value="">Selecione primeiro o estado</option>';
             document.getElementById('cidadeCarregamento').disabled = true;
@@ -2330,46 +2858,99 @@ function executarBuscaFornecedorMdfe() {
             });
         }
 
+        function popularSelectVeiculosMdfe(selectEl, list, placeholder) {
+            if (!selectEl) return;
+            selectEl.innerHTML = '<option value="">' + (placeholder || 'Selecione') + '</option>';
+            (list || []).forEach(function(o) {
+                var opt = document.createElement('option');
+                opt.value = o.id;
+                opt.setAttribute('data-placa', String(o.placa || '').trim());
+                opt.textContent = (o.placa || 'Veículo') + (o.modelo ? ' - ' + o.modelo : '') + (o.marca ? ' ' + o.marca : '');
+                selectEl.appendChild(opt);
+            });
+        }
+
+        function popularSelectMotoristasMdfe(selectEl, list, placeholder) {
+            if (!selectEl) return;
+            selectEl.innerHTML = '<option value="">' + (placeholder || 'Selecione') + '</option>';
+            (list || []).forEach(function(o) {
+                var opt = document.createElement('option');
+                opt.value = o.id;
+                opt.setAttribute('data-cpf', String(o.cpf || '').trim());
+                opt.setAttribute('data-nome', String(o.nome || '').trim());
+                opt.textContent = (o.nome || 'Motorista') + (o.cpf ? ' - ' + o.cpf : '');
+                selectEl.appendChild(opt);
+            });
+        }
+
+        function setupWizardVeiculoMotoristaSync() {
+            var wv = document.getElementById('wizard_veiculo_id');
+            if (wv && !wv.dataset.mdfeSyncBound) {
+                wv.dataset.mdfeSyncBound = '1';
+                wv.addEventListener('change', function() {
+                    var opt = wv.options[wv.selectedIndex];
+                    var placa = opt ? String(opt.getAttribute('data-placa') || '').trim() : '';
+                    var placaInput = document.getElementById('rod_placa');
+                    if (placa && placaInput && !placaInput.value) placaInput.value = placa;
+                });
+            }
+            var wm = document.getElementById('wizard_motorista_id');
+            if (wm && !wm.dataset.mdfeSyncBound) {
+                wm.dataset.mdfeSyncBound = '1';
+                wm.addEventListener('change', function() {
+                    var opt = wm.options[wm.selectedIndex];
+                    if (!opt || !opt.value) return;
+                    var nome = String(opt.getAttribute('data-nome') || '').trim();
+                    var cpf = String(opt.getAttribute('data-cpf') || '').trim();
+                    if (!nome && !cpf) return;
+                    var existe = rodCondutoresNovoMdfe.some(function(c) {
+                        return String(c.cpf || '').replace(/\D/g, '') === cpf.replace(/\D/g, '');
+                    });
+                    if (!existe && cpf.replace(/\D/g, '').length === 11) {
+                        rodCondutoresNovoMdfe.unshift({ nome: nome, cpf: cpf });
+                        renderCondutoresNovoMDFE();
+                    }
+                });
+            }
+        }
+
         function carregarVeiculosMotoristas() {
             var v = document.getElementById('veiculoMDFE');
             var m = document.getElementById('motoristaMDFE');
-            if (!v || !m) return;
-            // Usar mesma API das rotas (get_veiculos) para formato consistente { success, data }
+            var wv = document.getElementById('wizard_veiculo_id');
+            var wm = document.getElementById('wizard_motorista_id');
+            setupWizardVeiculoMotoristaSync();
             fetch('../../api/route_actions.php?action=get_veiculos')
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
                     var list = (d && d.success && d.data) ? d.data : (Array.isArray(d) ? d : []);
                     if (list.length) {
-                        list.forEach(function(o) {
-                            var opt = document.createElement('option');
-                            opt.value = o.id;
-                            opt.textContent = (o.placa || 'Veículo') + (o.modelo ? ' - ' + o.modelo : '') + (o.marca ? ' ' + o.marca : '');
-                            v.appendChild(opt);
-                        });
+                        popularSelectVeiculosMdfe(v, list, 'Selecione o veículo');
+                        popularSelectVeiculosMdfe(wv, list, 'Selecione ou informe placa na aba Rodoviário');
                     } else {
-                        v.innerHTML = '<option value="">Nenhum veículo cadastrado</option>';
+                        if (v) v.innerHTML = '<option value="">Nenhum veículo cadastrado</option>';
+                        if (wv) wv.innerHTML = '<option value="">Nenhum veículo cadastrado</option>';
                     }
                 })
-                .catch(function(err) {
+                .catch(function() {
                     if (v) v.innerHTML = '<option value="">Erro ao carregar veículos</option>';
+                    if (wv) wv.innerHTML = '<option value="">Erro ao carregar veículos</option>';
                 });
             fetch('../../api/motoristas.php?action=list&limit=500')
                 .then(function(r) { return r.json(); })
                 .then(function(d) {
                     var list = (d && d.success && d.data) ? d.data : [];
                     if (list.length) {
-                        list.forEach(function(o) {
-                            var opt = document.createElement('option');
-                            opt.value = o.id;
-                            opt.textContent = (o.nome || 'Motorista') + (o.cpf ? ' - ' + o.cpf : '');
-                            m.appendChild(opt);
-                        });
+                        popularSelectMotoristasMdfe(m, list, 'Selecione o motorista');
+                        popularSelectMotoristasMdfe(wm, list, 'Selecione ou cadastre condutor na aba Rodoviário');
                     } else {
-                        m.innerHTML = '<option value="">Nenhum motorista cadastrado</option>';
+                        if (m) m.innerHTML = '<option value="">Nenhum motorista cadastrado</option>';
+                        if (wm) wm.innerHTML = '<option value="">Nenhum motorista cadastrado</option>';
                     }
                 })
                 .catch(function() {
                     if (m) m.innerHTML = '<option value="">Erro ao carregar motoristas</option>';
+                    if (wm) wm.innerHTML = '<option value="">Erro ao carregar motoristas</option>';
                 });
         }
 
@@ -2486,7 +3067,9 @@ function executarBuscaFornecedorMdfe() {
                 .then(function(res) {
                     var data = res.data || {};
                     if (data.success) {
-                        mdfeNotify('MDF-e criado: #' + data.numero_mdfe + '. Status: ' + data.status, 'success');
+                        var msg = 'MDF-e criado: #' + data.numero_mdfe + '. Status: ' + data.status;
+                        if (data.ciot_auto_pef) msg += ' (CIOT importado automaticamente do PEF pela rota)';
+                        mdfeNotify(msg, 'success');
                         bootstrap.Modal.getInstance(document.getElementById('criarMDFEModal')).hide();
                         form.reset();
                         carregarMDFE();
@@ -2501,13 +3084,17 @@ function executarBuscaFornecedorMdfe() {
         function carregarMDFE() {
             var el = document.getElementById('mdfeList');
             el.innerHTML = '<div style="color:#17a2b8;background:#d1ecf1;padding:15px;border-radius:5px;"><strong>Carregando MDF-e...</strong></div>';
-            mdfeApiFetch('../api/documentos_fiscais_v2.php?action=list&tipo=mdfe&limit=100')
+            mdfeApiFetch('../api/documentos_fiscais_v2.php?action=list&tipo=mdfe&limit=500')
                 .then(function(res) {
                     var data = res.data || {};
                     if (data.success && data.documentos && data.documentos.length > 0) {
+                        mdfeListTruncationHtml = (typeof fiscalListTruncationBanner === 'function')
+                            ? fiscalListTruncationBanner(data.totais, data.documentos, 500)
+                            : '';
                         mdfeDocsCache = data.documentos || [];
                         aplicarFiltrosMDFE();
                     } else {
+                        mdfeListTruncationHtml = '';
                         mdfeDocsCache = [];
                         el.innerHTML = '<div style="color:#6c757d;background:#f8f9fa;padding:15px;border-radius:5px;"><strong>Nenhum MDF-e</strong><br>Clique em "Criar MDF-e" e selecione CT-e autorizados para gerar o manifesto.</div>';
                         atualizarPaginacaoMdfe(0);
@@ -2516,6 +3103,7 @@ function executarBuscaFornecedorMdfe() {
                 .catch(function(err) {
                     console.error(err);
                     mdfeDocsCache = [];
+                    mdfeListTruncationHtml = '';
                     el.innerHTML = '<div style="color:#dc3545;background:#f8d7da;padding:15px;border-radius:5px;"><strong>Erro ao carregar dados.</strong></div>';
                     atualizarPaginacaoMdfe(0);
                 });
@@ -2617,13 +3205,17 @@ function executarBuscaFornecedorMdfe() {
                     if (dentro24h) {
                         html += ' <a class="btn-icon" href="#" onclick="cancelarMDFE(' + doc.id + '); return false;" title="Cancelar MDF-e (até 24h)"><i class="fas fa-times-circle"></i></a>';
                     }
+                    html += ' <a class="btn-icon" href="#" onclick="downloadMdfePdf(' + doc.id + '); return false;" title="DAMDFE (PDF)"><i class="fas fa-file-pdf"></i></a>';
                     html += ' <a class="btn-icon" href="#" onclick="abrirModalIncluirCondutor(' + doc.id + '); return false;" title="Incluir condutor"><i class="fas fa-user-edit"></i></a>';
                     html += ' <a class="btn-icon" href="#" onclick="encerrarMDFE(' + doc.id + '); return false;" title="Encerrar MDF-e"><i class="fas fa-stop-circle"></i></a>';
+                }
+                if (st === 'encerrado') {
+                    html += ' <a class="btn-icon" href="#" onclick="downloadMdfePdf(' + doc.id + '); return false;" title="DAMDFE (PDF)"><i class="fas fa-file-pdf"></i></a>';
                 }
                 html += '</td></tr>';
             });
             html += '</tbody></table>';
-            el.innerHTML = html;
+            el.innerHTML = mdfeListTruncationHtml + html;
             bindMdfeSortEvents();
             atualizarPaginacaoMdfe(docsFiltrados.length);
         }
@@ -3034,11 +3626,12 @@ function executarBuscaFornecedorMdfe() {
         }
 
         function cancelarMDFE(id) {
-            mdfeConfirmAsync('Cancelar MDF-e', 'Só é permitido antes da viagem e dentro de 24h da autorização. Esta ação não pode ser desfeita. Deseja cancelar?').then(function(ok) {
-                if (!ok) return;
+            mdfePromptJustificativa('Cancelar MDF-e', 'Informe a justificativa do cancelamento (mínimo 15 caracteres). Só é permitido dentro de 24h da autorização.').then(function(justificativa) {
+                if (!justificativa) return;
                 var fd = new FormData();
                 fd.append('action', 'cancelar_mdfe');
                 fd.append('id', id);
+                fd.append('justificativa', justificativa);
                 mdfeApiFetch('../api/documentos_fiscais_v2.php', { method: 'POST', body: fd })
                     .then(function(res) {
                         var data = res.data || {};
@@ -3050,6 +3643,41 @@ function executarBuscaFornecedorMdfe() {
                         }
                     })
                     .catch(function() { mdfeNotify('Erro ao cancelar. Tente novamente.', 'error'); });
+            });
+        }
+
+        function mdfePromptJustificativa(titulo, mensagem) {
+            return new Promise(function(resolve) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({
+                        title: titulo,
+                        text: mensagem,
+                        input: 'textarea',
+                        inputPlaceholder: 'Justificativa...',
+                        inputAttributes: { maxlength: 255, rows: 4 },
+                        showCancelButton: true,
+                        confirmButtonText: 'Confirmar',
+                        cancelButtonText: 'Cancelar',
+                        inputValidator: function(value) {
+                            if (!value || String(value).trim().length < 15) {
+                                return 'Informe pelo menos 15 caracteres.';
+                            }
+                            return null;
+                        }
+                    }).then(function(result) {
+                        resolve(result.isConfirmed ? String(result.value || '').trim() : null);
+                    });
+                    return;
+                }
+                var txt = window.prompt(mensagem, '');
+                if (txt === null) { resolve(null); return; }
+                txt = String(txt).trim();
+                if (txt.length < 15) {
+                    mdfeNotify('Justificativa deve ter no mínimo 15 caracteres.', 'error');
+                    resolve(null);
+                    return;
+                }
+                resolve(txt);
             });
         }
 

@@ -5,6 +5,30 @@ require_once '../includes/functions.php';
 require_once __DIR__ . '/../fiscal/includes/CryptoManager.php';
 require_once __DIR__ . '/../includes/csrf.php';
 require_once __DIR__ . '/../includes/api_json.php';
+require_once __DIR__ . '/../includes/sf_openai_resolve.php';
+require_once __DIR__ . '/../includes/pef_ciot_helpers.php';
+
+if (!function_exists('sf_configuracoes_json_body')) {
+    /**
+     * Corpo JSON do POST. php://input só pode ser lido uma vez; use $routed quando a rota já leu.
+     *
+     * @param array<string, mixed>|null $routed
+     * @return array<string, mixed>
+     */
+    function sf_configuracoes_json_body(?array $routed): array
+    {
+        if ($routed !== null) {
+            return $routed;
+        }
+        $raw = file_get_contents('php://input');
+        if ($raw === '' || $raw === false) {
+            return [];
+        }
+        $d = json_decode($raw, true);
+
+        return is_array($d) ? $d : [];
+    }
+}
 
 configure_session();
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -22,12 +46,20 @@ $empresa_id = $_SESSION['empresa_id'];
 // Protege mutações (POST/PUT/PATCH/DELETE) com CSRF e retorno JSON padronizado.
 api_require_csrf_json();
 
-
-$method = $_SERVER['REQUEST_METHOD'];
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $action = $_GET['action'] ?? ($_POST['action'] ?? null);
+/** @var array<string, mixed>|null null = corpo JSON ainda não lido na rota (ler depois com sf_configuracoes_json_body) */
+$sf_routed_json_body = null;
 if ($method === 'POST' && !$action) {
-    $input = json_decode(file_get_contents('php://input'), true);
-    $action = $input['action'] ?? null;
+    $sf_routed_json_body = [];
+    $raw = file_get_contents('php://input');
+    if ($raw !== '' && $raw !== false) {
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            $sf_routed_json_body = $decoded;
+        }
+    }
+    $action = $sf_routed_json_body['action'] ?? null;
 }
 
 try {
@@ -45,7 +77,7 @@ try {
         exit;
     }
     if ($action === 'update_nome') {
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
         $nome = trim($input['nome_personalizado'] ?? '');
         if (!$nome) throw new Exception('Nome não informado');
         // Atualiza ou insere
@@ -401,6 +433,13 @@ try {
             // Valores padrão se não houver configuração fiscal
             $dados_combinados['ambiente_sefaz'] = 'homologacao';
         }
+
+        $pef = sf_pef_config((int) $empresa_id);
+        $pef['cert_key_pass'] = !empty($pef['cert_key_pass']) ? '********' : '';
+        if (empty($pef['cpf_cnpj_interessado']) && !empty($dados_combinados['cnpj'])) {
+            $pef['cpf_cnpj_interessado'] = preg_replace('/\D/', '', (string) $dados_combinados['cnpj']);
+        }
+        $dados_combinados['pef'] = $pef;
         
         echo json_encode([
             'success' => true,
@@ -411,7 +450,7 @@ try {
         exit;
     }
     if ($action === 'save_config_fiscal') {
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
         
         // Log para debug
         error_log("DEBUG: Dados recebidos em save_config_fiscal: " . json_encode($input));
@@ -608,6 +647,29 @@ try {
         }
         exit;
     }
+
+    if ($action === 'save_pef_config') {
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
+        $amb = $input['ambiente'] ?? 'homologacao';
+        if (!in_array($amb, ['homologacao', 'producao'], true)) {
+            echo json_encode(['success' => false, 'error' => 'Ambiente PEF inválido']);
+            exit;
+        }
+        $ok = sf_pef_save_config((int) $empresa_id, [
+            'ambiente' => $amb,
+            'cpf_cnpj_interessado' => $input['cpf_cnpj_interessado'] ?? '',
+            'cert_pem_path' => $input['cert_pem_path'] ?? '',
+            'cert_key_path' => $input['cert_key_path'] ?? '',
+            'cert_key_pass' => $input['cert_key_pass'] ?? '',
+            'ativo' => !empty($input['ativo']) ? 1 : 0,
+        ]);
+        if (!$ok) {
+            echo json_encode(['success' => false, 'error' => 'Não foi possível salvar a configuração CIOT/PEF.']);
+            exit;
+        }
+        echo json_encode(['success' => true, 'message' => 'Configuração CIOT/PEF salva com sucesso.']);
+        exit;
+    }
     
     // Configurações de Performance
     if ($action === 'get_config_performance') {
@@ -665,7 +727,7 @@ try {
     }
     
     if ($action === 'save_config_performance') {
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
         
         $peso_pontualidade = (int)($input['peso_pontualidade'] ?? 25);
         $peso_consumo = (int)($input['peso_consumo'] ?? 30);
@@ -747,7 +809,7 @@ try {
     
     // Configurações de Badges
     if ($action === 'save_config_badges') {
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
         
         $badge_motorista_economico = (int)($input['badge_motorista_economico'] ?? 3);
         $badge_sem_multas = (int)($input['badge_sem_multas'] ?? 12);
@@ -806,7 +868,7 @@ try {
     
     // Configurações de Níveis
     if ($action === 'save_config_niveis') {
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
         
         $nivel_bronze_min = (int)($input['nivel_bronze_min'] ?? 0);
         $nivel_bronze_max = (int)($input['nivel_bronze_max'] ?? 99);
@@ -909,7 +971,7 @@ try {
     
     // Configurações de Desafios
     if ($action === 'save_config_desafios') {
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
         
         $desafio_km_sem_infracoes = (int)($input['desafio_km_sem_infracoes'] ?? 5000);
         $desafio_rotas_sem_atrasos = (int)($input['desafio_rotas_sem_atrasos'] ?? 10);
@@ -973,7 +1035,7 @@ try {
     
     // Configurações de Métricas Avançadas
     if ($action === 'save_config_metricas') {
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
         
         $peso_ocorrencias_sinistros = (int)($input['peso_ocorrencias_sinistros'] ?? 15);
         $peso_custos_km = (int)($input['peso_custos_km'] ?? 10);
@@ -1032,7 +1094,7 @@ try {
     
     // Configurações de Filtros
     if ($action === 'save_config_filtros') {
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
         
         $periodo_padrao = $input['periodo_padrao'] ?? 'mensal';
         $filtro_por_veiculo = $input['filtro_por_veiculo'] ?? 'todos';
@@ -1200,13 +1262,43 @@ try {
         exit;
     }
     
-    // Configurações de Notificações
+    // Configurações de Notificações (gamificação — empresa)
+    if ($action === 'get_notifications_config') {
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_notificacoes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            notificacoes_badges TINYINT(1) DEFAULT 1,
+            notificacoes_niveis TINYINT(1) DEFAULT 1,
+            notificacoes_ranking TINYINT(1) DEFAULT 1,
+            notificacoes_desafios TINYINT(1) DEFAULT 1,
+            sistema_notificacoes_ativo TINYINT(1) DEFAULT 1,
+            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_empresa (empresa_id)
+        )");
+        $stmt = $conn->prepare('SELECT notificacoes_badges, notificacoes_niveis, notificacoes_ranking, notificacoes_desafios, sistema_notificacoes_ativo
+            FROM configuracoes_notificacoes WHERE empresa_id = :empresa_id LIMIT 1');
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'notificacoes_badges' => (int) ($row['notificacoes_badges'] ?? 1),
+                'notificacoes_niveis' => (int) ($row['notificacoes_niveis'] ?? 1),
+                'notificacoes_ranking' => (int) ($row['notificacoes_ranking'] ?? 1),
+                'notificacoes_desafios' => (int) ($row['notificacoes_desafios'] ?? 1),
+                'sistema_notificacoes_ativo' => (int) ($row['sistema_notificacoes_ativo'] ?? 1),
+            ],
+        ]);
+        exit;
+    }
+
     if ($action === 'save_notifications_config') {
         $notificacoes_badges = isset($_POST['notificacoes_badges']) ? 1 : 0;
         $notificacoes_niveis = isset($_POST['notificacoes_niveis']) ? 1 : 0;
         $notificacoes_ranking = isset($_POST['notificacoes_ranking']) ? 1 : 0;
         $notificacoes_desafios = isset($_POST['notificacoes_desafios']) ? 1 : 0;
-        $sistema_notificacoes_ativo = isset($_POST['sistema_notificacoes_ativo']) ? 1 : 0;
         
         // Criar tabela se não existir
         $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_notificacoes (
@@ -1223,14 +1315,13 @@ try {
         )");
         
         $stmt = $conn->prepare('INSERT INTO configuracoes_notificacoes 
-            (empresa_id, notificacoes_badges, notificacoes_niveis, notificacoes_ranking, notificacoes_desafios, sistema_notificacoes_ativo) 
-            VALUES (:empresa_id, :notificacoes_badges, :notificacoes_niveis, :notificacoes_ranking, :notificacoes_desafios, :sistema_notificacoes_ativo)
+            (empresa_id, notificacoes_badges, notificacoes_niveis, notificacoes_ranking, notificacoes_desafios) 
+            VALUES (:empresa_id, :notificacoes_badges, :notificacoes_niveis, :notificacoes_ranking, :notificacoes_desafios)
             ON DUPLICATE KEY UPDATE 
             notificacoes_badges = :notificacoes_badges_upd,
             notificacoes_niveis = :notificacoes_niveis_upd,
             notificacoes_ranking = :notificacoes_ranking_upd,
             notificacoes_desafios = :notificacoes_desafios_upd,
-            sistema_notificacoes_ativo = :sistema_notificacoes_ativo_upd,
             data_atualizacao = NOW()');
         
         $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
@@ -1238,16 +1329,42 @@ try {
         $stmt->bindParam(':notificacoes_niveis', $notificacoes_niveis, PDO::PARAM_INT);
         $stmt->bindParam(':notificacoes_ranking', $notificacoes_ranking, PDO::PARAM_INT);
         $stmt->bindParam(':notificacoes_desafios', $notificacoes_desafios, PDO::PARAM_INT);
-        $stmt->bindParam(':sistema_notificacoes_ativo', $sistema_notificacoes_ativo, PDO::PARAM_INT);
         $stmt->bindParam(':notificacoes_badges_upd', $notificacoes_badges, PDO::PARAM_INT);
         $stmt->bindParam(':notificacoes_niveis_upd', $notificacoes_niveis, PDO::PARAM_INT);
         $stmt->bindParam(':notificacoes_ranking_upd', $notificacoes_ranking, PDO::PARAM_INT);
         $stmt->bindParam(':notificacoes_desafios_upd', $notificacoes_desafios, PDO::PARAM_INT);
-        $stmt->bindParam(':sistema_notificacoes_ativo_upd', $sistema_notificacoes_ativo, PDO::PARAM_INT);
         
         $stmt->execute();
         
-        echo json_encode(['success' => true, 'message' => 'Configurações de notificações salvas com sucesso!']);
+        echo json_encode(['success' => true, 'message' => 'Configurações de gamificação salvas com sucesso!']);
+        exit;
+    }
+
+    if ($action === 'save_notifications_empresa') {
+        $sistema_notificacoes_ativo = isset($_POST['sistema_notificacoes_ativo']) ? 1 : 0;
+
+        $conn->exec("CREATE TABLE IF NOT EXISTS configuracoes_notificacoes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            empresa_id INT NOT NULL,
+            notificacoes_badges TINYINT(1) DEFAULT 1,
+            notificacoes_niveis TINYINT(1) DEFAULT 1,
+            notificacoes_ranking TINYINT(1) DEFAULT 1,
+            notificacoes_desafios TINYINT(1) DEFAULT 1,
+            sistema_notificacoes_ativo TINYINT(1) DEFAULT 1,
+            data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY unique_empresa (empresa_id)
+        )");
+
+        $stmt = $conn->prepare('INSERT INTO configuracoes_notificacoes (empresa_id, sistema_notificacoes_ativo)
+            VALUES (:empresa_id, :sistema_notificacoes_ativo)
+            ON DUPLICATE KEY UPDATE sistema_notificacoes_ativo = :sistema_notificacoes_ativo_upd, data_atualizacao = NOW()');
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindParam(':sistema_notificacoes_ativo', $sistema_notificacoes_ativo, PDO::PARAM_INT);
+        $stmt->bindParam(':sistema_notificacoes_ativo_upd', $sistema_notificacoes_ativo, PDO::PARAM_INT);
+        $stmt->execute();
+
+        echo json_encode(['success' => true, 'message' => 'Configuração da empresa salva com sucesso!']);
         exit;
     }
     
@@ -1315,6 +1432,466 @@ try {
         exit;
     }
 
+    // Google Vision (OCR de fichas de abastecimento): leitura de configurações, teste e gravação
+    if ($action === 'get_google_vision_settings') {
+        foreach ([
+            'ALTER TABLE configuracoes ADD COLUMN google_vision_api_key TEXT NULL DEFAULT NULL',
+        ] as $sqlAlter) {
+            try {
+                $conn->exec($sqlAlter);
+            } catch (Throwable $e) {
+            }
+        }
+        $stmt = $conn->prepare('SELECT google_vision_api_key FROM configuracoes WHERE empresa_id = :e LIMIT 1');
+        $stmt->execute([':e' => (int) $empresa_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $key = trim((string) ($row['google_vision_api_key'] ?? ''));
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'has_key' => $key !== '',
+                'key_masked' => $key !== '' ? ('****' . substr($key, -4)) : '',
+            ],
+        ]);
+        exit;
+    }
+
+    if ($action === 'test_google_vision') {
+        foreach ([
+            'ALTER TABLE configuracoes ADD COLUMN google_vision_api_key TEXT NULL DEFAULT NULL',
+        ] as $sqlAlter) {
+            try {
+                $conn->exec($sqlAlter);
+            } catch (Throwable $e) {
+            }
+        }
+        $stmt = $conn->prepare('SELECT google_vision_api_key FROM configuracoes WHERE empresa_id = :e LIMIT 1');
+        $stmt->execute([':e' => (int) $empresa_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $key = trim((string) ($row['google_vision_api_key'] ?? ''));
+        if ($key === '') {
+            throw new Exception('Configure a chave do Google Vision antes de testar.');
+        }
+        if (!function_exists('curl_init')) {
+            throw new Exception('Extensão cURL não está disponível no PHP.');
+        }
+        $url = 'https://vision.googleapis.com/v1/images:annotate?key=' . rawurlencode($key);
+        // PNG 1x1 transparente
+        $tinyPngB64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO2L6v8AAAAASUVORK5CYII=';
+        $payload = [
+            'requests' => [[
+                'image' => ['content' => $tinyPngB64],
+                'features' => [['type' => 'TEXT_DETECTION', 'maxResults' => 1]],
+            ]],
+        ];
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 25,
+        ]);
+        $raw = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $err = curl_error($ch);
+        $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($errno !== 0) {
+            throw new Exception('Falha de rede ao contatar Google Vision: ' . ($err !== '' ? $err : 'erro ' . $errno));
+        }
+        $resp = is_string($raw) ? json_decode($raw, true) : null;
+        $googleMsg = '';
+        if (is_array($resp) && is_array($resp['error'] ?? null)) {
+            $googleMsg = trim((string) ($resp['error']['message'] ?? ''));
+        }
+        if ($http === 401 || $http === 403) {
+            $msg = 'Chave Google Vision inválida ou sem permissão (HTTP ' . $http . ').';
+            if ($googleMsg !== '') {
+                $msg .= ' Detalhe Google: ' . $googleMsg;
+            }
+            throw new Exception($msg);
+        }
+        if ($http < 200 || $http >= 300) {
+            $snippet = is_string($raw) ? substr(trim($raw), 0, 220) : '';
+            $suffix = $googleMsg !== '' ? (' Detalhe Google: ' . $googleMsg) : ($snippet !== '' ? ': ' . $snippet : '');
+            throw new Exception('Resposta inesperada do Google Vision (HTTP ' . $http . ')' . $suffix . '.');
+        }
+        echo json_encode([
+            'success' => true,
+            'message' => 'Conexão OK com Google Vision API (HTTP ' . $http . ').',
+        ]);
+        exit;
+    }
+
+    if ($action === 'save_google_vision_settings') {
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
+        if (!is_array($input)) {
+            $input = [];
+        }
+        foreach ([
+            'ALTER TABLE configuracoes ADD COLUMN google_vision_api_key TEXT NULL DEFAULT NULL',
+        ] as $sqlAlter) {
+            try {
+                $conn->exec($sqlAlter);
+            } catch (Throwable $e) {
+            }
+        }
+        $check = $conn->prepare('SELECT id FROM configuracoes WHERE empresa_id = :empresa_id LIMIT 1');
+        $check->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $check->execute();
+        if (!$check->fetch(PDO::FETCH_ASSOC)) {
+            $nome_padrao = 'Frotec Online';
+            $logo_padrao = 'logo.png';
+            $create_stmt = $conn->prepare('INSERT INTO configuracoes (
+                empresa_id, cor_menu, nome_personalizado, logo_empresa, data_criacao, data_atualizacao,
+                notificar_abastecimentos, notificar_manutencoes, notificar_viagens,
+                limite_km_manutencao, limite_dias_manutencao, notificar_pneus_vida_util,
+                notificar_pneus_recapagem, notificar_pneus_troca_frequente,
+                calcular_todas_despesas, calcular_despesas_fixas, calcular_despesas_viagem,
+                calcular_abastecimentos, calcular_manutencao, calcular_manutencao_pneus, calcular_comissoes
+            ) VALUES (
+                :empresa_id, "#343a40", :nome_empresa, :logo_empresa, NOW(), NOW(),
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0
+            )');
+            $create_stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $create_stmt->bindParam(':nome_empresa', $nome_padrao);
+            $create_stmt->bindParam(':logo_empresa', $logo_padrao);
+            $create_stmt->execute();
+        }
+        $key = trim((string) ($input['google_vision_api_key'] ?? ''));
+        $clearKey = !empty($input['clear_google_vision_key']);
+        if ($clearKey) {
+            $key = '';
+        }
+        $stmtUp = $conn->prepare(
+            'UPDATE configuracoes
+             SET google_vision_api_key = :k, data_atualizacao = NOW()
+             WHERE empresa_id = :e'
+        );
+        $stmtUp->bindValue(':k', $key !== '' ? $key : null, $key !== '' ? PDO::PARAM_STR : PDO::PARAM_NULL);
+        $stmtUp->bindValue(':e', (int) $empresa_id, PDO::PARAM_INT);
+        $stmtUp->execute();
+        echo json_encode(['success' => true, 'message' => 'Configurações Google Vision salvas.']);
+        exit;
+    }
+
+    // Azure Document Intelligence (OCR de fichas de abastecimento): leitura de configurações, teste e gravação
+    if ($action === 'get_azure_settings') {
+        foreach ([
+            'ALTER TABLE configuracoes ADD COLUMN azure_docintel_endpoint VARCHAR(255) NULL DEFAULT NULL',
+            'ALTER TABLE configuracoes ADD COLUMN azure_docintel_key TEXT NULL DEFAULT NULL',
+            'ALTER TABLE configuracoes ADD COLUMN azure_docintel_model VARCHAR(80) NULL DEFAULT NULL',
+            'ALTER TABLE configuracoes ADD COLUMN azure_docintel_api_version VARCHAR(30) NULL DEFAULT NULL',
+        ] as $sqlAlter) {
+            try {
+                $conn->exec($sqlAlter);
+            } catch (Throwable $e) {
+            }
+        }
+        $stmt = $conn->prepare('SELECT azure_docintel_endpoint, azure_docintel_key, azure_docintel_model, azure_docintel_api_version FROM configuracoes WHERE empresa_id = :e LIMIT 1');
+        $stmt->execute([':e' => (int) $empresa_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $endpoint = trim((string) ($row['azure_docintel_endpoint'] ?? ''));
+        $key = trim((string) ($row['azure_docintel_key'] ?? ''));
+        $model = trim((string) ($row['azure_docintel_model'] ?? ''));
+        $apiVersion = trim((string) ($row['azure_docintel_api_version'] ?? ''));
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'has_key' => $key !== '',
+                'key_masked' => $key !== '' ? ('****' . substr($key, -4)) : '',
+                'endpoint' => $endpoint,
+                'model' => $model !== '' ? $model : 'prebuilt-layout',
+                'api_version' => $apiVersion !== '' ? $apiVersion : '2024-11-30',
+            ],
+        ]);
+        exit;
+    }
+
+    if ($action === 'test_azure') {
+        foreach ([
+            'ALTER TABLE configuracoes ADD COLUMN azure_docintel_endpoint VARCHAR(255) NULL DEFAULT NULL',
+            'ALTER TABLE configuracoes ADD COLUMN azure_docintel_key TEXT NULL DEFAULT NULL',
+            'ALTER TABLE configuracoes ADD COLUMN azure_docintel_model VARCHAR(80) NULL DEFAULT NULL',
+            'ALTER TABLE configuracoes ADD COLUMN azure_docintel_api_version VARCHAR(30) NULL DEFAULT NULL',
+        ] as $sqlAlter) {
+            try {
+                $conn->exec($sqlAlter);
+            } catch (Throwable $e) {
+            }
+        }
+        $stmt = $conn->prepare('SELECT azure_docintel_endpoint, azure_docintel_key, azure_docintel_model, azure_docintel_api_version FROM configuracoes WHERE empresa_id = :e LIMIT 1');
+        $stmt->execute([':e' => (int) $empresa_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $endpoint = rtrim(trim((string) ($row['azure_docintel_endpoint'] ?? '')), '/');
+        $key = trim((string) ($row['azure_docintel_key'] ?? ''));
+        $model = trim((string) ($row['azure_docintel_model'] ?? ''));
+        $apiVersion = trim((string) ($row['azure_docintel_api_version'] ?? ''));
+        if ($endpoint === '' || $key === '') {
+            throw new Exception('Configure endpoint e chave do Azure antes de testar.');
+        }
+        if ($model === '') {
+            $model = 'prebuilt-layout';
+        }
+        if ($apiVersion === '') {
+            $apiVersion = '2024-11-30';
+        }
+        if (!function_exists('curl_init')) {
+            throw new Exception('Extensão cURL não está disponível no PHP.');
+        }
+        $url = $endpoint . '/documentintelligence/documentModels/' . rawurlencode($model) . '?api-version=' . rawurlencode($apiVersion);
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_HTTPGET => true,
+            CURLOPT_HTTPHEADER => [
+                'Ocp-Apim-Subscription-Key: ' . $key,
+                'Content-Type: application/json',
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 25,
+        ]);
+        $raw = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $err = curl_error($ch);
+        $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($errno !== 0) {
+            throw new Exception('Falha de rede ao contatar Azure: ' . ($err !== '' ? $err : 'erro ' . $errno));
+        }
+        if ($http === 401 || $http === 403) {
+            throw new Exception('Credencial Azure inválida ou sem permissão (HTTP ' . $http . ').');
+        }
+        if ($http < 200 || $http >= 300) {
+            $snippet = is_string($raw) ? substr(trim($raw), 0, 220) : '';
+            throw new Exception('Resposta inesperada do Azure (HTTP ' . $http . ')' . ($snippet !== '' ? ': ' . $snippet : '') . '.');
+        }
+        echo json_encode([
+            'success' => true,
+            'message' => 'Conexão OK com Azure Document Intelligence (HTTP ' . $http . ').',
+        ]);
+        exit;
+    }
+
+    if ($action === 'save_azure_settings') {
+        foreach ([
+            'ALTER TABLE configuracoes ADD COLUMN azure_docintel_endpoint VARCHAR(255) NULL DEFAULT NULL',
+            'ALTER TABLE configuracoes ADD COLUMN azure_docintel_key TEXT NULL DEFAULT NULL',
+            'ALTER TABLE configuracoes ADD COLUMN azure_docintel_model VARCHAR(80) NULL DEFAULT NULL',
+            'ALTER TABLE configuracoes ADD COLUMN azure_docintel_api_version VARCHAR(30) NULL DEFAULT NULL',
+        ] as $sqlAlter) {
+            try {
+                $conn->exec($sqlAlter);
+            } catch (Throwable $e) {
+            }
+        }
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
+        if (!is_array($input)) {
+            $input = [];
+        }
+        $check = $conn->prepare('SELECT id FROM configuracoes WHERE empresa_id = :empresa_id LIMIT 1');
+        $check->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $check->execute();
+        if (!$check->fetch(PDO::FETCH_ASSOC)) {
+            $nome_padrao = 'Frotec Online';
+            $logo_padrao = 'logo.png';
+            $create_stmt = $conn->prepare('INSERT INTO configuracoes (
+                empresa_id, cor_menu, nome_personalizado, logo_empresa, data_criacao, data_atualizacao,
+                notificar_abastecimentos, notificar_manutencoes, notificar_viagens,
+                limite_km_manutencao, limite_dias_manutencao, notificar_pneus_vida_util,
+                notificar_pneus_recapagem, notificar_pneus_troca_frequente,
+                calcular_todas_despesas, calcular_despesas_fixas, calcular_despesas_viagem,
+                calcular_abastecimentos, calcular_manutencao, calcular_manutencao_pneus, calcular_comissoes
+            ) VALUES (
+                :empresa_id, "#343a40", :nome_empresa, :logo_empresa, NOW(), NOW(),
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0
+            )');
+            $create_stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $create_stmt->bindParam(':nome_empresa', $nome_padrao);
+            $create_stmt->bindParam(':logo_empresa', $logo_padrao);
+            $create_stmt->execute();
+        }
+        $endpoint = trim((string) ($input['azure_docintel_endpoint'] ?? ''));
+        $key = trim((string) ($input['azure_docintel_key'] ?? ''));
+        $model = trim((string) ($input['azure_docintel_model'] ?? ''));
+        $apiVersion = trim((string) ($input['azure_docintel_api_version'] ?? ''));
+        $clearKey = !empty($input['clear_azure_key']);
+        if ($endpoint !== '' && !preg_match('#^https?://#i', $endpoint)) {
+            throw new Exception('Endpoint do Azure deve começar com http:// ou https://.');
+        }
+        if (strlen($model) > 80) {
+            throw new Exception('Modelo Azure inválido (máximo 80 caracteres).');
+        }
+        if (strlen($apiVersion) > 30) {
+            throw new Exception('API version inválida (máximo 30 caracteres).');
+        }
+        if ($clearKey) {
+            $key = '';
+        }
+        $stmtUp = $conn->prepare(
+            'UPDATE configuracoes
+             SET azure_docintel_endpoint = :ep,
+                 azure_docintel_key = :k,
+                 azure_docintel_model = :m,
+                 azure_docintel_api_version = :v,
+                 data_atualizacao = NOW()
+             WHERE empresa_id = :e'
+        );
+        $stmtUp->bindValue(':ep', $endpoint !== '' ? $endpoint : null, $endpoint !== '' ? PDO::PARAM_STR : PDO::PARAM_NULL);
+        $stmtUp->bindValue(':k', $key !== '' ? $key : null, $key !== '' ? PDO::PARAM_STR : PDO::PARAM_NULL);
+        $stmtUp->bindValue(':m', $model !== '' ? $model : null, $model !== '' ? PDO::PARAM_STR : PDO::PARAM_NULL);
+        $stmtUp->bindValue(':v', $apiVersion !== '' ? $apiVersion : null, $apiVersion !== '' ? PDO::PARAM_STR : PDO::PARAM_NULL);
+        $stmtUp->bindValue(':e', (int) $empresa_id, PDO::PARAM_INT);
+        $stmtUp->execute();
+        echo json_encode(['success' => true, 'message' => 'Configurações Azure salvas.']);
+        exit;
+    }
+
+    // OpenAI (OCR de fichas de abastecimento): leitura de configurações, teste e gravação
+    if ($action === 'get_openai_settings') {
+        $eid = (int) $empresa_id;
+        sf_openai_ensure_schema($conn);
+        $data = sf_openai_settings_payload($conn, $eid);
+        echo json_encode(['success' => true, 'data' => $data]);
+        exit;
+    }
+
+    if ($action === 'test_openai') {
+        $eid = (int) $empresa_id;
+        sf_openai_ensure_schema($conn);
+        $key = sf_openai_key_resolved($conn, $eid);
+        if ($key === '') {
+            throw new Exception('Nenhuma chave OpenAI configurada (servidor ou banco desta empresa).');
+        }
+        if (!function_exists('curl_init')) {
+            throw new Exception('Extensão cURL não está disponível no PHP.');
+        }
+        $ch = curl_init('https://api.openai.com/v1/models?limit=1');
+        if ($ch === false) {
+            throw new Exception('Não foi possível iniciar a requisição à OpenAI.');
+        }
+        curl_setopt_array($ch, [
+            CURLOPT_HTTPHEADER => [
+                'Authorization: Bearer ' . $key,
+                'Content-Type: application/json',
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 25,
+        ]);
+        $raw = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $err = curl_error($ch);
+        $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($errno !== 0) {
+            throw new Exception('Falha de rede ao contatar a OpenAI: ' . ($err !== '' ? $err : 'erro ' . $errno));
+        }
+        if ($http === 401) {
+            throw new Exception('Chave inválida ou revogada (HTTP 401).');
+        }
+        if ($http === 429) {
+            throw new Exception('Limite de taxa na OpenAI (HTTP 429). Tente de novo em instantes.');
+        }
+        if ($http < 200 || $http >= 300) {
+            $snippet = is_string($raw) ? substr(trim($raw), 0, 200) : '';
+            throw new Exception('Resposta inesperada da OpenAI (HTTP ' . $http . ')' . ($snippet !== '' ? ': ' . $snippet : '') . '.');
+        }
+        echo json_encode([
+            'success' => true,
+            'message' => 'Conexão OK com a API OpenAI (HTTP ' . $http . ').',
+        ]);
+        exit;
+    }
+
+    if ($action === 'save_openai_settings') {
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
+        if (!is_array($input)) {
+            $input = [];
+        }
+        $eid = (int) $empresa_id;
+        sf_openai_ensure_schema($conn);
+
+        $check = $conn->prepare('SELECT id FROM configuracoes WHERE empresa_id = :empresa_id LIMIT 1');
+        $check->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $check->execute();
+        if (!$check->fetch(PDO::FETCH_ASSOC)) {
+            $nome_padrao = 'Frotec Online';
+            $logo_padrao = 'logo.png';
+            $create_stmt = $conn->prepare('INSERT INTO configuracoes (
+                empresa_id, cor_menu, nome_personalizado, logo_empresa, data_criacao, data_atualizacao,
+                notificar_abastecimentos, notificar_manutencoes, notificar_viagens,
+                limite_km_manutencao, limite_dias_manutencao, notificar_pneus_vida_util,
+                notificar_pneus_recapagem, notificar_pneus_troca_frequente,
+                calcular_todas_despesas, calcular_despesas_fixas, calcular_despesas_viagem,
+                calcular_abastecimentos, calcular_manutencao, calcular_manutencao_pneus, calcular_comissoes
+            ) VALUES (
+                :empresa_id, "#343a40", :nome_empresa, :logo_empresa, NOW(), NOW(),
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0
+            )');
+            $create_stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $create_stmt->bindParam(':nome_empresa', $nome_padrao);
+            $create_stmt->bindParam(':logo_empresa', $logo_padrao);
+            $create_stmt->execute();
+        }
+
+        $vision = trim((string) ($input['openai_vision_model'] ?? ''));
+        if ($vision === '') {
+            $vision = null;
+        } elseif (strlen($vision) > 80) {
+            throw new Exception('Modelo inválido (máximo 80 caracteres).');
+        }
+
+        $budgetIn = $input['openai_monthly_budget_usd'] ?? null;
+        $budgetParam = null;
+        if ($budgetIn !== null && $budgetIn !== '') {
+            $budgetParam = round((float) $budgetIn, 2);
+            if ($budgetParam < 0) {
+                throw new Exception('Orçamento mensal não pode ser negativo.');
+            }
+        }
+
+        $stmtUp = $conn->prepare(
+            'UPDATE configuracoes SET openai_vision_model = :v, openai_monthly_budget_usd = :b, data_atualizacao = NOW() WHERE empresa_id = :e'
+        );
+        $stmtUp->bindValue(':v', $vision, $vision === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmtUp->bindValue(':b', $budgetParam, $budgetParam === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmtUp->bindValue(':e', $eid, PDO::PARAM_INT);
+        $stmtUp->execute();
+
+        $clear = !empty($input['clear_openai_key']);
+        $newKey = trim((string) ($input['openai_api_key'] ?? ''));
+        if ($clear) {
+            $delCred = $conn->prepare('DELETE FROM empresa_openai_credentials WHERE empresa_id = :e');
+            $delCred->bindValue(':e', $eid, PDO::PARAM_INT);
+            $delCred->execute();
+            $uk = $conn->prepare('UPDATE configuracoes SET openai_api_key = NULL, data_atualizacao = NOW() WHERE empresa_id = :e');
+            $uk->bindValue(':e', $eid, PDO::PARAM_INT);
+            $uk->execute();
+        } elseif ($newKey !== '') {
+            if (strlen($newKey) < 20) {
+                throw new Exception('Chave OpenAI parece incompleta.');
+            }
+            if (strlen($newKey) > 16000000) {
+                throw new Exception('Chave OpenAI excede o tamanho máximo permitido.');
+            }
+            $cred = $conn->prepare(
+                'INSERT INTO empresa_openai_credentials (empresa_id, api_key) VALUES (:e, :k)
+                 ON DUPLICATE KEY UPDATE api_key = :k2, updated_at = CURRENT_TIMESTAMP'
+            );
+            $cred->bindValue(':e', $eid, PDO::PARAM_INT);
+            $cred->bindValue(':k', $newKey, PDO::PARAM_STR);
+            $cred->bindValue(':k2', $newKey, PDO::PARAM_STR);
+            $cred->execute();
+            $clrLegacy = $conn->prepare('UPDATE configuracoes SET openai_api_key = NULL, data_atualizacao = NOW() WHERE empresa_id = :e');
+            $clrLegacy->bindValue(':e', $eid, PDO::PARAM_INT);
+            $clrLegacy->execute();
+        }
+
+        $data = sf_openai_settings_payload($conn, $eid);
+        echo json_encode(['success' => true, 'message' => 'Configurações OpenAI salvas.', 'data' => $data]);
+        exit;
+    }
+
     // ========== Consulta de Multas (DETRAN / WSDenatran) ==========
     if ($action === 'get_config_denatran') {
         $conn->exec("CREATE TABLE IF NOT EXISTS certificados_denatran (
@@ -1379,7 +1956,7 @@ try {
         exit;
     }
     if ($action === 'save_config_denatran') {
-        $input = json_decode(file_get_contents('php://input'), true);
+        $input = sf_configuracoes_json_body($sf_routed_json_body);
         if (!$input) $input = $_POST;
         $habilitado = !empty($input['habilitado']) ? 1 : 0;
         $base_url = trim($input['base_url'] ?? 'https://wsdenatrandes-des07116.apps.dev.serpro');

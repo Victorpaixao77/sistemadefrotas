@@ -125,9 +125,9 @@ if (!function_exists('sf_sidebar_aria_current_rels')) {
     }
 }
 
-$sf_open_fiscal = sf_sidebar_any_active(['fiscal/pages/nfe.php', 'fiscal/pages/cte.php', 'fiscal/pages/mdfe.php', 'fiscal/index.php']);
+$sf_open_fiscal = sf_sidebar_any_active(['fiscal/pages/nfe.php', 'fiscal/pages/cte.php', 'fiscal/pages/mdfe.php', 'fiscal/pages/ciot.php', 'fiscal/index.php']);
 $sf_open_fin = sf_sidebar_any_active(['pages/contas_pagar.php', 'pages/despesas_fixas.php', 'pages/financiamento.php', 'pages/multas.php', 'pages/comissoes.php']);
-$sf_open_pneus = sf_sidebar_any_active(['pages/pneus.php', 'pages/estoque_pneus.php', 'pages/gestao_interativa.php', 'pages/manutencao_pneus.php']);
+$sf_open_pneus = sf_sidebar_any_active(['pages/pneus_dashboard.php', 'pages/pneus.php', 'pages/estoque_pneus.php', 'pages/gestao_interativa.php', 'pages/manutencao_pneus.php', 'pages/pneus_inventario.php']);
 $sf_open_gm = sf_sidebar_any_active(['pages/gestao_motoristas.php', 'pages/checklists.php', 'pages/rotas_motoristas.php', 'pages/abastecimentos_motoristas.php', 'pages/mapa_frota.php']);
 ?>
 <!-- Sidebar Navigation -->
@@ -146,7 +146,12 @@ $sf_open_gm = sf_sidebar_any_active(['pages/gestao_motoristas.php', 'pages/check
                 root.classList.remove('light-theme');
                 if (document.body) document.body.classList.remove('light-theme');
             }
-        } catch (e) { console.warn('Theme:', e); }
+            // Aplica o estado "recolhido" ANTES da página pintar, evitando o flash
+            // (abre expandido e volta a recolher) ao navegar entre páginas.
+            if (localStorage.getItem('sidebarCollapsed') === 'true' && document.body) {
+                document.body.classList.add('sidebar-collapsed', 'sidebar-no-anim');
+            }
+        } catch (e) { console.warn('Sidebar init:', e); }
     })();
     </script>
     <div class="sidebar-header">
@@ -169,8 +174,8 @@ $sf_open_gm = sf_sidebar_any_active(['pages/gestao_motoristas.php', 'pages/check
                 <span class="app-name"><?php echo htmlspecialchars($nome_personalizado); ?></span>
             </div>
         </div>
-        <button type="button" class="sidebar-toggle" aria-label="Recolher ou expandir menu lateral">
-            <i class="fas fa-chevron-left" aria-hidden="true"></i>
+        <button type="button" class="sidebar-toggle" aria-label="Recolher ou expandir menu lateral" title="Recolher ou expandir menu">
+            <span class="sidebar-toggle-dots" aria-hidden="true"></span>
         </button>
     </div>
     
@@ -266,6 +271,11 @@ $sf_open_gm = sf_sidebar_any_active(['pages/gestao_motoristas.php', 'pages/check
                                 <i class="fas fa-file-alt"></i> Gestão de MDF-e
                             </a>
                         </li>
+                        <li>
+                            <a href="<?php echo htmlspecialchars(sf_app_url('fiscal/pages/ciot.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('fiscal/pages/ciot.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('fiscal/pages/ciot.php')); ?>>
+                                <i class="fas fa-barcode"></i> CIOT (PEF ANTT)
+                            </a>
+                        </li>
                     </ul>
                 </li>
                 <?php endif; ?>
@@ -319,6 +329,11 @@ $sf_open_gm = sf_sidebar_any_active(['pages/gestao_motoristas.php', 'pages/check
                     </a>
                     <ul class="sidebar-dropdown"<?php echo $sf_open_pneus ? ' data-dropdown-open="1" style="display:block"' : ''; ?>>
                         <li>
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/pneus_dashboard.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/pneus_dashboard.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/pneus_dashboard.php')); ?>>
+                                <i class="fas fa-chart-pie"></i> Dashboard de Pneus
+                            </a>
+                        </li>
+                        <li>
                             <a href="<?php echo htmlspecialchars(sf_app_url('pages/pneus.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/pneus.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/pneus.php')); ?>>
                                 <i class="fas fa-truck"></i> Pneus
                             </a>
@@ -336,6 +351,11 @@ $sf_open_gm = sf_sidebar_any_active(['pages/gestao_motoristas.php', 'pages/check
                         <li>
                             <a href="<?php echo htmlspecialchars(sf_app_url('pages/manutencao_pneus.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/manutencao_pneus.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/manutencao_pneus.php')); ?>>
                                 <i class="fas fa-tools"></i> Manutenção de Pneus
+                            </a>
+                        </li>
+                        <li>
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/pneus_inventario.php')); ?>" class="sidebar-dropdown-link<?php echo sf_sidebar_active(sf_app_url('pages/pneus_inventario.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/pneus_inventario.php')); ?>>
+                                <i class="fas fa-barcode"></i> Inventário QR
                             </a>
                         </li>
                     </ul>
@@ -401,14 +421,39 @@ $sf_open_gm = sf_sidebar_any_active(['pages/gestao_motoristas.php', 'pages/check
                 </li>
                 <?php endif; ?>
                 
-                <?php if (can_manage_system_settings()): ?>
-                <li class="sidebar-nav-item">
-                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/configuracoes.php')); ?>" class="sidebar-link<?php echo sf_sidebar_active(sf_app_url('pages/configuracoes.php')); ?>"<?php echo sf_sidebar_aria_current(sf_app_url('pages/configuracoes.php')); ?>>
+                <?php if (can_manage_system_settings()):
+                    $sf_cfg_url = sf_app_url('pages/configuracoes.php');
+                    $sf_on_config = strpos($current_path, 'pages/configuracoes.php') !== false;
+                    $sf_cfg_aba = $sf_on_config ? ($_GET['aba'] ?? 'geral') : '';
+                    $sf_cfg_itens = [
+                        'geral' => ['Geral', 'fas fa-sliders'],
+                        'seguranca' => ['Segurança', 'fas fa-shield-halved'],
+                        'ia' => ['IA & OCR', 'fas fa-robot'],
+                        'fiscal' => ['Fiscal & Multas', 'fas fa-file-invoice'],
+                        'gps' => ['GPS', 'fas fa-draw-polygon'],
+                        'sistema' => ['Sistema', 'fas fa-microchip'],
+                        'gamificacao' => ['Gamificação', 'fas fa-trophy'],
+                    ];
+                ?>
+                <li class="sidebar-nav-item<?php echo $sf_on_config ? ' sidebar-nav-item--section-active' : ''; ?>">
+                    <a href="#" class="sidebar-link sidebar-dropdown-toggle<?php echo $sf_on_config ? ' active' : ''; ?>">
                         <div class="sidebar-link-icon">
                             <i class="fas fa-cog"></i>
                         </div>
                         <span class="sidebar-link-text">Configuração</span>
+                        <i class="fas fa-chevron-down dropdown-icon<?php echo $sf_on_config ? ' rotate' : ''; ?>"></i>
                     </a>
+                    <ul class="sidebar-dropdown"<?php echo $sf_on_config ? ' data-dropdown-open="1" style="display:block"' : ''; ?>>
+                        <?php foreach ($sf_cfg_itens as $aba_key => $aba_def):
+                            $aba_active = ($sf_cfg_aba === $aba_key) ? ' active' : '';
+                        ?>
+                        <li>
+                            <a href="<?php echo htmlspecialchars($sf_cfg_url . '?aba=' . $aba_key); ?>" class="sidebar-dropdown-link<?php echo $aba_active; ?>"<?php echo $aba_active ? ' aria-current="page"' : ''; ?>>
+                                <i class="<?php echo $aba_def[1]; ?>"></i> <?php echo htmlspecialchars($aba_def[0]); ?>
+                            </a>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
                 </li>
                 <?php endif; ?>
             </ul>

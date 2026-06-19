@@ -6,21 +6,13 @@ ini_set('log_errors', 1);
 ini_set('error_log', '../logs/php_errors.log');
 
 // Incluir arquivos necessários
-require_once '../includes/config.php';
-require_once '../includes/db_connect.php';
+require_once '../includes/pneus_api_base.php';
 
-// Garantir que a saída seja apenas JSON
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 try {
-    // Verificar autenticação usando a função do config.php
-    require_authentication();
-
-    // Obter conexão com o banco de dados
     $conn = getConnection();
-
-    // Log da sessão
-    error_log("Estado da sessão: " . print_r($_SESSION, true));
+    $empresa_id = pneus_empresa_id();
 
     // Processar filtros
     $mes = isset($_GET['mes']) ? intval($_GET['mes']) : null;
@@ -30,7 +22,7 @@ try {
 
     // Construir a condição WHERE para os filtros
     $where_conditions = ["m.empresa_id = :empresa_id"];
-    $params = [':empresa_id' => $_SESSION['empresa_id']];
+    $params = [':empresa_id' => $empresa_id];
 
     if ($mes && $ano) {
         $where_conditions[] = "MONTH(m.data_manutencao) = :mes AND YEAR(m.data_manutencao) = :ano";
@@ -148,7 +140,7 @@ try {
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'message' => 'Erro no banco de dados: ' . $e->getMessage()
+        'message' => 'Erro no banco de dados'
     ]);
 } catch (Exception $e) {
     error_log("Erro geral: " . $e->getMessage());
@@ -156,7 +148,7 @@ try {
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'message' => 'Erro ao carregar dados: ' . $e->getMessage()
+        'message' => 'Erro ao carregar dados'
     ]);
 }
 ?> 

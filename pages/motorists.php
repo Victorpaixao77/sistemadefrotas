@@ -1,6 +1,7 @@
 <?php
 // Include configuration and functions first
 require_once '../includes/config.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
 require_once '../includes/progress_bars.php';
 require_once '../includes/sf_api_base.php';
@@ -36,55 +37,27 @@ $empresa_id = $_SESSION['empresa_id'];
 // Sincronizar alertas de CNH vencendo para o sino de notificações (máx. 1 por dia)
 require_once __DIR__ . '/../includes/sync_cnh_notificacoes.php';
 
+// KPIs iniciais (lista vem só da API via motorists.js)
 $stmt = $conn->prepare("
-    SELECT 
-        m.id,
-        m.nome,
-        m.cpf,
-        m.telefone,
-        m.email,
-        m.cnh,
-        m.porcentagem_comissao,
-        m.foto_motorista,
-        d.nome AS disponibilidade_nome,
-        c.nome AS categoria_cnh_nome
+    SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN m.disponibilidade_id = 1 THEN 1 ELSE 0 END) AS disponiveis,
+        SUM(CASE WHEN m.disponibilidade_id != 1 OR m.disponibilidade_id IS NULL THEN 1 ELSE 0 END) AS indisponiveis,
+        AVG(CASE WHEN m.porcentagem_comissao IS NOT NULL THEN m.porcentagem_comissao END) AS media_comissao,
+        SUM(CASE WHEN TRIM(COALESCE(m.cpf, '')) = '' OR REPLACE(REPLACE(REPLACE(m.cpf, '.', ''), '-', ''), ' ', '') = '' THEN 1 ELSE 0 END) AS sem_cpf
     FROM motoristas m
-    LEFT JOIN disponibilidades d ON m.disponibilidade_id = d.id
-    LEFT JOIN categorias_cnh c ON m.categoria_cnh_id = c.id
     WHERE m.empresa_id = :empresa_id
-    ORDER BY m.nome ASC
 ");
 $stmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
 $stmt->execute();
-$motoristas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$mnt_kpi = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
-$total_motoristas = count($motoristas);
-$motoristas_disponiveis = 0;
-$motoristas_indisponiveis = 0;
-$soma_comissoes = 0.0;
-
-foreach ($motoristas as $motorista) {
-    $status = strtolower(iconv('UTF-8', 'ASCII//TRANSLIT', $motorista['disponibilidade_nome'] ?? ''));
-    if (in_array($status, ['ativo', 'disponivel', 'disponivel', 'em-operacao'], true)) {
-        $motoristas_disponiveis++;
-    } else {
-        $motoristas_indisponiveis++;
-    }
-
-    if (isset($motorista['porcentagem_comissao'])) {
-        $soma_comissoes += (float) $motorista['porcentagem_comissao'];
-    }
-}
-
-$media_comissao = $total_motoristas > 0 ? $soma_comissoes / $total_motoristas : 0.0;
-
-$motoristas_sem_cpf = 0;
-foreach ($motoristas as $m) {
-    $cpf = trim($m['cpf'] ?? '');
-    if ($cpf === '' || preg_replace('/\D/', '', $cpf) === '') {
-        $motoristas_sem_cpf++;
-    }
-}
+$total_motoristas = (int) ($mnt_kpi['total'] ?? 0);
+$motoristas_disponiveis = (int) ($mnt_kpi['disponiveis'] ?? 0);
+$motoristas_indisponiveis = (int) ($mnt_kpi['indisponiveis'] ?? 0);
+$media_comissao = (float) ($mnt_kpi['media_comissao'] ?? 0);
+$motoristas_sem_cpf = (int) ($mnt_kpi['sem_cpf'] ?? 0);
+$motoristas = [];
 
 // Helper functions
 if (!function_exists('normalize_status_class')) {
@@ -1356,6 +1329,7 @@ if (!function_exists('format_cpf_br')) {
             }
         }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'motorists-modern' : ''; ?>">
     <div class="app-container">
@@ -1399,15 +1373,16 @@ if (!function_exists('format_cpf_br')) {
                 
                 <?php if ($is_modern): ?>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Total</span><span class="val" id="totalMotorists"><?php echo (int) $total_motoristas; ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Ativos</span><span class="val" id="activeMotorists"><?php echo (int) $motoristas_disponiveis; ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Indisponíveis</span><span class="val" id="totalTrips"><?php echo (int) $motoristas_indisponiveis; ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Média comissão</span><span class="val" id="averageRating"><?php echo number_format($media_comissao, 2, ',', '.'); ?>%</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-users fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total</span></div><span class="val" id="totalMotorists"><?php echo (int) $total_motoristas; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-user-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Ativos</span></div><span class="val" id="activeMotorists"><?php echo (int) $motoristas_disponiveis; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-user-slash fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Indisponíveis</span></div><span class="val" id="kpiIndisponiveis"><?php echo (int) $motoristas_indisponiveis; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-percent fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Média comissão</span></div><span class="val" id="kpiComissaoMedia"><?php echo number_format($media_comissao, 2, ',', '.'); ?>%</span></div>
                 </div>
                 <?php else: ?>
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-users kpi-card-icon" aria-hidden="true"></i>
                             <h3>Total de Motoristas</h3>
                         </div>
                         <div class="card-body">
@@ -1419,6 +1394,7 @@ if (!function_exists('format_cpf_br')) {
                     </div>
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-user-check kpi-card-icon" aria-hidden="true"></i>
                             <h3>Motoristas Ativos</h3>
                         </div>
                         <div class="card-body">
@@ -1430,22 +1406,24 @@ if (!function_exists('format_cpf_br')) {
                     </div>
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-user-clock kpi-card-icon" aria-hidden="true"></i>
                             <h3>Status</h3>
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="totalTrips"><?php echo $motoristas_indisponiveis; ?></span>
+                                <span class="metric-value" id="kpiIndisponiveis"><?php echo $motoristas_indisponiveis; ?></span>
                                 <span class="metric-subtitle">Motoristas indisponíveis</span>
                             </div>
                         </div>
                     </div>
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-percent kpi-card-icon" aria-hidden="true"></i>
                             <h3>Comissão</h3>
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="averageRating"><?php echo number_format($media_comissao, 2, ',', '.'); ?>%</span>
+                                <span class="metric-value" id="kpiComissaoMedia"><?php echo number_format($media_comissao, 2, ',', '.'); ?>%</span>
                                 <span class="metric-subtitle">Média de comissão configurada</span>
                             </div>
                         </div>
@@ -1575,9 +1553,22 @@ if (!function_exists('format_cpf_br')) {
                     </div>
                 </div>
                 <?php endif; ?>
-                
+                <?php
+                $motoristas_modern_empty = false;
+                ?>
+                <!-- Painel de insights: CNH + qualidade de cadastro + resumo IA -->
+                <div id="sfMotInsights"></div>
+
+                <?php if (!empty($is_modern)): ?>
+                <div class="fornc-empty-state<?php echo $motoristas_modern_empty ? ' visible' : ''; ?>" id="motoristsEmptyState" role="status" aria-live="polite">
+                    <p class="fornc-empty-state-title">Nenhum motorista encontrado</p>
+                    <p class="fornc-empty-state-hint">Ajuste os filtros ou cadastre um novo motorista.</p>
+                    <button type="button" class="fornc-btn fornc-btn--primary" id="motoristsEmptyCreateBtn"><i class="fas fa-plus"></i> Cadastrar primeiro motorista</button>
+                </div>
+                <?php endif; ?>
+
                 <!-- Motorists List Table -->
-                <div class="<?php echo $is_modern ? 'motoristas-table-wrap fornc-table-wrap' : 'data-table-container'; ?>" id="motoristsTableContainer">
+                <div class="<?php echo $is_modern ? 'motoristas-table-wrap fornc-table-wrap' : 'data-table-container'; ?>" id="motoristsTableContainer"<?php echo $motoristas_modern_empty ? ' style="display:none"' : ''; ?>>
                     <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="motoristsTable">
                         <thead>
                             <tr>
@@ -1594,42 +1585,9 @@ if (!function_exists('format_cpf_br')) {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if (!empty($motoristas)): ?>
-                                <?php foreach ($motoristas as $motorista): ?>
-                                    <?php
-                                        $statusNome = $motorista['disponibilidade_nome'] ?? 'Indefinido';
-                                        $statusClass = normalize_status_class($statusNome);
-                                        $comissaoDisplay = isset($motorista['porcentagem_comissao'])
-                                            ? number_format((float) $motorista['porcentagem_comissao'], 2, ',', '.') . '%'
-                                            : '-';
-                                        $fotoUrl = !empty($motorista['foto_motorista']) ? '../uploads/motoristas/foto/' . basename($motorista['foto_motorista']) : '';
-                                    ?>
-                                    <tr>
-                                        <td><?php if ($fotoUrl): ?><img src="<?php echo htmlspecialchars($fotoUrl); ?>" alt="" class="motorist-thumb" style="width:36px;height:36px;object-fit:cover;border-radius:50%;"><?php else: ?><span class="motorist-thumb-placeholder" style="width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;background:var(--bg-tertiary);border-radius:50%;font-size:0.8rem;color:var(--text-muted);"><i class="fas fa-user"></i></span><?php endif; ?></td>
-                                        <td><?php echo htmlspecialchars($motorista['nome']); ?></td>
-                                        <td><?php echo htmlspecialchars(format_cpf_br($motorista['cpf'] ?? '')); ?></td>
-                                        <td><?php echo htmlspecialchars($motorista['cnh'] ?? '-'); ?></td>
-                                        <td><?php echo htmlspecialchars($motorista['categoria_cnh_nome'] ?? '-'); ?></td>
-                                        <td><?php echo htmlspecialchars(format_phone_br($motorista['telefone'] ?? '')); ?></td>
-                                        <td><?php echo htmlspecialchars($motorista['email'] ?? '-'); ?></td>
-                                        <td>
-                                            <span class="status-badge <?php echo $statusClass ? 'status-' . $statusClass : ''; ?>">
-                                                <?php echo htmlspecialchars($statusNome ?: 'Indefinido'); ?>
-                                            </span>
-                                        </td>
-                                        <td><?php echo htmlspecialchars($comissaoDisplay); ?></td>
-                                        <td class="actions">
-                                            <button class="btn-icon view-btn" data-id="<?php echo (int) $motorista['id']; ?>" title="Ver detalhes">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr class="no-data-row">
-                                    <td colspan="10" class="text-center">Nenhum motorista encontrado</td>
-                                </tr>
-                            <?php endif; ?>
+                            <tr class="mnt-loading-row">
+                                <td colspan="10" class="text-center text-muted">Carregando motoristas…</td>
+                            </tr>
                         </tbody>
                     </table>
                     <div id="motoristsCardsContainer" class="motorists-cards-grid" style="display:none;"></div>
@@ -2141,93 +2099,50 @@ if (!function_exists('format_cpf_br')) {
             </div>
         </div>
     </div>
-    
-    <!-- Modal de Ajuda -->
-    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpMotoristsModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Ajuda - Gestão de Motoristas</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="help-section">
-                    <h3>Visão Geral</h3>
-                    <p>A página de Motoristas permite gerenciar todos os motoristas da empresa. Aqui você pode cadastrar, editar, visualizar e excluir motoristas, além de acompanhar métricas importantes de performance e eficiência.</p>
-                </div>
+    <?php $sf_help_key = 'motorists'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
 
-                <div class="help-section">
-                    <h3>Funcionalidades Principais</h3>
-                    <ul>
-                        <li><strong>Novo Motorista:</strong> Cadastre um novo motorista com informações completas como dados pessoais, CNH e documentos.</li>
-                        <li><strong>Filtros:</strong> Use os filtros para encontrar motoristas específicos por status, tipo de CNH ou através da busca por texto.</li>
-                        <li><strong>Relatórios:</strong> Visualize relatórios e estatísticas de performance dos motoristas.</li>
-                        <li><strong>Análise de Eficiência:</strong> Acompanhe a eficiência financeira de cada motorista.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Indicadores (KPIs)</h3>
-                    <ul>
-                        <li><strong>Total de Motoristas:</strong> Número total de motoristas ativos.</li>
-                        <li><strong>Motoristas Ativos:</strong> Quantidade de motoristas em operação.</li>
-                        <li><strong>Eficiência Financeira:</strong> Análise de faturamento vs despesas por motorista.</li>
-                        <li><strong>Avaliação de Desempenho:</strong> Métricas de performance em diferentes aspectos.</li>
-                        <li><strong>Distribuição por CNH:</strong> Gráfico mostrando a distribuição por tipo de CNH.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Ações Disponíveis</h3>
-                    <ul>
-                        <li><strong>Visualizar:</strong> Veja detalhes completos do motorista, incluindo histórico de viagens e documentos.</li>
-                        <li><strong>Editar:</strong> Modifique informações de um motorista existente.</li>
-                        <li><strong>Excluir:</strong> Remova um motorista do sistema (ação irreversível).</li>
-                        <li><strong>Histórico:</strong> Acesse o histórico completo de viagens e atividades do motorista.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Dicas Úteis</h3>
-                    <ul>
-                        <li>Mantenha os documentos dos motoristas sempre atualizados, especialmente a CNH.</li>
-                        <li>Monitore a eficiência financeira para identificar oportunidades de melhoria.</li>
-                        <li>Acompanhe o desempenho dos motoristas para treinamentos específicos.</li>
-                        <li>Utilize os filtros para encontrar motoristas específicos rapidamente.</li>
-                        <li>Analise os relatórios para otimizar a alocação de motoristas.</li>
-                        <li>Configure alertas para vencimento de documentos importantes.</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeModal('helpMotoristsModal')">Fechar</button>
-            </div>
-        </div>
-    </div>
     
     <!-- JavaScript Files -->
     <?php sf_render_api_scripts(); ?>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
-    <script src="../js/motorists.js"></script>
+    <script src="../js/motorists.js?v=1.2"></script>
+    <script src="../js/sf_insights.js?v=1.3"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.SFInsights) {
+            SFInsights.init({
+                mountId: 'sfMotInsights',
+                insightsUrl: '../api/motorist_insights.php',
+                resumoUrl: '../api/motorist_resumo_ia.php',
+                title: 'Insights de motoristas',
+                sectionTitle: 'Pendências de cadastro',
+                emptyOk: 'Nenhuma pendência de CNH ou cadastro encontrada.',
+                stats: function (j) {
+                    var c = j.cnh || {};
+                    return [
+                        { label: 'motoristas', value: j.total_motoristas || 0, tone: 'ok' },
+                        { label: 'CNH vencida', value: c.vencidas || 0, tone: (c.vencidas > 0 ? 'erro' : 'ok') },
+                        { label: 'vence ≤30 dias', value: c.vence_30 || 0, tone: (c.vence_30 > 0 ? 'aviso' : 'ok') },
+                        { label: 'vence ≤60 dias', value: c.vence_60 || 0, tone: (c.vence_60 > 0 ? 'aviso' : 'ok') }
+                    ];
+                },
+                onEdit: function (id) {
+                    // loadMotoristForEdit já abre o modal (openModal) ao terminar de carregar.
+                    if (typeof loadMotoristForEdit === 'function') loadMotoristForEdit(id);
+                }
+            });
+        }
+    });
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
 
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Initialize page first (includes setupHelpButton)
-        initializePage();
-        
-        // Setup modal events after page initialization
-        setupModals();
-        
-        // Setup filters
-        setupFilters();
-        
-        // Initialize charts
-        initializeCharts();
-        
-        // Setup pagination
-        setupPagination();
+    function mntEsc(v) {
+        return (typeof escapeHtml === 'function') ? escapeHtml(v) : String(v ?? '');
+    }
 
+    document.addEventListener('DOMContentLoaded', function() {
         // Função para formatar valores em reais
         const formatCurrency = (value) => {
             return new Intl.NumberFormat('pt-BR', {
@@ -2518,11 +2433,26 @@ if (!function_exists('format_cpf_br')) {
             });
     }
 
-    function carregarConteudoRanking() {
+    function carregarConteudoRanking(filtros) {
         const content = document.getElementById('rankingContent');
-        
+
+        // Filtros opcionais encaminhados à API (período → datas reais que a API entende)
+        let qs = '';
+        if (filtros && filtros.periodo) {
+            const fim = new Date();
+            const inicio = new Date();
+            switch (filtros.periodo) {
+                case 'semanal': inicio.setDate(inicio.getDate() - 7); break;
+                case 'trimestral': inicio.setMonth(inicio.getMonth() - 3); break;
+                case 'anual': inicio.setFullYear(inicio.getFullYear() - 1); break;
+                case 'mensal': default: inicio.setDate(1); break;
+            }
+            const fmt = (d) => d.toISOString().slice(0, 10);
+            qs = '&periodo_inicio=' + fmt(inicio) + '&periodo_fim=' + fmt(fim);
+        }
+
         // Primeiro, tentar carregar dados reais de ranking
-        fetch('../api/ranking_motoristas.php?action=get_ranking&empresa_id=<?php echo $_SESSION['empresa_id']; ?>')
+        fetch('../api/ranking_motoristas.php?action=get_ranking&empresa_id=<?php echo $_SESSION['empresa_id']; ?>' + qs)
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.data && data.data.ranking && data.data.ranking.length > 0) {
@@ -2713,7 +2643,7 @@ if (!function_exists('format_cpf_br')) {
                                                 </span>
                                             </div>
                                             <div class="driver-info">
-                                                <div class="driver-name">${motorista.motorista_nome || 'N/A'}</div>
+                                                <div class="driver-name">${mntEsc(motorista.motorista_nome) || 'N/A'}</div>
                                                 <div class="driver-stats">
                                                     <span class="points"><i class="fas fa-star"></i> ${motorista.pontos_totais || 0} pontos</span>
                                                     <span class="routes"><i class="fas fa-route"></i> ${motorista.total_rotas_reais || motorista.rotas_concluidas || 0} rotas</span>
@@ -2724,7 +2654,7 @@ if (!function_exists('format_cpf_br')) {
                                             </div>
                                             <div class="level-badge">
                                                 <span class="badge ${getNivelClass(motorista.nivel_calculado)}">
-                                                    ${getNivelEmoji(motorista.nivel_calculado)} ${motorista.nivel_calculado}
+                                                    ${getNivelEmoji(motorista.nivel_calculado)} ${mntEsc(motorista.nivel_calculado)}
                                                 </span>
                                             </div>
                                         </div>
@@ -2821,7 +2751,7 @@ if (!function_exists('format_cpf_br')) {
                                                 </span>
                                             </div>
                                             <div class="driver-info">
-                                                <div class="driver-name">${motorista.motorista_nome || 'N/A'}</div>
+                                                <div class="driver-name">${mntEsc(motorista.motorista_nome) || 'N/A'}</div>
                                                 <div class="driver-id">ID: ${motorista.motorista_id || 'N/A'}</div>
                                             </div>
                                             <div class="score-section">
@@ -2832,7 +2762,7 @@ if (!function_exists('format_cpf_br')) {
                                             </div>
                                             <div class="status-section">
                                                 <span class="status-badge ${getStatusClass(motorista.status || 'Ativo')}">
-                                                    ${motorista.status || 'Ativo'}
+                                                    ${mntEsc(motorista.status) || 'Ativo'}
                                                 </span>
                                                 <button class="btn btn-sm btn-outline-primary" onclick="verDetalhesMotorista(${motorista.motorista_id})" title="Ver Detalhes">
                                                     <i class="fas fa-eye"></i>
@@ -3250,15 +3180,14 @@ if (!function_exists('format_cpf_br')) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert(`✅ ${data.message}`);
+                showNotification(data.message || 'Gamificação calculada com sucesso.', 'success');
                 carregarConteudoGamificacao(); // Recarregar dados
             } else {
-                alert(`❌ Erro: ${data.error || 'Falha ao calcular gamificação'}`);
+                showNotification(data.error || 'Falha ao calcular gamificação', 'error');
             }
         })
-        .catch(error => {
-            console.error('Erro ao calcular gamificação:', error);
-            alert('❌ Erro ao calcular gamificação');
+        .catch(() => {
+            showNotification('Erro ao calcular gamificação', 'error');
         });
     }
 
@@ -3270,21 +3199,18 @@ if (!function_exists('format_cpf_br')) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert(`✅ ${data.message}`);
+                showNotification(data.message || 'Ranking calculado com sucesso.', 'success');
                 carregarConteudoRanking(); // Recarregar dados
             } else {
-                alert(`❌ Erro: ${data.error || 'Falha ao calcular ranking'}`);
+                showNotification(data.error || 'Falha ao calcular ranking', 'error');
             }
         })
-        .catch(error => {
-            console.error('Erro ao calcular ranking:', error);
-            alert('❌ Erro ao calcular ranking');
+        .catch(() => {
+            showNotification('Erro ao calcular ranking', 'error');
         });
     }
 
     function verDetalhesMotorista(motoristaId) {
-        console.log('Ver detalhes do motorista:', motoristaId);
-        
         // Buscar dados do motorista
         fetch(`../api/ranking_motoristas.php?action=get_detalhes&motorista_id=${motoristaId}`)
             .then(response => response.json())
@@ -3292,13 +3218,11 @@ if (!function_exists('format_cpf_br')) {
                 if (data.success && data.data && data.data.motorista) {
                     mostrarDetalhesMotorista(data.data.motorista, data.data.historico, data.data.gamificacao);
                 } else {
-                    console.error('Erro na resposta:', data);
-                    alert('❌ Erro ao carregar detalhes do motorista');
+                    showNotification('Erro ao carregar detalhes do motorista', 'error');
                 }
             })
-            .catch(error => {
-                console.error('Erro ao carregar detalhes:', error);
-                alert('❌ Erro ao carregar detalhes do motorista');
+            .catch(() => {
+                showNotification('Erro ao carregar detalhes do motorista', 'error');
             });
     }
     
@@ -3318,7 +3242,7 @@ if (!function_exists('format_cpf_br')) {
                             <div class="row">
                                 <div class="col-md-6">
                                     <h6 class="text-primary mb-3">Informações Pessoais</h6>
-                                    <p><strong>Nome:</strong> ${motorista.nome || 'N/A'}</p>
+                                    <p><strong>Nome:</strong> ${mntEsc(motorista.nome) || 'N/A'}</p>
                                     <p><strong>ID:</strong> ${motorista.id || 'N/A'}</p>
                                     <p><strong>CPF:</strong> ${motorista.cpf || 'N/A'}</p>
                                     <p><strong>CNH:</strong> ${motorista.cnh || 'N/A'}</p>
@@ -3328,7 +3252,7 @@ if (!function_exists('format_cpf_br')) {
                                     <h6 class="text-primary mb-3">Performance no Ranking</h6>
                                     <p><strong>Posição:</strong> ${motorista.posicao_ranking || 'N/A'}</p>
                                     <p><strong>Nota Total:</strong> ${motorista.nota_total || '0'}/100</p>
-                                    <p><strong>Classificação:</strong> ${motorista.classificacao || 'N/A'}</p>
+                                    <p><strong>Classificação:</strong> ${mntEsc(motorista.classificacao) || 'N/A'}</p>
                                     <p><strong>Total de Rotas:</strong> ${motorista.total_rotas || '0'}</p>
                                     <p><strong>Rotas Pontuais:</strong> ${motorista.rotas_pontuais || '0'}</p>
                                 </div>
@@ -3520,15 +3444,11 @@ if (!function_exists('format_cpf_br')) {
         const periodo = document.getElementById('filtroPeriodo').value;
         const veiculo = document.getElementById('filtroVeiculo').value;
         const rota = document.getElementById('filtroRota').value;
-        
-        // Simular aplicação de filtros
-        console.log('Aplicando filtros:', { periodo, veiculo, rota });
-        
-        // Mostrar notificação de filtros aplicados
-        alert(`✅ Filtros aplicados!\n\nPeríodo: ${periodo}\nVeículo: ${veiculo}\nRota: ${rota}\n\nOs dados serão recarregados com os filtros selecionados.`);
-        
-        // Recarregar conteúdo do ranking com filtros
-        carregarConteudoRanking();
+
+        showNotification('Atualizando ranking...', 'info');
+
+        // Recarregar conteúdo do ranking encaminhando os filtros à API
+        carregarConteudoRanking({ periodo, veiculo, rota });
     }
 
     // Função para simular dados de gamificação baseados nos motoristas reais
@@ -3674,5 +3594,6 @@ if (!function_exists('format_cpf_br')) {
     </style>
 
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html>

@@ -27,12 +27,12 @@
   bottom: 110px;
   right: 32px;
   width: 350px;
-  max-height: 60vh;
+  max-height: min(75vh, 640px);
   background: var(--card-bg);
   color: var(--text-primary);
   border-radius: 16px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.28);
-  overflow-y: auto;
+  overflow: hidden;
   z-index: 10000;
   display: none;
   flex-direction: column;
@@ -41,6 +41,7 @@
   display: flex;
 }
 .ia-notification-header {
+  flex-shrink: 0;
   padding: 18px 20px 10px 20px;
   font-size: 1.2rem;
   font-weight: 600;
@@ -50,9 +51,17 @@
   align-items: center;
 }
 .ia-notification-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(52vh, 420px);
   padding: 10px 20px 20px 20px;
-  flex: 1;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ia-notification-footer {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
 }
 .ia-notification-item {
   background: var(--bg-tertiary);

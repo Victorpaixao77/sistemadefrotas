@@ -195,7 +195,7 @@ try {
     }
     
     // 3. Despesas de Viagem por mês (total_despviagem; se zero, soma das rubricas — evita gráficos vazios quando só o detalhe foi lançado)
-    $dvLinha = "CASE WHEN COALESCE(dv.total_despviagem, 0) > 0 THEN dv.total_despviagem ELSE (COALESCE(dv.descarga, 0) + COALESCE(dv.pedagios, 0) + COALESCE(dv.caixinha, 0) + COALESCE(dv.estacionamento, 0) + COALESCE(dv.lavagem, 0) + COALESCE(dv.borracharia, 0) + COALESCE(dv.eletrica_mecanica, 0) + COALESCE(dv.adiantamento, 0)) END";
+    $dvLinha = "CASE WHEN COALESCE(dv.total_despviagem, 0) > 0 THEN dv.total_despviagem ELSE (COALESCE(dv.descarga, 0) + COALESCE(dv.pedagios, 0) + COALESCE(dv.caixinha, 0) + COALESCE(dv.estacionamento, 0) + COALESCE(dv.lavagem, 0) + COALESCE(dv.borracharia, 0) + COALESCE(dv.eletrica_mecanica, 0) + COALESCE(dv.adiantamento, 0) + COALESCE(dv.outros, 0)) END";
     $sql_despesas = "
         SELECT 
             DATE_FORMAT(r.data_saida, '%Y-%m') as mes_ano,
@@ -435,10 +435,10 @@ try {
     // Despesas de viagem por tipo (totais no período) para gráfico pizza
     $despesas_viagem_tipos = [
         'descarga' => 0, 'pedagios' => 0, 'caixinha' => 0, 'estacionamento' => 0,
-        'lavagem' => 0, 'borracharia' => 0, 'eletrica_mecanica' => 0, 'adiantamento' => 0
+        'lavagem' => 0, 'borracharia' => 0, 'eletrica_mecanica' => 0, 'adiantamento' => 0, 'outros' => 0
     ];
     try {
-        $cols = ['descarga', 'pedagios', 'caixinha', 'estacionamento', 'lavagem', 'borracharia', 'eletrica_mecanica', 'adiantamento'];
+        $cols = ['descarga', 'pedagios', 'caixinha', 'estacionamento', 'lavagem', 'borracharia', 'eletrica_mecanica', 'adiantamento', 'outros'];
         $sel = implode(', ', array_map(function ($c) { return 'COALESCE(SUM(' . $c . '), 0) as ' . $c; }, $cols));
         $sql_dv_tipos = "SELECT $sel FROM despesas_viagem dv INNER JOIN rotas r ON r.id = dv.rota_id WHERE r.empresa_id = :empresa_id " . $cond_rotas_r;
         $stmt = $conn->prepare($sql_dv_tipos);

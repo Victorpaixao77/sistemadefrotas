@@ -9,6 +9,56 @@ require_once dirname(__DIR__, 2) . '/includes/functions.php';
 require_once dirname(__DIR__, 2) . '/includes/pneu_movimentacoes_helper.php';
 require_once dirname(__DIR__, 2) . '/includes/csrf.php';
 require_once dirname(__DIR__, 2) . '/includes/api_json.php';
+require_once dirname(__DIR__, 2) . '/includes/permissions.php';
+require_once dirname(__DIR__, 2) . '/includes/pneus_helpers.php';
+
+/**
+ * Resolve slot_id (ex.: cavalo-0-1) para eixo_veiculo_id e posicao_slot.
+ */
+function eixos_resolve_slot_veiculo(PDO $conn, int $veiculo_id, int $empresa_id, string $slot_id): ?array
+{
+    $parts = explode('-', $slot_id, 3);
+    if (count($parts) !== 3) {
+        return null;
+    }
+    [$tipoSlot, $idxEixo, $posSlot] = $parts;
+    $tipo_veiculo = ($tipoSlot === 'cavalo') ? 'caminhao' : (($tipoSlot === 'carreta') ? 'carreta' : null);
+    if ($tipo_veiculo === null) {
+        return null;
+    }
+    $offset = (int) $idxEixo;
+    $stmt = $conn->prepare(
+        'SELECT id, quantidade_pneus FROM eixos_veiculos
+         WHERE veiculo_id = ? AND empresa_id = ? AND tipo_veiculo = ?
+         ORDER BY numero_eixo ASC
+         LIMIT 1 OFFSET ' . $offset
+    );
+    $stmt->execute([$veiculo_id, $empresa_id, $tipo_veiculo]);
+    $eixo = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$eixo) {
+        return null;
+    }
+    $pos = (int) $posSlot;
+    if ($pos < 0 || $pos >= (int) $eixo['quantidade_pneus']) {
+        return null;
+    }
+    return [
+        'eixo_id' => (int) $eixo['id'],
+        'posicao_slot' => $pos,
+    ];
+}
+
+function eixos_alocacao_posicao_id_exists(PDO $conn): bool
+{
+    static $exists = null;
+    if ($exists !== null) {
+        return $exists;
+    }
+    $stmt = $conn->prepare("SHOW COLUMNS FROM alocacoes_pneus_flexiveis LIKE 'posicao_id'");
+    $stmt->execute();
+    $exists = $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+    return $exists;
+}
 
 // Configurar sessão
 configure_session();
@@ -18,9 +68,10 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Debug: Verificar dados da sessão
-error_log("API Eixos - Session ID: " . session_id());
-error_log("API Eixos - Session data: " . print_r($_SESSION, true));
+// Debug: Verificar dados da sessão (apenas em DEBUG_MODE)
+if (defined('DEBUG_MODE') && DEBUG_MODE) {
+    error_log('API Eixos - Session ID: ' . session_id());
+}
 
 // Verificar autenticação e empresa_id
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
@@ -37,6 +88,13 @@ if ($empresa_id <= 0) {
     ob_clean();
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'ID da empresa inválido']);
+    exit;
+}
+
+if (!can_access_tire_management()) {
+    ob_clean();
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Sem permissão para gestão de pneus']);
     exit;
 }
 
@@ -274,10 +332,27 @@ try {
                     echo json_encode(['success' => false, 'error' => 'Pneu não encontrado']);
                     exit;
                 }
+
+                $pos_check_id = $posicao_id ? (int) $posicao_id : null;
+                if (file_exists(__DIR__ . '/../../includes/pneus_mercado_helpers.php')) {
+                    require_once __DIR__ . '/../../includes/pneus_mercado_helpers.php';
+                    $val = pneus_validar_posicao_instalacao($conn, (int) $pneu_id, $pos_check_id, $empresa_id);
+                    if (empty($val['ok'])) {
+                        ob_clean();
+                        echo json_encode(['success' => false, 'error' => $val['error'] ?? 'Posição incompatível com o pneu']);
+                        exit;
+                    }
+                }
                 
+                $conn->beginTransaction();
+
                 // Desativar alocações anteriores do pneu
                 $stmt = $conn->prepare("UPDATE alocacoes_pneus_flexiveis SET ativo = 0, data_remocao = NOW() WHERE pneu_id = ? AND ativo = 1");
                 $stmt->execute([$pneu_id]);
+
+                // Desativar pneu anteriormente alocado neste slot
+                $stmt = $conn->prepare("UPDATE alocacoes_pneus_flexiveis SET ativo = 0, data_remocao = NOW() WHERE slot_id = ? AND empresa_id = ? AND ativo = 1");
+                $stmt->execute([$slot_id, $empresa_id]);
                 
                 // Verificar se a coluna posicao_id existe
                 $stmt = $conn->prepare("SHOW COLUMNS FROM alocacoes_pneus_flexiveis LIKE 'posicao_id'");
@@ -308,22 +383,43 @@ try {
                 $stmt->execute([$eixo_id, $empresa_id]);
                 $eixo_row = $stmt->fetch(PDO::FETCH_ASSOC);
                 if ($eixo_row) {
+                    $veiculo_id_inst = (int) $eixo_row['veiculo_id'];
+                    $km_odometro = pneus_get_veiculo_km($conn, $veiculo_id_inst, $empresa_id);
+                    if ($km_odometro !== null) {
+                        $stmt = $conn->prepare(
+                            'UPDATE pneus SET km_instalacao = CASE WHEN km_instalacao IS NULL OR km_instalacao = 0 THEN ? ELSE km_instalacao END,
+                             updated_at = NOW() WHERE id = ? AND empresa_id = ?'
+                        );
+                        $stmt->execute([$km_odometro, $pneu_id, $empresa_id]);
+                        if (pneus_column_exists($conn, 'pneus', 'km_rodado_total')) {
+                            $stmt = $conn->prepare('SELECT km_instalacao FROM pneus WHERE id = ?');
+                            $stmt->execute([$pneu_id]);
+                            $ki = (int) ($stmt->fetchColumn() ?: 0);
+                            $kr = max(0, $km_odometro - $ki);
+                            $stmt = $conn->prepare('UPDATE pneus SET km_rodado_total = ? WHERE id = ? AND empresa_id = ?');
+                            $stmt->execute([$kr, $pneu_id, $empresa_id]);
+                        }
+                    }
                     pneu_movimentacao_inserir($conn, [
                         'empresa_id'  => $empresa_id,
                         'pneu_id'     => (int) $pneu_id,
                         'tipo'        => 'instalacao',
-                        'veiculo_id'  => (int) $eixo_row['veiculo_id'],
+                        'veiculo_id'  => $veiculo_id_inst,
                         'eixo_id'     => (int) $eixo_id,
                         'posicao_id'  => $posicao_id ? (int) $posicao_id : null,
+                        'km_odometro' => $km_odometro,
                     ]);
                 }
-                
+
+                $conn->commit();
+
                 ob_clean();
                 echo json_encode(['success' => true, 'message' => 'Pneu alocado com sucesso']);
                 break;
                 
             case 'remover_pneu':
                 $slot_id = $input['slot_id'] ?? null;
+                $motivo_remocao_id = isset($input['motivo_remocao_id']) ? (int) $input['motivo_remocao_id'] : null;
                 
                 if (!$slot_id) {
                     ob_clean();
@@ -337,7 +433,9 @@ try {
                 $aloc = $stmt->fetch(PDO::FETCH_ASSOC);
                 $pneu_id_removido = $aloc ? (int)$aloc['pneu_id'] : null;
                 $eixo_veiculo_id = $aloc ? (int)$aloc['eixo_veiculo_id'] : null;
-                
+
+                $conn->beginTransaction();
+
                 // Desativar alocação
                 $stmt = $conn->prepare("UPDATE alocacoes_pneus_flexiveis SET ativo = 0, data_remocao = NOW() WHERE slot_id = ? AND empresa_id = ? AND ativo = 1");
                 $stmt->execute([$slot_id, $empresa_id]);
@@ -357,19 +455,203 @@ try {
                         $stmt->execute([$eixo_veiculo_id, $empresa_id]);
                         $ev = $stmt->fetch(PDO::FETCH_ASSOC);
                         if ($ev) {
-                            pneu_movimentacao_inserir($conn, [
+                            $mov = [
                                 'empresa_id' => $empresa_id,
                                 'pneu_id'    => $pneu_id_removido,
                                 'tipo'       => 'remocao',
                                 'veiculo_id' => (int) $ev['veiculo_id'],
                                 'eixo_id'    => $eixo_veiculo_id,
-                            ]);
+                            ];
+                            if ($motivo_remocao_id > 0) {
+                                $mov['motivo_remocao_id'] = $motivo_remocao_id;
+                            }
+                            pneu_movimentacao_inserir($conn, $mov);
+                            if (file_exists(__DIR__ . '/../../includes/pneus_mercado_helpers.php')) {
+                                require_once __DIR__ . '/../../includes/pneus_mercado_helpers.php';
+                                pneus_auditoria_registrar($conn, [
+                                    'empresa_id' => $empresa_id,
+                                    'pneu_id' => $pneu_id_removido,
+                                    'acao' => 'remocao_veiculo',
+                                    'dados' => ['slot_id' => $slot_id, 'motivo_remocao_id' => $motivo_remocao_id],
+                                ]);
+                            }
                         }
                     }
                 }
-                
+
+                $conn->commit();
+
                 ob_clean();
                 echo json_encode(['success' => true, 'message' => 'Pneu removido com sucesso']);
+                break;
+
+            case 'mover_pneu':
+                $from_slot = $input['from_slot_id'] ?? null;
+                $to_slot = $input['to_slot_id'] ?? null;
+
+                if (!$from_slot || !$to_slot || $from_slot === $to_slot) {
+                    ob_clean();
+                    echo json_encode(['success' => false, 'error' => 'Slots de origem e destino inválidos']);
+                    exit;
+                }
+
+                $stmt = $conn->prepare(
+                    'SELECT apf.pneu_id, apf.posicao_id, ev.veiculo_id
+                     FROM alocacoes_pneus_flexiveis apf
+                     INNER JOIN eixos_veiculos ev ON apf.eixo_veiculo_id = ev.id
+                     WHERE apf.slot_id = ? AND apf.empresa_id = ? AND apf.ativo = 1
+                     LIMIT 1'
+                );
+                $stmt->execute([$from_slot, $empresa_id]);
+                $origem = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$origem) {
+                    ob_clean();
+                    echo json_encode(['success' => false, 'error' => 'Nenhum pneu alocado no slot de origem']);
+                    exit;
+                }
+
+                $stmt = $conn->prepare(
+                    'SELECT id FROM alocacoes_pneus_flexiveis WHERE slot_id = ? AND empresa_id = ? AND ativo = 1 LIMIT 1'
+                );
+                $stmt->execute([$to_slot, $empresa_id]);
+                if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+                    ob_clean();
+                    echo json_encode(['success' => false, 'error' => 'Slot de destino já está ocupado']);
+                    exit;
+                }
+
+                $veiculo_id_move = (int) $origem['veiculo_id'];
+                $target = eixos_resolve_slot_veiculo($conn, $veiculo_id_move, $empresa_id, $to_slot);
+                if (!$target) {
+                    ob_clean();
+                    echo json_encode(['success' => false, 'error' => 'Slot de destino inválido para este veículo']);
+                    exit;
+                }
+
+                $pneu_id_move = (int) $origem['pneu_id'];
+                $posicao_id_move = isset($origem['posicao_id']) ? (int) $origem['posicao_id'] : null;
+                if ($posicao_id_move <= 0) {
+                    $posicao_id_move = null;
+                }
+
+                $conn->beginTransaction();
+
+                $stmt = $conn->prepare(
+                    'UPDATE alocacoes_pneus_flexiveis SET ativo = 0, data_remocao = NOW()
+                     WHERE slot_id = ? AND empresa_id = ? AND ativo = 1'
+                );
+                $stmt->execute([$from_slot, $empresa_id]);
+
+                if (eixos_alocacao_posicao_id_exists($conn)) {
+                    $stmt = $conn->prepare(
+                        'INSERT INTO alocacoes_pneus_flexiveis (eixo_veiculo_id, pneu_id, posicao_slot, posicao_id, slot_id, empresa_id)
+                         VALUES (?, ?, ?, ?, ?, ?)'
+                    );
+                    $stmt->execute([
+                        $target['eixo_id'],
+                        $pneu_id_move,
+                        $target['posicao_slot'],
+                        $posicao_id_move,
+                        $to_slot,
+                        $empresa_id,
+                    ]);
+                } else {
+                    $stmt = $conn->prepare(
+                        'INSERT INTO alocacoes_pneus_flexiveis (eixo_veiculo_id, pneu_id, posicao_slot, slot_id, empresa_id)
+                         VALUES (?, ?, ?, ?, ?)'
+                    );
+                    $stmt->execute([
+                        $target['eixo_id'],
+                        $pneu_id_move,
+                        $target['posicao_slot'],
+                        $to_slot,
+                        $empresa_id,
+                    ]);
+                }
+
+                pneu_movimentacao_inserir($conn, [
+                    'empresa_id' => $empresa_id,
+                    'pneu_id' => $pneu_id_move,
+                    'tipo' => 'deslocamento',
+                    'veiculo_id' => $veiculo_id_move,
+                    'eixo_id' => $target['eixo_id'],
+                    'posicao_id' => $posicao_id_move,
+                    'observacoes' => 'Movido de ' . $from_slot . ' para ' . $to_slot,
+                ]);
+
+                $conn->commit();
+
+                ob_clean();
+                echo json_encode(['success' => true, 'message' => 'Pneu movido com sucesso']);
+                break;
+
+            case 'enviar_manutencao':
+                $slot_id = $input['slot_id'] ?? null;
+                $observacoes = trim((string) ($input['observacoes'] ?? 'Enviado para manutenção'));
+
+                if (!$slot_id) {
+                    ob_clean();
+                    echo json_encode(['success' => false, 'error' => 'slot_id obrigatório']);
+                    exit;
+                }
+
+                $stmt = $conn->prepare(
+                    'SELECT apf.pneu_id, apf.eixo_veiculo_id, apf.posicao_id
+                     FROM alocacoes_pneus_flexiveis apf
+                     WHERE apf.slot_id = ? AND apf.empresa_id = ? AND apf.ativo = 1
+                     LIMIT 1'
+                );
+                $stmt->execute([$slot_id, $empresa_id]);
+                $aloc = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                if (!$aloc) {
+                    ob_clean();
+                    echo json_encode(['success' => false, 'error' => 'Nenhum pneu alocado neste slot']);
+                    exit;
+                }
+
+                $pneu_id_manut = (int) $aloc['pneu_id'];
+                $eixo_veiculo_id = (int) $aloc['eixo_veiculo_id'];
+                $posicao_id_manut = isset($aloc['posicao_id']) ? (int) $aloc['posicao_id'] : null;
+                if ($posicao_id_manut <= 0) {
+                    $posicao_id_manut = null;
+                }
+
+                $stmt = $conn->prepare('SELECT veiculo_id FROM eixos_veiculos WHERE id = ? AND empresa_id = ?');
+                $stmt->execute([$eixo_veiculo_id, $empresa_id]);
+                $ev = $stmt->fetch(PDO::FETCH_ASSOC);
+                $veiculo_id_manut = $ev ? (int) $ev['veiculo_id'] : null;
+
+                $conn->beginTransaction();
+
+                $stmt = $conn->prepare(
+                    'UPDATE alocacoes_pneus_flexiveis SET ativo = 0, data_remocao = NOW()
+                     WHERE slot_id = ? AND empresa_id = ? AND ativo = 1'
+                );
+                $stmt->execute([$slot_id, $empresa_id]);
+
+                $statusManut = pneus_status_id_manutencao($conn) ?? pneus_status_id_por_nome($conn, 'furado');
+                if ($statusManut) {
+                    pneus_sync_status_estoque($conn, $pneu_id_manut, $empresa_id, $statusManut, 0);
+                }
+
+                if ($veiculo_id_manut) {
+                    pneu_movimentacao_inserir($conn, [
+                        'empresa_id' => $empresa_id,
+                        'pneu_id' => $pneu_id_manut,
+                        'tipo' => 'manutencao',
+                        'veiculo_id' => $veiculo_id_manut,
+                        'eixo_id' => $eixo_veiculo_id,
+                        'posicao_id' => $posicao_id_manut,
+                        'observacoes' => $observacoes,
+                    ]);
+                }
+
+                $conn->commit();
+
+                ob_clean();
+                echo json_encode(['success' => true, 'message' => 'Pneu enviado para manutenção']);
                 break;
                 
             default:
@@ -383,8 +665,11 @@ try {
     }
     
 } catch (Exception $e) {
+    if (isset($conn) && $conn->inTransaction()) {
+        $conn->rollBack();
+    }
     ob_clean();
     error_log("Erro na API de eixos: " . $e->getMessage());
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Erro ao processar a operação de eixos.']);
 }
 ?>

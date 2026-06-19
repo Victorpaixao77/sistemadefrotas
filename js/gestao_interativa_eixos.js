@@ -1,5 +1,19 @@
 // Sistema de Eixos de Veículos - Gestão Interativa
-// Usando API do banco de dados ao invés de arquivo JSON
+
+function escapeHtmlPneus(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function sfPneusFetchHeaders(extra) {
+    const h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+    if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+        h['X-CSRF-Token'] = window.__SF_CSRF__;
+    }
+    return h;
+}
 
 // Estado dos eixos e pneus alocados no modo flexível
 let eixosCaminhao = [];
@@ -92,44 +106,40 @@ function carregarLayoutFallback(veiculoId) {
 function adicionarEixo(tipo) {
     const veiculoId = veiculoSelecionado;
     if (!veiculoId) {
-        alert('Selecione um veículo primeiro!');
+        giToast('Selecione um veículo primeiro!');
         return;
     }
 
-    let qtd = prompt('Quantos pneus por eixo? (1 = rodado simples/2 pneus, 2 = rodado duplo/4 pneus)', '1');
-    if (!qtd || isNaN(qtd)) return;
-    
-    qtd = parseInt(qtd);
-    if (qtd < 1 || qtd > 2) {
-        alert('Quantidade deve ser 1 ou 2!');
-        return;
-    }
+    giChoose('Tipo de eixo a adicionar', [
+        { label: 'Rodado simples', desc: '2 pneus (um de cada lado)', value: 2 },
+        { label: 'Rodado duplo', desc: '4 pneus (dois de cada lado)', value: 4 }
+    ]).then(function (quantidade_pneus) {
+        if (!quantidade_pneus) return;
 
-    const quantidade_pneus = qtd === 1 ? 2 : 4; // Converter para quantidade real de pneus
-
-    fetch('../gestao_interativa/api/eixos_veiculos.php?action=adicionar_eixo', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({
-            veiculo_id: veiculoId,
-            tipo_veiculo: tipo,
-            quantidade_pneus: quantidade_pneus
+        fetch('../gestao_interativa/api/eixos_veiculos.php?action=adicionar_eixo', {
+            method: 'POST',
+            headers: sfPneusFetchHeaders(),
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                veiculo_id: veiculoId,
+                tipo_veiculo: tipo,
+                quantidade_pneus: quantidade_pneus
+            })
         })
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            alert('Eixo adicionado com sucesso!');
-            // Recarregar layout do banco
-            onSelecionarVeiculoFlexivel(veiculoId);
-        } else {
-            alert('Erro ao adicionar eixo: ' + data.error);
-        }
-    })
-    .catch(error => {
-        console.error('Erro ao adicionar eixo:', error);
-        alert('Erro ao adicionar eixo. Tente novamente.');
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                giToast('Eixo adicionado com sucesso!', 'success');
+                // Recarregar layout do banco
+                onSelecionarVeiculoFlexivel(veiculoId);
+            } else {
+                giToast('Erro ao adicionar eixo: ' + data.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao adicionar eixo:', error);
+            giToast('Erro ao adicionar eixo. Tente novamente.', 'error');
+        });
     });
 }
 
@@ -137,14 +147,14 @@ function adicionarEixo(tipo) {
 function excluirEixo(tipo) {
     const veiculoId = veiculoSelecionado;
     if (!veiculoId) {
-        alert('Selecione um veículo primeiro!');
+        giToast('Selecione um veículo primeiro!');
         return;
     }
 
     const eixos = tipo === 'caminhao' ? eixosCaminhao : eixosCarreta;
     
     if (eixos.length === 0) {
-        alert(`Não há eixos para excluir no ${tipo === 'caminhao' ? 'caminhão' : 'carreta'}.`);
+        giToast(`Não há eixos para excluir no ${tipo === 'caminhao' ? 'caminhão' : 'carreta'}.`);
         return;
     }
 
@@ -173,34 +183,27 @@ function excluirEixo(tipo) {
     });
 
     if (eixosSemPneus.length === 0) {
-        alert(`Todos os eixos do ${tipo === 'caminhao' ? 'caminhão' : 'carreta'} têm pneus alocados. Remova os pneus primeiro.`);
+        giToast(`Todos os eixos do ${tipo === 'caminhao' ? 'caminhão' : 'carreta'} têm pneus alocados. Remova os pneus primeiro.`);
         return;
     }
 
-    // Mostrar opções de eixos que podem ser excluídos
-    let opcoes = `Eixos disponíveis para exclusão:\n\n`;
-    eixosSemPneus.forEach(numero => {
-        opcoes += `${numero}. Eixo ${numero}\n`;
+    // Lista de eixos que podem ser excluídos (sem pneus)
+    const opcoesEixos = eixosSemPneus.map(function (numero) {
+        return { label: `Eixo ${numero}`, value: numero - 1 };
     });
-    
-    if (eixosComPneus.length > 0) {
-        opcoes += `\nEixos com pneus (não podem ser excluídos): ${eixosComPneus.join(', ')}`;
-    }
-    
-    const escolha = prompt(opcoes + '\n\nDigite o número do eixo que deseja excluir:');
-    const index = parseInt(escolha) - 1;
-    
-    if (isNaN(index) || index < 0 || !eixosSemPneus.includes(index + 1)) {
-        alert('Seleção inválida!');
-        return;
-    }
+    const aviso = eixosComPneus.length > 0
+        ? 'Eixos com pneus alocados não aparecem (remova os pneus antes).'
+        : '';
 
-    if (confirm(`Tem certeza que deseja excluir o Eixo ${index + 1}?`)) {
-        const eixoParaExcluir = eixos[index];
-        
+    giChoose('Selecione o eixo para excluir' + (aviso ? ' — ' + aviso : ''), opcoesEixos).then(function (index) {
+        if (index === null || index === undefined) return;
+        giConfirm(`Tem certeza que deseja excluir o Eixo ${index + 1}?`, { okLabel: 'Excluir' }).then(function (ok) {
+            if (!ok) return;
+            const eixoParaExcluir = eixos[index];
+
         fetch('../gestao_interativa/api/eixos_veiculos.php?action=excluir_eixo', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: sfPneusFetchHeaders(),
             credentials: 'same-origin',
             body: JSON.stringify({
                 eixo_id: eixoParaExcluir.id
@@ -209,44 +212,42 @@ function excluirEixo(tipo) {
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                alert(`Eixo ${index + 1} excluído com sucesso!`);
+                giToast(`Eixo ${index + 1} excluído com sucesso!`);
                 // Recarregar layout do banco
                 onSelecionarVeiculoFlexivel(veiculoId);
             } else {
-                alert('Erro ao excluir eixo: ' + data.error);
+                giToast('Erro ao excluir eixo: ' + data.error);
             }
         })
         .catch(error => {
             console.error('Erro ao excluir eixo:', error);
-            alert('Erro ao excluir eixo. Tente novamente.');
+            giToast('Erro ao excluir eixo. Tente novamente.');
         });
-    }
+        });
+    });
 }
 
 // Função para alocar pneu usando API do banco
 async function alocarPneuFlexivel(slotId, pneuId) {
     const veiculoId = veiculoSelecionado;
     if (!veiculoId) {
-        alert('Selecione um veículo primeiro!');
+        giToast('Selecione um veículo primeiro!');
         return;
     }
 
     // Carregar posições disponíveis
     let posicoes = [];
     try {
-        console.log('Carregando posições disponíveis...');
         const response = await fetch('../gestao_interativa/api/posicoes_pneus.php', {
             credentials: 'same-origin'
         });
         
-        console.log('Response status posições:', response.status);
         
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
         const text = await response.text();
-        console.log('Response text:', text);
         
         let data;
         try {
@@ -256,18 +257,16 @@ async function alocarPneuFlexivel(slotId, pneuId) {
             throw new Error('Resposta inválida do servidor: ' + text.substring(0, 100));
         }
         
-        console.log('Dados de posições recebidos:', data);
         
         if (data.success && data.posicoes) {
             posicoes = data.posicoes;
-            console.log('Posições carregadas:', posicoes.length);
         } else {
             console.error('API retornou erro:', data);
             throw new Error(data.error || 'Erro desconhecido ao carregar posições');
         }
     } catch (error) {
         console.error('Erro ao carregar posições:', error);
-        alert('ERRO: Não foi possível carregar as posições de pneus.\n\n' + 
+        giToast('ERRO: Não foi possível carregar as posições de pneus.\n\n' + 
               'Detalhes: ' + error.message + '\n\n' +
               'Verifique o console do navegador (F12) para mais informações.');
         return;
@@ -275,7 +274,7 @@ async function alocarPneuFlexivel(slotId, pneuId) {
 
     // Se não há posições, mostrar erro
     if (!posicoes || posicoes.length === 0) {
-        alert('ATENÇÃO: Não há posições de pneus cadastradas no sistema!\n\n' +
+        giToast('ATENÇÃO: Não há posições de pneus cadastradas no sistema!\n\n' +
               'Para usar este sistema, você precisa cadastrar as posições de pneus primeiro.\n' +
               'Por favor, cadastre as posições antes de alocar pneus.');
         return;
@@ -290,14 +289,14 @@ async function alocarPneuFlexivel(slotId, pneuId) {
         const eixo = eixos[parseInt(idxEixo)];
         
         if (!eixo) {
-            alert('Eixo não encontrado!');
+            giToast('Eixo não encontrado!');
             return;
         }
 
         try {
             const response = await fetch('../gestao_interativa/api/eixos_veiculos.php?action=alocar_pneu', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: sfPneusFetchHeaders(),
                 credentials: 'same-origin',
                 body: JSON.stringify({
                     eixo_id: eixo.id,
@@ -319,39 +318,30 @@ async function alocarPneuFlexivel(slotId, pneuId) {
                 renderizarEixosFlexivel();
                 atualizarDashboardPneusEmUso();
             } else {
-                alert('Erro ao alocar pneu: ' + data.error);
+                giToast('Erro ao alocar pneu: ' + data.error);
             }
         } catch (error) {
             console.error('Erro ao alocar pneu:', error);
-            alert('Erro ao alocar pneu. Tente novamente.');
+            giToast('Erro ao alocar pneu. Tente novamente.');
         }
         return;
     }
     */
 
-    // Criar prompt simples para seleção de posição
-    let opcoes = 'Selecione a posição do pneu:\n\n';
-    posicoes.forEach((pos, index) => {
-        opcoes += `${index + 1}. ${pos.nome}\n`;
-    });
-    
-    console.log('Exibindo prompt de seleção de posição...');
-    const escolha = prompt(opcoes + '\nDigite o número da posição:');
-    
-    // Se o usuário cancelar o prompt, não continuar
-    if (escolha === null || escolha === '') {
-        console.log('Usuário cancelou a seleção da posição');
+    // Seleção da posição do pneu via modal
+    const posOpcoes = posicoes.map(function (pos) { return { label: pos.nome, value: pos.id }; });
+    const posicaoIdEscolhida = await giChoose('Selecione a posição do pneu', posOpcoes);
+
+    // Se o usuário cancelar, não continuar
+    if (posicaoIdEscolhida === null || posicaoIdEscolhida === undefined) {
         return;
     }
-    
-    const index = parseInt(escolha) - 1;
-    
-    if (isNaN(index) || index < 0 || index >= posicoes.length) {
-        alert('Seleção inválida!');
+
+    const posicaoSelecionada = posicoes.find(function (p) { return p.id === posicaoIdEscolhida; });
+    if (!posicaoSelecionada) {
+        giToast('Seleção inválida!');
         return;
     }
-    
-    const posicaoSelecionada = posicoes[index];
     
     // Encontrar o eixo correspondente ao slot
     const [tipoEixo, idxEixo, posicaoEixo] = slotId.split('-');
@@ -359,14 +349,14 @@ async function alocarPneuFlexivel(slotId, pneuId) {
     const eixo = eixos[parseInt(idxEixo)];
     
     if (!eixo) {
-        alert('Eixo não encontrado!');
+        giToast('Eixo não encontrado!');
         return;
     }
 
     try {
         const response = await fetch('../gestao_interativa/api/eixos_veiculos.php?action=alocar_pneu', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: sfPneusFetchHeaders(),
             credentials: 'same-origin',
             body: JSON.stringify({
                 eixo_id: eixo.id,
@@ -392,38 +382,134 @@ async function alocarPneuFlexivel(slotId, pneuId) {
             renderizarEixosFlexivel();
             atualizarDashboardPneusEmUso();
         } else {
-            alert('Erro ao alocar pneu: ' + data.error);
+            giToast('Erro ao alocar pneu: ' + data.error);
         }
     } catch (error) {
         console.error('Erro ao alocar pneu:', error);
-        alert('Erro ao alocar pneu. Tente novamente.');
+        giToast('Erro ao alocar pneu. Tente novamente.');
     }
 }
 
 // Função para remover pneu usando API do banco
-function removerPneuFlexivel(slotId) {
-    fetch('../gestao_interativa/api/eixos_veiculos.php?action=remover_pneu', {
+function removerPneuFlexivel(slotId, motivoRemocaoId) {
+    const body = { slot_id: slotId };
+    if (motivoRemocaoId) body.motivo_remocao_id = motivoRemocaoId;
+    return fetch('../gestao_interativa/api/eixos_veiculos.php?action=remover_pneu', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: sfPneusFetchHeaders(),
+        credentials: 'same-origin',
+        body: JSON.stringify(body)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            delete pneusFlexAlocados[slotId];
+            renderizarEixosFlexivel();
+            atualizarDashboardPneusEmUso();
+        } else {
+            giToast('Erro ao remover pneu: ' + data.error);
+        }
+        return data;
+    })
+    .catch(error => {
+        console.error('Erro ao remover pneu:', error);
+        giToast('Erro ao remover pneu. Tente novamente.');
+        return { success: false };
+    });
+}
+
+async function solicitarRemocaoPneuFlexivel(slotId) {
+    let motivoId = null;
+    let motivos = [];
+    try {
+        const res = await fetch('../api/pneus_mercado.php?action=catalogos', { credentials: 'same-origin' });
+        const data = await res.json();
+        motivos = (data && data.motivos_remocao) ? data.motivos_remocao : [];
+    } catch (e) {
+        console.warn('Motivos remoção indisponíveis', e);
+    }
+
+    if (motivos.length) {
+        // Escolher o motivo já serve como confirmação da remoção.
+        const motOpcoes = motivos.map(function (m) { return { label: m.nome, value: m.id }; });
+        const esc = await giChoose('Motivo da remoção do pneu', motOpcoes);
+        if (esc === null || esc === undefined) return { success: false, cancelled: true };
+        motivoId = esc || null;
+    } else {
+        const ok = await giConfirm('Confirmar remoção do pneu deste slot?', { okLabel: 'Remover' });
+        if (!ok) return { success: false, cancelled: true };
+    }
+    return removerPneuFlexivel(slotId, motivoId);
+}
+
+// Mover pneu entre slots (persiste no banco)
+function moverPneuFlexivel(fromSlotId, toSlotId) {
+    return fetch('../gestao_interativa/api/eixos_veiculos.php?action=mover_pneu', {
+        method: 'POST',
+        headers: sfPneusFetchHeaders(),
         credentials: 'same-origin',
         body: JSON.stringify({
-            slot_id: slotId
+            from_slot_id: fromSlotId,
+            to_slot_id: toSlotId
         })
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            // Atualizar estado local
-            delete pneusFlexAlocados[slotId];
+            const pneu = pneusFlexAlocados[fromSlotId];
+            if (pneu) {
+                delete pneusFlexAlocados[fromSlotId];
+                pneusFlexAlocados[toSlotId] = pneu;
+            }
             renderizarEixosFlexivel();
             atualizarDashboardPneusEmUso();
         } else {
-            alert('Erro ao remover pneu: ' + data.error);
+            giToast('Erro ao mover pneu: ' + (data.error || 'falha desconhecida'));
         }
+        return data;
     })
     .catch(error => {
-        console.error('Erro ao remover pneu:', error);
-        alert('Erro ao remover pneu. Tente novamente.');
+        console.error('Erro ao mover pneu:', error);
+        giToast('Erro ao mover pneu. Tente novamente.');
+        return { success: false };
+    });
+}
+
+// Enviar pneu alocado para manutenção (remove do veículo)
+function enviarManutencaoFlexivel(slotId, observacoes) {
+    return fetch('../gestao_interativa/api/eixos_veiculos.php?action=enviar_manutencao', {
+        method: 'POST',
+        headers: sfPneusFetchHeaders(),
+        credentials: 'same-origin',
+        body: JSON.stringify({
+            slot_id: slotId,
+            observacoes: observacoes || 'Enviado para manutenção'
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            delete pneusFlexAlocados[slotId];
+            renderizarEixosFlexivel();
+            atualizarDashboardPneusEmUso();
+            if (typeof carregarPneusDisponiveis === 'function') {
+                carregarPneusDisponiveis().catch(function () {});
+            }
+            const veiculoId = typeof veiculoSelecionado !== 'undefined' ? veiculoSelecionado : null;
+            if (veiculoId) {
+                carregarHistoricoFlexivel(veiculoId);
+                carregarEstatisticasFlexivel(veiculoId);
+            }
+            giToast('Pneu enviado para manutenção com sucesso.');
+        } else {
+            giToast('Erro: ' + (data.error || 'não foi possível enviar para manutenção'));
+        }
+        return data;
+    })
+    .catch(error => {
+        console.error('Erro ao enviar para manutenção:', error);
+        giToast('Erro ao enviar pneu para manutenção.');
+        return { success: false };
     });
 }
 
@@ -432,7 +518,7 @@ function salvarLayoutFlexivel(auto = false) {
     // Com o novo sistema, não precisamos mais salvar manualmente
     // Os dados são salvos automaticamente no banco
     if (!auto) {
-        alert('Layout salvo automaticamente no banco de dados!');
+        giToast('Layout salvo automaticamente no banco de dados!');
     }
 }
 
@@ -447,13 +533,11 @@ function limparLayoutFlexivel() {
 
 // Função para carregar histórico no modo flexível
 function carregarHistoricoFlexivel(veiculoId) {
-    console.log('Carregando histórico flexível para veículo:', veiculoId);
     fetch(`../gestao_interativa/api/historico_alocacoes.php?veiculo_id=${veiculoId}`, {
         credentials: 'same-origin'
     })
         .then(response => response.json())
         .then(data => {
-            console.log('Dados do histórico flexível:', data);
             const historyDiv = document.getElementById('allocationHistory');
             
             if (data.success && data.historico && data.historico.length > 0) {
@@ -463,18 +547,16 @@ function carregarHistoricoFlexivel(veiculoId) {
                     const data = item.data_remocao || item.data_instalacao;
                     html += `
                         <div style="padding: 8px; border-bottom: 1px solid #ddd; font-size: 0.9em;">
-                            <strong>${data}</strong><br>
-                            ${acao}: ${item.numero_serie} (Pos. ${item.posicao})<br>
-                            <span class="status-badge status-${item.status_nome ? item.status_nome.toLowerCase().replace(' ', '-') : 'bom'}">${item.status_nome || 'Bom'}</span>
+                            <strong>${escapeHtmlPneus(data)}</strong><br>
+                            ${acao}: ${escapeHtmlPneus(item.numero_serie)} (Pos. ${escapeHtmlPneus(item.posicao)})<br>
+                            <span class="status-badge status-${escapeHtmlPneus(item.status_nome ? item.status_nome.toLowerCase().replace(' ', '-') : 'bom')}">${escapeHtmlPneus(item.status_nome || 'Bom')}</span>
                         </div>
                     `;
                 });
                 html += '</div>';
                 historyDiv.innerHTML = html;
-                console.log('Histórico flexível carregado com sucesso');
             } else {
                 historyDiv.innerHTML = '<p>Nenhum histórico encontrado para este veículo.</p>';
-                console.log('Nenhum histórico flexível encontrado');
             }
         })
         .catch(error => {
@@ -488,13 +570,11 @@ function carregarHistoricoFlexivel(veiculoId) {
 
 // Função para carregar estatísticas no modo flexível
 function carregarEstatisticasFlexivel(veiculoId) {
-    console.log('Carregando estatísticas flexível para veículo:', veiculoId);
     fetch(`../gestao_interativa/api/estatisticas_veiculo.php?veiculo_id=${veiculoId}`, {
         credentials: 'same-origin'
     })
         .then(response => response.json())
         .then(data => {
-            console.log('Dados das estatísticas flexível:', data);
             const statsDiv = document.getElementById('vehicleStats');
             
             if (data.success && data.estatisticas) {
@@ -508,10 +588,8 @@ function carregarEstatisticasFlexivel(veiculoId) {
                         <p><strong>Total de Alocações:</strong> ${stats.totalAlocacoes}</p>
                     </div>
                 `;
-                console.log('Estatísticas flexível carregadas com sucesso');
             } else {
                 statsDiv.innerHTML = '<p>Erro ao carregar estatísticas.</p>';
-                console.log('Erro ao carregar estatísticas flexível:', data.error);
             }
         })
         .catch(error => {
@@ -528,6 +606,9 @@ window.adicionarEixo = adicionarEixo;
 window.excluirEixo = excluirEixo;
 window.alocarPneuFlexivel = alocarPneuFlexivel;
 window.removerPneuFlexivel = removerPneuFlexivel;
+window.solicitarRemocaoPneuFlexivel = solicitarRemocaoPneuFlexivel;
+window.moverPneuFlexivel = moverPneuFlexivel;
+window.enviarManutencaoFlexivel = enviarManutencaoFlexivel;
 window.salvarLayoutFlexivel = salvarLayoutFlexivel;
 window.limparLayoutFlexivel = limparLayoutFlexivel;
 window.onSelecionarVeiculoFlexivel = onSelecionarVeiculoFlexivel;

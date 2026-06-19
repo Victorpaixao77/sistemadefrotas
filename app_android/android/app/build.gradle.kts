@@ -12,8 +12,8 @@ android {
         applicationId = "com.sistemafrotas.motorista"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 10
+        versionName = "1.9"
     }
 
     buildTypes {
@@ -21,7 +21,8 @@ android {
             buildConfigField("Boolean", "LOG_API_BODY", "true")
         }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             buildConfigField("Boolean", "LOG_API_BODY", "false")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -69,6 +70,11 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
     // Coil (imagens)
     implementation("io.coil-kt:coil-compose:2.5.0")
+    // QR / câmera (módulo pneus)
+    implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
     // Google Play Services - Location (GPS)
     implementation("com.google.android.gms:play-services-location:21.0.1")
     implementation("androidx.work:work-runtime-ktx:2.9.0")
@@ -77,4 +83,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("junit:junit:4.13.2")
+    // org.json real no classpath dos testes JVM (o JSONObject do Android é só um stub
+    // "not mocked" em unit tests; OutboxPayloadCodec usa JSONObject).
+    testImplementation("org.json:json:20231013")
 }

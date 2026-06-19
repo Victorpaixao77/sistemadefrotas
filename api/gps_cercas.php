@@ -16,7 +16,8 @@ if (session_status() === PHP_SESSION_NONE) {
 
 header('Content-Type: application/json; charset=utf-8');
 
-require_authentication();
+require_once dirname(__DIR__) . '/includes/gps_web_api_base.php';
+gps_require_web_panel_access();
 $empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
 if ($empresa_id <= 0) {
     api_json_unauthorized();

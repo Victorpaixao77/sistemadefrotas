@@ -7,6 +7,7 @@ if (!empty($_GET['debug']) && $_GET['debug'] === '1') {
 }
 // Include configuration and functions first
 require_once '../includes/config.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
 require_once '../includes/sf_api_base.php';
 
@@ -251,6 +252,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
         grid-column: 1 / -1;
     }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'vehicles-modern' : ''; ?>">
     <div class="app-container">
@@ -289,15 +291,16 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                 <!-- KPIs (moderno: mesma faixa compacta que fornecedores_moderno) -->
                 <?php if ($is_modern): ?>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Total</span><span class="val" id="totalVehicles">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Ativos</span><span class="val" id="activeVehicles">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Em manutenção</span><span class="val" id="maintenanceVehicles">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Quilometragem</span><span class="val" id="totalMileage">0 km</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-truck fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total</span></div><span class="val" id="totalVehicles">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Ativos</span></div><span class="val" id="activeVehicles">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-wrench fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Em manutenção</span></div><span class="val" id="maintenanceVehicles">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-gauge-high fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Quilometragem</span></div><span class="val" id="totalMileage">0 km</span></div>
                 </div>
                 <?php else: ?>
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-truck kpi-card-icon" aria-hidden="true"></i>
                             <h3>Total de Veículos</h3>
                         </div>
                         <div class="card-body">
@@ -309,6 +312,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                     </div>
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-circle-check kpi-card-icon" aria-hidden="true"></i>
                             <h3>Veículos Ativos</h3>
                         </div>
                         <div class="card-body">
@@ -320,6 +324,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                     </div>
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-screwdriver-wrench kpi-card-icon" aria-hidden="true"></i>
                             <h3>Em Manutenção</h3>
                         </div>
                         <div class="card-body">
@@ -331,6 +336,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                     </div>
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-road kpi-card-icon" aria-hidden="true"></i>
                             <h3>Quilometragem Total</h3>
                         </div>
                         <div class="card-body">
@@ -385,6 +391,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                         <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn" title="Filtros"><i class="fas fa-sliders-h"></i> Opções</button>
                         <button type="button" class="fornc-btn fornc-btn--ghost" id="clearVehicleFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
                         <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar"><i class="fas fa-file-export"></i> Exportar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="vehiclesColumnsBtn" title="Colunas da tabela" aria-label="Colunas da tabela"><i class="fas fa-columns"></i></button>
                         <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
                     </div>
                 </div>
@@ -424,21 +431,31 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                     </div>
                 </div>
                 <?php endif; ?>
-                
+                <!-- Painel de insights da frota -->
+                <div id="sfVehInsights"></div>
+
+                <?php if (!empty($is_modern)): ?>
+                <div class="fornc-empty-state" id="vehiclesEmptyState" role="status" aria-live="polite">
+                    <p class="fornc-empty-state-title">Nenhum veículo encontrado</p>
+                    <p class="fornc-empty-state-hint">Ajuste os filtros ou cadastre um novo veículo na frota.</p>
+                    <button type="button" class="fornc-btn fornc-btn--primary" id="vehiclesEmptyCreateBtn"><i class="fas fa-plus"></i> Cadastrar primeiro veículo</button>
+                </div>
+                <?php endif; ?>
+
                 <!-- Vehicles List Table -->
-                <div class="<?php echo $is_modern ? 'vehicles-table-wrap fornc-table-wrap' : 'data-table-container'; ?>">
+                <div class="<?php echo $is_modern ? 'vehicles-table-wrap fornc-table-wrap' : 'data-table-container'; ?>" id="vehiclesTableOuter">
                     <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="vehiclesTable">
                         <thead>
                             <tr>
                                 <?php if (!empty($is_modern)): ?>
-                                <th class="sortable sorted" data-sort="placa">Placa <span class="sort-ind">▲</span></th>
-                                <th class="sortable" data-sort="modelo">Modelo <span class="sort-ind">⇅</span></th>
-                                <th class="sortable" data-sort="marca">Marca <span class="sort-ind">⇅</span></th>
-                                <th class="sortable" data-sort="ano">Ano <span class="sort-ind">⇅</span></th>
-                                <th class="sortable" data-sort="status_nome">Status <span class="sort-ind">⇅</span></th>
-                                <th class="sortable" data-sort="cavalo_nome">Cavalo <span class="sort-ind">⇅</span></th>
-                                <th class="sortable" data-sort="carreta_nome">Carreta <span class="sort-ind">⇅</span></th>
-                                <th class="sortable" data-sort="km_atual">Quilometragem <span class="sort-ind">⇅</span></th>
+                                <th class="sortable sorted" data-sort="placa" data-col="placa">Placa <span class="sort-ind">▲</span></th>
+                                <th class="sortable" data-sort="modelo" data-col="modelo">Modelo <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="marca" data-col="marca">Marca <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="ano" data-col="ano">Ano <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="status_nome" data-col="status">Status <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="cavalo_nome" data-col="cavalo">Cavalo <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="carreta_nome" data-col="carreta">Carreta <span class="sort-ind">⇅</span></th>
+                                <th class="sortable" data-sort="km_atual" data-col="km">Quilometragem <span class="sort-ind">⇅</span></th>
                                 <?php else: ?>
                                 <th>Placa</th>
                                 <th>Modelo</th>
@@ -449,7 +466,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                                 <th>Carreta</th>
                                 <th>Quilometragem</th>
                                 <?php endif; ?>
-                                <th>Ações</th>
+                                <th data-col="acoes">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -561,7 +578,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                                     $stmt = $conn->prepare($sql);
                                     $stmt->execute();
                                     while ($row = $stmt->fetch()) {
-                                        echo "<option value='" . $row['id'] . "'>" . $row['nome'] . " (" . $row['eixos'] . " eixos, " . $row['tracao'] . ")</option>";
+                                        echo "<option value='" . (int) $row['id'] . "'>" . htmlspecialchars($row['nome'] . ' (' . $row['eixos'] . ' eixos, ' . $row['tracao'] . ')', ENT_QUOTES, 'UTF-8') . "</option>";
                                     }
                                 } catch(PDOException $e) {
                                     error_log("Erro ao buscar tipos de cavalos: " . $e->getMessage());
@@ -581,7 +598,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                                     $stmt = $conn->prepare($sql);
                                     $stmt->execute();
                                     while ($row = $stmt->fetch()) {
-                                        echo "<option value='" . $row['id'] . "'>" . $row['nome'] . " (" . $row['capacidade_media'] . " ton)</option>";
+                                        echo "<option value='" . (int) $row['id'] . "'>" . htmlspecialchars($row['nome'] . ' (' . $row['capacidade_media'] . ' ton)', ENT_QUOTES, 'UTF-8') . "</option>";
                                     }
                                 } catch(PDOException $e) {
                                     error_log("Erro ao buscar tipos de carretas: " . $e->getMessage());
@@ -789,69 +806,38 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
             </div>
         </div>
     </div>
+    <?php $sf_help_key = 'vehicles'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+
     
-    <!-- Modal de Ajuda -->
-    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpVehiclesModal">
+    <?php if (!empty($is_modern)): ?>
+    <div class="modal fornc-modal fornc-columns-modal" id="vehiclesColumnsModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Ajuda - Gestão de Veículos</h2>
-                <span class="close-modal">&times;</span>
+                <h2>Colunas da tabela</h2>
+                <span class="close-modal" title="Fechar">&times;</span>
             </div>
             <div class="modal-body">
-                <div class="help-section">
-                    <h3>Visão Geral</h3>
-                    <p>A página de Veículos permite gerenciar toda a frota de veículos da empresa. Aqui você pode cadastrar, editar, visualizar e excluir veículos, além de acompanhar métricas importantes de performance e status.</p>
-                </div>
-
-                <div class="help-section">
-                    <h3>Funcionalidades Principais</h3>
-                    <ul>
-                        <li><strong>Novo Veículo:</strong> Cadastre um novo veículo com informações completas como placa, modelo, tipo, categoria e especificações técnicas.</li>
-                        <li><strong>Filtros:</strong> Use os filtros para encontrar veículos específicos por status, tipo ou através da busca por texto.</li>
-                        <li><strong>Exportar:</strong> Exporte a lista de veículos para análise externa em formato PDF.</li>
-                        <li><strong>Relatórios:</strong> Visualize relatórios e estatísticas da frota.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Indicadores (KPIs)</h3>
-                    <ul>
-                        <li><strong>Total de Veículos:</strong> Número total de veículos na frota.</li>
-                        <li><strong>Veículos Ativos:</strong> Quantidade de veículos em operação.</li>
-                        <li><strong>Em Manutenção:</strong> Veículos atualmente em manutenção.</li>
-                        <li><strong>Quilometragem Total:</strong> Soma da quilometragem de todos os veículos.</li>
-                        <li><strong>Distribuição por Tipo:</strong> Gráfico mostrando a distribuição de veículos por tipo.</li>
-                        <li><strong>Status da Frota:</strong> Gráfico com o status atual de todos os veículos.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Ações Disponíveis</h3>
-                    <ul>
-                        <li><strong>Visualizar:</strong> Veja detalhes completos do veículo, incluindo histórico de manutenções e especificações técnicas.</li>
-                        <li><strong>Editar:</strong> Modifique informações de um veículo existente.</li>
-                        <li><strong>Excluir:</strong> Remova um veículo do sistema (ação irreversível).</li>
-                        <li><strong>Histórico:</strong> Acesse o histórico completo de manutenções do veículo.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Dicas Úteis</h3>
-                    <ul>
-                        <li>Mantenha as informações dos veículos sempre atualizadas, especialmente a quilometragem.</li>
-                        <li>Configure alertas para manutenções preventivas baseadas na quilometragem.</li>
-                        <li>Monitore o status dos veículos para identificar problemas rapidamente.</li>
-                        <li>Utilize os filtros para encontrar veículos específicos rapidamente.</li>
-                        <li>Acompanhe as métricas para otimizar a utilização da frota.</li>
-                        <li>Exporte relatórios regularmente para análise de performance.</li>
-                    </ul>
+                <p class="text-muted" style="font-size:0.8rem; margin-top:0;">Marque as colunas desejadas e clique em <strong>Salvar preferências</strong>.</p>
+                <div id="vehiclesColumnsToggleList">
+                    <div class="col-toggle-row col-toggle-section">Colunas</div>
+                    <label class="col-toggle-row"><span>Placa</span><input type="checkbox" data-col-toggle="placa" checked></label>
+                    <label class="col-toggle-row"><span>Modelo</span><input type="checkbox" data-col-toggle="modelo" checked></label>
+                    <label class="col-toggle-row"><span>Marca</span><input type="checkbox" data-col-toggle="marca" checked></label>
+                    <label class="col-toggle-row"><span>Ano</span><input type="checkbox" data-col-toggle="ano" checked></label>
+                    <label class="col-toggle-row"><span>Status</span><input type="checkbox" data-col-toggle="status" checked></label>
+                    <label class="col-toggle-row"><span>Cavalo</span><input type="checkbox" data-col-toggle="cavalo" checked></label>
+                    <label class="col-toggle-row"><span>Carreta</span><input type="checkbox" data-col-toggle="carreta" checked></label>
+                    <label class="col-toggle-row"><span>Quilometragem</span><input type="checkbox" data-col-toggle="km" checked></label>
+                    <label class="col-toggle-row"><span>Ações</span><input type="checkbox" data-col-toggle="acoes" checked></label>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-secondary" onclick="closeModalById('helpVehiclesModal')">Fechar</button>
+            <div class="modal-footer columns-modal-footer">
+                <button type="button" class="btn-secondary btn-columns-close close-modal">Fechar</button>
+                <button type="button" class="btn-primary btn-columns-save" id="vehiclesColumnsSaveBtn">Salvar preferências</button>
             </div>
         </div>
     </div>
+    <?php endif; ?>
     
     <!-- Modal para exibir foto do veículo -->
     <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="fotoVeiculoModal" style="display:none;">
@@ -870,7 +856,33 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
     <?php sf_render_api_scripts(); ?>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
-    <script src="../js/vehicles.js"></script>
+    <?php if (!empty($is_modern)): ?><script src="../js/fornc-table-columns.js"></script><?php endif; ?>
+    <script src="../js/vehicles.js?v=1.2"></script>
+    <script src="../js/sf_insights.js?v=1.3"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.SFInsights) {
+            SFInsights.init({
+                mountId: 'sfVehInsights',
+                insightsUrl: '../api/vehicle_insights.php',
+                resumoUrl: '../api/vehicle_resumo_ia.php',
+                title: 'Insights da frota',
+                sectionTitle: 'Pendências de cadastro',
+                emptyOk: 'Nenhuma pendência de cadastro encontrada na frota.',
+                stats: function (j) {
+                    var r = j.resumo || {};
+                    return [
+                        { label: 'veículos', value: j.total_veiculos || 0, tone: 'ok' },
+                        { label: 'sem foto', value: r.sem_foto || 0, tone: 'aviso' },
+                        { label: 'sem CRLV', value: r.sem_documento || 0, tone: 'aviso' },
+                        { label: 'manutenção atrasada', value: r.manutencao_atrasada || 0, tone: (r.manutencao_atrasada > 0 ? 'erro' : 'ok') }
+                    ];
+                },
+                onEdit: function (id) { if (typeof showEditVehicleModal === 'function') showEditVehicleModal(id); }
+            });
+        }
+    });
+    </script>
     <script>
     // Função para abrir a foto do veículo
     $(document).ready(function() {
@@ -880,7 +892,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                 foto = foto.replace(/^uploads[\\\/]veiculos[\\\/]/, '');
                 window.open('../uploads/veiculos/' + foto, '_blank');
             } else {
-                alert('Nenhuma foto disponível!');
+                if (typeof vehNotify === 'function') vehNotify('Nenhuma foto disponível.', 'warning'); else alert('Nenhuma foto disponível!');
             }
         });
         $('#closeFotoVeiculoModal').on('click', function() {
@@ -901,7 +913,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                 doc = doc.replace(/^uploads[\\\/]veiculos[\\\/]/, '');
                 window.open('../uploads/veiculos/' + doc, '_blank');
             } else {
-                alert('Nenhum documento disponível!');
+                if (typeof vehNotify === 'function') vehNotify('Nenhum documento disponível.', 'warning'); else alert('Nenhum documento disponível!');
             }
         });
         // Atualizar status da foto ao abrir detalhes do veículo
@@ -913,5 +925,6 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
     </script>
 
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html>

@@ -12,6 +12,8 @@
  */
 
 require_once __DIR__ . '/CryptoManager.php';
+require_once __DIR__ . '/MdfeContextLoader.php';
+require_once __DIR__ . '/MdfeXmlBuilder.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 use NFePHP\Common\Certificate;
@@ -335,9 +337,23 @@ class MdfeService
     }
 
     /**
-     * Monta XML MDF-e basico (modal rodoviario) para assinatura/autorizacao.
+     * Monta XML MDF-e layout 4.00 via contexto completo (wizard + vínculos).
      */
     private function montarXmlMdfe(array $mdfe): string
+    {
+        $mdfeId = (int) ($mdfe['id'] ?? 0);
+        if ($mdfeId > 0) {
+            $loader = new MdfeContextLoader($this->empresaId);
+            $ctx = $loader->loadById($mdfeId);
+            return MdfeXmlBuilder::build($ctx);
+        }
+        return $this->montarXmlMdfeLegado($mdfe);
+    }
+
+    /**
+     * Fallback legado quando não há ID persistido.
+     */
+    private function montarXmlMdfeLegado(array $mdfe): string
     {
         $conn = getConnection();
 
@@ -936,6 +952,305 @@ class MdfeService
     private function xmlEscape(string $v): string
     {
         return htmlspecialchars($v, ENT_QUOTES | ENT_XML1, 'UTF-8');
+    }
+
+    /**
+     * Cancela MDF-e na SEFAZ (evento 110111).
+     *
+     * @return array{sucesso:bool,erro?:string,protocolo?:string|null,cStat?:string,xMotivo?:string,xml_retorno?:string}
+     */
+    public function cancelarMdfe(string $chave, string $nProt, string $justificativa): array
+    {
+        $chave = $this->apenasDigitos($chave);
+        $justificativa = trim($justificativa);
+        if (strlen($chave) !== 44) {
+            return ['sucesso' => false, 'erro' => 'Chave MDF-e inválida.'];
+        }
+        if (strlen($justificativa) < 15) {
+            return ['sucesso' => false, 'erro' => 'Justificativa do cancelamento deve ter no mínimo 15 caracteres.'];
+        }
+        if (trim($nProt) === '') {
+            return ['sucesso' => false, 'erro' => 'Protocolo de autorização (nProt) não informado.'];
+        }
+
+        return $this->enviarEventoMdfe('110111', $chave, 1, function () use ($nProt, $justificativa) {
+            return '<evCancMDFe>'
+                . '<nProt>' . $this->xmlEscape(trim($nProt)) . '</nProt>'
+                . '<xJust>' . $this->xmlEscape($justificativa) . '</xJust>'
+                . '</evCancMDFe>';
+        });
+    }
+
+    /**
+     * Encerra MDF-e na SEFAZ (evento 110112).
+     *
+     * @return array{sucesso:bool,erro?:string,protocolo?:string|null,cStat?:string,xMotivo?:string,xml_retorno?:string}
+     */
+    public function encerrarMdfe(string $chave, string $nProt, string $cMun, string $cUfIbge): array
+    {
+        $chave = $this->apenasDigitos($chave);
+        $cMun = $this->apenasDigitos($cMun);
+        $cUfIbge = str_pad($this->apenasDigitos($cUfIbge), 2, '0', STR_PAD_LEFT);
+        if (strlen($chave) !== 44) {
+            return ['sucesso' => false, 'erro' => 'Chave MDF-e inválida.'];
+        }
+        if (strlen($cMun) !== 7) {
+            return ['sucesso' => false, 'erro' => 'Código IBGE do município de encerramento inválido.'];
+        }
+        if (trim($nProt) === '') {
+            return ['sucesso' => false, 'erro' => 'Protocolo de autorização (nProt) não informado.'];
+        }
+
+        $dtEnc = date('Y-m-d');
+        return $this->enviarEventoMdfe('110112', $chave, 1, function () use ($nProt, $dtEnc, $cMun, $cUfIbge) {
+            return '<evEncMDFe>'
+                . '<nProt>' . $this->xmlEscape(trim($nProt)) . '</nProt>'
+                . '<dtEnc>' . $this->xmlEscape($dtEnc) . '</dtEnc>'
+                . '<cUF>' . $this->xmlEscape($cUfIbge) . '</cUF>'
+                . '<cMun>' . $this->xmlEscape($cMun) . '</cMun>'
+                . '</evEncMDFe>';
+        });
+    }
+
+    /**
+     * Inclui condutor no MDF-e (evento 110114).
+     *
+     * @return array{sucesso:bool,erro?:string,protocolo?:string|null,cStat?:string,xMotivo?:string,xml_retorno?:string}
+     */
+    public function incluirCondutorMdfe(string $chave, string $nomeCondutor, string $cpfCondutor, int $nSeq = 1): array
+    {
+        $chave = $this->apenasDigitos($chave);
+        $cpf = $this->apenasDigitos($cpfCondutor);
+        $nome = trim($nomeCondutor);
+        if (strlen($chave) !== 44) {
+            return ['sucesso' => false, 'erro' => 'Chave MDF-e inválida.'];
+        }
+        if ($nome === '' || strlen($cpf) !== 11) {
+            return ['sucesso' => false, 'erro' => 'Nome e CPF do condutor são obrigatórios.'];
+        }
+        $nSeq = max(1, min(99, $nSeq));
+
+        return $this->enviarEventoMdfe('110114', $chave, $nSeq, function () use ($nome, $cpf) {
+            return '<evIncCondutorMDFe>'
+                . '<condutor><xNome>' . $this->xmlEscape($nome) . '</xNome>'
+                . '<CPF>' . $this->xmlEscape($cpf) . '</CPF></condutor>'
+                . '</evIncCondutorMDFe>';
+        });
+    }
+
+    /**
+     * @param callable():string $detEventoBuilder
+     * @return array{sucesso:bool,erro?:string,protocolo?:string|null,cStat?:string,xMotivo?:string,xml_retorno?:string}
+     */
+    private function enviarEventoMdfe(string $tpEvento, string $chave, int $nSeqEvento, callable $detEventoBuilder): array
+    {
+        try {
+            if (class_exists('NFePHP\\MDFe\\Tools') && class_exists('NFePHP\\Common\\Certificate')) {
+                $tools = $this->buildMdfeTools();
+                $xmlEvento = $this->montarXmlEventoMdfe($tpEvento, $chave, $nSeqEvento, $detEventoBuilder());
+                $xmlAssinado = (string) $this->callFirstAvailableMethod($tools, ['signMDFe', 'signMdfe'], [$xmlEvento]);
+                if ($xmlAssinado === '') {
+                    $xmlAssinado = $this->assinarInfEventoManual($xmlEvento);
+                }
+                $xmlRetorno = (string) $this->callFirstAvailableMethod(
+                    $tools,
+                    ['sefazRecepcaoEvento', 'sefazEnviaEvento', 'sefazEvento'],
+                    [$xmlAssinado]
+                );
+                if ($xmlRetorno !== '') {
+                    return $this->parseRetornoEventoMdfe($xmlRetorno);
+                }
+            }
+
+            $xmlEvento = $this->montarXmlEventoMdfe($tpEvento, $chave, $nSeqEvento, $detEventoBuilder());
+            $xmlAssinado = $this->assinarInfEventoManual($xmlEvento);
+            $xmlRetorno = $this->enviarEventoSoapManual($xmlAssinado);
+            return $this->parseRetornoEventoMdfe($xmlRetorno);
+        } catch (Throwable $e) {
+            return ['sucesso' => false, 'erro' => 'Falha no evento MDF-e: ' . $e->getMessage()];
+        }
+    }
+
+    private function montarXmlEventoMdfe(string $tpEvento, string $chave, int $nSeqEvento, string $innerDetEvento): string
+    {
+        $tpAmb = (($this->cfg['ambiente_sefaz'] ?? 'homologacao') === 'producao') ? '1' : '2';
+        $cOrgao = substr($chave, 0, 2);
+        $cnpj = $this->apenasDigitos((string) ($this->cfg['cnpj'] ?? ''));
+        if (strlen($cnpj) !== 14) {
+            throw new RuntimeException('CNPJ da empresa inválido para evento MDF-e.');
+        }
+        $nSeq = str_pad((string) max(1, $nSeqEvento), 2, '0', STR_PAD_LEFT);
+        $id = 'ID' . $tpEvento . $chave . $nSeq;
+        $dhEvento = date('Y-m-d\TH:i:sP');
+        $idLote = str_pad((string) random_int(1, 999999999999999), 15, '0', STR_PAD_LEFT);
+
+        return '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<envEvento xmlns="http://www.portalfiscal.inf.br/mdfe" versao="3.00">'
+            . '<idLote>' . $idLote . '</idLote>'
+            . '<evento versao="3.00">'
+            . '<infEvento Id="' . $id . '">'
+            . '<cOrgao>' . $cOrgao . '</cOrgao>'
+            . '<tpAmb>' . $tpAmb . '</tpAmb>'
+            . '<CNPJ>' . $cnpj . '</CNPJ>'
+            . '<chMDFe>' . $chave . '</chMDFe>'
+            . '<dhEvento>' . $dhEvento . '</dhEvento>'
+            . '<tpEvento>' . $tpEvento . '</tpEvento>'
+            . '<nSeqEvento>' . (int) $nSeqEvento . '</nSeqEvento>'
+            . '<detEvento versaoEvento="3.00">' . $innerDetEvento . '</detEvento>'
+            . '</infEvento>'
+            . '</evento>'
+            . '</envEvento>';
+    }
+
+    private function assinarInfEventoManual(string $xmlEvento): string
+    {
+        $pfx = @file_get_contents($this->certPath);
+        if ($pfx === false || $pfx === '') {
+            throw new RuntimeException('Certificado A1 não pôde ser lido para assinatura do evento.');
+        }
+        $certs = [];
+        if (!openssl_pkcs12_read($pfx, $certs, $this->certPass)) {
+            throw new RuntimeException('Falha ao carregar certificado PFX para assinatura do evento.');
+        }
+        $privateKey = $certs['pkey'] ?? null;
+        $x509 = $certs['cert'] ?? null;
+        if (!$privateKey || !$x509) {
+            throw new RuntimeException('Certificado incompleto para assinatura do evento.');
+        }
+
+        $doc = new DOMDocument('1.0', 'UTF-8');
+        $doc->preserveWhiteSpace = false;
+        $doc->formatOutput = false;
+        $doc->loadXML($xmlEvento);
+        $infEvento = $doc->getElementsByTagName('infEvento')->item(0);
+        if (!$infEvento) {
+            throw new RuntimeException('Tag infEvento não encontrada para assinatura.');
+        }
+
+        $id = $infEvento->getAttribute('Id');
+        $canonical = $infEvento->C14N(false, false);
+        if (!openssl_sign($canonical, $signatureBin, $privateKey, OPENSSL_ALGO_SHA1)) {
+            throw new RuntimeException('Falha ao assinar evento MDF-e.');
+        }
+        $sigValue = base64_encode($signatureBin);
+        $certClean = preg_replace('/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s+/', '', $x509);
+        $digestValue = base64_encode(hash('sha1', $canonical, true));
+
+        $sigNs = 'http://www.w3.org/2000/09/xmldsig#';
+        $signature = $doc->createElementNS($sigNs, 'Signature');
+        $signedInfo = $doc->createElementNS($sigNs, 'SignedInfo');
+        $canonMethod = $doc->createElementNS($sigNs, 'CanonicalizationMethod');
+        $canonMethod->setAttribute('Algorithm', 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315');
+        $signedInfo->appendChild($canonMethod);
+        $sigMethod = $doc->createElementNS($sigNs, 'SignatureMethod');
+        $sigMethod->setAttribute('Algorithm', 'http://www.w3.org/2000/09/xmldsig#rsa-sha1');
+        $signedInfo->appendChild($sigMethod);
+        $reference = $doc->createElementNS($sigNs, 'Reference');
+        $reference->setAttribute('URI', '#' . $id);
+        $transforms = $doc->createElementNS($sigNs, 'Transforms');
+        $transform = $doc->createElementNS($sigNs, 'Transform');
+        $transform->setAttribute('Algorithm', 'http://www.w3.org/2000/09/xmldsig#enveloped-signature');
+        $transforms->appendChild($transform);
+        $transform2 = $doc->createElementNS($sigNs, 'Transform');
+        $transform2->setAttribute('Algorithm', 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315');
+        $transforms->appendChild($transform2);
+        $reference->appendChild($transforms);
+        $digestMethod = $doc->createElementNS($sigNs, 'DigestMethod');
+        $digestMethod->setAttribute('Algorithm', 'http://www.w3.org/2000/09/xmldsig#sha1');
+        $reference->appendChild($digestMethod);
+        $digestValueNode = $doc->createElementNS($sigNs, 'DigestValue', $digestValue);
+        $reference->appendChild($digestValueNode);
+        $signedInfo->appendChild($reference);
+        $signature->appendChild($signedInfo);
+        $signature->appendChild($doc->createElementNS($sigNs, 'SignatureValue', $sigValue));
+        $keyInfo = $doc->createElementNS($sigNs, 'KeyInfo');
+        $x509Data = $doc->createElementNS($sigNs, 'X509Data');
+        $x509Cert = $doc->createElementNS($sigNs, 'X509Certificate', $certClean);
+        $x509Data->appendChild($x509Cert);
+        $keyInfo->appendChild($x509Data);
+        $signature->appendChild($keyInfo);
+
+        $eventoNode = $doc->getElementsByTagName('evento')->item(0);
+        if (!$eventoNode) {
+            throw new RuntimeException('Tag evento não encontrada para assinatura.');
+        }
+        $eventoNode->appendChild($signature);
+
+        return $doc->saveXML();
+    }
+
+    private function enviarEventoSoapManual(string $xmlAssinado): string
+    {
+        $tpAmb = (($this->cfg['ambiente_sefaz'] ?? 'homologacao') === 'producao') ? 1 : 2;
+        $url = $this->getWsRecepcaoEventoUrl($tpAmb);
+        $eventoSemDecl = preg_replace('/<\?xml[^>]*\?>\s*/', '', $xmlAssinado) ?: $xmlAssinado;
+
+        $soapEnvelope = '<?xml version="1.0" encoding="UTF-8"?>'
+            . '<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+            . 'xmlns:xsd="http://www.w3.org/2001/XMLSchema" '
+            . 'xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">'
+            . '<soap12:Body>'
+            . '<mdfeDadosMsg xmlns="http://www.portalfiscal.inf.br/mdfe/wsdl/MDFeRecepcaoEvento">'
+            . $eventoSemDecl
+            . '</mdfeDadosMsg>'
+            . '</soap12:Body>'
+            . '</soap12:Envelope>';
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 45);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSLCERT, $this->certPath);
+        curl_setopt($ch, CURLOPT_SSLCERTTYPE, 'P12');
+        curl_setopt($ch, CURLOPT_SSLCERTPASSWD, $this->certPass);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/soap+xml; charset=utf-8',
+            'SOAPAction: "mdfeRecepcaoEvento"',
+        ]);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $soapEnvelope);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+        if ($response === false || trim((string) $response) === '') {
+            throw new RuntimeException('Erro no envio do evento MDF-e (HTTP ' . $httpCode . '): ' . $err);
+        }
+        return (string) $response;
+    }
+
+    private function getWsRecepcaoEventoUrl(int $tpAmb): string
+    {
+        $cfgCustom = trim((string) ($this->cfg['url_mdfe_recepcao_evento'] ?? ''));
+        if ($cfgCustom !== '') {
+            return $cfgCustom;
+        }
+        if ($tpAmb === 1) {
+            return 'https://mdfe.svrs.rs.gov.br/ws/MDFeRecepcaoEvento/MDFeRecepcaoEvento.asmx';
+        }
+        return 'https://mdfe-homologacao.svrs.rs.gov.br/ws/MDFeRecepcaoEvento/MDFeRecepcaoEvento.asmx';
+    }
+
+    /**
+     * @return array{sucesso:bool,erro?:string,protocolo?:string|null,cStat?:string,xMotivo?:string,xml_retorno?:string}
+     */
+    private function parseRetornoEventoMdfe(string $xmlRetorno): array
+    {
+        $parsed = $this->parseRetornoSefaz($xmlRetorno);
+        $cStat = (string) ($parsed['cStat'] ?? '');
+        $xMotivo = (string) ($parsed['xMotivo'] ?? '');
+        $protocolo = $parsed['protocolo'] ?? null;
+        $ok = in_array($cStat, ['135', '136', '100', '150'], true);
+        return [
+            'sucesso' => $ok,
+            'cStat' => $cStat,
+            'xMotivo' => $xMotivo,
+            'protocolo' => $protocolo,
+            'xml_retorno' => $xmlRetorno,
+            'erro' => $ok ? null : ('SEFAZ retornou ' . ($cStat !== '' ? $cStat : 'status desconhecido') . ' - ' . ($xMotivo !== '' ? $xMotivo : 'sem motivo')),
+        ];
     }
 }
 

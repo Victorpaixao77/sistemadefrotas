@@ -28,20 +28,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Incluir configurações
 require_once '../../includes/config.php';
 require_once '../../includes/functions.php';
+require_once __DIR__ . '/../../includes/csrf.php';
+require_once __DIR__ . '/../../includes/api_json.php';
 require_once __DIR__ . '/../includes/CTeService.php';
 require_once __DIR__ . '/../includes/MdfeService.php';
 require_once __DIR__ . '/../includes/NFeService.php';
 
 try {
-    // Configurar sessão
     configure_session();
     session_start();
-    
-    // Obter dados do POST
-    $input = json_decode(file_get_contents('php://input'), true);
-    $empresa_id = (int)($_SESSION['empresa_id'] ?? ($input['empresa_id'] ?? 0));
+    require_authentication();
+    api_require_csrf_json();
+
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $empresa_id = (int)($_SESSION['empresa_id'] ?? 0);
     if ($empresa_id < 1) {
-        throw new Exception('Sessão inválida ou empresa não informada.');
+        api_json_error('Sessão inválida.', 401);
     }
     $action = $input['action'] ?? 'list';
     
@@ -376,11 +378,12 @@ try {
             ]);
     }
     
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    error_log('fiscal_events: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'message' => 'Erro interno do servidor: ' . $e->getMessage()
-    ]);
+        'message' => 'Erro interno do servidor.'
+    ], JSON_UNESCAPED_UNICODE);
 }
 ?>

@@ -2,6 +2,7 @@
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 
 // Configure session before starting it
 configure_session();
@@ -145,6 +146,7 @@ $total_paginas = $resultado['total_paginas'];
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <script src="../js/motoristas.js"></script>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'gestao-motoristas-modern' : ''; ?>">
     <div class="app-container">
@@ -159,12 +161,12 @@ $total_paginas = $resultado['total_paginas'];
             <!-- Page Content -->
             <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
                 <?php if ($is_modern): ?>
-                <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Motoristas ativos</span><span class="val" id="kpiTotalAtivos">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Checklists pendentes</span><span class="val" id="kpiChecklistsPendentes">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Infrações (30 dias)</span><span class="val" id="kpiInfracoesRecentes">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Melhor eficiência</span><span class="val" id="kpiMelhorEficiencia">-</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Mais viagens</span><span class="val" id="kpiMaisViagens">-</span></div>
+                <div class="fornc-kpi-strip fornc-kpi-strip--5">
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-user-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Motoristas ativos</span></div><span class="val" id="kpiTotalAtivos">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-clipboard-list fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Checklists pendentes</span></div><span class="val" id="kpiChecklistsPendentes">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-triangle-exclamation fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Infrações (30 dias)</span></div><span class="val" id="kpiInfracoesRecentes">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-chart-line fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Melhor eficiência</span></div><span class="val" id="kpiMelhorEficiencia">-</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-road fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Mais viagens</span></div><span class="val" id="kpiMaisViagens">-</span></div>
                 </div>
                 <div class="fornc-toolbar">
                     <div class="fornc-search-block">
@@ -200,6 +202,7 @@ $total_paginas = $resultado['total_paginas'];
                     <div class="fornc-btn-row">
                         <button id="applyMotoristFilters" class="fornc-btn fornc-btn--accent" title="Aplicar filtros"><i class="fas fa-search"></i> Pesquisar</button>
                         <button id="clearMotoristFilters" class="fornc-btn fornc-btn--ghost" title="Limpar filtros"><i class="fas fa-undo"></i></button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="gestaoMotorColumnsBtn" title="Colunas da tabela" aria-label="Colunas da tabela"><i class="fas fa-columns"></i></button>
                         <button id="filterBtn" class="fornc-btn fornc-btn--ghost" title="Filtros"><i class="fas fa-sliders-h"></i> Opções</button>
                         <button id="exportBtn" class="fornc-btn fornc-btn--muted" title="Exportar"><i class="fas fa-file-export"></i> Exportar</button>
                         <button id="helpBtn" class="fornc-btn fornc-btn--ghost fornc-btn--icon" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
@@ -229,6 +232,7 @@ $total_paginas = $resultado['total_paginas'];
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-user-check kpi-card-icon" aria-hidden="true"></i>
                             <h3>Motoristas Ativos</h3>
                         </div>
                         <div class="card-body">
@@ -241,6 +245,7 @@ $total_paginas = $resultado['total_paginas'];
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-clipboard-list kpi-card-icon" aria-hidden="true"></i>
                             <h3>Checklists Pendentes</h3>
                         </div>
                         <div class="card-body">
@@ -253,6 +258,7 @@ $total_paginas = $resultado['total_paginas'];
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-triangle-exclamation kpi-card-icon" aria-hidden="true"></i>
                             <h3>Infrações Recentes</h3>
                         </div>
                         <div class="card-body">
@@ -265,6 +271,7 @@ $total_paginas = $resultado['total_paginas'];
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-gauge-high kpi-card-icon" aria-hidden="true"></i>
                             <h3>Melhor Eficiência</h3>
                         </div>
                         <div class="card-body">
@@ -277,6 +284,7 @@ $total_paginas = $resultado['total_paginas'];
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-route kpi-card-icon" aria-hidden="true"></i>
                             <h3>Mais Viagens</h3>
                         </div>
                         <div class="card-body">
@@ -324,35 +332,45 @@ $total_paginas = $resultado['total_paginas'];
                     </div>
                 </div>
                 <?php endif; ?>
+                <?php
+                $gestao_motor_modern_empty = !empty($is_modern) && empty($motoristas);
+                ?>
+                <?php if (!empty($is_modern)): ?>
+                <div class="fornc-empty-state<?php echo $gestao_motor_modern_empty ? ' visible' : ''; ?>" id="gestaoMotorEmptyState" role="status" aria-live="polite">
+                    <p class="fornc-empty-state-title">Nenhum motorista encontrado</p>
+                    <p class="fornc-empty-state-hint">Ajuste os filtros ou cadastre motoristas no cadastro principal.</p>
+                    <a href="motorists.php" class="fornc-btn fornc-btn--primary"><i class="fas fa-user-plus"></i> Ir para cadastro de motoristas</a>
+                </div>
+                <?php endif; ?>
                 
                 <!-- Motorists Table -->
-                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>" id="gestaoMotorTableWrap"<?php echo $gestao_motor_modern_empty ? ' style="display:none"' : ''; ?>>
                     <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="motoristTable">
                         <thead>
                             <tr>
-                                <th>Nome</th>
-                                <th>CNH</th>
-                                <th>Categoria</th>
-                                <th>Status</th>
-                                <th>Telefone</th>
-                                <th>Validade CNH</th>
-                                <th>Ações</th>
+                                <th<?php echo $is_modern ? ' data-col="nome"' : ''; ?>>Nome</th>
+                                <th<?php echo $is_modern ? ' data-col="cnh"' : ''; ?>>CNH</th>
+                                <th<?php echo $is_modern ? ' data-col="categoria"' : ''; ?>>Categoria</th>
+                                <th<?php echo $is_modern ? ' data-col="status"' : ''; ?>>Status</th>
+                                <th<?php echo $is_modern ? ' data-col="telefone"' : ''; ?>>Telefone</th>
+                                <th<?php echo $is_modern ? ' data-col="validade_cnh"' : ''; ?>>Validade CNH</th>
+                                <th<?php echo $is_modern ? ' data-col="acoes"' : ''; ?>>Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($motoristas as $motorista): ?>
                             <tr>
-                                <td><?php echo htmlspecialchars($motorista['nome']); ?></td>
-                                <td><?php echo htmlspecialchars($motorista['cnh']); ?></td>
-                                <td><?php echo htmlspecialchars($motorista['categoria_cnh_nome'] ?? '-'); ?></td>
-                                <td>
+                                <td<?php echo $is_modern ? ' data-col="nome"' : ''; ?>><?php echo htmlspecialchars($motorista['nome']); ?></td>
+                                <td<?php echo $is_modern ? ' data-col="cnh"' : ''; ?>><?php echo htmlspecialchars($motorista['cnh']); ?></td>
+                                <td<?php echo $is_modern ? ' data-col="categoria"' : ''; ?>><?php echo htmlspecialchars($motorista['categoria_cnh_nome'] ?? '-'); ?></td>
+                                <td<?php echo $is_modern ? ' data-col="status"' : ''; ?>>
                                     <span class="status-badge status-<?php echo $motorista['disponibilidade_id'] ?? '1'; ?>">
                                         <?php echo htmlspecialchars($motorista['disponibilidade_nome'] ?? 'Ativo'); ?>
                                     </span>
                                 </td>
-                                <td><?php echo htmlspecialchars($motorista['telefone'] ?? '-'); ?></td>
-                                <td><?php echo $motorista['data_validade_cnh'] ? date('d/m/Y', strtotime($motorista['data_validade_cnh'])) : '-'; ?></td>
-                                <td class="actions">
+                                <td<?php echo $is_modern ? ' data-col="telefone"' : ''; ?>><?php echo htmlspecialchars($motorista['telefone'] ?? '-'); ?></td>
+                                <td<?php echo $is_modern ? ' data-col="validade_cnh"' : ''; ?>><?php echo $motorista['data_validade_cnh'] ? date('d/m/Y', strtotime($motorista['data_validade_cnh'])) : '-'; ?></td>
+                                <td class="actions"<?php echo $is_modern ? ' data-col="acoes"' : ''; ?>>
                                     <button class="btn-icon view-btn" data-id="<?php echo $motorista['id']; ?>" title="Ver detalhes">
                                         <i class="fas fa-eye"></i>
                                     </button>
@@ -360,7 +378,7 @@ $total_paginas = $resultado['total_paginas'];
                             </tr>
                             <?php endforeach; ?>
                             
-                            <?php if (empty($motoristas)): ?>
+                            <?php if (empty($motoristas) && empty($is_modern)): ?>
                             <tr>
                                 <td colspan="7" class="text-center">Nenhum motorista encontrado</td>
                             </tr>
@@ -485,72 +503,53 @@ $total_paginas = $resultado['total_paginas'];
             </div>
         </div>
     </div>
+    <?php $sf_help_key = 'gestao_motoristas'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
 
-    <!-- Modal de Ajuda -->
-    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpMotoristModal">
+
+    <?php if (!empty($is_modern)): ?>
+    <div class="modal fornc-modal fornc-columns-modal" id="gestaoMotorColumnsModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Ajuda - Gestão de Motoristas</h2>
-                <button class="close-modal" type="button" aria-label="Fechar">
-                    <i class="fas fa-times"></i>
-                </button>
+                <h2>Colunas da tabela</h2>
+                <span class="close-modal" title="Fechar">&times;</span>
             </div>
             <div class="modal-body">
-                <div class="help-section">
-                    <h3>Visão Geral</h3>
-                    <p>A página de Gestão de Motoristas oferece uma visão completa da performance e status de todos os motoristas da empresa. Aqui você pode acompanhar eficiência, pendências e análises inteligentes.</p>
-                </div>
-
-                <div class="help-section">
-                    <h3>Funcionalidades Principais</h3>
-                    <ul>
-                        <li><strong>Visualização:</strong> Visualize detalhes completos dos motoristas cadastrados.</li>
-                        <li><strong>Filtros:</strong> Use os filtros para encontrar motoristas específicos por status ou categoria.</li>
-                        <li><strong>Exportar:</strong> Exporte os dados dos motoristas para análise externa.</li>
-                        <li><strong>Análises:</strong> Visualize relatórios e estatísticas de performance.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Indicadores (KPIs)</h3>
-                    <ul>
-                        <li><strong>Motoristas Ativos:</strong> Número de motoristas atualmente ativos.</li>
-                        <li><strong>Checklists Pendentes:</strong> Quantidade de checklists não realizados.</li>
-                        <li><strong>Infrações Recentes:</strong> Número de infrações nos últimos 30 dias.</li>
-                        <li><strong>Melhor Eficiência:</strong> Motorista com melhor km/l.</li>
-                        <li><strong>Mais Viagens:</strong> Motorista com maior número de viagens.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Ações Disponíveis</h3>
-                    <ul>
-                        <li><strong>Visualizar:</strong> Veja detalhes completos do motorista, incluindo informações pessoais e da CNH.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Dicas Úteis</h3>
-                    <ul>
-                        <li>Monitore regularmente a eficiência de combustível para identificar oportunidades de melhoria.</li>
-                        <li>Acompanhe os checklists pendentes para garantir a segurança da frota.</li>
-                        <li>Analise o histórico de infrações para identificar padrões e necessidades de treinamento.</li>
-                        <li>Configure alertas para vencimento de documentação importante.</li>
-                        <li>Use os rankings para reconhecer motoristas com melhor desempenho.</li>
-                    </ul>
+                <p class="text-muted" style="font-size:0.8rem; margin-top:0;">Marque as colunas desejadas e clique em <strong>Salvar preferências</strong>.</p>
+                <div id="gestaoMotorColumnsToggleList">
+                    <div class="col-toggle-row col-toggle-section">Colunas</div>
+                    <label class="col-toggle-row"><span>Nome</span><input type="checkbox" data-col-toggle="nome" checked></label>
+                    <label class="col-toggle-row"><span>CNH</span><input type="checkbox" data-col-toggle="cnh" checked></label>
+                    <label class="col-toggle-row"><span>Categoria</span><input type="checkbox" data-col-toggle="categoria" checked></label>
+                    <label class="col-toggle-row"><span>Status</span><input type="checkbox" data-col-toggle="status" checked></label>
+                    <label class="col-toggle-row"><span>Telefone</span><input type="checkbox" data-col-toggle="telefone" checked></label>
+                    <label class="col-toggle-row"><span>Validade CNH</span><input type="checkbox" data-col-toggle="validade_cnh" checked></label>
+                    <label class="col-toggle-row"><span>Ações</span><input type="checkbox" data-col-toggle="acoes" checked></label>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeModal('helpMotoristModal')">Fechar</button>
+            <div class="modal-footer columns-modal-footer">
+                <button type="button" class="btn-secondary btn-columns-close close-modal">Fechar</button>
+                <button type="button" class="btn-primary btn-columns-save" id="gestaoMotorColumnsSaveBtn">Salvar preferências</button>
             </div>
         </div>
     </div>
+    <?php endif; ?>
 
     <!-- JavaScript Files -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <?php if (!empty($is_modern)): ?><script src="../js/fornc-table-columns.js"></script><?php endif; ?>
     <script>
     // DASHBOARDS E GRÁFICOS DE MOTORISTAS
     document.addEventListener('DOMContentLoaded', function() {
+        if (document.body.classList.contains('gestao-motoristas-modern') && typeof window.initForncTableColumns === 'function') {
+            window.initForncTableColumns({
+                tableSelector: '#motoristTable',
+                toggleListSelector: '#gestaoMotorColumnsToggleList',
+                storageKey: 'sf_gestao_motoristas_cols_v1',
+                columnsBtnId: 'gestaoMotorColumnsBtn',
+                modalId: 'gestaoMotorColumnsModal',
+                saveBtnId: 'gestaoMotorColumnsSaveBtn'
+            });
+        }
         // KPIs
         fetch('../api/gestao_motoristas_dashboard.php?action=kpis')
             .then(r => r.json()).then(res => {
@@ -636,5 +635,6 @@ $total_paginas = $resultado['total_paginas'];
         }
     }
     </script>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

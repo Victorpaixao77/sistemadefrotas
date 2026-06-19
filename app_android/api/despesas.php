@@ -65,7 +65,7 @@ try {
         $borracharia = (float)($d['borracharia'] ?? 0);
         $eletrica_mecanica = (float)($d['eletrica_mecanica'] ?? 0);
         $adiantamento = (float)($d['adiantamento'] ?? 0);
-        $total_despviagem = (float)($d['total'] ?? $d['total_despviagem'] ?? 0);
+        $outros = (float)($d['outros'] ?? 0);
         $observacoes = $d['observacoes'] ?? null;
 
         if ($action === 'update') {
@@ -78,14 +78,14 @@ try {
                     descarga = :descarga, pedagios = :pedagios, caixinha = :caixinha,
                     estacionamento = :estacionamento, lavagem = :lavagem, borracharia = :borracharia,
                     eletrica_mecanica = :eletrica_mecanica, adiantamento = :adiantamento,
-                    total_despviagem = :total_despviagem, status = :status, fonte = :fonte
+                    outros = :outros, status = :status, fonte = :fonte
                 WHERE id = :id AND empresa_id = :e AND rota_id = :rota_id
             ');
             $stmt->execute([
                 ':descarga' => $descarga, ':pedagios' => $pedagios, ':caixinha' => $caixinha,
                 ':estacionamento' => $estacionamento, ':lavagem' => $lavagem, ':borracharia' => $borracharia,
                 ':eletrica_mecanica' => $eletrica_mecanica, ':adiantamento' => $adiantamento,
-                ':total_despviagem' => $total_despviagem, ':status' => 'pendente', ':fonte' => 'motorista',
+                ':outros' => $outros, ':status' => 'pendente', ':fonte' => 'motorista',
                 ':id' => $id, ':e' => $empresa_id, ':rota_id' => $rota_id,
             ]);
             api_success(null, 'Despesas atualizadas com sucesso.');
@@ -95,11 +95,11 @@ try {
             INSERT INTO despesas_viagem (
                 empresa_id, rota_id, descarga, pedagios, caixinha,
                 estacionamento, lavagem, borracharia, eletrica_mecanica,
-                adiantamento, total_despviagem, status, fonte
+                adiantamento, outros, status, fonte
             ) VALUES (
                 :e, :rota_id, :descarga, :pedagios, :caixinha,
                 :estacionamento, :lavagem, :borracharia, :eletrica_mecanica,
-                :adiantamento, :total_despviagem, "pendente", "motorista"
+                :adiantamento, :outros, "pendente", "motorista"
             )
         ');
         $stmt->execute([
@@ -107,7 +107,7 @@ try {
             ':descarga' => $descarga, ':pedagios' => $pedagios, ':caixinha' => $caixinha,
             ':estacionamento' => $estacionamento, ':lavagem' => $lavagem, ':borracharia' => $borracharia,
             ':eletrica_mecanica' => $eletrica_mecanica, ':adiantamento' => $adiantamento,
-            ':total_despviagem' => $total_despviagem,
+            ':outros' => $outros,
         ]);
         $id = $conn->lastInsertId();
         api_success(['id' => (int)$id], 'Despesas registradas com sucesso.');

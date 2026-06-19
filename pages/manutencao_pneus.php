@@ -1,6 +1,7 @@
 <?php
 // Include configuration and functions first
 require_once '../includes/config.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
 
@@ -9,6 +10,10 @@ configure_session();
 
 // Initialize the session
 session_start();
+
+require_authentication();
+require_once '../includes/permissions.php';
+require_permission('access_tire_management');
 
 // Set page title
 $page_title = "Manutenção de Pneus";
@@ -23,20 +28,20 @@ $mes = isset($_GET['mes']) ? intval($_GET['mes']) : null;
 $ano = isset($_GET['ano']) ? intval($_GET['ano']) : null;
 
 // Buscar dados para os KPIs
+$periodWhere = 'empresa_id = :empresa_id';
+$params = [':empresa_id' => $_SESSION['empresa_id']];
+if ($mes && $ano) {
+    $periodWhere .= ' AND MONTH(data_manutencao) = :mes AND YEAR(data_manutencao) = :ano';
+    $params[':mes'] = $mes;
+    $params[':ano'] = $ano;
+}
+
 $sql = "SELECT 
             COUNT(*) as total_manutencoes,
             SUM(custo) as custo_total,
-            COUNT(CASE WHEN data_manutencao >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN 1 END) as manutencoes_mes
+            COUNT(*) as manutencoes_mes
         FROM pneu_manutencao 
-        WHERE empresa_id = :empresa_id";
-
-// Aplicar filtro de mês/ano nos KPIs se existir
-if ($mes && $ano) {
-    $sql .= " AND MONTH(data_manutencao) = :mes AND YEAR(data_manutencao) = :ano";
-    $params = [':empresa_id' => $_SESSION['empresa_id'], ':mes' => $mes, ':ano' => $ano];
-} else {
-    $params = [':empresa_id' => $_SESSION['empresa_id']];
-}
+        WHERE {$periodWhere}";
 
 $kpis = fetchOne($conn, $sql, $params);
 
@@ -50,8 +55,8 @@ if (!in_array($limit, $allowed_per)) {
 $offset = ($page - 1) * $limit;
 
 // Total de registros para paginação
-$sql_count = "SELECT COUNT(*) as total FROM pneu_manutencao WHERE empresa_id = :empresa_id";
-$total = (int) fetchOne($conn, $sql_count, [':empresa_id' => $_SESSION['empresa_id']])['total'];
+$sql_count = "SELECT COUNT(*) as total FROM pneu_manutencao WHERE {$periodWhere}";
+$total = (int) fetchOne($conn, $sql_count, $params)['total'];
 $total_pages = $total > 0 ? (int) ceil($total / $limit) : 1;
 
 // Lista de manutenções com LIMIT/OFFSET (paginação efetiva)
@@ -60,12 +65,16 @@ $sql = "SELECT m.*, p.numero_serie as numero_pneu, v.placa as placa_veiculo, t.n
         LEFT JOIN pneus p ON m.pneu_id = p.id 
         LEFT JOIN veiculos v ON m.veiculo_id = v.id 
         LEFT JOIN tipo_manutencao_pneus t ON m.tipo_manutencao_id = t.id
-        WHERE m.empresa_id = :empresa_id
+        WHERE m.empresa_id = :empresa_id" . ($mes && $ano ? ' AND MONTH(m.data_manutencao) = :mes AND YEAR(m.data_manutencao) = :ano' : '') . "
         ORDER BY m.data_manutencao DESC
         LIMIT :limit OFFSET :offset";
 
 $stmt = $conn->prepare($sql);
 $stmt->bindValue(':empresa_id', $_SESSION['empresa_id']);
+if ($mes && $ano) {
+    $stmt->bindValue(':mes', $mes, PDO::PARAM_INT);
+    $stmt->bindValue(':ano', $ano, PDO::PARAM_INT);
+}
 $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
 $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
 $stmt->execute();
@@ -215,6 +224,7 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
             }
         }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'manutencao-pneus-modern' : ''; ?>">
     <div class="app-container">
@@ -259,9 +269,9 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
 
                 <?php if ($is_modern): ?>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Manutenções (mês)</span><span class="val"><?php echo (int)($kpis['manutencoes_mes'] ?? 0); ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Custo total</span><span class="val">R$ <?php echo number_format($kpis['custo_total'] ?? 0, 2, ',', '.'); ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Total geral</span><span class="val"><?php echo (int)($kpis['total_manutencoes'] ?? 0); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-screwdriver-wrench fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Manutenções (mês)</span></div><span class="val"><?php echo (int)($kpis['manutencoes_mes'] ?? 0); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-coins fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Custo total</span></div><span class="val">R$ <?php echo number_format($kpis['custo_total'] ?? 0, 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-list-ol fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total geral</span></div><span class="val"><?php echo (int)($kpis['total_manutencoes'] ?? 0); ?></span></div>
                 </div>
                 <div class="fornc-toolbar">
                     <div class="fornc-search-block">
@@ -324,6 +334,7 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-wrench kpi-card-icon" aria-hidden="true"></i>
                             <h3>Manutenções</h3>
                         </div>
                         <div class="card-body">
@@ -336,6 +347,7 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-sack-dollar kpi-card-icon" aria-hidden="true"></i>
                             <h3>Custo Total</h3>
                         </div>
                         <div class="card-body">
@@ -348,6 +360,7 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-clipboard-list kpi-card-icon" aria-hidden="true"></i>
                             <h3>Total Geral</h3>
                         </div>
                         <div class="card-body">
@@ -672,83 +685,7 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
     </div>
     
     <!-- Help Modal -->
-    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Ajuda - Manutenção de Pneus</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="help-section">
-                    <h3>Visão Geral</h3>
-                    <p>O módulo de Manutenção de Pneus permite gerenciar todas as manutenções realizadas nos pneus da sua frota, oferecendo análises detalhadas de custos e tipos de manutenção.</p>
-                </div>
-
-                <div class="help-section">
-                    <h3>Funcionalidades Principais</h3>
-                    <ul>
-                        <li><strong>Nova Manutenção:</strong> Registre novas manutenções com informações como:
-                            <ul>
-                                <li>Data da manutenção</li>
-                                <li>Pneu e veículo</li>
-                                <li>Tipo de manutenção</li>
-                                <li>Quilometragem</li>
-                                <li>Custo</li>
-                                <li>Observações</li>
-                            </ul>
-                        </li>
-                        <li><strong>Filtros:</strong> Filtre os dados por:
-                            <ul>
-                                <li>Tipo de manutenção</li>
-                                <li>Pneu</li>
-                                <li>Veículo</li>
-                                <li>Período</li>
-                            </ul>
-                        </li>
-                        <li><strong>Análises:</strong> Visualize:
-                            <ul>
-                                <li>Custo total por mês</li>
-                                <li>Quantidade por tipo de manutenção</li>
-                                <li>Top pneus com maior custo</li>
-                                <li>Média de custo por tipo</li>
-                                <li>Gráficos de distribuição e evolução</li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Como Usar</h3>
-                    <ol>
-                        <li><strong>Registrar Manutenção:</strong>
-                            <ul>
-                                <li>Clique no botão "Nova Manutenção"</li>
-                                <li>Preencha todos os campos obrigatórios (*)</li>
-                                <li>Clique em "Salvar"</li>
-                            </ul>
-                        </li>
-                        <li><strong>Filtrar Dados:</strong>
-                            <ul>
-                                <li>Use a barra de busca para encontrar manutenções específicas</li>
-                                <li>Selecione o tipo de manutenção no filtro</li>
-                                <li>Clique em "Filtrar" para aplicar os filtros</li>
-                            </ul>
-                        </li>
-                        <li><strong>Gerenciar Registros:</strong>
-                            <ul>
-                                <li>Use o botão de visualizar (olho) para ver detalhes</li>
-                                <li>Use o botão de editar (lápis) para modificar um registro</li>
-                                <li>Use o botão de excluir (lixeira) para remover um registro</li>
-                            </ul>
-                        </li>
-                    </ol>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary close-modal">Fechar</button>
-            </div>
-        </div>
-    </div>
+    <?php $sf_help_key = 'manutencao_pneus'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
     
     <!-- Filter Modal -->
     <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="filterModal">
@@ -785,7 +722,6 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
         
         function initializePage() {
             document.getElementById('addMaintenanceBtn').addEventListener('click', showAddMaintenanceModal);
-            document.getElementById('helpBtn').addEventListener('click', showHelpModal);
             document.getElementById('filterBtn').addEventListener('click', showFilterModal);
             setupTableButtons();
         }
@@ -956,6 +892,14 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
             });
         }
         
+        function pneusCsrfHeaders(extra) {
+            const h = Object.assign({ 'Content-Type': 'application/json' }, extra || {});
+            if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+                h['X-CSRF-Token'] = window.__SF_CSRF__;
+            }
+            return h;
+        }
+
         function saveMaintenance() {
             const form = document.getElementById('maintenanceForm');
             const formData = new FormData(form);
@@ -970,9 +914,7 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
             
             fetch(`../api/pneu_manutencao_actions.php?action=${method}${maintenanceId ? '&id=' + maintenanceId : ''}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: pneusCsrfHeaders(),
                 body: JSON.stringify(data)
             })
                 .then(response => response.json())
@@ -993,7 +935,8 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
         function showDeleteConfirmation(maintenanceId) {
             if (confirm('Tem certeza que deseja excluir esta manutenção?')) {
                 fetch(`../api/pneu_manutencao_actions.php?action=delete&id=${maintenanceId}`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: pneusCsrfHeaders({})
                 })
                     .then(response => response.json())
                     .then(result => {
@@ -1053,10 +996,6 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
                 style: 'currency',
                 currency: 'BRL'
             }).format(value);
-        }
-        
-        function showHelpModal() {
-            document.getElementById('helpModal').style.display = 'block';
         }
         
         function showFilterModal() {
@@ -1288,5 +1227,6 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
     </script>
 
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

@@ -1,8 +1,4 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 // Include configuration and functions first
 require_once '../../includes/config.php';
 require_once '../../includes/functions.php';
@@ -114,6 +110,20 @@ if (array_key_exists('classic', $_GET)) {
             font-size: 0.9rem;
             color: var(--text-secondary);
         }
+
+        .nfe-manifest-dropdown { position: relative; display: inline-block; }
+        .nfe-manifest-menu {
+            display: none; position: absolute; right: 0; top: 100%; z-index: 1050;
+            min-width: 220px; background: var(--bg-secondary, #fff); border: 1px solid var(--border-color, #dee2e6);
+            border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.15); padding: 4px 0;
+        }
+        .nfe-manifest-menu.is-open { display: block; }
+        .nfe-manifest-menu button {
+            display: block; width: 100%; text-align: left; border: 0; background: transparent;
+            padding: 8px 12px; font-size: 0.875rem; cursor: pointer;
+        }
+        .nfe-manifest-menu button:hover { background: rgba(0,0,0,.05); }
+        .mdfe-checklist-list .list-group-item { background: transparent; border-color: var(--border-color, #dee2e6); }
         
         .document-tabs {
             display: flex;
@@ -501,6 +511,9 @@ if (array_key_exists('classic', $_GET)) {
                         <button type="button" class="fornc-btn fornc-btn--ghost" id="clearNfeFilters" title="Limpar filtros">
                             <i class="fas fa-undo"></i>
                         </button>
+                        <button type="button" class="fornc-btn fornc-btn--accent" id="btnManifestarNfeSelecionadas" title="Manifestar destinatário (ciência) nas NF-e marcadas">
+                            <i class="fas fa-clipboard-check"></i> Manifestar selecionadas
+                        </button>
                         <button type="button" class="fornc-btn fornc-btn--primary" onclick="abrirModalEmitirNfe()" title="Gerar e enviar NF-e modelo 55">
                             <i class="fas fa-file-invoice"></i> Emitir NF-e
                         </button>
@@ -780,6 +793,41 @@ if (array_key_exists('classic', $_GET)) {
         </div>
     </div>
     
+    <!-- Modal Manifestação destinatário NF-e -->
+    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?> fade" id="modalManifestarNfe" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-clipboard-check"></i> Manifestação do destinatário</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="manifestNfeId" value="">
+                    <p class="small text-muted mb-2" id="manifestNfeResumo"></p>
+                    <div class="mb-3">
+                        <label for="manifestNfeTipo" class="form-label">Tipo de manifestação</label>
+                        <select class="form-select" id="manifestNfeTipo">
+                            <option value="ciencia">Ciência da operação</option>
+                            <option value="confirmacao">Confirmação da operação</option>
+                            <option value="desconhecimento">Desconhecimento da operação</option>
+                            <option value="nao_realizada">Operação não realizada</option>
+                        </select>
+                    </div>
+                    <div class="mb-0" id="manifestNfeJustWrap" style="display:none;">
+                        <label for="manifestNfeJustificativa" class="form-label">Justificativa <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="manifestNfeJustificativa" rows="3" minlength="15" maxlength="255" placeholder="Mínimo 15 caracteres (obrigatório para operação não realizada)"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btnConfirmarManifestNfe" onclick="confirmarManifestacaoNfe()">
+                        <i class="fas fa-paper-plane"></i> Enviar à SEFAZ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Visualizar NF-e (dados básicos) -->
     <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?> fade" id="modalVisualizarNfe" tabindex="-1" aria-labelledby="modalVisualizarNfeLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -793,6 +841,7 @@ if (array_key_exists('classic', $_GET)) {
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <div id="modalVisualizarNfeManifestBtns" class="d-none"></div>
                 </div>
             </div>
         </div>
@@ -812,6 +861,7 @@ if (array_key_exists('classic', $_GET)) {
     
     <script>
         var nfeDocsRecebidasCache = [];
+        var nfeListTruncationHtml = '';
         var nfePaginaAtual = 1;
         var nfePerPage = 10;
 
@@ -828,7 +878,31 @@ if (array_key_exists('classic', $_GET)) {
                 }
             });
             initEmitDestKindToggle();
-            
+
+            var btnManifestarSel = document.getElementById('btnManifestarNfeSelecionadas');
+            if (btnManifestarSel) {
+                btnManifestarSel.addEventListener('click', function() {
+                    manifestarNfeSelecionadas('ciencia');
+                });
+            }
+
+            var manifestTipoSel = document.getElementById('manifestNfeTipo');
+            if (manifestTipoSel) {
+                manifestTipoSel.addEventListener('change', function() {
+                    var wrap = document.getElementById('manifestNfeJustWrap');
+                    if (wrap) wrap.style.display = manifestTipoSel.value === 'nao_realizada' ? 'block' : 'none';
+                });
+            }
+
+            document.addEventListener('click', function(ev) {
+                document.querySelectorAll('.nfe-manifest-menu.is-open').forEach(function(menu) {
+                    var trigger = menu.parentElement && menu.parentElement.querySelector('.btn-icon');
+                    if (!menu.contains(ev.target) && !(trigger && trigger.contains(ev.target))) {
+                        menu.classList.remove('is-open');
+                    }
+                });
+            });
+
             const refreshBtn = document.getElementById('refreshBtn');
             if (refreshBtn) {
                 refreshBtn.addEventListener('click', function() {
@@ -1714,7 +1788,7 @@ if (array_key_exists('classic', $_GET)) {
             msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 15px; border-radius: 5px;">' +
                 '<strong>🔄 Carregando NF-e...</strong></div>';
             
-            fiscalApiFetch('../api/documentos_fiscais_v2.php?action=list&tipo=nfe&limit=100')
+            fiscalApiFetch('../api/documentos_fiscais_v2.php?action=list&tipo=nfe&limit=500')
                 .then(res => {
                     const data = res.data || {};
                     if (res.status === 429 || (data && String(data.code || '') === 'rate_limited')) {
@@ -1725,10 +1799,14 @@ if (array_key_exists('classic', $_GET)) {
                         return;
                     }
                     if (data.success) {
+                        nfeListTruncationHtml = (typeof fiscalListTruncationBanner === 'function')
+                            ? fiscalListTruncationBanner(data.totais, data.documentos, 500)
+                            : '';
                         if (data.documentos && data.documentos.length > 0) {
                             nfeDocsRecebidasCache = data.documentos || [];
                             aplicarFiltrosNfeRecebidas();
                         } else {
+                            nfeListTruncationHtml = '';
                             nfeDocsRecebidasCache = [];
                             msg.innerHTML = '<div style="color: #6c757d; background: #f8f9fa; padding: 15px; border-radius: 5px;">' +
                                 '<strong>📭 Nenhuma NF-e recebida</strong><br>Use "Buscar NF-e do meu CNPJ" ou <strong>Receber NF-e</strong> (XML, manual ou chave na SEFAZ).</div>';
@@ -1741,8 +1819,10 @@ if (array_key_exists('classic', $_GET)) {
                 .catch(error => {
                     console.error('❌ Erro ao carregar NF-e:', error);
                     nfeDocsRecebidasCache = [];
+                    nfeListTruncationHtml = '';
+                    var errMsg = (error && error.message) ? String(error.message) : 'Erro desconhecido';
                     msg.innerHTML = '<div style="color: #dc3545; background: #f8d7da; padding: 15px; border-radius: 5px;">' +
-                        '<strong>❌ Erro ao carregar dados!</strong><br>' + error.message + '</div>';
+                        '<strong>❌ Erro ao carregar dados!</strong><br>' + escapeHtml(errMsg) + '</div>';
                     atualizarPaginacaoNfe(0);
                 });
         }
@@ -1813,10 +1893,20 @@ if (array_key_exists('classic', $_GET)) {
                 html += '<a class="btn-icon" href="#" onclick="abrirModalNfe(' + doc.id + '); return false;" title="Visualizar"><i class="fas fa-search"></i></a>';
                 html += '<a class="btn-icon" href="#" onclick="downloadNfeXml(' + doc.id + '); return false;" title="Download XML"><i class="fas fa-file-code"></i></a>';
                 html += '<a class="btn-icon" href="#" onclick="downloadNfePdf(' + doc.id + '); return false;" title="Download PDF"><i class="fas fa-file-pdf"></i></a>';
+                if (nfePodeManifestar(doc.status)) {
+                    html += '<span class="nfe-manifest-dropdown">';
+                    html += '<a class="btn-icon" href="#" onclick="toggleNfeManifestMenu(' + doc.id + '); return false;" title="Manifestação destinatário"><i class="fas fa-clipboard-check"></i></a>';
+                    html += '<div class="nfe-manifest-menu" id="nfeManifestMenu_' + doc.id + '">';
+                    html += '<button type="button" onclick="abrirModalManifestarNfe(' + doc.id + ',\'ciencia\')">Ciência da operação</button>';
+                    html += '<button type="button" onclick="abrirModalManifestarNfe(' + doc.id + ',\'confirmacao\')">Confirmação</button>';
+                    html += '<button type="button" onclick="abrirModalManifestarNfe(' + doc.id + ',\'desconhecimento\')">Desconhecimento</button>';
+                    html += '<button type="button" onclick="abrirModalManifestarNfe(' + doc.id + ',\'nao_realizada\')">Operação não realizada</button>';
+                    html += '</div></span>';
+                }
                 html += '</td></tr>';
             });
             html += '</tbody></table>';
-            msg.innerHTML = html;
+            msg.innerHTML = nfeListTruncationHtml + html;
             atualizarPaginacaoNfe(docsFiltrados.length);
         }
 
@@ -1869,6 +1959,127 @@ if (array_key_exists('classic', $_GET)) {
             var u = '../api/download_nfe_pdf.php?id=' + encodeURIComponent(id) + '&_=' + Date.now();
             window.open(u, '_blank', 'noopener,noreferrer');
         }
+
+        function nfePodeManifestar(status) {
+            var st = String(status || '').toLowerCase();
+            if (!st || st === 'cancelada' || st === 'cancelado') return false;
+            return true;
+        }
+
+        function toggleNfeManifestMenu(id) {
+            document.querySelectorAll('.nfe-manifest-menu.is-open').forEach(function(m) {
+                if (m.id !== 'nfeManifestMenu_' + id) m.classList.remove('is-open');
+            });
+            var menu = document.getElementById('nfeManifestMenu_' + id);
+            if (menu) menu.classList.toggle('is-open');
+        }
+
+        function abrirModalManifestarNfe(id, tipo) {
+            document.querySelectorAll('.nfe-manifest-menu.is-open').forEach(function(m) { m.classList.remove('is-open'); });
+            var doc = (nfeDocsRecebidasCache || []).find(function(d) { return Number(d.id) === Number(id); });
+            document.getElementById('manifestNfeId').value = id;
+            var tipoSel = document.getElementById('manifestNfeTipo');
+            if (tipoSel) tipoSel.value = tipo || 'ciencia';
+            var wrap = document.getElementById('manifestNfeJustWrap');
+            if (wrap) wrap.style.display = (tipoSel && tipoSel.value === 'nao_realizada') ? 'block' : 'none';
+            var resumo = document.getElementById('manifestNfeResumo');
+            if (resumo && doc) {
+                resumo.textContent = 'NF-e ' + (doc.numero_nfe || id) + ' — ' + (doc.cliente_razao_social || 'Emitente');
+            } else if (resumo) {
+                resumo.textContent = 'NF-e #' + id;
+            }
+            document.getElementById('manifestNfeJustificativa').value = '';
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('modalManifestarNfe')).show();
+        }
+
+        function confirmarManifestacaoNfe() {
+            var id = parseInt(document.getElementById('manifestNfeId').value, 10);
+            var tipo = (document.getElementById('manifestNfeTipo') || {}).value || 'ciencia';
+            var just = (document.getElementById('manifestNfeJustificativa') || {}).value || '';
+            if (!id) {
+                fiscalToast('NF-e inválida.', 'warning');
+                return;
+            }
+            if (tipo === 'nao_realizada' && just.trim().length < 15) {
+                fiscalToast('Informe justificativa com pelo menos 15 caracteres.', 'warning');
+                return;
+            }
+            enviarManifestacaoNfe(id, tipo, just.trim());
+        }
+
+        function enviarManifestacaoNfe(id, tipo, justificativa) {
+            var fd = new FormData();
+            fd.append('action', 'processar_evento');
+            fd.append('tipo_evento', 'manifestacao');
+            fd.append('documento_id', String(id));
+            fd.append('manifestacao_tipo', tipo);
+            if (justificativa) fd.append('justificativa', justificativa);
+
+            var btn = document.getElementById('btnConfirmarManifestNfe');
+            var orig = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...'; }
+
+            fiscalApiFetch('../api/documentos_fiscais_v2.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function(res) {
+                    var data = res.data || {};
+                    if (data.success) {
+                        fiscalToast(data.message || 'Manifestação registrada na SEFAZ.', 'success');
+                        var modalEl = document.getElementById('modalManifestarNfe');
+                        if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                        carregarNFE();
+                    } else {
+                        fiscalToast(fiscalApiErrorMessage(data, res.status), 'danger');
+                    }
+                })
+                .catch(function() { fiscalToast('Erro ao manifestar NF-e.', 'danger'); })
+                .finally(function() {
+                    if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+                });
+        }
+
+        function manifestarNfeSelecionadas(tipo) {
+            var ids = [];
+            document.querySelectorAll('.nfe-check:checked').forEach(function(cb) {
+                var id = parseInt(cb.getAttribute('data-id'), 10);
+                if (id > 0) ids.push(id);
+            });
+            if (!ids.length) {
+                fiscalToast('Marque pelo menos uma NF-e na lista.', 'warning');
+                return;
+            }
+            var elegiveis = ids.filter(function(id) {
+                var doc = (nfeDocsRecebidasCache || []).find(function(d) { return Number(d.id) === id; });
+                return doc && nfePodeManifestar(doc.status);
+            });
+            if (!elegiveis.length) {
+                fiscalToast('Nenhuma NF-e selecionada permite manifestação.', 'warning');
+                return;
+            }
+            if (!confirm('Manifestar ' + elegiveis.length + ' NF-e(s) com "' + (tipo === 'ciencia' ? 'Ciência da operação' : tipo) + '"?')) return;
+
+            var idx = 0;
+            var ok = 0;
+            var fail = 0;
+            var next = function() {
+                if (idx >= elegiveis.length) {
+                    fiscalToast('Manifestação em lote: ' + ok + ' OK, ' + fail + ' falha(s).', fail ? 'warning' : 'success');
+                    carregarNFE();
+                    return;
+                }
+                var fd = new FormData();
+                fd.append('action', 'processar_evento');
+                fd.append('tipo_evento', 'manifestacao');
+                fd.append('documento_id', String(elegiveis[idx]));
+                fd.append('manifestacao_tipo', tipo);
+                fiscalApiFetch('../api/documentos_fiscais_v2.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function(res) {
+                        if ((res.data || {}).success) ok++; else fail++;
+                    })
+                    .catch(function() { fail++; })
+                    .finally(function() { idx++; next(); });
+            };
+            next();
+        }
         
         function abrirModalNfe(id) {
             const modal = new bootstrap.Modal(document.getElementById('modalVisualizarNfe'));
@@ -1906,6 +2117,19 @@ if (array_key_exists('classic', $_GET)) {
                         '<dt class="col-sm-4">Status</dt><dd class="col-sm-8">' + escapeHtml(situacao) + '</dd>' +
                         '<dt class="col-sm-4">Protocolo</dt><dd class="col-sm-8">' + escapeHtml(d.protocolo_autorizacao || '-') + '</dd>' +
                         '</dl>';
+                    var mBtns = document.getElementById('modalVisualizarNfeManifestBtns');
+                    if (mBtns) {
+                        if (nfePodeManifestar(d.status)) {
+                            mBtns.className = 'btn-group';
+                            mBtns.innerHTML =
+                                '<button type="button" class="btn btn-outline-primary btn-sm" onclick="abrirModalManifestarNfe(' + id + ',\'ciencia\')">Ciência</button>' +
+                                '<button type="button" class="btn btn-outline-success btn-sm" onclick="abrirModalManifestarNfe(' + id + ',\'confirmacao\')">Confirmar</button>' +
+                                '<button type="button" class="btn btn-outline-warning btn-sm" onclick="abrirModalManifestarNfe(' + id + ',\'desconhecimento\')">Desconhecimento</button>';
+                        } else {
+                            mBtns.className = 'd-none';
+                            mBtns.innerHTML = '';
+                        }
+                    }
                 })
                 .catch(err => {
                     body.innerHTML = '<p class="text-danger">Erro ao carregar dados.</p>';

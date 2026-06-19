@@ -93,20 +93,22 @@ $page_title = 'Exemplos de dashboard';
                 </div>
 
                 <h2 class="dex-section-title">1) Faixa de KPIs (4 colunas padrão)</h2>
-                <p class="dex-section-hint">Classe: <code>fornc-kpi-strip</code> + <code>fornc-kpi-cell</code> — igual às listagens modernas.</p>
+                <p class="dex-section-hint">Classe: <code>fornc-kpi-strip</code> + <code>fornc-kpi-cell</code> — cabeçalho com <code>fornc-kpi-head</code> (ícone + rótulo) e valor em <code>.val</code>, igual às listagens modernas.</p>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Exemplo A</span><span class="val">128</span></div>
-                    <div class="fornc-kpi-cell is-ok"><span class="lbl">Status OK</span><span class="val">99%</span></div>
-                    <div class="fornc-kpi-cell is-warn"><span class="lbl">Atenção</span><span class="val">3</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Moeda</span><span class="val">R$ 12.450</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-chart-column fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Exemplo A</span></div><span class="val">128</span></div>
+                    <div class="fornc-kpi-cell is-ok"><div class="fornc-kpi-head"><i class="fas fa-circle-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Status OK</span></div><span class="val">99%</span></div>
+                    <div class="fornc-kpi-cell is-warn"><div class="fornc-kpi-head"><i class="fas fa-triangle-exclamation fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Atenção</span></div><span class="val">3</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-coins fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Moeda</span></div><span class="val">R$ 12.450</span></div>
                 </div>
-                <div class="dex-code">.fornc-kpi-strip &gt; .fornc-kpi-cell &gt; .lbl / .val</div>
+                <div class="dex-code">.fornc-kpi-cell &gt; .fornc-kpi-head (.fornc-kpi-icon + .lbl) + .val</div>
 
                 <h2 class="dex-section-title">2) Faixa de KPIs densa (auto-fit)</h2>
                 <p class="dex-section-hint">Útil no painel inicial com muitos indicadores. Classe extra: <code>fornc-kpi-strip--dense</code>.</p>
                 <div class="fornc-kpi-strip fornc-kpi-strip--dense">
-                    <?php foreach (['Vei.', 'Mot.', 'Rotas', 'Abast.', 'Desp.', 'Manut.', 'Pneus', 'Lucro'] as $i => $lbl): ?>
-                    <div class="fornc-kpi-cell"><span class="lbl"><?php echo htmlspecialchars($lbl); ?></span><span class="val"><?php echo 10 + $i * 7; ?></span></div>
+                    <?php
+                    $dex_dense_icons = ['fa-truck', 'fa-users', 'fa-route', 'fa-gas-pump', 'fa-receipt', 'fa-screwdriver-wrench', 'fa-circle-dot', 'fa-coins'];
+                    foreach (['Vei.', 'Mot.', 'Rotas', 'Abast.', 'Desp.', 'Manut.', 'Pneus', 'Lucro'] as $i => $lbl): ?>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas <?php echo $dex_dense_icons[$i]; ?> fornc-kpi-icon" aria-hidden="true"></i><span class="lbl"><?php echo htmlspecialchars($lbl); ?></span></div><span class="val"><?php echo 10 + $i * 7; ?></span></div>
                     <?php endforeach; ?>
                 </div>
 
@@ -183,11 +185,17 @@ $page_title = 'Exemplos de dashboard';
                 <p class="dex-section-hint">Combine com <code>dashboard-card</code> do tema ou estilize como nos KPIs acima.</p>
                 <div class="dashboard-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:0.75rem;">
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Card A</h3></div>
+                        <div class="card-header">
+                            <i class="fas fa-chart-column kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Card A</h3>
+                        </div>
                         <div class="card-body"><p style="margin:0;font-size:0.85rem;color:var(--text-secondary);">Texto ou gráfico.</p></div>
                     </div>
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Card B</h3></div>
+                        <div class="card-header">
+                            <i class="fas fa-chart-line kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Card B</h3>
+                        </div>
                         <div class="card-body"><p style="margin:0;font-size:0.85rem;color:var(--text-secondary);">Mesma linguagem visual.</p></div>
                     </div>
                 </div>

@@ -324,4 +324,110 @@ th a.sortable:hover {
     flex-wrap: wrap;
     gap: 0.5rem;
 }
-.relatorio-veiculo-resumo strong { font-size: 1rem; } 
+.relatorio-veiculo-resumo strong { font-size: 1rem; }
+
+.fornc-table-wrap.loading,
+.mann-table-wrap.loading {
+    opacity: 0.65;
+    pointer-events: none;
+}
+
+.fornc-kpi-summary {
+    margin: 0.35rem 0 0.75rem;
+    font-size: 0.82rem;
+}
+
+#mntToastWrap {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 10080;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 340px;
+}
+
+.mnt-toast {
+    padding: 0.7rem 0.9rem;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.mnt-toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.mnt-toast.success { background: #16a34a; }
+.mnt-toast.error { background: #dc2626; }
+.mnt-toast.info { background: #2563eb; }
+
+.mnt-confirm {
+    position: fixed;
+    inset: 0;
+    z-index: 10070;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+.mnt-confirm-box {
+    background: var(--card-bg, var(--bg-secondary));
+    color: var(--text-primary);
+    border-radius: 12px;
+    padding: 1.25rem;
+    max-width: 380px;
+    width: 100%;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    text-align: center;
+}
+
+.mnt-confirm-ico {
+    font-size: 2rem;
+    color: #dc2626;
+    margin-bottom: 0.5rem;
+}
+
+.mnt-confirm-box h4 {
+    margin: 0 0 0.4rem;
+    font-size: 1.05rem;
+}
+
+.mnt-confirm-box p {
+    margin: 0 0 1rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.mnt-confirm-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.mann-os-doc .mann-os-footer { margin-top: 1.5rem; font-size: 0.8rem; color: #666; }
+
+.mann-nf-row { display: flex; gap: 0.35rem; align-items: stretch; }
+.mann-nf-row input[type="text"] { flex: 1; min-width: 0; }
+.mann-nf-ocr-btn { flex: 0 0 auto; padding: 0.35rem 0.65rem; }
+
+/* Impressão OS: via iframe em maintenance.js (evita duplicar conteúdo da página) */
+.mann-os-print-wrap .modal-body { max-height: 70vh; overflow-y: auto; }
+.mann-os-doc h1 { font-size: 1.25rem; margin: 0 0 0.75rem; }
+.mann-os-doc .mann-os-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1rem; margin-bottom: 1rem; }
+.mann-os-doc .mann-os-block { margin-bottom: 0.75rem; }
+.mann-os-doc .mann-os-block strong { display: block; font-size: 0.75rem; text-transform: uppercase; color: #555; margin-bottom: 0.15rem; }
+.mann-os-doc table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+.mann-os-doc th, .mann-os-doc td { border: 1px solid #ccc; padding: 0.35rem 0.5rem; text-align: left; font-size: 0.85rem; } 

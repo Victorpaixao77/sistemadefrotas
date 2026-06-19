@@ -53,14 +53,14 @@ require_once __DIR__ . '/notifications.php';
             <!-- Dropdown de Notificações -->
             <div class="notification-dropdown" id="notificationDropdown">
                 <div class="notification-header">
-                    <h3>Notificações</h3>
-                    <button class="notification-clear-btn">Limpar</button>
+                    <h3>Operacionais</h3>
+                    <button type="button" class="notification-clear-btn">Limpar</button>
                 </div>
                 <div class="notification-list">
                     <!-- Notificações serão carregadas via JavaScript -->
                 </div>
                 <div class="notification-footer">
-                    <a href="#" class="view-all-link">Ver todas</a>
+                    <a href="<?php echo htmlspecialchars(sf_app_url('pages/notificacoes.php')); ?>" class="view-all-link">Ver todas</a>
                 </div>
             </div>
         </div>
@@ -210,7 +210,14 @@ require_once __DIR__ . '/notifications.php';
 </header>
 
 <style>
-.notification-dropdown.show,
+.notification-dropdown.show {
+    display: flex;
+    flex-direction: column;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
 .profile-dropdown.show {
     display: block;
     opacity: 1;
@@ -372,6 +379,7 @@ button.user-profile {
 <!-- Inclusão do JS para Personalizar Cores e funcionalidades do header -->
 <?php sf_render_api_scripts(); ?>
 <script src="<?php echo htmlspecialchars(sf_app_url('js/modal_a11y.js')); ?>"></script>
+<script src="<?php echo htmlspecialchars(sf_app_url('js/notificacoes-common.js')); ?>"></script>
 <script src="<?php echo htmlspecialchars(sf_app_url('js/header.js')); ?>"></script>
 
 <link rel="stylesheet" href="<?php echo htmlspecialchars(sf_app_url('notificacoes/ia_fabicon.css')); ?>">

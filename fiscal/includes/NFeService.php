@@ -31,7 +31,11 @@ class NFeService
             session_start();
         }
 
-        $this->empresaId = $empresaId ?: ($_SESSION['empresa_id'] ?? 1);
+        $resolvedEmpresa = $empresaId ?: (int)($_SESSION['empresa_id'] ?? 0);
+        if ($resolvedEmpresa < 1) {
+            throw new RuntimeException('Empresa não identificada na sessão.');
+        }
+        $this->empresaId = $resolvedEmpresa;
         $this->bootstrapTools();
     }
 

@@ -42,7 +42,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize charts
     initializeCharts();
-    
+
+    // Painel de insights (lazy)
+    setupRouteAnomalies();
+
     // Setup form submission
     const saveRouteBtn = document.getElementById('saveRouteBtn');
     if (saveRouteBtn) {
@@ -79,6 +82,8 @@ let currentRouteFilterMonth = null;
 let currentSortField = 'data_rota';
 let currentSortDir = 'DESC';
 const ROUTES_MODERN_LS = 'routes_modern_prefs_v2';
+/** true só quando per_page veio da URL ou o usuário mudou o select (não localStorage). */
+let routesPerPageInUrl = false;
 
 /** Primeira ordenação ao escolher coluna: texto A→Z, datas recentes primeiro, números maior→menor, status 0 antes de 1. */
 function routesDefaultSortDir(field) {
@@ -498,6 +503,181 @@ function showRouteToast(msg, type) {
     }
 }
 
+// Confirmação estilizada (substitui confirm() nativo). Retorna Promise<boolean>.
+function routeConfirm(message, opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+        var modal = document.getElementById('rtConfirm');
+        var msg = document.getElementById('rtConfirmMsg');
+        var ok = document.getElementById('rtConfirmOk');
+        var cancel = document.getElementById('rtConfirmCancel');
+        if (!modal || !ok || !cancel) { resolve(window.confirm(message)); return; }
+        if (msg) msg.textContent = message || 'Tem certeza?';
+        if (opts.okLabel) ok.innerHTML = '<i class="fas fa-check"></i> ' + opts.okLabel;
+        modal.style.display = 'flex';
+        function cleanup(val) {
+            modal.style.display = 'none';
+            ok.removeEventListener('click', onOk);
+            cancel.removeEventListener('click', onCancel);
+            modal.removeEventListener('click', onBackdrop);
+            resolve(val);
+        }
+        function onOk() { cleanup(true); }
+        function onCancel() { cleanup(false); }
+        function onBackdrop(e) { if (e.target === modal) cleanup(false); }
+        ok.addEventListener('click', onOk);
+        cancel.addEventListener('click', onCancel);
+        modal.addEventListener('click', onBackdrop);
+    });
+}
+
+// ---- Painel de insights das rotas ----
+var ROUTE_INSIGHTS_TITLE = 'Insights das rotas';
+var routeInsightsLoaded = false;
+var routeInsightsLoading = false;
+
+function routeInsightsUrl() {
+    return sfApiUrl('route_anomalies.php');
+}
+
+function routeInsightsPlaceholder() {
+    if (window.SFInsights && SFInsights.placeholderHtml) {
+        return SFInsights.placeholderHtml(ROUTE_INSIGHTS_TITLE);
+    }
+    return '<i class="fas fa-clipboard-check"></i> ' + ROUTE_INSIGHTS_TITLE +
+        ' — <span style="font-weight:500;color:var(--text-muted)">expandir para analisar</span>';
+}
+
+function routeInsightsReadCache() {
+    if (!window.SFInsights || !SFInsights.readCache) return null;
+    return SFInsights.readCache(routeInsightsUrl());
+}
+
+function routeInsightsWriteCache(data) {
+    if (window.SFInsights && SFInsights.writeCache) {
+        SFInsights.writeCache(routeInsightsUrl(), data, SFInsights.CACHE_TTL_MS);
+    }
+}
+
+function initRouteInsightsPanel() {
+    var panel = document.getElementById('routeAnomalies');
+    var summary = document.getElementById('raSummary');
+    if (panel) panel.style.display = '';
+    if (summary) summary.innerHTML = routeInsightsPlaceholder();
+}
+
+function setupRouteAnomalies() {
+    initRouteInsightsPanel();
+    var toggle = document.getElementById('raToggle');
+    var list = document.getElementById('raList');
+    if (toggle && list) {
+        toggle.addEventListener('click', function () {
+            var open = toggle.getAttribute('aria-expanded') === 'true';
+            var willOpen = !open;
+            toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            list.style.display = willOpen ? '' : 'none';
+            if (willOpen && !routeInsightsLoaded && !routeInsightsLoading) {
+                loadRouteAnomalies(false);
+            }
+        });
+    }
+    var refresh = document.getElementById('raRefresh');
+    if (refresh) {
+        refresh.addEventListener('click', function (e) {
+            e.stopPropagation();
+            routeInsightsLoaded = false;
+            if (window.SFInsights && SFInsights.removeCache) SFInsights.removeCache(routeInsightsUrl());
+            loadRouteAnomalies(true);
+        });
+    }
+    if (list) {
+        list.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-ra-edit]');
+            if (!btn) return;
+            var id = btn.getAttribute('data-ra-edit');
+            if (typeof showEditRouteModal === 'function') showEditRouteModal(id);
+        });
+    }
+}
+
+function renderRouteAnomalies(json) {
+    var panel = document.getElementById('routeAnomalies');
+    var summary = document.getElementById('raSummary');
+    var list = document.getElementById('raList');
+    if (!panel || !summary || !list) return;
+    routeInsightsLoaded = true;
+    panel.classList.remove('has-erros', 'has-avisos');
+    var erros = json.erros || 0, avisos = json.avisos || 0, total = json.total_inconsistencias || 0;
+    panel.style.display = '';
+
+    if (total === 0) {
+        summary.innerHTML = '<i class="fas fa-clipboard-check" style="color:#16a34a"></i> ' + ROUTE_INSIGHTS_TITLE +
+            ' <span class="ra-pill ok">tudo certo</span>';
+        list.innerHTML = '<div class="ra-empty">Nenhuma inconsistência encontrada.</div>';
+        list.style.display = '';
+        return;
+    }
+
+    panel.classList.add(erros > 0 ? 'has-erros' : 'has-avisos');
+    var color = erros > 0 ? '#dc2626' : '#f59e0b';
+    summary.innerHTML = '<i class="fas fa-clipboard-check" style="color:' + color + '"></i> ' + ROUTE_INSIGHTS_TITLE +
+        '<span class="ra-pill ' + (erros > 0 ? 'erro' : 'aviso') + '">' + total + ' inconsistência(s)</span>' +
+        (erros > 0 ? '<span class="ra-pill erro">' + erros + ' erro(s)</span>' : '') +
+        (avisos > 0 ? '<span class="ra-pill aviso">' + avisos + ' aviso(s)</span>' : '');
+
+    var html = (json.itens || []).map(function (it) {
+        var d = it.data_rota ? new Date(it.data_rota) : null;
+        var dataBr = (d && !isNaN(d.getTime())) ? d.toLocaleDateString('pt-BR') : (it.data_rota || '');
+        var motivos = (it.motivos || []).map(function (m) { return '<li>' + escapeHtmlRoute(m.msg) + '</li>'; }).join('');
+        var icon = it.severidade === 'erro' ? 'fa-circle-xmark' : 'fa-triangle-exclamation';
+        return '<div class="ra-item">' +
+            '<span class="ra-sev ' + it.severidade + '"><i class="fas ' + icon + '"></i></span>' +
+            '<div class="ra-info">' +
+                '<div class="ra-meta"><strong>' + escapeHtmlRoute(dataBr) + '</strong> · ' +
+                escapeHtmlRoute(it.motorista) + ' · ' + escapeHtmlRoute(it.placa) + ' · ' + escapeHtmlRoute(it.rota) + '</div>' +
+                '<ul class="ra-motivos">' + motivos + '</ul>' +
+            '</div>' +
+            '<button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon ra-edit" data-ra-edit="' + it.id + '" title="Abrir rota" aria-label="Abrir rota"><i class="fas fa-edit"></i></button>' +
+            '</div>';
+    }).join('');
+    list.innerHTML = html;
+}
+
+function loadRouteAnomalies(forceRefresh) {
+    if (routeInsightsLoading) return;
+    var panel = document.getElementById('routeAnomalies');
+    var summary = document.getElementById('raSummary');
+    var list = document.getElementById('raList');
+    if (!panel) return;
+    panel.style.display = '';
+
+    if (!forceRefresh) {
+        var hit = routeInsightsReadCache();
+        if (hit && hit.success) {
+            renderRouteAnomalies(hit);
+            return;
+        }
+    }
+
+    routeInsightsLoading = true;
+    if (summary) summary.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analisando rotas…';
+    if (list) list.innerHTML = '<div class="ra-empty">Carregando…</div>';
+    var url = routeInsightsUrl();
+    if (forceRefresh) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'refresh=1&_=' + Date.now();
+    fetch(url, { credentials: 'include' })
+        .then(function (r) { return r.json(); })
+        .then(function (json) {
+            if (json && json.success) {
+                routeInsightsWriteCache(json);
+                renderRouteAnomalies(json);
+            } else {
+                panel.style.display = 'none';
+            }
+        })
+        .catch(function () { panel.style.display = 'none'; })
+        .then(function () { routeInsightsLoading = false; });
+}
+
 function initializePage() {
     // Restaurar filtros da URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -544,6 +724,9 @@ function initializePage() {
     const perPageEl = document.getElementById('perPageRoutes');
     if (perPageEl && !Number.isNaN(perPageFromUrl) && [5, 10, 25, 50, 100].indexOf(perPageFromUrl) >= 0) {
         perPageEl.value = String(perPageFromUrl);
+        routesPerPageInUrl = true;
+    } else if (urlParams.has('per_page')) {
+        routesPerPageInUrl = true;
     }
     
     // Load route data from API
@@ -785,6 +968,7 @@ function setupFilters() {
     const perPageSelect = document.getElementById('perPageRoutes');
     if (perPageSelect) {
         perPageSelect.addEventListener('change', function() {
+            routesPerPageInUrl = true;
             currentPage = 1;
             saveRoutesNonColumnPrefs();
             loadRouteData(1);
@@ -900,6 +1084,48 @@ function updateEstadosSelects(estados) {
     }
 }
 
+function syncRoutesBrowserUrl(state) {
+    const page = state.page;
+    const limit = state.limit;
+    const searchTerm = state.searchTerm || '';
+    const delivery = state.delivery || '';
+    const driver = state.driver || '';
+    const date = state.date || '';
+    const hasDateRange = !!(currentRouteDateFrom && currentRouteDateTo);
+    const hasMonth = !!(currentRouteFilterMonth && !currentRouteDateFrom);
+    const hasFilters = !!(searchTerm || delivery || driver || date || hasDateRange || hasMonth);
+    const hasNonDefaultSort = currentSortField !== 'data_rota' || currentSortDir !== 'DESC';
+    const hasNonDefaultPage = page !== 1;
+    const hasPerPageInUrl = routesPerPageInUrl && limit !== 10;
+
+    if (!hasFilters && !hasNonDefaultSort && !hasNonDefaultPage && !hasPerPageInUrl) {
+        if (window.location.search !== '') {
+            window.history.replaceState({}, '', window.location.pathname);
+        }
+        return;
+    }
+
+    const params = new URLSearchParams();
+    if (hasNonDefaultPage) params.set('page', String(page));
+    if (hasPerPageInUrl) params.set('per_page', String(limit));
+    if (searchTerm) params.set('search', searchTerm);
+    if (delivery) params.set('delivery', delivery);
+    if (driver) params.set('driver', driver);
+    if (date) params.set('date', date);
+    if (currentRouteDateFrom) params.set('date_from', currentRouteDateFrom);
+    if (currentRouteDateTo) params.set('date_to', currentRouteDateTo);
+    if (hasMonth) params.set('month', currentRouteFilterMonth);
+    if (hasNonDefaultSort) {
+        params.set('sort', currentSortField);
+        params.set('dir', currentSortDir);
+    }
+    const qs = params.toString();
+    const desiredSearch = qs ? '?' + qs : '';
+    if (window.location.search !== desiredSearch) {
+        window.history.replaceState({}, '', window.location.pathname + desiredSearch);
+    }
+}
+
 function loadRouteData(page = 1) {
     currentPage = page;
     
@@ -936,25 +1162,14 @@ function loadRouteData(page = 1) {
                 if (data.pagination) {
                     totalPages = data.pagination.total_pages;
                     updatePaginationButtons(data.pagination);
-                    const params = new URLSearchParams();
-                    if (currentPage !== 1) params.set('page', currentPage);
-                    if (limit !== 10) params.set('per_page', limit);
-                    if (searchTerm) params.set('search', searchTerm);
-                    if (delivery) params.set('delivery', delivery);
-                    if (driver) params.set('driver', driver);
-                    if (date) params.set('date', date);
-                    if (currentRouteDateFrom) params.set('date_from', currentRouteDateFrom);
-                    if (currentRouteDateTo) params.set('date_to', currentRouteDateTo);
-                    if (currentRouteFilterMonth && !currentRouteDateFrom) params.set('month', currentRouteFilterMonth);
-                    if (currentSortField !== 'data_rota' || currentSortDir !== 'DESC') {
-                        params.set('sort', currentSortField);
-                        params.set('dir', currentSortDir);
-                    }
-                    const qs = params.toString();
-                    const newUrl = window.location.pathname + (qs ? '?' + qs : '');
-                    if (window.location.search !== (qs ? '?' + qs : '')) {
-                        window.history.replaceState({}, '', newUrl);
-                    }
+                    syncRoutesBrowserUrl({
+                        page: currentPage,
+                        limit: limit,
+                        searchTerm: searchTerm,
+                        delivery: delivery,
+                        driver: driver,
+                        date: date
+                    });
                 }
                 saveRoutesNonColumnPrefs();
                 setKpiActiveFromDelivery();
@@ -1012,9 +1227,9 @@ function updateRouteTable(routes) {
             row.innerHTML = `
                 ${selCell}
                 <td data-col="data">${formatDate(route.data_rota)}</td>
-                <td data-col="motorista">${route.motorista_nome || '-'}</td>
-                <td data-col="veiculo">${route.veiculo_placa || '-'}</td>
-                <td data-col="rota">${route.cidade_origem_nome || '-'} → ${route.cidade_destino_nome || '-'}</td>
+                <td data-col="motorista">${escapeHtmlRoute(route.motorista_nome) || '-'}</td>
+                <td data-col="veiculo">${escapeHtmlRoute(route.veiculo_placa) || '-'}</td>
+                <td data-col="rota">${escapeHtmlRoute(route.cidade_origem_nome) || '-'} → ${escapeHtmlRoute(route.cidade_destino_nome) || '-'}</td>
                 <td data-col="dist">${formatDistance(route.distancia_km)}</td>
                 <td data-col="frete">${formatCurrency(route.frete)}</td>
                 ${optCells}
@@ -1040,7 +1255,7 @@ function updateRouteTable(routes) {
             tbody.appendChild(row);
         });
     } else {
-        tbody.innerHTML = '<tr><td colspan="' + cc + '" class="text-center">Nenhuma rota encontrada</td></tr>';
+        tbody.innerHTML = '';
     }
     
     setupTableButtons();
@@ -1138,12 +1353,15 @@ function updatePaginationButtons(pagination) {
 }
 
 function updateURLParameter(param, value) {
+    if (param === 'per_page') routesPerPageInUrl = true;
     const url = new URL(window.location.href);
     url.searchParams.set(param, value);
     const perPageSelect = document.getElementById('perPageRoutes');
     const perPage = perPageSelect ? parseInt(perPageSelect.value, 10) : 10;
-    if ([5, 10, 25, 50, 100].indexOf(perPage) >= 0) {
-        url.searchParams.set('per_page', perPage);
+    if (routesPerPageInUrl && [5, 10, 25, 50, 100].indexOf(perPage) >= 0 && perPage !== 10) {
+        url.searchParams.set('per_page', String(perPage));
+    } else {
+        url.searchParams.delete('per_page');
     }
     window.history.pushState({}, '', url);
 }
@@ -1273,27 +1491,28 @@ function showDeleteConfirmation(routeId) {
 }
 
 function deleteRoute(routeId) {
-    if (!confirm('Tem certeza que deseja excluir esta rota?')) return;
-    
-    fetch(sfApiUrl(`route_actions.php?action=delete&id=${routeId}`), {
-        method: 'POST',
-        credentials: 'include',
-        headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                closeAllModals();
-                loadRouteData(currentPage);
-                showRouteToast('Rota excluída com sucesso!', 'success');
-            } else {
-                throw new Error(data.error || 'Erro ao excluir rota');
-            }
+    routeConfirm('Tem certeza que deseja excluir esta rota?', { okLabel: 'Excluir' }).then(function (ok) {
+        if (!ok) return;
+        fetch(sfApiUrl(`route_actions.php?action=delete&id=${routeId}`), {
+            method: 'POST',
+            credentials: 'include',
+            headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
         })
-        .catch(error => {
-            console.error('Erro ao excluir rota:', error);
-            showRouteToast('Erro ao excluir rota: ' + sfErrUserMessage(error), 'error');
-        });
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    closeAllModals();
+                    loadRouteData(currentPage);
+                    showRouteToast('Rota excluída com sucesso!', 'success');
+                } else {
+                    throw new Error(data.error || 'Erro ao excluir rota');
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao excluir rota:', error);
+                showRouteToast('Erro ao excluir rota: ' + sfErrUserMessage(error), 'error');
+            });
+    });
 }
 
 function saveRoute() {
@@ -1691,7 +1910,7 @@ function fillExpensesForm(expenses) {
     // Preenche cada campo com o valor existente ou deixa vazio
     const fields = [
         'descarga', 'pedagios', 'caixinha', 'estacionamento',
-        'lavagem', 'borracharia', 'eletrica_mecanica', 'adiantamento'
+        'lavagem', 'borracharia', 'eletrica_mecanica', 'adiantamento', 'outros'
     ];
     
     fields.forEach(field => {
@@ -1706,7 +1925,7 @@ function fillExpensesForm(expenses) {
 function setupExpensesCalculations() {
     const expenseInputs = [
         'descarga', 'pedagios', 'caixinha', 'estacionamento',
-        'lavagem', 'borracharia', 'eletrica_mecanica', 'adiantamento'
+        'lavagem', 'borracharia', 'eletrica_mecanica', 'adiantamento', 'outros'
     ];
     
     expenseInputs.forEach(inputId => {
@@ -1723,7 +1942,7 @@ function setupExpensesCalculations() {
 function calculateTotalExpenses() {
     const expenseInputs = [
         'descarga', 'pedagios', 'caixinha', 'estacionamento',
-        'lavagem', 'borracharia', 'eletrica_mecanica', 'adiantamento'
+        'lavagem', 'borracharia', 'eletrica_mecanica', 'adiantamento', 'outros'
     ];
     
     const total = expenseInputs.reduce((sum, inputId) => {
@@ -1798,12 +2017,6 @@ function initializeEventListeners() {
     const filterBtn = document.getElementById('filterBtn');
     if (filterBtn) {
         filterBtn.addEventListener('click', () => showModal('filterModal'));
-    }
-
-    // Botão de ajuda
-    const helpBtn = document.getElementById('helpBtn');
-    if (helpBtn) {
-        helpBtn.addEventListener('click', () => showModal('helpRouteModal'));
     }
 
     // Botão de exportar
@@ -1882,30 +2095,32 @@ function initializeEventListeners() {
         clearExpensesBtn.addEventListener('click', function() {
             const expenseRouteId = document.getElementById('expenseRouteId').value;
             if (!expenseRouteId) return;
-            if (!confirm('Tem certeza que deseja excluir as despesas desta viagem?')) return;
-            var delBody = 'rota_id=' + encodeURIComponent(expenseRouteId);
-            if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
-                delBody += '&csrf_token=' + encodeURIComponent(window.__SF_CSRF__);
-            }
-            fetch(sfApiUrl('route_actions.php?action=delete_expenses'), {
-                method: 'POST',
-                credentials: 'include',
-                headers: typeof sfMutationHeaders === 'function'
-                    ? sfMutationHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' })
-                    : { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: delBody
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    closeAllModals();
-                    showRouteToast('Despesas excluídas com sucesso!', 'success');
-                } else {
-                    throw new Error(result.error || 'Erro ao excluir despesas');
+            routeConfirm('Tem certeza que deseja excluir as despesas desta viagem?', { okLabel: 'Excluir' }).then(function (ok) {
+                if (!ok) return;
+                var delBody = 'rota_id=' + encodeURIComponent(expenseRouteId);
+                if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+                    delBody += '&csrf_token=' + encodeURIComponent(window.__SF_CSRF__);
                 }
-            })
-            .catch(error => {
-                showRouteToast('Erro ao excluir despesas: ' + sfErrUserMessage(error), 'error');
+                fetch(sfApiUrl('route_actions.php?action=delete_expenses'), {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: typeof sfMutationHeaders === 'function'
+                        ? sfMutationHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' })
+                        : { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: delBody
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        closeAllModals();
+                        showRouteToast('Despesas excluídas com sucesso!', 'success');
+                    } else {
+                        throw new Error(result.error || 'Erro ao excluir despesas');
+                    }
+                })
+                .catch(error => {
+                    showRouteToast('Erro ao excluir despesas: ' + sfErrUserMessage(error), 'error');
+                });
             });
         });
     }

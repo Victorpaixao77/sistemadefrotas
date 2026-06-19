@@ -32,7 +32,13 @@ $action = isset($_GET['action']) ? $_GET['action'] : 'list';
 switch ($action) {
     case 'view':
         if ($vehicleId) {
-            echo json_encode(getVehicleData($vehicleId));
+            try {
+                echo json_encode(getVehicleData($vehicleId));
+            } catch (Exception $e) {
+                error_log('vehicle_data view: ' . $e->getMessage());
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Veículo não encontrado.']);
+            }
         } else {
             http_response_code(400);
             echo json_encode(['error' => 'Vehicle ID is required']);
@@ -88,6 +94,10 @@ switch ($action) {
     case 'stats':
         // Return vehicle statistics
         echo json_encode(getVehicleStats());
+        break;
+
+    case 'fleet_analytics':
+        echo json_encode(getFleetAnalytics());
         break;
         
     case 'maintenance':
@@ -294,6 +304,8 @@ function getVehicleData($id) {
             throw new Exception('Veículo não encontrado');
         }
 
+        $empresa_id = (int) $_SESSION['empresa_id'];
+
         // Busca o histórico de quilometragem das tabelas existentes
         $historico_km = [];
 
@@ -314,13 +326,14 @@ function getVehicleData($id) {
             LEFT JOIN cidades co ON r.cidade_origem_id = co.id
             LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
             WHERE r.veiculo_id = :veiculo_id 
+            AND r.empresa_id = :empresa_id
             AND r.status = 'aprovado'
             AND (r.total_km > 0 OR r.distancia_km > 0 OR r.km_saida IS NOT NULL OR r.km_chegada IS NOT NULL)
             ORDER BY r.data_saida DESC
             LIMIT 10";
             
             $stmt = $conn->prepare($sql_rotas);
-            $stmt->execute(['veiculo_id' => $id]);
+            $stmt->execute(['veiculo_id' => $id, 'empresa_id' => $empresa_id]);
             $rotas = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             // 2. Buscar abastecimentos
@@ -334,6 +347,7 @@ function getVehicleData($id) {
                 CONCAT('Abastecimento: ', a.posto, ' - ', a.litros, 'L') as observacoes
             FROM abastecimentos a
             WHERE a.veiculo_id = :veiculo_id 
+            AND a.empresa_id = :empresa_id
             AND a.status = 'aprovado'
             AND a.km_atual IS NOT NULL
             AND a.km_atual > 0
@@ -341,7 +355,7 @@ function getVehicleData($id) {
             LIMIT 10";
             
             $stmt = $conn->prepare($sql_abast);
-            $stmt->execute(['veiculo_id' => $id]);
+            $stmt->execute(['veiculo_id' => $id, 'empresa_id' => $empresa_id]);
             $abastecimentos = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             // 3. Buscar manutenções
@@ -355,13 +369,14 @@ function getVehicleData($id) {
                 CONCAT('Manutenção: ', LEFT(m.descricao, 50)) as observacoes
             FROM manutencoes m
             WHERE m.veiculo_id = :veiculo_id 
+            AND m.empresa_id = :empresa_id
             AND m.km_atual IS NOT NULL
             AND m.km_atual > 0
             ORDER BY m.data_manutencao DESC
             LIMIT 10";
             
             $stmt = $conn->prepare($sql_manut);
-            $stmt->execute(['veiculo_id' => $id]);
+            $stmt->execute(['veiculo_id' => $id, 'empresa_id' => $empresa_id]);
             $manutencoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             // 4. Combinar e criar resumo inteligente
@@ -415,42 +430,42 @@ function getVehicleData($id) {
         // Buscar totais reais para os cards
         // Total de viagens aprovadas
         $sql_total_viagens = "SELECT COUNT(*) as total FROM rotas 
-                             WHERE veiculo_id = :veiculo_id AND status = 'aprovado'";
+                             WHERE veiculo_id = :veiculo_id AND empresa_id = :empresa_id AND status = 'aprovado'";
         $stmt = $conn->prepare($sql_total_viagens);
-        $stmt->execute(['veiculo_id' => $id]);
+        $stmt->execute(['veiculo_id' => $id, 'empresa_id' => $empresa_id]);
         $total_viagens = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
         
         // Total de abastecimentos aprovados
         $sql_total_abast = "SELECT COUNT(*) as total FROM abastecimentos 
-                           WHERE veiculo_id = :veiculo_id AND status = 'aprovado'";
+                           WHERE veiculo_id = :veiculo_id AND empresa_id = :empresa_id AND status = 'aprovado'";
         $stmt = $conn->prepare($sql_total_abast);
-        $stmt->execute(['veiculo_id' => $id]);
+        $stmt->execute(['veiculo_id' => $id, 'empresa_id' => $empresa_id]);
         $total_abastecimentos = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
         
         // Total de manutenções
         $sql_total_manut = "SELECT COUNT(*) as total FROM manutencoes 
-                           WHERE veiculo_id = :veiculo_id";
+                           WHERE veiculo_id = :veiculo_id AND empresa_id = :empresa_id";
         $stmt = $conn->prepare($sql_total_manut);
-        $stmt->execute(['veiculo_id' => $id]);
+        $stmt->execute(['veiculo_id' => $id, 'empresa_id' => $empresa_id]);
         $total_manutencoes = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
         
         // Últimas datas de cada atividade
         $sql_ultima_viagem = "SELECT MAX(data_saida) as ultima_data FROM rotas 
-                             WHERE veiculo_id = :veiculo_id AND status = 'aprovado'";
+                             WHERE veiculo_id = :veiculo_id AND empresa_id = :empresa_id AND status = 'aprovado'";
         $stmt = $conn->prepare($sql_ultima_viagem);
-        $stmt->execute(['veiculo_id' => $id]);
+        $stmt->execute(['veiculo_id' => $id, 'empresa_id' => $empresa_id]);
         $ultima_viagem = $stmt->fetch(PDO::FETCH_ASSOC)['ultima_data'];
         
         $sql_ultimo_abast = "SELECT MAX(data_abastecimento) as ultima_data FROM abastecimentos 
-                            WHERE veiculo_id = :veiculo_id AND status = 'aprovado'";
+                            WHERE veiculo_id = :veiculo_id AND empresa_id = :empresa_id AND status = 'aprovado'";
         $stmt = $conn->prepare($sql_ultimo_abast);
-        $stmt->execute(['veiculo_id' => $id]);
+        $stmt->execute(['veiculo_id' => $id, 'empresa_id' => $empresa_id]);
         $ultimo_abastecimento = $stmt->fetch(PDO::FETCH_ASSOC)['ultima_data'];
         
         $sql_ultima_manut = "SELECT MAX(data_manutencao) as ultima_data FROM manutencoes 
-                            WHERE veiculo_id = :veiculo_id";
+                            WHERE veiculo_id = :veiculo_id AND empresa_id = :empresa_id";
         $stmt = $conn->prepare($sql_ultima_manut);
-        $stmt->execute(['veiculo_id' => $id]);
+        $stmt->execute(['veiculo_id' => $id, 'empresa_id' => $empresa_id]);
         $ultima_manutencao = $stmt->fetch(PDO::FETCH_ASSOC)['ultima_data'];
         
         return [
@@ -471,7 +486,7 @@ function getVehicleData($id) {
         
     } catch (Exception $e) {
         error_log("Erro ao buscar dados do veículo: " . $e->getMessage());
-        throw new Exception($e->getMessage());
+        throw $e;
     }
 }
 
@@ -517,44 +532,11 @@ function getVehicleMaintenanceHistory($id) {
         
     } catch (Exception $e) {
         error_log("Erro ao buscar histórico de manutenção: " . $e->getMessage());
-        
-        // Em caso de erro, retornar dados de exemplo
-        $maintenanceRecords = [
-            [
-                'id' => '1',
-                'date' => '2025-04-28',
-                'type' => 'Preventiva',
-                'description' => 'Troca de óleo e filtros',
-                'mileage' => '45890',
-                'cost' => '580.00',
-                'mechanic' => 'Oficina ABC',
-                'notes' => 'Serviço realizado conforme programado'
-            ],
-            [
-                'id' => '2',
-                'date' => '2025-03-15',
-                'type' => 'Corretiva',
-                'description' => 'Substituição de pastilhas de freio',
-                'mileage' => '42350',
-                'cost' => '420.00',
-                'mechanic' => 'Oficina ABC',
-                'notes' => 'Desgaste acima do normal'
-            ],
-            [
-                'id' => '3',
-                'date' => '2025-01-15',
-                'type' => 'Preventiva',
-                'description' => 'Revisão completa: óleo, filtros, fluidos, suspensão',
-                'mileage' => '35840',
-                'cost' => '1250.00',
-                'mechanic' => 'Concessionária Mercedes',
-                'notes' => 'Revisão oficial da montadora'
-            ]
-        ];
-        
+        http_response_code(500);
         return [
-            'success' => true,
-            'maintenanceRecords' => $maintenanceRecords
+            'success' => false,
+            'error' => 'Não foi possível carregar o histórico de manutenção.',
+            'maintenanceRecords' => []
         ];
     }
 }
@@ -597,11 +579,12 @@ function getVehicleCosts($id) {
         $sql_km = "SELECT COALESCE(SUM(COALESCE(total_km, distancia_km, 0)), 1) as km_percorrida
                    FROM rotas 
                    WHERE veiculo_id = :veiculo_id 
+                   AND empresa_id = :empresa_id
                    AND data_saida >= DATE_SUB(NOW(), INTERVAL 1 YEAR)
                    AND status = 'aprovado'";
         
         $stmt = $conn->prepare($sql_km);
-        $stmt->execute(['veiculo_id' => $id]);
+        $stmt->execute(['veiculo_id' => $id, 'empresa_id' => $empresa_id]);
         $km_result = $stmt->fetch(PDO::FETCH_ASSOC);
         $km_percorrida = $km_result['km_percorrida'] ?: 1; // Evitar divisão por zero
         
@@ -639,19 +622,84 @@ function getVehicleCosts($id) {
         
     } catch (Exception $e) {
         error_log("Erro ao buscar custos do veículo: " . $e->getMessage());
-        
-        // Dados de exemplo em caso de erro
+        http_response_code(500);
         return [
-            'success' => true,
+            'success' => false,
+            'error' => 'Não foi possível carregar os custos do veículo.',
             'costs' => [
-                'maintenance' => '2500.00',
-                'fuel' => '8500.00',
-                'total' => '11000.00',
-                'cost_per_km' => '2.45',
-                'km_traveled' => 4500
+                'maintenance' => '0.00',
+                'fuel' => '0.00',
+                'total' => '0.00',
+                'cost_per_km' => '0.00',
+                'km_traveled' => 0
             ],
             'chart_data' => []
         ];
+    }
+}
+
+function getFleetAnalytics() {
+    try {
+        $conn = getConnection();
+        $empresa_id = (int) $_SESSION['empresa_id'];
+
+        $months = [];
+        for ($i = 11; $i >= 0; $i--) {
+            $months[] = date('Y-m', strtotime("-{$i} months"));
+        }
+
+        $sqlMaint = "SELECT DATE_FORMAT(data_manutencao, '%Y-%m') AS mes,
+                            SUM(COALESCE(custo_total, valor, 0)) AS total
+                     FROM manutencoes
+                     WHERE empresa_id = :empresa_id
+                       AND data_manutencao >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+                     GROUP BY mes";
+        $stmtM = $conn->prepare($sqlMaint);
+        $stmtM->execute([':empresa_id' => $empresa_id]);
+        $maintMap = [];
+        while ($row = $stmtM->fetch(PDO::FETCH_ASSOC)) {
+            $maintMap[$row['mes']] = (float) $row['total'];
+        }
+
+        $sqlFuel = "SELECT DATE_FORMAT(data_abastecimento, '%Y-%m') AS mes,
+                           CASE WHEN SUM(litros) > 0 AND MAX(km_atual) > MIN(km_atual)
+                                THEN (MAX(km_atual) - MIN(km_atual)) / SUM(litros)
+                                ELSE NULL END AS km_l
+                    FROM abastecimentos
+                    WHERE empresa_id = :empresa_id
+                      AND status = 'aprovado'
+                      AND data_abastecimento >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+                    GROUP BY mes";
+        $stmtF = $conn->prepare($sqlFuel);
+        $stmtF->execute([':empresa_id' => $empresa_id]);
+        $fuelMap = [];
+        while ($row = $stmtF->fetch(PDO::FETCH_ASSOC)) {
+            if ($row['km_l'] !== null) {
+                $fuelMap[$row['mes']] = round((float) $row['km_l'], 2);
+            }
+        }
+
+        $labels = array_map(function ($ym) {
+            $p = explode('-', $ym);
+            return date('M/y', mktime(0, 0, 0, (int) $p[1], 1, (int) $p[0]));
+        }, $months);
+
+        $maintenance = [];
+        $fuelEfficiency = [];
+        foreach ($months as $ym) {
+            $maintenance[] = round($maintMap[$ym] ?? 0, 2);
+            $fuelEfficiency[] = $fuelMap[$ym] ?? null;
+        }
+
+        return [
+            'success' => true,
+            'labels' => $labels,
+            'maintenance_costs' => $maintenance,
+            'fuel_efficiency' => $fuelEfficiency,
+        ];
+    } catch (Exception $e) {
+        error_log('getFleetAnalytics: ' . $e->getMessage());
+        return ['success' => false, 'error' => 'Não foi possível carregar análise da frota.'];
     }
 }
 

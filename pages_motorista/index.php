@@ -391,6 +391,7 @@ $ultimos_checklists = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <!-- Card de Rotas -->
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-route kpi-card-icon" aria-hidden="true"></i>
                             <h3>Rotas</h3>
                         </div>
                         <div class="card-body">
@@ -445,6 +446,7 @@ $ultimos_checklists = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <!-- Card de Abastecimentos -->
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-gas-pump kpi-card-icon" aria-hidden="true"></i>
                             <h3>Abastecimentos</h3>
                         </div>
                         <div class="card-body">
@@ -492,9 +494,32 @@ $ultimos_checklists = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </div>
 
+                    <!-- Card de Pneus -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <i class="fas fa-circle kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Pneus</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="card-content">
+                                <div class="card-icon">
+                                    <i class="fas fa-qrcode"></i>
+                                </div>
+                                <div class="card-info">
+                                    <h4>Inspeção de Pneus</h4>
+                                    <p>QR Code, pressão, sulco e fotos</p>
+                                </div>
+                            </div>
+                            <a href="pneus.php" class="btn btn-primary">
+                                <i class="fas fa-arrow-right"></i> Acessar
+                            </a>
+                        </div>
+                    </div>
+
                     <!-- Card de Checklists -->
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-clipboard-check kpi-card-icon" aria-hidden="true"></i>
                             <h3>Checklists</h3>
                         </div>
                         <div class="card-body">

@@ -4,6 +4,7 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 configure_session();
 session_start();
 require_authentication();
@@ -89,6 +90,7 @@ $counts = getDashboardCounts();
     <style>
         body.rotas-motoristas-modern .dashboard-content.fornc-page { overflow-x: auto; }
     </style>
+    <?php sf_page_help_css('..'); ?>
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
@@ -101,10 +103,10 @@ $counts = getDashboardCounts();
             <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
                 <?php if ($is_modern): ?>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Pendentes</span><span class="val"><?php echo $counts['pendentes']; ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Aceitas</span><span class="val"><?php echo $counts['aceitas']; ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Rejeitadas</span><span class="val"><?php echo $counts['rejeitadas']; ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Total</span><span class="val"><?php echo $counts['total']; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-clock fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Pendentes</span></div><span class="val"><?php echo $counts['pendentes']; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Aceitas</span></div><span class="val"><?php echo $counts['aceitas']; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-xmark fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Rejeitadas</span></div><span class="val"><?php echo $counts['rejeitadas']; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-route fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total</span></div><span class="val"><?php echo $counts['total']; ?></span></div>
                 </div>
                 <div class="fornc-toolbar">
                     <div class="fornc-search-block">
@@ -144,6 +146,7 @@ $counts = getDashboardCounts();
                         <button type="button" id="clearRouteFilters" class="fornc-btn fornc-btn--ghost" title="Limpar filtros">
                             <i class="fas fa-undo"></i>
                         </button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
                     </div>
                 </div>
                 <?php else: ?>
@@ -152,19 +155,31 @@ $counts = getDashboardCounts();
                 </div>
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Rotas Pendentes</h3></div>
+                        <div class="card-header">
+                            <i class="fas fa-hourglass-half kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Rotas Pendentes</h3>
+                        </div>
                         <div class="card-body"><div class="metric"><span class="metric-value"><?php echo $counts['pendentes']; ?></span><span class="metric-subtitle">Pendentes</span></div></div>
                     </div>
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Rotas Aceitas</h3></div>
+                        <div class="card-header">
+                            <i class="fas fa-circle-check kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Rotas Aceitas</h3>
+                        </div>
                         <div class="card-body"><div class="metric"><span class="metric-value"><?php echo $counts['aceitas']; ?></span><span class="metric-subtitle">Aceitas</span></div></div>
                     </div>
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Rotas Rejeitadas</h3></div>
+                        <div class="card-header">
+                            <i class="fas fa-circle-xmark kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Rotas Rejeitadas</h3>
+                        </div>
                         <div class="card-body"><div class="metric"><span class="metric-value"><?php echo $counts['rejeitadas']; ?></span><span class="metric-subtitle">Rejeitadas</span></div></div>
                     </div>
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Total de Rotas</h3></div>
+                        <div class="card-header">
+                            <i class="fas fa-route kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Total de Rotas</h3>
+                        </div>
                         <div class="card-body"><div class="metric"><span class="metric-value"><?php echo $counts['total']; ?></span><span class="metric-subtitle">Total</span></div></div>
                     </div>
                 </div>
@@ -192,10 +207,21 @@ $counts = getDashboardCounts();
                         <button type="button" class="btn-restore-layout" id="clearRouteFilters" title="Limpar filtros">
                             <i class="fas fa-undo"></i>
                         </button>
+                        <button type="button" class="btn-help" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
                     </div>
                 </div>
                 <?php endif; ?>
-                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'table-container'; ?>">
+                <?php
+                $rotas_mot_modern_empty = !empty($is_modern) && empty($rotas);
+                ?>
+                <?php if (!empty($is_modern)): ?>
+                <div class="fornc-empty-state<?php echo $rotas_mot_modern_empty ? ' visible' : ''; ?>" id="rotasMotoristasEmptyState" role="status" aria-live="polite">
+                    <p class="fornc-empty-state-title">Nenhuma rota pendente encontrada</p>
+                    <p class="fornc-empty-state-hint">Ajuste os filtros ou cadastre e publique rotas para os motoristas aceitarem.</p>
+                    <a href="routes.php" class="fornc-btn fornc-btn--primary"><i class="fas fa-route"></i> Ir para rotas</a>
+                </div>
+                <?php endif; ?>
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'table-container'; ?>" id="rotasMotoristasTableWrap"<?php echo $rotas_mot_modern_empty ? ' style="display:none"' : ''; ?>>
                     <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>">
                         <thead>
                             <tr>
@@ -243,7 +269,7 @@ $counts = getDashboardCounts();
                                 </td>
                             </tr>
                             <?php endforeach; ?>
-                            <?php if (empty($rotas)): ?>
+                            <?php if (empty($rotas) && empty($is_modern)): ?>
                             <tr>
                                 <td colspan="8" class="text-center">Nenhuma rota pendente encontrada</td>
                             </tr>
@@ -652,7 +678,7 @@ $counts = getDashboardCounts();
             function fillExpensesForm(despesas) {
                 const fields = [
                     'descarga', 'pedagios', 'caixinha', 'estacionamento', 'lavagem',
-                    'borracharia', 'eletrica_mecanica', 'adiantamento', 'total_despviagem'
+                    'borracharia', 'eletrica_mecanica', 'adiantamento', 'outros', 'total_despviagem'
                 ];
                 fields.forEach(f => {
                     document.getElementById(f).value = despesas && despesas[f] ? despesas[f] : '';
@@ -663,7 +689,7 @@ $counts = getDashboardCounts();
             function calculateTotalExpenses() {
                 const fields = [
                     'descarga', 'pedagios', 'caixinha', 'estacionamento', 'lavagem',
-                    'borracharia', 'eletrica_mecanica', 'adiantamento'
+                    'borracharia', 'eletrica_mecanica', 'adiantamento', 'outros'
                 ];
                 let total = 0;
                 fields.forEach(f => {
@@ -674,7 +700,7 @@ $counts = getDashboardCounts();
             }
 
             // Listeners para cálculo automático
-            ['descarga','pedagios','caixinha','estacionamento','lavagem','borracharia','eletrica_mecanica','adiantamento']
+            ['descarga','pedagios','caixinha','estacionamento','lavagem','borracharia','eletrica_mecanica','adiantamento','outros']
                 .forEach(f => {
                     document.getElementById(f).addEventListener('input', calculateTotalExpenses);
                 });
@@ -946,6 +972,10 @@ $counts = getDashboardCounts();
                             <input type="number" id="adiantamento" name="adiantamento" step="0.01" min="0">
                         </div>
                         <div class="form-group">
+                            <label for="outros">Outros</label>
+                            <input type="number" id="outros" name="outros" step="0.01" min="0">
+                        </div>
+                        <div class="form-group">
                             <label for="total_despviagem">Total</label>
                             <input type="number" id="total_despviagem" name="total_despviagem" step="0.01" readonly>
                         </div>
@@ -959,5 +989,7 @@ $counts = getDashboardCounts();
             </div>
         </div>
     </div>
+    <?php $sf_help_key = 'rotas_motoristas'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html>

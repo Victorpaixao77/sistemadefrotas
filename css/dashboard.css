@@ -1,0 +1,590 @@
+/* ==========================================================================
+   Dashboard (index.php) — estilos extraídos do <style> inline para cachear
+   e facilitar manutenção. Mantém o prefixo body.index-dashboard-modern.
+   ========================================================================== */
+
+.main-content {
+    margin-left: var(--sidebar-width);
+    transition: margin-left var(--transition-speed) ease;
+    width: calc(100% - var(--sidebar-width));
+    min-height: 100vh;
+    background: var(--bg-primary);
+}
+
+.sidebar-collapsed .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+    width: calc(100% - var(--sidebar-collapsed-width));
+}
+
+.dashboard-content {
+    padding: 20px;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+}
+
+/* Dashboard principal — modo moderno (alinhado ao fornc-modern-page) */
+body.index-dashboard-modern .dashboard-content.fornc-page {
+    padding-top: 8px;
+}
+body.index-dashboard-modern .index-alerts-modern {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem !important;
+}
+body.index-dashboard-modern .alerta-card--modern {
+    flex: 1 1 240px;
+    min-width: 200px;
+    background: var(--card-bg, var(--bg-secondary)) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-left: 4px solid var(--alert-accent, var(--accent-primary)) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+    padding: 0.75rem 1rem !important;
+    font-weight: 500 !important;
+}
+body.index-dashboard-modern .alerta-card--modern i {
+    color: var(--alert-accent, var(--accent-primary)) !important;
+}
+/* Alertas clicáveis: viram link de ação (sem cara de link azul) */
+body.index-dashboard-modern a.alerta-card--link {
+    text-decoration: none;
+    color: var(--text-primary) !important;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+body.index-dashboard-modern a.alerta-card--link:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12) !important;
+}
+body.index-dashboard-modern .alerta-card--link .alerta-card-go {
+    margin-left: auto;
+    opacity: 0.55;
+    font-size: 0.8rem;
+}
+body.index-dashboard-modern a.alerta-card--link:hover .alerta-card-go {
+    opacity: 1;
+}
+body.index-dashboard-modern .dashboard-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
+    gap: 0.65rem !important;
+    max-width: 100% !important;
+}
+body.index-dashboard-modern .dashboard-card {
+    background: var(--card-bg, var(--bg-secondary));
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+}
+body.index-dashboard-modern .dashboard-card .card-header {
+    padding: 0.55rem 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+body.index-dashboard-modern .dashboard-card .card-header .kpi-card-icon {
+    font-size: 0.72rem;
+    color: var(--accent-primary);
+    opacity: 0.92;
+    flex-shrink: 0;
+}
+body.index-dashboard-modern .index-kpi-lucro .card-header .kpi-card-icon {
+    color: var(--accent-success, #059669);
+}
+body.index-dashboard-modern .dashboard-card .card-body {
+    padding: 0.65rem 0.75rem 0.85rem;
+}
+body.index-dashboard-modern .analytics-section .section-header h2 {
+    font-size: 1rem;
+    margin: 0 0 0.5rem 0;
+}
+body.index-dashboard-modern .analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 0.65rem;
+}
+body.index-dashboard-modern .analytics-card {
+    background: var(--card-bg, var(--bg-secondary));
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+body.index-dashboard-modern .analytics-card .card-header {
+    padding: 0.55rem 0.7rem;
+}
+body.index-dashboard-modern .analytics-card .card-body {
+    padding: 0.5rem 0.65rem 0.75rem;
+    min-height: 220px;
+}
+body.index-dashboard-modern .card {
+    background: var(--card-bg, var(--bg-secondary));
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+body.index-dashboard-modern .card .card-header {
+    padding: 0.55rem 0.75rem;
+}
+body.index-dashboard-modern .card .card-body {
+    padding: 0.65rem 0.85rem;
+}
+body.index-dashboard-modern .index-home-subbar {
+    margin-bottom: 0.5rem;
+}
+body.index-dashboard-modern .index-home-toolbar.fornc-toolbar {
+    display: block;
+    padding-bottom: 0.45rem;
+}
+body.index-dashboard-modern .index-home-toolbar .index-home-toolbar-title {
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+}
+body.index-dashboard-modern .index-home-updated {
+    margin: 0.35rem 0 0;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+body.index-dashboard-modern .index-home-kpi-strip.fornc-kpi-strip {
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)) !important;
+}
+body.index-dashboard-modern .index-kpi-delta {
+    display: block;
+    font-size: 0.58rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+    line-height: 1.2;
+}
+body.index-dashboard-modern .index-proximas-rotas .fornc-table {
+    font-size: 0.72rem;
+}
+body.index-dashboard-modern .index-proximas-rotas .fornc-table td {
+    text-transform: none;
+    letter-spacing: normal;
+}
+@media print {
+    body.index-dashboard-modern .sidebar,
+    body.index-dashboard-modern .sidebar-toggle,
+    body.index-dashboard-modern .no-print,
+    body.index-dashboard-modern .top-header,
+    body.index-dashboard-modern footer {
+        display: none !important;
+    }
+    body.index-dashboard-modern .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    body.index-dashboard-modern .dashboard-content > *:not(#dashboardPrintArea) {
+        display: none !important;
+    }
+    body.index-dashboard-modern #dashboardPrintArea {
+        display: block !important;
+    }
+}
+#dashboardPrintArea {
+    display: none;
+    padding: 1rem;
+    font-size: 12px;
+}
+#dashboardPrintArea table {
+    width: 100%;
+    border-collapse: collapse;
+}
+#dashboardPrintArea th, #dashboardPrintArea td {
+    border: 1px solid #ccc;
+    padding: 6px 8px;
+    text-align: left;
+}
+body.index-dashboard-modern .sortable-ghost {
+    opacity: 0.45;
+}
+body.index-dashboard-modern .index-kpi-lucro {
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.45);
+}
+body.index-dashboard-modern .index-kpi-lucro .card-header h3 {
+    color: var(--accent-success, #059669);
+    margin: 0;
+    font-size: 0.95rem;
+}
+body.index-dashboard-modern .index-kpi-lucro__value {
+    color: var(--accent-success, #059669);
+    font-size: 1.65rem;
+    font-weight: 700;
+}
+
+/* KPI Abastecimentos: qtd + valor na mesma altura (evita card "duplo") */
+body.index-dashboard-modern .kpi-abast-dual {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: 0.5rem 0.75rem;
+    align-items: start;
+}
+body.index-dashboard-modern .kpi-abast-dual .kpi-abast-item {
+    min-width: 0;
+}
+body.index-dashboard-modern .kpi-abast-dual .kpi-abast-item:first-child {
+    padding-right: 0.65rem;
+    border-right: 1px solid var(--border-color, #e5e7eb);
+}
+body.index-dashboard-modern .kpi-abast-dual .metric-value {
+    font-size: 1.35rem;
+    line-height: 1.15;
+}
+body.index-dashboard-modern .kpi-abast-dual .kpi-abast-item--valor .metric-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    word-break: break-word;
+}
+body.index-dashboard-modern .kpi-abast-dual .metric-subtitle {
+    font-size: 0.68rem;
+    margin-top: 0.15rem;
+}
+@media (max-width: 380px) {
+    body.index-dashboard-modern .kpi-abast-dual {
+        grid-template-columns: 1fr;
+    }
+    body.index-dashboard-modern .kpi-abast-dual .kpi-abast-item:first-child {
+        padding-right: 0;
+        border-right: none;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--border-color, #e5e7eb);
+    }
+}
+body.index-dashboard-modern .fornc-kpi-cell .val .kpi-strip-sep {
+    opacity: 0.45;
+    font-weight: 600;
+    margin: 0 0.15rem;
+}
+
+/* ==========================================================================
+   NOVO: barra de controles minimalista (período + ações)
+   ========================================================================== */
+body.index-dashboard-modern .index-home-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin: 0 0 1rem;
+}
+body.index-dashboard-modern .index-period-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+}
+body.index-dashboard-modern .index-period-form label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+}
+body.index-dashboard-modern .index-period-form select {
+    font-size: 0.82rem;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--card-bg, var(--bg-secondary));
+    color: var(--text-primary);
+    cursor: pointer;
+}
+body.index-dashboard-modern .index-home-controls-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+body.index-dashboard-modern .index-home-controls-actions .index-home-updated {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin: 0;
+}
+body.index-dashboard-modern .index-home-controls-actions .fornc-btn {
+    padding: 0.35rem 0.6rem;
+}
+@media (max-width: 600px) {
+    body.index-dashboard-modern .index-home-controls-actions .index-home-updated {
+        display: none;
+    }
+}
+
+/* ==========================================================================
+   NOVO: saudação + pendências do dia (topo da landing page)
+   ========================================================================== */
+body.index-dashboard-modern .index-greeting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin: 0.25rem 0 0.85rem;
+}
+body.index-dashboard-modern .index-greeting-title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+body.index-dashboard-modern .index-greeting-sub {
+    margin: 0.1rem 0 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+body.index-dashboard-modern .index-pendencias {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+body.index-dashboard-modern .index-pend-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    text-decoration: none;
+    font-size: 0.82rem;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    background: var(--card-bg, var(--bg-secondary));
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+body.index-dashboard-modern .index-pend-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+body.index-dashboard-modern .index-pend-pill strong {
+    font-size: 0.95rem;
+}
+body.index-dashboard-modern .index-pend-pill.is-warn {
+    border-color: rgba(245, 158, 11, 0.5);
+}
+body.index-dashboard-modern .index-pend-pill.is-warn i,
+body.index-dashboard-modern .index-pend-pill.is-warn strong {
+    color: #b45309;
+}
+body.index-dashboard-modern .index-pend-pill.is-danger {
+    border-color: rgba(220, 38, 38, 0.5);
+}
+body.index-dashboard-modern .index-pend-pill.is-danger i,
+body.index-dashboard-modern .index-pend-pill.is-danger strong {
+    color: #dc2626;
+}
+body.index-dashboard-modern .index-pend-ok {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #16a34a;
+}
+
+/* ==========================================================================
+   NOVO: seções de KPIs (hierarquia visual) + modo compacto + toolbar
+   ========================================================================== */
+
+/* Cabeçalho de cada grupo de KPIs (Operação / Custos / Financeiro) */
+body.index-dashboard-modern .dash-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.85rem 0 0.5rem;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+    color: var(--text-muted);
+}
+body.index-dashboard-modern .dash-section-title::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+body.index-dashboard-modern .dash-section-title i {
+    color: var(--accent-primary);
+}
+body.index-dashboard-modern .dash-section + .dash-section {
+    margin-top: 0.25rem;
+}
+
+/* Botões de personalização da toolbar */
+body.index-dashboard-modern .dash-customize-row {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+
+/* Modo compacto: cards menores e mais densos (toggle "Compactar") */
+body.index-dashboard-modern .dashboard-grid.compact-layout {
+    grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)) !important;
+    gap: 0.45rem !important;
+}
+body.index-dashboard-modern .dashboard-grid.compact-layout .dashboard-card .card-header {
+    padding: 0.4rem 0.55rem;
+}
+body.index-dashboard-modern .dashboard-grid.compact-layout .dashboard-card .card-header h3 {
+    font-size: 0.74rem;
+}
+body.index-dashboard-modern .dashboard-grid.compact-layout .dashboard-card .card-body {
+    padding: 0.4rem 0.55rem 0.55rem;
+}
+body.index-dashboard-modern .dashboard-grid.compact-layout .metric-value {
+    font-size: 1.05rem;
+}
+body.index-dashboard-modern .dashboard-grid.compact-layout .index-kpi-lucro__value {
+    font-size: 1.2rem;
+}
+body.index-dashboard-modern .dashboard-grid.compact-layout .metric-subtitle,
+body.index-dashboard-modern .dashboard-grid.compact-layout .index-kpi-delta {
+    display: none;
+}
+
+body.index-dashboard-modern .index-flash {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+    font-size: 0.875rem;
+}
+body.index-dashboard-modern .index-flash--warn {
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: var(--text-primary);
+}
+
+body.index-dashboard-modern .index-insights-list {
+    margin: 0;
+    padding-left: 1.15rem;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+body.index-dashboard-modern .index-insights-list li + li {
+    margin-top: 0.35rem;
+}
+
+body.index-dashboard-modern .index-proximas-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+body.index-dashboard-modern .index-proximas-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 0.65rem 1rem;
+    align-items: center;
+    padding: 0.55rem 0.65rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    text-decoration: none;
+    color: inherit;
+    font-size: 0.85rem;
+    transition: background 0.15s ease;
+}
+body.index-dashboard-modern .index-proximas-item:hover {
+    background: var(--bg-secondary, rgba(30, 41, 59, 0.35));
+}
+body.index-dashboard-modern .index-proximas-data {
+    font-weight: 600;
+    min-width: 2.5rem;
+}
+body.index-dashboard-modern .index-proximas-meta {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+@media (max-width: 640px) {
+    body.index-dashboard-modern .index-proximas-item {
+        grid-template-columns: auto 1fr;
+    }
+    body.index-dashboard-modern .index-proximas-meta {
+        grid-column: 2;
+        white-space: normal;
+    }
+}
+
+body.index-dashboard-modern .index-gps-link {
+    color: var(--primary-color, #3b82f6);
+    text-decoration: none;
+    font-weight: 500;
+}
+body.index-dashboard-modern .index-gps-link:hover {
+    text-decoration: underline;
+}
+
+body.index-dashboard-modern .index-pend-pill.is-info {
+    border-color: rgba(59, 130, 246, 0.45);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+body.index-dashboard-modern .dashboard-card--link {
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+body.index-dashboard-modern .dashboard-card--link:hover,
+body.index-dashboard-modern .dashboard-card--link:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+    outline: none;
+}
+body.index-dashboard-modern .dashboard-card--link:focus-visible {
+    box-shadow: 0 0 0 2px var(--primary-color, #3b82f6);
+}
+
+body.index-dashboard-modern .index-atividades-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+body.index-dashboard-modern .index-atividade-item {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.85rem 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color, #e9ecef);
+    background: var(--bg-secondary, #f8f9fa);
+}
+body.index-dashboard-modern .index-atividade-icon {
+    font-size: 1.2rem;
+    min-width: 1.5rem;
+    text-align: center;
+}
+body.index-dashboard-modern .index-atividade-desc {
+    font-weight: 600;
+    color: var(--text-primary, #2c3e50);
+    margin-bottom: 0.15rem;
+}
+body.index-dashboard-modern .index-atividade-data {
+    font-size: 0.85rem;
+    color: var(--text-muted, #7f8c8d);
+}

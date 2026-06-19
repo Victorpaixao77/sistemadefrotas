@@ -18,6 +18,9 @@ import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sistemafrotas.motorista.ui.viewmodel.AuthViewModelFactory
+import com.sistemafrotas.motorista.ui.viewmodel.DespesasViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -34,30 +37,17 @@ fun DespesasScreen(
     modifier: Modifier = Modifier,
     onSubScreenChange: (title: String?, onBack: (() -> Unit)?) -> Unit = { _, _ -> },
 ) {
-    var rotas by remember { mutableStateOf<List<RotaItem>>(emptyList()) }
+    val vm: DespesasViewModel = viewModel(
+        factory = AuthViewModelFactory(authRepository) { DespesasViewModel(it) }
+    )
+    val rotas by vm.rotas.collectAsState()
+    val loading by vm.loading.collectAsState()
+    val refreshing by vm.refreshing.collectAsState()
+    val error by vm.error.collectAsState()
     var selectedRota by remember { mutableStateOf<RotaItem?>(null) }
-    var loading by remember { mutableStateOf(true) }
-    var refreshing by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
 
-    fun loadRotas() {
-        scope.launch {
-            refreshing = true
-            error = null
-            try {
-                authRepository.loadRotas(limite = 80)
-                    .onSuccess { rotas = it.rotas ?: emptyList() }
-                    .onFailure { error = it.message }
-            } finally {
-                loading = false
-                refreshing = false
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) { loadRotas() }
-    val pullRefreshState = rememberPullRefreshState(refreshing, onRefresh = { loadRotas() })
+    LaunchedEffect(Unit) { vm.carregarSeNecessario() }
+    val pullRefreshState = rememberPullRefreshState(refreshing, onRefresh = { vm.loadRotas() })
 
     if (selectedRota != null) {
         LaunchedEffect(selectedRota) {
@@ -87,9 +77,9 @@ fun DespesasScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(error!!, color = MaterialTheme.colorScheme.error)
+                Text(error ?: "", color = MaterialTheme.colorScheme.error)
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = { error = null; loadRotas() }) { Text("Tentar novamente") }
+                Button(onClick = { vm.setError(null); vm.loadRotas() }) { Text("Tentar novamente") }
             }
         } else if (rotas.isEmpty()) {
             Column(
@@ -146,6 +136,7 @@ private fun DespesasFormScreen(
     var borracharia by remember { mutableStateOf("") }
     var eletricaMecanica by remember { mutableStateOf("") }
     var adiantamento by remember { mutableStateOf("") }
+    var outros by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var loadingDados by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -170,6 +161,7 @@ private fun DespesasFormScreen(
                     borracharia = moneyFromApi(d.borracharia)
                     eletricaMecanica = moneyFromApi(d.eletricaMecanica)
                     adiantamento = moneyFromApi(d.adiantamento)
+                    outros = moneyFromApi(d.outros)
                 } else {
                     despesaId = null
                 }
@@ -202,7 +194,7 @@ private fun DespesasFormScreen(
                         onClick = {
                             loading = true
                             error = null
-                            val total = toDouble(descarga) + toDouble(pedagios) + toDouble(caixinha) + toDouble(estacionamento) + toDouble(lavagem) + toDouble(borracharia) + toDouble(eletricaMecanica) + toDouble(adiantamento)
+                            val total = toDouble(descarga) + toDouble(pedagios) + toDouble(caixinha) + toDouble(estacionamento) + toDouble(lavagem) + toDouble(borracharia) + toDouble(eletricaMecanica) + toDouble(adiantamento) + toDouble(outros)
                             scope.launch {
                                 val action = if (despesaId != null) "update" else "create"
                                 val payload = mutableMapOf<String, Any?>(
@@ -216,6 +208,7 @@ private fun DespesasFormScreen(
                                     "borracharia" to toDouble(borracharia),
                                     "eletrica_mecanica" to toDouble(eletricaMecanica),
                                     "adiantamento" to toDouble(adiantamento),
+                                    "outros" to toDouble(outros),
                                     "total" to total,
                                 )
                                 if (despesaId != null) payload["id"] = despesaId
@@ -276,8 +269,10 @@ private fun DespesasFormScreen(
             OutlinedTextField(value = eletricaMecanica, onValueChange = { eletricaMecanica = it.filter { ch -> ch.isDigit() }.take(12) }, label = { Text("Elétrica/Mecânica") }, modifier = Modifier.fillMaxWidth(), visualTransformation = CurrencyTransformation())
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(value = adiantamento, onValueChange = { adiantamento = it.filter { ch -> ch.isDigit() }.take(12) }, label = { Text("Adiantamento") }, modifier = Modifier.fillMaxWidth(), visualTransformation = CurrencyTransformation())
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(value = outros, onValueChange = { outros = it.filter { ch -> ch.isDigit() }.take(12) }, label = { Text("Outros") }, modifier = Modifier.fillMaxWidth(), visualTransformation = CurrencyTransformation())
             Spacer(Modifier.height(16.dp))
-            val totalDespesas = toDouble(descarga) + toDouble(pedagios) + toDouble(caixinha) + toDouble(estacionamento) + toDouble(lavagem) + toDouble(borracharia) + toDouble(eletricaMecanica) + toDouble(adiantamento)
+            val totalDespesas = toDouble(descarga) + toDouble(pedagios) + toDouble(caixinha) + toDouble(estacionamento) + toDouble(lavagem) + toDouble(borracharia) + toDouble(eletricaMecanica) + toDouble(adiantamento) + toDouble(outros)
             Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                 Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text("Total das despesas", style = MaterialTheme.typography.titleSmall)

@@ -36,6 +36,15 @@ function fiscalApiFetch(url, init) {
     });
 }
 
+function fiscalListTruncationBanner(totais, documentos, limit) {
+    var total = parseInt((totais && totais.total) || 0, 10);
+    var returned = (documentos || []).length;
+    if (!total || total <= returned) return '';
+    var lim = limit || returned;
+    return '<div style="color:#856404;background:#fff3cd;padding:10px 15px;border-radius:5px;margin-bottom:10px;" role="alert">' +
+        '<strong>Lista parcial:</strong> exibindo ' + returned + ' de ' + total + ' registros (limite da consulta: ' + lim + ').</div>';
+}
+
 function fiscalApiErrorMessage(data, httpStatus) {
     var st = typeof httpStatus === 'number' ? httpStatus : 0;
     if (st === 429 || (data && String(data.code || '') === 'rate_limited')) {
@@ -301,4 +310,5 @@ if (typeof window !== 'undefined') {
     window.fiscalToast = fiscalToast;
     window.fiscalConfirmAsync = fiscalConfirmAsync;
     window.fiscalPromptAsync = fiscalPromptAsync;
+    window.fiscalListTruncationBanner = fiscalListTruncationBanner;
 }

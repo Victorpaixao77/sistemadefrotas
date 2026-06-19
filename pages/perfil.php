@@ -2,17 +2,19 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
+require_once '../includes/sf_api_base.php';
 
 configure_session();
 session_start();
+require_authentication();
 
-if (!isset($_SESSION['usuario_id'])) {
-    header('Location: ../login.php');
+if (!isset($_SESSION['empresa_id'])) {
+    header('Location: ../selecionar_empresa.php');
     exit;
 }
 
-$usuario_id = $_SESSION['usuario_id'];
-$empresa_id = $_SESSION['empresa_id'];
+$usuario_id = (int) ($_SESSION['usuario_id'] ?? $_SESSION['user_id'] ?? 0);
+$empresa_id = (int) $_SESSION['empresa_id'];
 
 // Buscar dados atuais do usuário
 $conn = getConnection();
@@ -36,6 +38,8 @@ $page_title = 'Meu Perfil';
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <link rel="stylesheet" href="../css/notif-preferencias.css?v=2">
+    <?php sf_render_api_scripts(); ?>
 </head>
 <body>
     <?php include '../includes/sidebar_pages.php'; ?>
@@ -48,7 +52,10 @@ $page_title = 'Meu Perfil';
             <div class="dashboard-grid mb-4" style="grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 32px;">
                 <!-- Card: Foto de Perfil -->
                 <div class="dashboard-card">
-                    <div class="card-header"><h3>Foto de Perfil</h3></div>
+                    <div class="card-header">
+                        <i class="fas fa-camera kpi-card-icon" aria-hidden="true"></i>
+                        <h3>Foto de Perfil</h3>
+                    </div>
                     <div class="card-body text-center">
                         <form method="post" enctype="multipart/form-data" action="../includes/perfil_update.php">
                             <input type="hidden" name="acao" value="foto">
@@ -67,7 +74,10 @@ $page_title = 'Meu Perfil';
                 </div>
                 <!-- Card: Alterar Nome -->
                 <div class="dashboard-card">
-                    <div class="card-header"><h3>Alterar Nome</h3></div>
+                    <div class="card-header">
+                        <i class="fas fa-user-pen kpi-card-icon" aria-hidden="true"></i>
+                        <h3>Alterar Nome</h3>
+                    </div>
                     <div class="card-body">
                         <form method="post" action="../includes/perfil_update.php">
                             <input type="hidden" name="acao" value="nome">
@@ -83,7 +93,10 @@ $page_title = 'Meu Perfil';
                 </div>
                 <!-- Card: Alterar E-mail -->
                 <div class="dashboard-card">
-                    <div class="card-header"><h3>Alterar E-mail</h3></div>
+                    <div class="card-header">
+                        <i class="fas fa-envelope kpi-card-icon" aria-hidden="true"></i>
+                        <h3>Alterar E-mail</h3>
+                    </div>
                     <div class="card-body">
                         <form method="post" action="../includes/perfil_update.php">
                             <input type="hidden" name="acao" value="email">
@@ -99,7 +112,10 @@ $page_title = 'Meu Perfil';
                 </div>
                 <!-- Card: Trocar Senha -->
                 <div class="dashboard-card">
-                    <div class="card-header"><h3>Trocar Senha</h3></div>
+                    <div class="card-header">
+                        <i class="fas fa-key kpi-card-icon" aria-hidden="true"></i>
+                        <h3>Trocar Senha</h3>
+                    </div>
                     <div class="card-body">
                         <form method="post" action="../includes/perfil_update.php" autocomplete="off">
                             <input type="hidden" name="acao" value="senha">
@@ -118,11 +134,60 @@ $page_title = 'Meu Perfil';
                     </div>
                 </div>
             </div>
+
+            <div class="dashboard-card perfil-notif-card" style="margin-top: 1rem;">
+                <div class="card-header">
+                    <i class="fas fa-bell kpi-card-icon" aria-hidden="true"></i>
+                    <h3>Notificações</h3>
+                </div>
+                <div class="card-body">
+                    <p class="config-card-lead">Escolha quais alertas <strong>você</strong> deseja receber no sininho (operacionais) e no painel de IA. As preferências são individuais.</p>
+                    <form id="configNotifPrefsForm">
+                        <div class="notif-prefs-grid">
+                            <div class="notif-prefs-col">
+                                <div class="notif-prefs-col-head">
+                                    <h6><i class="fas fa-bell" aria-hidden="true"></i> Operacionais</h6>
+                                    <div class="notif-prefs-actions">
+                                        <button type="button" class="btn-link-sm" data-prefs-grupo="operacional" data-prefs-acao="all">Marcar todos</button>
+                                        <span aria-hidden="true">·</span>
+                                        <button type="button" class="btn-link-sm" data-prefs-grupo="operacional" data-prefs-acao="none">Desmarcar todos</button>
+                                    </div>
+                                </div>
+                                <div id="notifPrefsOperacional" class="notif-prefs-tipos"><p class="notif-prefs-loading">Carregando…</p></div>
+                            </div>
+                            <div class="notif-prefs-col">
+                                <div class="notif-prefs-col-head">
+                                    <h6><i class="fas fa-robot" aria-hidden="true"></i> Inteligência Artificial</h6>
+                                    <div class="notif-prefs-actions">
+                                        <button type="button" class="btn-link-sm" data-prefs-grupo="ia" data-prefs-acao="all">Marcar todos</button>
+                                        <span aria-hidden="true">·</span>
+                                        <button type="button" class="btn-link-sm" data-prefs-grupo="ia" data-prefs-acao="none">Desmarcar todos</button>
+                                    </div>
+                                </div>
+                                <div id="notifPrefsIa" class="notif-prefs-tipos"><p class="notif-prefs-loading">Carregando…</p></div>
+                            </div>
+                        </div>
+                        <div class="notif-prefs-digest">
+                            <label class="notif-pref-check">
+                                <input type="checkbox" id="notifPrefDigest" name="email_digest">
+                                Receber resumo diário por e-mail
+                            </label>
+                            <label class="notif-pref-time">
+                                Hora do resumo
+                                <input type="time" id="notifPrefDigestHora" value="08:00">
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Salvar preferências</button>
+                    </form>
+                    <div id="configNotifPrefsMsg" class="perfil-inline-msg" role="status"></div>
+                </div>
+            </div>
         </div>
         <?php include '../includes/footer.php'; ?>
     </div>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <script src="../js/notificacoes-preferencias-config.js?v=2"></script>
     <script>
     // Preview da foto de perfil
     document.getElementById('foto_perfil').addEventListener('change', function(e) {

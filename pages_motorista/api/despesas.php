@@ -54,7 +54,7 @@ try {
         'borracharia' => $_POST['borracharia'] ?: 0,
         'eletrica_mecanica' => $_POST['eletrica_mecanica'] ?: 0,
         'adiantamento' => $_POST['adiantamento'] ?: 0,
-        'total_despviagem' => $_POST['total'] ?: 0,
+        'outros' => isset($_POST['outros']) ? ($_POST['outros'] !== '' ? $_POST['outros'] : 0) : 0,
         'status' => 'pendente',
         'fonte' => 'motorista'
     ];
@@ -64,11 +64,11 @@ try {
         $sql = "INSERT INTO despesas_viagem (
                     empresa_id, rota_id, descarga, pedagios, caixinha,
                     estacionamento, lavagem, borracharia, eletrica_mecanica,
-                    adiantamento, total_despviagem, status, fonte
+                    adiantamento, outros, status, fonte
                 ) VALUES (
                     :empresa_id, :rota_id, :descarga, :pedagios, :caixinha,
                     :estacionamento, :lavagem, :borracharia, :eletrica_mecanica,
-                    :adiantamento, :total_despviagem, :status, :fonte
+                    :adiantamento, :outros, :status, :fonte
                 )";
         
         $stmt = $conn->prepare($sql);
@@ -86,7 +86,7 @@ try {
                     borracharia = :borracharia,
                     eletrica_mecanica = :eletrica_mecanica,
                     adiantamento = :adiantamento,
-                    total_despviagem = :total_despviagem,
+                    outros = :outros,
                     status = :status,
                     fonte = :fonte
                 WHERE id = :id

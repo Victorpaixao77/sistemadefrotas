@@ -1,0 +1,23 @@
+---
+description: Ao editar telas/CSS/JS — aplicar skills de UX e acessibilidade do Frotec
+globs: pages/**/*,fiscal/pages/**/*,pages_motorista/**/*,pages_adm/**/*,css/**/*,js/**/*,includes/header.php,includes/sidebar_pages.php
+alwaysApply: false
+---
+
+# UI/UX — páginas e assets
+
+Antes de implementar ou refatorar interface:
+
+1. Ler `.cursor/skills/ui-ux-pro-max/SKILL.md` (design system para dashboard/logística).
+2. Ler `C:\Users\victo\.agents\skills\web-design-guidelines\SKILL.md` e auditar o diff.
+
+Checklist rápido Frotec:
+
+- Sidebar + header consistentes (`includes/sidebar_pages.php`, `header.php`)
+- Botões primários/secundários alinhados a `fornc-btn` / `btn-add-widget`
+- Tabelas responsivas (`fornc-table-wrap`, `data-table`)
+- Feedback: toasts (`fiscalToast`), estados loading, mensagens de erro genéricas
+- Formulários: labels, `aria-*`, CSRF em POST
+- Dark mode: variáveis `theme.css` — não hardcodar cores sem variável
+
+Para validação E2E após mudanças grandes: `webapp-testing` skill em `C:\Users\victo\.agents\skills\`.

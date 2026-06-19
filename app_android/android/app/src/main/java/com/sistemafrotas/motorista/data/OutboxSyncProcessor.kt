@@ -122,6 +122,176 @@ object OutboxSyncProcessor {
                         throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
                     }
                 }
+                PendingSyncOperation.CREATE_OCORRENCIA_JSON -> {
+                    val toSend = resolveRotaIdInPayload(context.applicationContext, payload)
+                    val res = Api.service.criarOcorrencia(toSend)
+                    if (!res.isSuccessful || res.body()?.success != true) {
+                        throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
+                    }
+                }
+                PendingSyncOperation.CREATE_JORNADA -> {
+                    val toSend = resolveRotaIdInPayload(context.applicationContext, payload)
+                    val res = Api.service.registrarJornada(toSend)
+                    if (!res.isSuccessful || res.body()?.success != true) {
+                        throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
+                    }
+                }
+                PendingSyncOperation.CREATE_PANICO -> {
+                    val res = Api.service.acionarPanico(payload)
+                    if (!res.isSuccessful || res.body()?.success != true) {
+                        throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
+                    }
+                }
+                PendingSyncOperation.CREATE_POD -> {
+                    val resolved = resolveRotaIdInPayload(context.applicationContext, payload)
+                    val fileKeys = listOf("foto_nf_abs_path", "foto_carga_abs_path", "assinatura_abs_path")
+                    val bodyMap = resolved.filterKeys { it !in fileKeys }
+                    val text = "text/plain; charset=utf-8".toMediaType()
+                    val parts = bodyMap.mapNotNull { (k, v) ->
+                        if (v == null) null else k to (
+                            when (v) {
+                                is Number -> v.toString()
+                                is Boolean -> if (v) "1" else "0"
+                                else -> v.toString()
+                            }
+                        ).toRequestBody(text)
+                    }.toMap()
+                    fun partFrom(pathKey: String, field: String): MultipartBody.Part? {
+                        val p = resolved[pathKey]?.toString() ?: return null
+                        val f = File(p)
+                        if (!f.exists() || f.length() == 0L) return null
+                        val mime = if (p.endsWith(".png")) "image/png" else "image/jpeg"
+                        return MultipartBody.Part.createFormData(field, f.name, f.asRequestBody(mime.toMediaType()))
+                    }
+                    val pNf = partFrom("foto_nf_abs_path", "foto_nf")
+                    val pCarga = partFrom("foto_carga_abs_path", "foto_carga")
+                    val pAssin = partFrom("assinatura_abs_path", "assinatura")
+                    val res = Api.service.criarComprovanteMultipart(parts, pNf, pCarga, pAssin)
+                    if (!res.isSuccessful || res.body()?.success != true) {
+                        throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
+                    }
+                    listOf(pNf to "foto_nf_abs_path", pCarga to "foto_carga_abs_path", pAssin to "assinatura_abs_path").forEach { (_, key) ->
+                        resolved[key]?.toString()?.let { runCatching { File(it).delete() } }
+                    }
+                }
+                PendingSyncOperation.CREATE_OCORRENCIA_MULTIPART -> {
+                    val path = payload["foto_abs_path"]?.toString()
+                    val file = path?.let { File(it) }
+                    if (file == null || !file.exists() || file.length() == 0L) {
+                        throw IllegalStateException("Foto ausente ou vazia")
+                    }
+                    val resolved = resolveRotaIdInPayload(context.applicationContext, payload)
+                    val bodyMap = resolved.filterKeys { it != "foto_abs_path" }
+                    val text = "text/plain; charset=utf-8".toMediaType()
+                    val parts = bodyMap.mapNotNull { (k, v) ->
+                        if (v == null) null
+                        else {
+                            val s = when (v) {
+                                is Number -> v.toString()
+                                is Boolean -> if (v) "1" else "0"
+                                else -> v.toString()
+                            }
+                            k to s.toRequestBody(text)
+                        }
+                    }.toMap()
+                    val mime = when {
+                        path.endsWith(".png") -> "image/png"
+                        path.endsWith(".webp") -> "image/webp"
+                        else -> "image/jpeg"
+                    }
+                    val part = MultipartBody.Part.createFormData(
+                        "foto",
+                        file.name,
+                        file.asRequestBody(mime.toMediaType()),
+                    )
+                    val res = Api.service.criarOcorrenciaMultipart(parts, part)
+                    if (!res.isSuccessful || res.body()?.success != true) {
+                        throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
+                    }
+                    runCatching { file.delete() }
+                }
+                PendingSyncOperation.CREATE_PEDAGIO_JSON -> {
+                    val toSend = resolveRotaIdInPayload(context.applicationContext, payload)
+                    val res = Api.service.criarPedagio(toSend)
+                    if (!res.isSuccessful || res.body()?.success != true) {
+                        throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
+                    }
+                }
+                PendingSyncOperation.CREATE_PEDAGIO_MULTIPART -> {
+                    val path = payload["foto_abs_path"]?.toString()
+                    val file = path?.let { File(it) }
+                    if (file == null || !file.exists() || file.length() == 0L) {
+                        throw IllegalStateException("Foto ausente ou vazia")
+                    }
+                    val resolved = resolveRotaIdInPayload(context.applicationContext, payload)
+                    val bodyMap = resolved.filterKeys { it != "foto_abs_path" }
+                    val text = "text/plain; charset=utf-8".toMediaType()
+                    val parts = bodyMap.mapNotNull { (k, v) ->
+                        if (v == null) null
+                        else {
+                            val s = when (v) {
+                                is Number -> v.toString()
+                                is Boolean -> if (v) "1" else "0"
+                                else -> v.toString()
+                            }
+                            k to s.toRequestBody(text)
+                        }
+                    }.toMap()
+                    val mime = when {
+                        path.endsWith(".png") -> "image/png"
+                        path.endsWith(".webp") -> "image/webp"
+                        else -> "image/jpeg"
+                    }
+                    val part = MultipartBody.Part.createFormData(
+                        "foto",
+                        file.name,
+                        file.asRequestBody(mime.toMediaType()),
+                    )
+                    val res = Api.service.criarPedagioMultipart(parts, part)
+                    if (!res.isSuccessful || res.body()?.success != true) {
+                        throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
+                    }
+                    runCatching { file.delete() }
+                }
+                PendingSyncOperation.CREATE_CONFERENCIA_JSON -> {
+                    val toSend = resolveRotaIdInPayload(context.applicationContext, payload)
+                    val res = Api.service.criarConferencia(toSend)
+                    if (!res.isSuccessful || res.body()?.success != true) {
+                        throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
+                    }
+                }
+                PendingSyncOperation.CREATE_CONFERENCIA_MULTIPART -> {
+                    val path = payload["foto_abs_path"]?.toString()
+                    val file = path?.let { File(it) }
+                    if (file == null || !file.exists() || file.length() == 0L) {
+                        throw IllegalStateException("Foto ausente ou vazia")
+                    }
+                    val resolved = resolveRotaIdInPayload(context.applicationContext, payload)
+                    val bodyMap = resolved.filterKeys { it != "foto_abs_path" }
+                    val text = "text/plain; charset=utf-8".toMediaType()
+                    val parts = bodyMap.mapNotNull { (k, v) ->
+                        if (v == null) null
+                        else {
+                            val s = when (v) {
+                                is Number -> v.toString()
+                                is Boolean -> if (v) "1" else "0"
+                                else -> v.toString()
+                            }
+                            k to s.toRequestBody(text)
+                        }
+                    }.toMap()
+                    val mime = when {
+                        path.endsWith(".png") -> "image/png"
+                        path.endsWith(".webp") -> "image/webp"
+                        else -> "image/jpeg"
+                    }
+                    val part = MultipartBody.Part.createFormData("foto", file.name, file.asRequestBody(mime.toMediaType()))
+                    val res = Api.service.criarConferenciaMultipart(parts, part)
+                    if (!res.isSuccessful || res.body()?.success != true) {
+                        throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
+                    }
+                    runCatching { file.delete() }
+                }
                 PendingSyncOperation.SAVE_DESPESAS -> {
                     val toSend = resolveRotaIdInPayload(context.applicationContext, payload)
                     val res = Api.service.salvarDespesas(toSend)

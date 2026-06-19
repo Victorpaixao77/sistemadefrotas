@@ -1,14 +1,11 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 require_once '../../includes/config.php';
 require_once '../../includes/functions.php';
 configure_session();
 session_start();
 require_authentication();
 require_once __DIR__ . '/../../includes/csrf.php';
+require_once __DIR__ . '/../../includes/sf_page_help.php';
 
 $page_title = "Gestão de MDF-e";
 $is_modern = true;
@@ -37,6 +34,7 @@ if (array_key_exists('classic', $_GET)) {
     <link rel="icon" type="image/png" href="../../logo.png">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" href="css/mdfe-page.css?v=<?php echo file_exists(__DIR__ . '/css/mdfe-page.css') ? (int)filemtime(__DIR__ . '/css/mdfe-page.css') : 1; ?>">
+    <?php sf_page_help_css('../..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'routes-modern mdfe-modern' : ''; ?>">
     <div class="app-container">
@@ -96,6 +94,9 @@ if (array_key_exists('classic', $_GET)) {
                         <button type="button" class="fornc-btn fornc-btn--muted" title="Exportar" onclick="exportarDados()">
                             <i class="fas fa-file-export"></i> Exportar
                         </button>
+                        <button type="button" id="helpBtn" class="fornc-btn fornc-btn--ghost" title="Ajuda MDF-e">
+                            <i class="fas fa-circle-question"></i> Ajuda
+                        </button>
                     </div>
                 </div>
                 <?php else: ?>
@@ -131,9 +132,12 @@ if (array_key_exists('classic', $_GET)) {
     <script src="../../js/sidebar.js"></script>
     <script src="../../js/theme.js"></script>
     <?php include __DIR__ . '/partials/mdfe_ui_modals.php'; ?>
-    <script>window.MDFE_CSRF_TOKEN = <?php echo json_encode(csrf_token_get()); ?>;</script>
+    <script>window.MDFE_CSRF_TOKEN = <?php echo json_encode(csrf_token_get()); ?>; window.FISCAL_CSRF_TOKEN = window.MDFE_CSRF_TOKEN;</script>
+    <script src="js/fiscal_api_fetch.js?v=<?php echo file_exists(__DIR__ . '/js/fiscal_api_fetch.js') ? (int)filemtime(__DIR__ . '/js/fiscal_api_fetch.js') : 1; ?>"></script>
     <script src="../../js/doc_validators.js"></script>
     <script src="js/mdfe.js?v=<?php echo filemtime(__DIR__ . '/js/mdfe.js'); ?>"></script>
+    <?php $sf_help_key = 'mdfe'; include __DIR__ . '/../../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('../..'); ?>
     <?php include '../../includes/footer.php'; ?>
 </body>
 </html>

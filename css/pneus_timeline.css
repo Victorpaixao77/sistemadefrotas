@@ -1,0 +1,140 @@
+/* Timeline visual do histórico do pneu */
+.pneu-timeline {
+    position: relative;
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+}
+.pneu-timeline::before {
+    content: '';
+    position: absolute;
+    left: 0.45rem;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    width: 2px;
+    background: var(--border-color, #334155);
+}
+.pneu-timeline-item {
+    position: relative;
+    margin-bottom: 1rem;
+    padding-left: 1rem;
+}
+.pneu-timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -1.15rem;
+    top: 0.35rem;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent-primary, #3b82f6);
+    border: 2px solid var(--bg-secondary, #1e293b);
+}
+.pneu-timeline-item.tipo-instalacao::before { background: #10b981; }
+.pneu-timeline-item.tipo-remocao::before { background: #f59e0b; }
+.pneu-timeline-item.tipo-recapagem::before { background: #8b5cf6; }
+.pneu-timeline-item.tipo-manutencao::before { background: #06b6d4; }
+.pneu-timeline-item.tipo-descarte::before { background: #ef4444; }
+.pneu-timeline-item.tipo-entrada_estoque::before { background: #64748b; }
+.pneu-timeline-date {
+    font-size: 0.75rem;
+    color: var(--text-secondary, #94a3b8);
+    margin-bottom: 0.15rem;
+}
+.pneu-timeline-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+.pneu-timeline-meta {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #94a3b8);
+    margin-top: 0.2rem;
+}
+.pneu-ficha-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0;
+}
+.pneu-ficha-kpi {
+    background: var(--bg-secondary, #1e293b);
+    border: 1px solid var(--border-color, #334155);
+    border-radius: 8px;
+    padding: 0.75rem;
+}
+.pneu-ficha-kpi .lbl { font-size: 0.75rem; color: var(--text-secondary); }
+.pneu-ficha-kpi .val { font-size: 1.1rem; font-weight: 700; }
+.pneu-ia-box {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+}
+.pneu-ia-sugestoes { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
+.pneu-ia-sugestoes button {
+    font-size: 0.8rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    cursor: pointer;
+}
+.pneu-mercado-section {
+    margin: 1.25rem 0;
+    padding: 1rem;
+    border: 1px solid var(--border-color, #334155);
+    border-radius: 8px;
+    background: var(--bg-secondary, #1e293b);
+}
+.pneu-mercado-section h3 {
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+}
+.pneu-fotos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+}
+.pneu-foto-thumb {
+    display: block;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    text-decoration: none;
+    color: inherit;
+    font-size: 0.7rem;
+    text-align: center;
+}
+.pneu-foto-thumb img {
+    width: 100%;
+    height: 72px;
+    object-fit: cover;
+    display: block;
+}
+.pneu-foto-thumb span {
+    display: block;
+    padding: 4px;
+    background: var(--bg-primary);
+}
+.pneu-mercado-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+    align-items: end;
+}
+.pneu-mercado-form label {
+    font-size: 0.75rem;
+    display: block;
+    margin-bottom: 2px;
+}
+.pneu-mercado-form input,
+.pneu-mercado-form select {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 0.85rem;
+}
+.pneu-dot-alerta { color: #f59e0b; font-weight: 600; }
+.pneu-dot-vencido { color: #ef4444; font-weight: 600; }
+.pneu-qr-wrap { text-align: center; margin: 1rem 0; }
+.pneu-qr-wrap img { max-width: 180px; border: 8px solid #fff; border-radius: 8px; }

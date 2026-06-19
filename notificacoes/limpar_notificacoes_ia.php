@@ -1,34 +1,58 @@
 <?php
-require_once '../includes/db_connect.php';
-session_start();
-$empresa_id = $_SESSION['empresa_id'];
+require_once dirname(__DIR__) . '/includes/config.php';
+require_once dirname(__DIR__) . '/includes/db_connect.php';
+require_once dirname(__DIR__) . '/includes/csrf.php';
+require_once dirname(__DIR__) . '/includes/notificacoes_helpers.php';
+
+configure_session();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 header('Content-Type: application/json');
+
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || empty($_SESSION['empresa_id'])) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Não autenticado']);
+    exit;
+}
+
+api_require_csrf_json();
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'error' => 'Método não permitido']);
+    exit;
+}
+
+$empresa_id = (int) $_SESSION['empresa_id'];
 
 try {
     $conn = getConnection();
-    
-    // Marcar apenas notificações de IA como lidas
-    // Tipos de notificações de IA: manutencao, alerta, pneu, documento, financeiro, rota, abastecimento, consumo, custo, seguranca, insights, recomendacao
-    $stmt = $conn->prepare('UPDATE notificacoes SET lida = 1 WHERE empresa_id = ? AND tipo IN ("manutencao", "alerta", "pneu", "documento", "financeiro", "rota", "abastecimento", "consumo", "custo", "seguranca", "insights", "recomendacao")');
-    $stmt->execute([$empresa_id]);
-    
-    // Obter estatísticas de limpeza
-    $stmt_count = $conn->prepare('SELECT COUNT(*) as total FROM notificacoes WHERE empresa_id = ? AND lida = 0');
-    $stmt_count->execute([$empresa_id]);
-    $total_restantes = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
-    
-    // Contar notificações de IA não lidas
-    $stmt_ia = $conn->prepare('SELECT COUNT(*) as total FROM notificacoes WHERE empresa_id = ? AND lida = 0 AND tipo IN ("manutencao", "alerta", "pneu", "documento", "financeiro", "rota", "abastecimento", "consumo", "custo", "seguranca", "insights", "recomendacao")');
-    $stmt_ia->execute([$empresa_id]);
-    $total_ia_restantes = $stmt_ia->fetch(PDO::FETCH_ASSOC)['total'];
-    
+
+    $tipos = sf_notif_tipos_ia();
+    $ph = [];
+    $params = [':empresa_id' => $empresa_id];
+    foreach ($tipos as $i => $t) {
+        $key = ':tipo' . $i;
+        $ph[] = $key;
+        $params[$key] = $t;
+    }
+
+    $sql = 'UPDATE notificacoes SET lida = 1
+            WHERE empresa_id = :empresa_id AND lida = 0 AND tipo IN (' . implode(', ', $ph) . ')';
+    $stmt = $conn->prepare($sql);
+    $stmt->execute($params);
+
     echo json_encode([
-        'success' => true, 
-        'message' => 'Notificações de IA limpas com sucesso',
-        'total_restantes' => $total_restantes,
-        'total_ia_restantes' => $total_ia_restantes
+        'success' => true,
+        'message' => 'Notificações de IA marcadas como lidas',
+        'marcadas' => $stmt->rowCount(),
+        'operacional' => sf_notif_contar_nao_lidas_usuario($conn, $empresa_id, sf_notif_usuario_id(), 'operacional'),
+        'ia' => sf_notif_contar_nao_lidas_usuario($conn, $empresa_id, sf_notif_usuario_id(), 'ia'),
     ]);
-    
-} catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+} catch (Throwable $e) {
+    error_log('notificacoes/limpar_notificacoes_ia.php: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Erro ao limpar notificações de IA']);
 }

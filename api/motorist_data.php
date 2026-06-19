@@ -331,8 +331,9 @@ function getMotoristsList($limit = 10, $page = 1, $status = null, $search = null
             SUM(CASE WHEN disponibilidade_id = 2 THEN 1 ELSE 0 END) as motorists_ferias,
             SUM(CASE WHEN disponibilidade_id = 3 THEN 1 ELSE 0 END) as motorists_licenca,
             SUM(CASE WHEN disponibilidade_id = 4 THEN 1 ELSE 0 END) as motorists_inativos,
-            SUM(CASE WHEN disponibilidade_id = 5 THEN 1 ELSE 0 END) as motorists_afastados
-            FROM motoristas 
+            SUM(CASE WHEN disponibilidade_id = 5 THEN 1 ELSE 0 END) as motorists_afastados,
+            AVG(CASE WHEN porcentagem_comissao IS NOT NULL THEN porcentagem_comissao END) as media_comissao_pct
+            FROM motoristas
             WHERE empresa_id = :empresa_id";
             
         $stmt_summary = $conn->prepare($sql_summary);

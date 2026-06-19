@@ -2,6 +2,47 @@
  * Sidebar functionality management
  */
 
+/**
+ * Remove bloqueios de UI comuns: menu mobile + overlay, scroll preso no body,
+ * loading global do módulo fornecedores (evita tela escura “travada”).
+ * Chamado no pageshow (inclui retorno via bfcache) e ao redimensionar para desktop.
+ */
+function sfResetUiBlockers() {
+    var sidebar = document.querySelector('.sidebar');
+    var overlay = document.querySelector('.sidebar-overlay');
+    var toggle = document.querySelector('.mobile-menu-toggle');
+    if (sidebar) {
+        sidebar.classList.remove('active');
+    }
+    if (overlay) {
+        overlay.classList.remove('active');
+    }
+    document.body.style.removeProperty('overflow');
+    if (toggle) {
+        toggle.setAttribute('aria-expanded', 'false');
+        toggle.setAttribute('aria-label', 'Abrir menu de navegação');
+    }
+    var globalLoading = document.getElementById('fornGlobalLoading');
+    if (globalLoading) {
+        globalLoading.classList.remove('active');
+        globalLoading.setAttribute('aria-hidden', 'true');
+    }
+}
+
+window.addEventListener('pageshow', function () {
+    sfResetUiBlockers();
+});
+
+var _sfResizeUiTimer;
+window.addEventListener('resize', function () {
+    clearTimeout(_sfResizeUiTimer);
+    _sfResizeUiTimer = setTimeout(function () {
+        if (window.matchMedia('(min-width: 768px)').matches) {
+            sfResetUiBlockers();
+        }
+    }, 150);
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     var mainContent = document.querySelector('.main-content');
     if (mainContent) {
@@ -31,13 +72,21 @@ document.addEventListener('DOMContentLoaded', function() {
  */
 function initializeSidebar() {
     const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-    
+
     if (isCollapsed) {
         document.body.classList.add('sidebar-collapsed');
     }
-    
+
     // Initialize dropdown states
     initializeDropdowns();
+
+    // Reabilita as transições após o primeiro paint (a classe sidebar-no-anim
+    // é aplicada cedo, no topo do sidebar, para evitar o flash ao navegar).
+    requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+            document.body.classList.remove('sidebar-no-anim');
+        });
+    });
 }
 
 /**

@@ -1,0 +1,145 @@
+/* Modal de ajuda unificado — layout e cores iguais em todo o sistema */
+.modal#helpModal {
+    padding: 20px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal#helpModal.active {
+    display: flex;
+}
+
+.modal-content.sf-help-modal-content {
+    max-width: 820px;
+    width: 100%;
+    max-height: min(90vh, 900px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: var(--card-border-radius, 12px);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+
+.sf-help-modal-content .modal-header,
+.sf-help-modal-content .modal-footer {
+    flex-shrink: 0;
+    background-color: var(--card-bg, #fff);
+}
+
+.sf-help-modal-content .modal-header {
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.sf-help-modal-content .modal-footer {
+    border-top: 1px solid var(--border-color, #e5e7eb);
+}
+
+.sf-help-modal-body {
+    overflow-x: hidden;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+    background-color: var(--card-bg, #fff);
+    color: var(--text-primary, #1f2937);
+}
+
+.sf-help-modal-content .modal-header h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text-primary, #1f2937);
+}
+
+.sf-help-modal-content .modal-header h2 .fa-question-circle {
+    color: var(--accent-primary, #3b82f6);
+    font-size: 1.05rem;
+}
+
+.sf-help-section,
+.help-section.sf-help-section {
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.sf-help-section:last-child,
+.help-section.sf-help-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.sf-help-section h3,
+.help-section.sf-help-section h3,
+#helpModal .sf-help-modal-content .help-section.sf-help-section h3 {
+    font-size: 1.02rem;
+    font-weight: 600;
+    margin: 0 0 0.65rem;
+    color: var(--accent-primary, #3b82f6);
+}
+
+.sf-help-section p,
+.help-section.sf-help-section p {
+    margin: 0 0 0.5rem;
+    line-height: 1.55;
+    color: var(--text-secondary, #4b5563);
+    font-size: 0.9rem;
+}
+
+.sf-help-section ul,
+.sf-help-section ol,
+.help-section.sf-help-section ul,
+.help-section.sf-help-section ol {
+    margin: 0.35rem 0 0.5rem;
+    padding-left: 1.25rem;
+    line-height: 1.55;
+    font-size: 0.9rem;
+}
+
+.sf-help-section li,
+.help-section.sf-help-section li {
+    margin: 0.35rem 0;
+    color: var(--text-secondary, #4b5563);
+}
+
+.sf-help-section strong,
+.help-section.sf-help-section strong {
+    color: var(--text-primary, #1f2937);
+    font-weight: 600;
+}
+
+.sf-help-legend {
+    list-style: none;
+    padding-left: 0 !important;
+}
+
+.sf-help-legend li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin: 0.45rem 0;
+    color: var(--text-secondary, #4b5563);
+}
+
+.sf-help-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-top: 0.2rem;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.sf-help-modal-content code {
+    font-size: 0.85em;
+    background: var(--bg-secondary, #f3f4f6);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+}

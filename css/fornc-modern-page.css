@@ -26,6 +26,19 @@
                 grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
+        .fornc-kpi-strip.fornc-kpi-strip--5 {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+        @media (max-width: 1200px) {
+            .fornc-kpi-strip.fornc-kpi-strip--5 {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+        @media (max-width: 700px) {
+            .fornc-kpi-strip.fornc-kpi-strip--5 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
         .fornc-kpi-cell {
             background: var(--card-bg, var(--bg-secondary));
             border: 1px solid var(--border-color);
@@ -36,12 +49,28 @@
             gap: 0.1rem;
             min-width: 0;
         }
-        .fornc-kpi-cell .lbl {
+        /* Ícone + rótulo na mesma linha (alinhado ao padrão das rotas / dashboard-card) */
+        .fornc-kpi-head {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            min-width: 0;
+        }
+        .fornc-kpi-head .fornc-kpi-icon {
+            flex-shrink: 0;
+            font-size: 0.62rem;
+            color: var(--accent-primary, #3b82f6);
+            opacity: 0.92;
+            line-height: 1;
+        }
+        .fornc-kpi-head .lbl {
             font-size: 0.58rem;
             text-transform: uppercase;
             letter-spacing: 0.06em;
             color: var(--text-muted);
             font-weight: 600;
+            flex: 1;
+            min-width: 0;
         }
         .fornc-kpi-cell .val {
             font-size: 0.95rem;
@@ -67,6 +96,32 @@
             margin: 0 0 0.65rem;
             font-size: 0.76rem;
             color: var(--text-secondary);
+        }
+
+        /* Estado vazio em listagens (mesmo padrão visual de Rotas) */
+        .fornc-empty-state {
+            display: none;
+            text-align: center;
+            padding: 2.5rem 1.25rem;
+            border: 1px dashed var(--border-color);
+            border-radius: 10px;
+            background: var(--bg-secondary);
+            margin-bottom: 12px;
+        }
+        .fornc-empty-state.visible {
+            display: block;
+        }
+        .fornc-empty-state .fornc-empty-state-title {
+            margin: 0 0 8px 0;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 1rem;
+        }
+        .fornc-empty-state .fornc-empty-state-hint {
+            margin: 0 0 14px 0;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.45;
         }
 
         /* Barra de ferramentas */
@@ -568,140 +623,7 @@
             font-size: 0.75rem;
             margin-top: 6px;
         }
-        #helpFornecedorModal.fornc-modal .modal-content {
-            width: 100%;
-            max-width: min(900px, 96vw);
-            max-height: 85vh;
-        }
-        #helpFornecedorModal .help-section {
-            margin-bottom: 1.25rem;
-            padding: 0.25rem 0;
-        }
-        #helpFornecedorModal .modal-body h3 {
-            color: var(--accent-primary);
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-        #helpFornecedorModal .modal-body p,
-        #helpFornecedorModal .modal-body li {
-            line-height: 1.5;
-            margin-bottom: 0.5rem;
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-        }
-        #helpFornecedorModal .modal-body ul {
-            padding-left: 1.1rem;
-            margin: 0.4rem 0 0.6rem;
-        }
-
-        #helpVehiclesModal.fornc-modal .modal-content {
-            width: 100%;
-            max-width: min(900px, 96vw);
-            max-height: 85vh;
-        }
-        #helpVehiclesModal .help-section {
-            margin-bottom: 1.25rem;
-            padding: 0.25rem 0;
-        }
-        #helpVehiclesModal .modal-body h3 {
-            color: var(--accent-primary);
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-        #helpVehiclesModal .modal-body p,
-        #helpVehiclesModal .modal-body li {
-            line-height: 1.5;
-            margin-bottom: 0.5rem;
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-        }
-        #helpVehiclesModal .modal-body ul {
-            padding-left: 1.1rem;
-            margin: 0.4rem 0 0.6rem;
-        }
-
-        #helpModal.fornc-modal .modal-content {
-            width: 100%;
-            max-width: min(900px, 96vw);
-            max-height: 85vh;
-        }
-        #helpModal .help-section {
-            margin-bottom: 1.25rem;
-            padding: 0.25rem 0;
-        }
-        #helpModal .modal-body h3 {
-            color: var(--accent-primary);
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-        #helpModal .modal-body p,
-        #helpModal .modal-body li {
-            line-height: 1.5;
-            margin-bottom: 0.5rem;
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-        }
-        #helpModal .modal-body ul {
-            padding-left: 1.1rem;
-            margin: 0.4rem 0 0.6rem;
-        }
-
-        #helpMotoristsModal.fornc-modal .modal-content {
-            width: 100%;
-            max-width: min(900px, 96vw);
-            max-height: 85vh;
-        }
-        #helpMotoristsModal .help-section {
-            margin-bottom: 1.25rem;
-            padding: 0.25rem 0;
-        }
-        #helpMotoristsModal .modal-body h3 {
-            color: var(--accent-primary);
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-        #helpMotoristsModal .modal-body p,
-        #helpMotoristsModal .modal-body li {
-            line-height: 1.5;
-            margin-bottom: 0.5rem;
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-        }
-        #helpMotoristsModal .modal-body ul {
-            padding-left: 1.1rem;
-            margin: 0.4rem 0 0.6rem;
-        }
-
-        #helpMaintenanceModal.fornc-modal .modal-content {
-            width: 100%;
-            max-width: min(900px, 96vw);
-            max-height: 85vh;
-        }
-        #helpMaintenanceModal .help-section {
-            margin-bottom: 1.25rem;
-            padding: 0.25rem 0;
-        }
-        #helpMaintenanceModal .modal-body h3 {
-            color: var(--accent-primary);
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-        #helpMaintenanceModal .modal-body p,
-        #helpMaintenanceModal .modal-body li {
-            line-height: 1.5;
-            margin-bottom: 0.5rem;
-            font-size: 0.8125rem;
-            color: var(--text-secondary);
-        }
-        #helpMaintenanceModal .modal-body ul {
-            padding-left: 1.1rem;
-            margin: 0.4rem 0 0.6rem;
-        }
+        /* Modal de ajuda: layout/cores em css/sf-page-help.css (#helpModal .sf-help-modal-content) */
 
         .fornc-modal .modal-footer .btn-primary,
         .fornc-modal .modal-footer .btn-secondary,
@@ -720,4 +642,49 @@
             .fornc-modal .form-actions {
                 flex-wrap: wrap;
             }
+        }
+
+        /* Modal “Colunas” (reutilizável — Rotas, Veículos, Motoristas, etc.) */
+        .fornc-columns-modal.fornc-modal .modal-content,
+        .modal.fornc-columns-modal .modal-content {
+            max-width: 460px;
+        }
+        .fornc-columns-modal .col-toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 0.78rem;
+            border-bottom: 1px solid var(--border-color);
+            gap: 10px;
+        }
+        .fornc-columns-modal .col-toggle-row:last-child {
+            border-bottom: none;
+        }
+        .fornc-columns-modal .col-toggle-row.col-toggle-section {
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            padding-top: 10px;
+            border-bottom: none;
+        }
+        .fornc-columns-modal .columns-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 10px 16px;
+        }
+        .fornc-columns-modal .columns-modal-footer .btn-columns-save {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            min-height: auto;
+        }
+        .fornc-columns-modal .columns-modal-footer .btn-columns-close {
+            padding: 4px 10px;
+            font-size: 0.78rem;
+            min-height: auto;
         }

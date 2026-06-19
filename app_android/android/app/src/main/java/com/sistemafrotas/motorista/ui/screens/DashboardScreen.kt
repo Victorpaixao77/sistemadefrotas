@@ -2,6 +2,7 @@ package com.sistemafrotas.motorista.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.ExperimentalMaterialApi
@@ -10,19 +11,28 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.AssignmentTurnedIn
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.TireRepair
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sistemafrotas.motorista.ui.viewmodel.AuthViewModelFactory
+import com.sistemafrotas.motorista.ui.viewmodel.DashboardViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sistemafrotas.motorista.data.AuthRepository
+import com.sistemafrotas.motorista.data.api.JornadaResumoHoje
 import com.sistemafrotas.motorista.data.api.DashboardData
 import com.sistemafrotas.motorista.ui.components.DashboardHomeSkeleton
 import com.sistemafrotas.motorista.ui.components.GpsDeviceStatusCard
@@ -37,46 +47,31 @@ fun DashboardScreen(
     authRepository: AuthRepository,
     onSessionExpired: () -> Unit = {},
     onNavigateToTab: ((Int) -> Unit)? = null,
+    onAbrirMais: ((String) -> Unit)? = null,
     onLogout: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    var data by remember { mutableStateOf<DashboardData?>(null) }
-    var loading by remember { mutableStateOf(true) }
-    var refreshing by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
+    val vm: DashboardViewModel = viewModel(
+        factory = AuthViewModelFactory(authRepository) { DashboardViewModel(it) }
+    )
+    val data by vm.data.collectAsState()
+    val loading by vm.loading.collectAsState()
+    val refreshing by vm.refreshing.collectAsState()
+    val error by vm.error.collectAsState()
     val nome by authRepository.nome.collectAsState(initial = null)
-    val scope = rememberCoroutineScope()
+    var jornadaResumo by remember { mutableStateOf<JornadaResumoHoje?>(null) }
+
+    LaunchedEffect(Unit) {
+        authRepository.loadJornada().onSuccess { jornadaResumo = it.resumoHoje }
+    }
 
     fun isSessionMsg(msg: String) = msg.contains("expirad", ignoreCase = true) ||
         msg.contains("inválido", ignoreCase = true) ||
         msg.contains("Sessão expirada", ignoreCase = true)
 
-    fun refresh(isPull: Boolean = false) {
-        scope.launch {
-            if (isPull) refreshing = true else loading = true
-            try {
-                authRepository.loadDashboardResult()
-                    .onSuccess {
-                        data = it
-                        error = null
-                    }
-                    .onFailure { e ->
-                        val msg = e.message ?: ""
-                        when {
-                            data == null -> error = msg
-                            isSessionMsg(msg) -> error = msg
-                        }
-                    }
-            } finally {
-                loading = false
-                refreshing = false
-            }
-        }
-    }
+    LaunchedEffect(Unit) { vm.carregarSeNecessario() }
 
-    LaunchedEffect(Unit) { refresh(false) }
-
-    val pullRefreshState = rememberPullRefreshState(refreshing, { refresh(true) })
+    val pullRefreshState = rememberPullRefreshState(refreshing, { vm.refresh(true) })
 
     LaunchedEffect(error) {
         val msg = error ?: return@LaunchedEffect
@@ -93,7 +88,7 @@ fun DashboardScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
             ) {
                 Column(Modifier.padding(16.dp)) {
-                    Text(error!!, color = MaterialTheme.colorScheme.onErrorContainer)
+                    Text(error ?: "", color = MaterialTheme.colorScheme.onErrorContainer)
                     Spacer(Modifier.height(12.dp))
                     Text(
                         "Dica: No celular, altere a URL em Configurações para o IP do seu PC. No emulador use 10.0.2.2.",
@@ -101,7 +96,7 @@ fun DashboardScreen(
                         color = MaterialTheme.colorScheme.onErrorContainer,
                     )
                     Spacer(Modifier.height(16.dp))
-                    Button(onClick = { error = null; refresh(false) }) {
+                    Button(onClick = { vm.setError(null); vm.refresh(false) }) {
                         Text("Tentar novamente")
                     }
                 }
@@ -130,6 +125,60 @@ fun DashboardScreen(
                     }
                 }
                 Spacer(Modifier.height(20.dp))
+
+                // ----- Ações rápidas (atalhos grandes para o uso em campo) -----
+                Text("Ações rápidas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
+                // Pânico em destaque (1 toque a partir do Início)
+                Card(
+                    modifier = Modifier.fillMaxWidth().clickable { onAbrirMais?.invoke("panico") },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFFDC2626)),
+                ) {
+                    Row(Modifier.fillMaxWidth().padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Campaign, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text("Pânico / Emergência", color = androidx.compose.ui.graphics.Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                            Text("Envia sua localização à central", color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    DashAcao("Abastecer", Icons.Filled.LocalGasStation, Modifier.weight(1f)) { onNavigateToTab?.invoke(2) }
+                    DashAcao("Jornada", Icons.Filled.AccessTime, Modifier.weight(1f)) { onAbrirMais?.invoke("jornada") }
+                }
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    DashAcao("Ocorrência", Icons.Filled.Warning, Modifier.weight(1f)) { onAbrirMais?.invoke("ocorrencias") }
+                    DashAcao("Entrega (POD)", Icons.Filled.AssignmentTurnedIn, Modifier.weight(1f)) { onAbrirMais?.invoke("pod") }
+                }
+                Spacer(Modifier.height(12.dp))
+
+                // ----- Card de Jornada (estado atual + horas do dia) -----
+                jornadaResumo?.let { jr ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().clickable { onAbrirMais?.invoke("jornada") },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    ) {
+                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.AccessTime, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(jornadaEstadoLabel(jr.estadoAtual), fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    "Hoje: ${jornadaMin(jr.dirigindoMin)} dirigindo · ${jornadaMin(jr.descansoMin)} parado",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Icon(Icons.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                    Spacer(Modifier.height(20.dp))
+                }
 
                 if (resumo != null) {
                     Text("Resumo do mês", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -242,6 +291,13 @@ fun DashboardScreen(
                     count = null,
                     onClick = { onNavigateToTab?.invoke(4) },
                 )
+                Spacer(Modifier.height(12.dp))
+                DashboardButton(
+                    icon = Icons.Filled.TireRepair,
+                    title = "Pneus",
+                    count = null,
+                    onClick = { onNavigateToTab?.invoke(5) },
+                )
             }
             PullRefreshIndicator(refreshing, pullRefreshState, Modifier.align(Alignment.TopCenter))
             }
@@ -316,6 +372,45 @@ private fun DashboardButton(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+private fun jornadaEstadoLabel(estado: String?): String = when (estado) {
+    "inicio" -> "Em viagem (dirigindo)"
+    "parada" -> "Parado"
+    "descanso" -> "Em descanso"
+    "refeicao" -> "Em refeição"
+    "fim" -> "Jornada encerrada"
+    else -> "Jornada não iniciada hoje"
+}
+
+private fun jornadaMin(min: Int): String {
+    val h = min / 60
+    val m = min % 60
+    return if (h > 0) "${h}h${if (m > 0) " ${m}min" else ""}" else "${m}min"
+}
+
+/** Atalho quadrado de ação rápida no Início (ícone + rótulo, alvo grande para uso em campo). */
+@Composable
+private fun DashAcao(
+    label: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = modifier.clickable { onClick() },
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(
+            Modifier.fillMaxWidth().padding(vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
+            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
         }
     }
 }

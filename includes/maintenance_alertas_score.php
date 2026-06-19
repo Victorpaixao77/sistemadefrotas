@@ -66,18 +66,28 @@ try {
             if ($vencido_km || $vencido_data) {
                 $alertas_proximas[] = [
                     'placa' => $p['placa'],
+                    'veiculo_id' => (int) $p['veiculo_id'],
+                    'componente_id' => (int) $p['componente_id'],
+                    'tipo_manutencao_id' => (int) $p['tipo_manutencao_id'],
+                    'plano_id' => (int) $p['id'],
+                    'km_atual' => (int) ($p['km_atual_veiculo'] ?? 0),
                     'componente' => $p['componente_nome'],
                     'tipo' => $p['tipo_nome'],
                     'vencido' => true,
-                    'msg' => implode('; ', $msg)
+                    'msg' => implode('; ', $msg),
                 ];
             } elseif (!empty($msg)) {
                 $alertas_proximas[] = [
                     'placa' => $p['placa'],
+                    'veiculo_id' => (int) $p['veiculo_id'],
+                    'componente_id' => (int) $p['componente_id'],
+                    'tipo_manutencao_id' => (int) $p['tipo_manutencao_id'],
+                    'plano_id' => (int) $p['id'],
+                    'km_atual' => (int) ($p['km_atual_veiculo'] ?? 0),
                     'componente' => $p['componente_nome'],
                     'tipo' => $p['tipo_nome'],
                     'vencido' => false,
-                    'msg' => implode('; ', $msg)
+                    'msg' => implode('; ', $msg),
                 ];
             }
         }
@@ -91,7 +101,7 @@ try {
 
     // Alertas inteligentes
     // 1) Veículo com 3+ corretivas no mesmo componente
-    $sql = "SELECT v.placa, cm.nome as componente, COUNT(*) as qtd
+    $sql = "SELECT v.id as veiculo_id, v.placa, cm.id as componente_id, cm.nome as componente, COUNT(*) as qtd
             FROM manutencoes m
             JOIN veiculos v ON v.id = m.veiculo_id AND v.empresa_id = m.empresa_id
             JOIN componentes_manutencao cm ON cm.id = m.componente_id
@@ -108,7 +118,10 @@ try {
         $alertas_inteligentes[] = [
             'tipo' => 'corretivas_componente',
             'nivel' => 'warning',
-            'mensagem' => 'Veículo ' . $row['placa'] . ': 3 ou mais corretivas no componente "' . $row['componente'] . '" nos últimos 12 meses.'
+            'veiculo_id' => (int) $row['veiculo_id'],
+            'componente_id' => (int) $row['componente_id'],
+            'placa' => $row['placa'],
+            'mensagem' => 'Veículo ' . $row['placa'] . ': 3 ou mais corretivas no componente "' . $row['componente'] . '" nos últimos 12 meses.',
         ];
     }
 
@@ -220,6 +233,7 @@ try {
         elseif ($score < 70) $status = 'atencao';
 
         $score_veiculos[] = [
+            'veiculo_id' => (int) $v['id'],
             'placa' => $v['placa'],
             'modelo' => $v['modelo'] ?? '',
             'score' => (int)$score,
@@ -240,14 +254,18 @@ try {
                 $alertas_inteligentes[] = [
                     'tipo' => 'custo_acima_media',
                     'nivel' => 'warning',
-                    'mensagem' => 'Veículo ' . $s['placa'] . ': custo manutenção/km (R$ ' . number_format($ck, 2, ',', '.') . ') acima da média da frota.'
+                    'veiculo_id' => (int) ($s['veiculo_id'] ?? 0),
+                    'placa' => $s['placa'],
+                    'mensagem' => 'Veículo ' . $s['placa'] . ': custo manutenção/km (R$ ' . number_format($ck, 2, ',', '.') . ') acima da média da frota.',
                 ];
             }
             if ($s['status'] === 'critico' && $media_custo_km > 0 && $ck >= $media_custo_km) {
                 $alertas_inteligentes[] = [
                     'tipo' => 'avaliar_troca',
                     'nivel' => 'warning',
-                    'mensagem' => 'Avaliar troca do veículo ' . $s['placa'] . ' – custo operacional elevado (score ' . $s['score'] . ').'
+                    'veiculo_id' => (int) ($s['veiculo_id'] ?? 0),
+                    'placa' => $s['placa'],
+                    'mensagem' => 'Avaliar troca do veículo ' . $s['placa'] . ' – custo operacional elevado (score ' . $s['score'] . ').',
                 ];
             }
         }

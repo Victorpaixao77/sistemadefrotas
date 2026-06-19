@@ -1,7 +1,7 @@
 <?php
 /**
- * Gera e envia PDF do CT-e (DACTE) a partir do XML.
- * Se não houver xml_cte, gera o XML antes (via CteXmlHelper) e depois o PDF.
+ * Gera e envia PDF do CT-e (DACTE).
+ * Preferência: sped-da (layout oficial). Fallback: mPDF resumido.
  */
 while (ob_get_level()) {
     ob_end_clean();
@@ -48,9 +48,14 @@ if (!$cte) {
     exit('CT-e não encontrado');
 }
 
+$status = strtolower(trim((string) ($cte['status'] ?? '')));
+if (!in_array($status, ['autorizado', 'pendente', 'rascunho'], true)) {
+    // permite PDF mesmo cancelado se houver XML histórico
+}
+
 if (!empty($cte['pdf_cte'])) {
-    $path = __DIR__ . '/../../' . $cte['pdf_cte'];
-    if (file_exists($path)) {
+    $path = __DIR__ . '/../../' . ltrim((string) $cte['pdf_cte'], '/');
+    if (is_file($path)) {
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="cte_' . ($cte['numero_cte'] ?? $id) . '.pdf"');
         header('Content-Length: ' . filesize($path));
@@ -59,11 +64,8 @@ if (!empty($cte['pdf_cte'])) {
     }
 }
 
-$xml_content = null;
-if (!empty($cte['xml_cte'])) {
-    $xml_content = $cte['xml_cte'];
-}
-if ($xml_content === null || $xml_content === '') {
+$xml_content = trim((string) ($cte['xml_cte'] ?? ''));
+if ($xml_content === '') {
     $stmtEmp = $conn->prepare("SELECT * FROM empresa_clientes WHERE id = ? LIMIT 1");
     $stmtEmp->execute([$empresa_id]);
     $empresa = $stmtEmp->fetch(PDO::FETCH_ASSOC);
@@ -71,53 +73,57 @@ if ($xml_content === null || $xml_content === '') {
         $empresa = ['cnpj' => '', 'razao_social' => 'Transportadora', 'nome_fantasia' => '', 'inscricao_estadual' => '', 'endereco' => '', 'cep' => '', 'cidade' => '', 'estado' => 'PR'];
     }
     require_once __DIR__ . '/../includes/CteXmlHelper.php';
-    $xml_content = montarCteProcXml($conn, $cte, $empresa);
+    $xml_content = (string) montarCteProcXml($conn, $cte, $empresa);
 }
 
-if ($xml_content === null || $xml_content === '') {
+if ($xml_content === '') {
     header('Content-Type: text/plain; charset=utf-8');
     http_response_code(404);
     exit('Não foi possível obter o XML do CT-e para gerar o PDF.');
 }
 
-require_once __DIR__ . '/../../vendor/autoload.php';
-require_once __DIR__ . '/../includes/MpdfTempDir.php';
-require_once __DIR__ . '/../includes/DactePdfHelper.php';
+$pdf_content = null;
+$engine = 'mpdf';
+$protocolo = (string) ($cte['protocolo_autorizacao'] ?? '');
+$chave = (string) ($cte['chave_acesso'] ?? '');
 
-$dacte = montarDacteCompletoHtml($xml_content, $cte);
-$html = $dacte['html'];
-$numero = $dacte['numero'];
-
-try {
-    $mpdf = new \Mpdf\Mpdf([
-        'mode' => 'utf-8',
-        'format' => 'A4',
-        'tempDir' => fiscal_mpdf_temp_dir(),
-        'margin_left' => 12,
-        'margin_right' => 12,
-        'margin_top' => 12,
-        'margin_bottom' => 12,
-    ]);
-    $mpdf->SetTitle('CT-e ' . $numero);
-    $mpdf->WriteHTML($html);
-    $pdf_content = $mpdf->Output('', \Mpdf\Output\Destination::STRING_RETURN);
-} catch (Throwable $e) {
-    error_log('download_cte_pdf: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
-    header('Content-Type: text/plain; charset=utf-8');
-    http_response_code(500);
-    $hint = ' Verifique permissão de escrita em uploads/mpdf_tmp e extensões PHP (gd, mbstring).';
-    $msg = 'Erro ao gerar PDF.' . $hint;
-    if (defined('DEBUG_MODE') && DEBUG_MODE) {
-        $msg .= ' ' . $e->getMessage();
+if (is_readable(__DIR__ . '/../../vendor/autoload.php')) {
+    require_once __DIR__ . '/../../vendor/autoload.php';
+    require_once __DIR__ . '/../includes/CteDacteSped.php';
+    $pdf_content = fiscal_gerar_dacte_pdf_sped_da($xml_content, $protocolo !== '' ? $protocolo : null, $chave, $empresa_id);
+    if ($pdf_content !== null) {
+        $engine = 'sped-da';
     }
-    exit($msg);
 }
 
-$chave = preg_replace('/[^0-9]/', '', $cte['chave_acesso'] ?? $cte['numero_cte'] ?? (string)$id);
-$filename = 'cte_' . ($chave ?: $id) . '.pdf';
-if (strlen($filename) < 10) {
-    $filename = 'cte_' . $id . '.pdf';
+if ($pdf_content === null) {
+    require_once __DIR__ . '/../../vendor/autoload.php';
+    require_once __DIR__ . '/../includes/MpdfTempDir.php';
+    require_once __DIR__ . '/../includes/DactePdfHelper.php';
+    $dacte = montarDacteCompletoHtml($xml_content, $cte);
+    try {
+        $mpdf = new \Mpdf\Mpdf([
+            'mode' => 'utf-8',
+            'format' => 'A4',
+            'tempDir' => fiscal_mpdf_temp_dir(),
+            'margin_left' => 12,
+            'margin_right' => 12,
+            'margin_top' => 12,
+            'margin_bottom' => 12,
+        ]);
+        $mpdf->SetTitle('CT-e ' . ($dacte['numero'] ?? $id));
+        $mpdf->WriteHTML($dacte['html']);
+        $pdf_content = $mpdf->Output('', \Mpdf\Output\Destination::STRING_RETURN);
+    } catch (Throwable $e) {
+        error_log('download_cte_pdf: ' . $e->getMessage());
+        header('Content-Type: text/plain; charset=utf-8');
+        http_response_code(500);
+        exit('Erro ao gerar PDF.');
+    }
 }
+
+$chaveFn = preg_replace('/[^0-9]/', '', $chave ?: (string) $id);
+$filename = 'cte_' . ($chaveFn ?: $id) . '.pdf';
 
 while (ob_get_level()) {
     ob_end_clean();
@@ -126,6 +132,7 @@ while (ob_get_level()) {
 header('Content-Type: application/pdf');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 header('Content-Length: ' . strlen($pdf_content));
+header('X-Fiscal-Dacte-Engine: ' . $engine);
 header('Cache-Control: no-cache, must-revalidate');
 
 echo $pdf_content;

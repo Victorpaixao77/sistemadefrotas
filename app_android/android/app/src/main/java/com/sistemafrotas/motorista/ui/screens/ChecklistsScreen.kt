@@ -19,6 +19,9 @@ import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sistemafrotas.motorista.ui.viewmodel.AuthViewModelFactory
+import com.sistemafrotas.motorista.ui.viewmodel.ChecklistsViewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.size
@@ -40,27 +43,16 @@ fun ChecklistsScreen(
     modifier: Modifier = Modifier,
     onSubScreenChange: (title: String?, onBack: (() -> Unit)?) -> Unit = { _, _ -> },
 ) {
+    val vm: ChecklistsViewModel = viewModel(
+        factory = AuthViewModelFactory(authRepository) { ChecklistsViewModel(it) }
+    )
+    val list by vm.list.collectAsState()
+    val refreshing by vm.refreshing.collectAsState()
+    val error by vm.error.collectAsState()
     var showForm by remember { mutableStateOf(false) }
-    var list by remember { mutableStateOf<List<ChecklistItem>>(emptyList()) }
-    var refreshing by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
 
-    fun refresh() {
-        scope.launch {
-            refreshing = true
-            error = null
-            try {
-                authRepository.loadChecklists()
-                    .onSuccess { list = it.checklists ?: emptyList() }
-                    .onFailure { error = it.message }
-            } finally {
-                refreshing = false
-            }
-        }
-    }
-    LaunchedEffect(Unit) { refresh() }
-    val pullRefreshState = rememberPullRefreshState(refreshing, onRefresh = { refresh() })
+    LaunchedEffect(Unit) { vm.carregarSeNecessario() }
+    val pullRefreshState = rememberPullRefreshState(refreshing, onRefresh = { vm.refresh() })
 
     if (showForm) {
         LaunchedEffect(showForm) {
@@ -69,7 +61,7 @@ fun ChecklistsScreen(
         NovoChecklistScreen(
             authRepository = authRepository,
             onBack = { showForm = false },
-            onSuccess = { showForm = false; refresh() },
+            onSuccess = { showForm = false; vm.refresh() },
             showTopBar = false,
             modifier = modifier,
         )
@@ -97,9 +89,9 @@ fun ChecklistsScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(error!!, color = MaterialTheme.colorScheme.error)
+                    Text(error ?: "", color = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.height(8.dp))
-                    Button(onClick = { error = null; refresh() }) { Text("Tentar novamente") }
+                    Button(onClick = { vm.setError(null); vm.refresh() }) { Text("Tentar novamente") }
                 }
             } else if (list.isEmpty()) {
                 Column(
@@ -134,39 +126,68 @@ fun ChecklistsScreen(
     }
 }
 
-private val CHECKLIST_ITENS: List<Pair<String, String>> = listOf(
-    "oleo_motor" to "Óleo do motor",
-    "agua_radiador" to "Água do radiador",
-    "fluido_freio" to "Fluido de freio",
-    "fluido_direcao" to "Fluido da direção",
-    "combustivel" to "Combustível",
-    "pneus" to "Pneus",
-    "estepe" to "Estepe",
-    "luzes" to "Luzes",
-    "buzina" to "Buzina",
-    "limpador_para_brisa" to "Limpador de para-brisa",
-    "agua_limpador" to "Água do limpador",
-    "freios" to "Freios",
-    "vazamentos" to "Vazamentos",
-    "rastreador" to "Rastreador",
-    "triangulo" to "Triângulo",
-    "extintor" to "Extintor",
-    "chave_macaco" to "Chave e macaco",
-    "cintas" to "Cintas",
-    "primeiros_socorros" to "Kit primeiros socorros",
-    "doc_veiculo" to "Documento do veículo",
-    "cnh" to "CNH",
-    "licenciamento" to "Licenciamento",
-    "seguro" to "Seguro",
-    "manifesto_carga" to "Manifesto de carga",
-    "doc_empresa" to "Documentação da empresa",
-    "carga_amarrada" to "Carga amarrada",
-    "peso_correto" to "Peso correto",
-    "motorista_descansado" to "Motorista descansado",
-    "motorista_sobrio" to "Motorista sóbrio",
-    "celular_carregado" to "Celular carregado",
-    "epi" to "EPI",
+// Checklist Inteligente: itens agrupados; o grupo "Carga e carreta" só aparece
+// quando a configuração do veículo tem carreta (conjunto/outro).
+private data class ChkGrupo(val titulo: String, val itens: List<Pair<String, String>>, val soComCarreta: Boolean = false)
+
+private val CHECKLIST_GRUPOS: List<ChkGrupo> = listOf(
+    ChkGrupo("Veículo", listOf(
+        "oleo_motor" to "Óleo do motor",
+        "agua_radiador" to "Água do radiador",
+        "fluido_freio" to "Fluido de freio",
+        "fluido_direcao" to "Fluido da direção",
+        "combustivel" to "Combustível",
+        "pneus" to "Pneus",
+        "estepe" to "Estepe",
+        "luzes" to "Luzes",
+        "buzina" to "Buzina",
+        "limpador_para_brisa" to "Limpador de para-brisa",
+        "agua_limpador" to "Água do limpador",
+        "freios" to "Freios",
+        "vazamentos" to "Vazamentos",
+    )),
+    ChkGrupo("Segurança", listOf(
+        "rastreador" to "Rastreador",
+        "triangulo" to "Triângulo",
+        "extintor" to "Extintor",
+        "chave_macaco" to "Chave e macaco",
+        "primeiros_socorros" to "Kit primeiros socorros",
+        "epi" to "EPI",
+    )),
+    ChkGrupo("Documentação", listOf(
+        "doc_veiculo" to "Documento do veículo",
+        "cnh" to "CNH",
+        "licenciamento" to "Licenciamento",
+        "seguro" to "Seguro",
+        "manifesto_carga" to "Manifesto de carga",
+        "doc_empresa" to "Documentação da empresa",
+    )),
+    ChkGrupo("Carga e carreta", listOf(
+        "cintas" to "Cintas",
+        "carga_amarrada" to "Carga amarrada",
+        "peso_correto" to "Peso correto",
+        "quinta_roda" to "Quinta-roda",
+        "mangueiras" to "Mangueiras (freio/ar)",
+        "travas" to "Travas do container/carreta",
+        "lona_carga" to "Lona da carga",
+    ), soComCarreta = true),
+    ChkGrupo("Motorista", listOf(
+        "motorista_descansado" to "Motorista descansado",
+        "motorista_sobrio" to "Motorista sóbrio",
+        "celular_carregado" to "Celular carregado",
+    )),
 )
+
+private val CHECKLIST_TODAS_CHAVES: List<String> = CHECKLIST_GRUPOS.flatMap { g -> g.itens.map { it.first } }
+
+private val CHECKLIST_CONFIGS: List<Pair<String, String>> = listOf(
+    "conjunto" to "Caminhão + carreta (conjunto)",
+    "caminhao" to "Caminhão / cavalo (sem carreta)",
+    "onibus" to "Ônibus / Van",
+    "outro" to "Outro",
+)
+
+private fun configTemCarreta(config: String): Boolean = config == "conjunto" || config == "outro"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -177,9 +198,10 @@ private fun NovoChecklistScreen(authRepository: AuthRepository, onBack: () -> Un
     var veiculoId by remember { mutableStateOf<Int?>(null) }
     val itemOk = remember {
         mutableStateMapOf<String, Boolean>().apply {
-            CHECKLIST_ITENS.forEach { (k, _) -> put(k, true) }
+            CHECKLIST_TODAS_CHAVES.forEach { k -> put(k, true) }
         }
     }
+    var config by remember { mutableStateOf("conjunto") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
@@ -217,7 +239,10 @@ private fun NovoChecklistScreen(authRepository: AuthRepository, onBack: () -> Un
                             "veiculo_id" to veiculoId,
                             "data_checklist" to dataChecklist,
                         )
-                        CHECKLIST_ITENS.forEach { (key, _) -> body[key] = if (itemOk[key] == true) 1 else 0 }
+                        CHECKLIST_GRUPOS.forEach { g ->
+                            if (g.soComCarreta && !configTemCarreta(config)) return@forEach
+                            g.itens.forEach { (key, _) -> body[key] = if (itemOk[key] == true) 1 else 0 }
+                        }
                         scope.launch {
                             authRepository.criarChecklist(body).onSuccess { onSuccess() }.onFailure { error = it.message; loading = false }
                         }
@@ -275,20 +300,41 @@ private fun NovoChecklistScreen(authRepository: AuthRepository, onBack: () -> Un
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Text("Itens do veículo e documentação", style = MaterialTheme.typography.titleSmall)
-            Spacer(Modifier.height(8.dp))
-            CHECKLIST_ITENS.forEach { (key, label) ->
-                Row(
-                    Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                    Switch(
-                        checked = itemOk[key] == true,
-                        onCheckedChange = { itemOk[key] = it },
-                    )
+            // Configuração do veículo: define quais itens são relevantes (Checklist Inteligente)
+            var expC by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(expanded = expC, onExpandedChange = { expC = it }) {
+                OutlinedTextField(
+                    value = CHECKLIST_CONFIGS.find { it.first == config }?.second ?: "Configuração do veículo",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Configuração do veículo") },
+                    modifier = Modifier.fillMaxWidth().menuAnchor(),
+                )
+                ExposedDropdownMenu(expanded = expC, onDismissRequest = { expC = false }) {
+                    CHECKLIST_CONFIGS.forEach { (k, lbl) -> DropdownMenuItem(text = { Text(lbl) }, onClick = { config = k; expC = false }) }
                 }
+            }
+            Spacer(Modifier.height(12.dp))
+
+            // Itens agrupados; "Carga e carreta" só aparece quando há carreta.
+            CHECKLIST_GRUPOS.forEach { g ->
+                if (g.soComCarreta && !configTemCarreta(config)) return@forEach
+                Text(g.titulo, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.height(4.dp))
+                g.itens.forEach { (key, label) ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Switch(
+                            checked = itemOk[key] == true,
+                            onCheckedChange = { itemOk[key] = it },
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
             }
             Spacer(Modifier.height(24.dp))
             }

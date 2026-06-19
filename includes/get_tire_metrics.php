@@ -1,79 +1,108 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/pneus_helpers.php';
 
-ob_start();
+header('Content-Type: application/json; charset=utf-8');
+
+configure_session();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+require_authentication();
+pneus_require_page_access();
 
 try {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    
-    if (!isset($_SESSION['loggedin']) || !isset($_SESSION['empresa_id'])) {
-        throw new Exception('Usuário não está logado ou empresa_id não definido');
-    }
-    
     $pdo = getConnection();
-    $empresa_id = $_SESSION['empresa_id'];
-    
-    $metrics = [];
-    
-    // Total de pneus em uso (status_id = 1, ajuste conforme status_pneus da base)
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as total 
-        FROM pneus 
-        WHERE empresa_id = ? AND status_id = 1");
-    $stmt->execute([$empresa_id]);
-    $metrics['total_em_uso'] = (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+    $empresa_id = pneus_empresa_id();
 
-    // Total de pneus
-    $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM pneus WHERE empresa_id = ?");
-    $stmt->execute([$empresa_id]);
-    $metrics['total_pneus'] = (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
-
-    // Vida útil média: baseada em sulco (0–10 mm → 0–100%). Sem sulco usa 100.
-    $stmt = $pdo->prepare("
-        SELECT COALESCE(AVG(LEAST(100, GREATEST(0, (sulco_inicial / 10.0) * 100))), 100) as vida_media
-        FROM pneus
-        WHERE empresa_id = ? AND sulco_inicial IS NOT NULL
-    ");
-    $stmt->execute([$empresa_id]);
-    $metrics['vida_media'] = (int) round((float) $stmt->fetch(PDO::FETCH_ASSOC)['vida_media']);
-
-    // Pneus em alerta: sulco <= 2 mm
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) as total
-        FROM pneus
-        WHERE empresa_id = ? AND sulco_inicial IS NOT NULL AND sulco_inicial <= 2
-    ");
-    $stmt->execute([$empresa_id]);
-    $metrics['pneus_alerta'] = (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
-
-    // Custo total (valor médio estimado)
-    $valor_medio_pneu = 2500;
-    $metrics['custo_total'] = $metrics['total_pneus'] * $valor_medio_pneu;
-
-    while (ob_get_level()) {
-        ob_end_clean();
+    // Em uso: alocações ativas (mais confiável que só status_id)
+    $emUso = 0;
+    $queriesUso = [
+        'SELECT COUNT(DISTINCT pneu_id) AS c FROM instalacoes_pneus ip INNER JOIN pneus p ON p.id = ip.pneu_id WHERE p.empresa_id = ? AND ip.data_remocao IS NULL',
+        'SELECT COUNT(DISTINCT apf.pneu_id) AS c FROM alocacoes_pneus_flexiveis apf INNER JOIN pneus p ON p.id = apf.pneu_id WHERE p.empresa_id = ? AND apf.ativo = 1',
+        "SELECT COUNT(DISTINCT pa.pneu_id) AS c FROM pneus_alocacao pa INNER JOIN pneus p ON p.id = pa.pneu_id WHERE p.empresa_id = ? AND pa.status = 'alocado'",
+        "SELECT COUNT(DISTINCT ep.pneu_id) AS c FROM eixo_pneus ep INNER JOIN pneus p ON p.id = ep.pneu_id WHERE p.empresa_id = ? AND ep.status = 'alocado'",
+    ];
+    $pneusEmUsoIds = [];
+    foreach ($queriesUso as $sql) {
+        try {
+            $st = $pdo->prepare($sql);
+            $st->execute([$empresa_id]);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as $row) {
+                if (!empty($row['pneu_id'])) {
+                    $pneusEmUsoIds[(int) $row['pneu_id']] = true;
+                }
+            }
+            if (isset($row['c'])) {
+                $emUso += (int) $row['c'];
+            }
+        } catch (Throwable $e) {
+            // ignora tabela ausente
+        }
     }
-    header('Content-Type: application/json');
+    // Recalcular distinct se possível
+    $st = $pdo->prepare("
+        SELECT COUNT(DISTINCT x.pneu_id) AS total FROM (
+            SELECT ip.pneu_id FROM instalacoes_pneus ip INNER JOIN pneus p ON p.id = ip.pneu_id WHERE p.empresa_id = ? AND ip.data_remocao IS NULL
+            UNION
+            SELECT apf.pneu_id FROM alocacoes_pneus_flexiveis apf INNER JOIN pneus p ON p.id = apf.pneu_id WHERE p.empresa_id = ? AND apf.ativo = 1
+            UNION
+            SELECT pa.pneu_id FROM pneus_alocacao pa INNER JOIN pneus p ON p.id = pa.pneu_id WHERE p.empresa_id = ? AND pa.status = 'alocado'
+            UNION
+            SELECT ep.pneu_id FROM eixo_pneus ep INNER JOIN pneus p ON p.id = ep.pneu_id WHERE p.empresa_id = ? AND ep.status = 'alocado'
+        ) x
+    ");
+    try {
+        $st->execute([$empresa_id, $empresa_id, $empresa_id, $empresa_id]);
+        $emUso = (int) ($st->fetch(PDO::FETCH_ASSOC)['total'] ?? $emUso);
+    } catch (Throwable $e) {
+        $emUso = count($pneusEmUsoIds);
+    }
+
+    $st = $pdo->prepare('SELECT COUNT(*) AS total FROM pneus WHERE empresa_id = ?');
+    $st->execute([$empresa_id]);
+    $total_pneus = (int) $st->fetch(PDO::FETCH_ASSOC)['total'];
+
+    $st = $pdo->prepare("
+        SELECT COALESCE(AVG(LEAST(100, GREATEST(0, (sulco_inicial / 10.0) * 100))), 0) AS vida_media
+        FROM pneus WHERE empresa_id = ? AND sulco_inicial IS NOT NULL
+    ");
+    $st->execute([$empresa_id]);
+    $vida_media = (int) round((float) $st->fetch(PDO::FETCH_ASSOC)['vida_media']);
+
+    $st = $pdo->prepare('
+        SELECT COUNT(*) AS total FROM pneus
+        WHERE empresa_id = ? AND sulco_inicial IS NOT NULL AND sulco_inicial <= 2
+    ');
+    $st->execute([$empresa_id]);
+    $pneus_alerta = (int) $st->fetch(PDO::FETCH_ASSOC)['total'];
+
+    $st = $pdo->prepare('
+        SELECT COALESCE(SUM(custo), 0) AS total FROM pneu_movimentacoes
+        WHERE empresa_id = ? AND tipo IN (\'entrada_estoque\', \'recapagem\', \'manutencao\')
+    ');
+    $custo_total = 0.0;
+    try {
+        $st->execute([$empresa_id]);
+        $custo_total = (float) $st->fetch(PDO::FETCH_ASSOC)['total'];
+    } catch (Throwable $e) {
+        $custo_total = $total_pneus * 2500;
+    }
+
     echo json_encode([
         'success' => true,
-        'data' => $metrics
-    ]);
-
-} catch (Exception $e) {
-    if (function_exists('error_log')) {
-        error_log('get_tire_metrics.php: ' . $e->getMessage());
-    }
-    while (ob_get_level()) {
-        ob_end_clean();
-    }
-    header('Content-Type: application/json');
+        'data' => [
+            'total_em_uso' => $emUso,
+            'total_pneus' => $total_pneus,
+            'vida_media' => $vida_media,
+            'pneus_alerta' => $pneus_alerta,
+            'custo_total' => $custo_total,
+        ],
+    ], JSON_UNESCAPED_UNICODE);
+} catch (Throwable $e) {
+    error_log('get_tire_metrics.php: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error' => 'Erro ao buscar métricas dos pneus',
-        'message' => $e->getMessage()
-    ]);
-} 
+    echo json_encode(['success' => false, 'error' => 'Erro ao buscar métricas dos pneus'], JSON_UNESCAPED_UNICODE);
+}

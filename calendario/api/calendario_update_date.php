@@ -1,39 +1,7 @@
 <?php
-/**
- * Atualiza apenas data_inicio / data_fim (ex.: arrastar evento no FullCalendar).
- */
-session_name('sistema_frotas_session');
-session_set_cookie_params([
-    'lifetime' => 86400,
-    'path' => '/sistema-frotas',
-    'domain' => '',
-    'secure' => false,
-    'httponly' => true,
-    'samesite' => 'Lax',
-]);
+require_once __DIR__ . '/calendario_api_base.php';
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-require_once '../../includes/config.php';
-require_once '../../includes/db_connect.php';
-require_once '../../includes/functions.php';
-
-header('Content-Type: application/json; charset=utf-8');
-
-if (!isset($_SESSION['usuario_id']) || !isset($_SESSION['empresa_id'])) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['error' => 'Método não permitido']);
-    exit;
-}
-
+$empresa_id = calendario_api_require_post_json();
 $input = json_decode(file_get_contents('php://input'), true);
 if (!is_array($input) || empty($input['id']) || empty($input['start'])) {
     http_response_code(400);
@@ -41,11 +9,16 @@ if (!is_array($input) || empty($input['id']) || empty($input['start'])) {
     exit;
 }
 
-$empresa_id = (int) $_SESSION['empresa_id'];
 $id = (int) $input['id'];
+if ($id <= 0) {
+    http_response_code(400);
+    echo json_encode(['error' => 'ID inválido']);
+    exit;
+}
 
 /** @param mixed $v */
-function calendario_parse_dt($v) {
+function calendario_parse_dt($v)
+{
     if ($v === null || $v === '') {
         return null;
     }
@@ -62,7 +35,6 @@ function calendario_parse_dt($v) {
 
 $data_inicio = calendario_parse_dt($input['start']);
 $data_fim = isset($input['end']) ? calendario_parse_dt($input['end']) : null;
-
 if (!$data_inicio) {
     http_response_code(400);
     echo json_encode(['error' => 'Data de início inválida']);
@@ -71,24 +43,27 @@ if (!$data_inicio) {
 
 try {
     $conn = getConnection();
-    $check = $conn->prepare('SELECT id FROM calendario_eventos WHERE id = :id AND empresa_id = :eid');
-    $check->execute([':id' => $id, ':eid' => $empresa_id]);
-    if (!$check->fetch()) {
-        http_response_code(404);
-        echo json_encode(['error' => 'Evento não encontrado']);
+    if (!calendario_evento_manual_only($conn, $id, $empresa_id)) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Evento automático não pode ser movido']);
         exit;
     }
 
-    $sql = 'UPDATE calendario_eventos SET data_inicio = :di, data_fim = :df WHERE id = :id AND empresa_id = :eid';
-    $stmt = $conn->prepare($sql);
+    $stmt = $conn->prepare('UPDATE calendario_eventos SET data_inicio = :di, data_fim = :df
+        WHERE id = :id AND empresa_id = :eid AND (origem_tipo = \'personalizado\' OR origem_tipo IS NULL)');
     $stmt->bindValue(':di', $data_inicio);
     $stmt->bindValue(':df', $data_fim, $data_fim === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
     $stmt->bindValue(':id', $id, PDO::PARAM_INT);
     $stmt->bindValue(':eid', $empresa_id, PDO::PARAM_INT);
     $stmt->execute();
 
+    if ($stmt->rowCount() < 1) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Evento não encontrado']);
+        exit;
+    }
+
     echo json_encode(['success' => true]);
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Erro ao atualizar datas']);
+} catch (Throwable $e) {
+    calendario_api_fail('calendario_update_date', $e);
 }

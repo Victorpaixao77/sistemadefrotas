@@ -1,22 +1,12 @@
 <?php
-require_once '../includes/config.php';
-require_once '../includes/db_connect.php';
+require_once '../includes/pneus_api_base.php';
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
-// Verificar se o usuário está autenticado
-if (!is_logged_in()) {
-    echo json_encode(['success' => false, 'error' => 'Usuário não autenticado']);
-    exit;
-}
-
-// Obter conexão com o banco de dados
 $conn = getConnection();
-
-// Obter a ação solicitada
+$empresa_id = pneus_empresa_id();
 $action = $_GET['action'] ?? '';
 
-// Processar a ação
 switch ($action) {
     case 'view':
         $id = $_GET['id'] ?? 0;
@@ -37,7 +27,7 @@ switch ($action) {
         try {
             $manutencao = fetchOne($conn, $sql, [
                 ':id' => $id,
-                ':empresa_id' => $_SESSION['empresa_id']
+                ':empresa_id' => $empresa_id
             ]);
             
             if ($manutencao) {
@@ -46,7 +36,7 @@ switch ($action) {
                 echo json_encode(['success' => false, 'error' => 'Manutenção não encontrada']);
             }
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'error' => 'Erro ao buscar manutenção: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'error' => 'Erro ao buscar manutenção']);
         }
         break;
         
@@ -61,7 +51,7 @@ switch ($action) {
         
         $count_sql = "SELECT COUNT(*) as total FROM pneu_manutencao WHERE empresa_id = :empresa_id";
         $stmt = $conn->prepare($count_sql);
-        $stmt->bindValue(':empresa_id', $_SESSION['empresa_id']);
+        $stmt->bindValue(':empresa_id', $empresa_id);
         $stmt->execute();
         $total = (int) $stmt->fetch(PDO::FETCH_ASSOC)['total'];
         
@@ -76,7 +66,7 @@ switch ($action) {
         
         try {
             $stmt = $conn->prepare($sql);
-            $stmt->bindValue(':empresa_id', $_SESSION['empresa_id']);
+            $stmt->bindValue(':empresa_id', $empresa_id);
             $stmt->bindValue(':limit', $per_page, PDO::PARAM_INT);
             $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             $stmt->execute();
@@ -92,7 +82,7 @@ switch ($action) {
                 ]
             ]);
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'error' => 'Erro ao listar manutenções: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'error' => 'Erro ao listar manutenções']);
         }
         break;
 
@@ -100,6 +90,10 @@ switch ($action) {
         $pneu_id = isset($_GET['pneu_id']) ? (int)$_GET['pneu_id'] : 0;
         if ($pneu_id <= 0) {
             echo json_encode(['success' => false, 'error' => 'ID do pneu não fornecido']);
+            exit;
+        }
+        if (!pneus_validar_pneu_empresa($conn, $pneu_id, $empresa_id)) {
+            echo json_encode(['success' => false, 'error' => 'Pneu não encontrado']);
             exit;
         }
         $sql = "SELECT m.id, m.data_manutencao, m.custo, m.km_veiculo, m.observacoes, m.pneu_id, m.veiculo_id,
@@ -112,12 +106,12 @@ switch ($action) {
         try {
             $stmt = $conn->prepare($sql);
             $stmt->bindValue(':pneu_id', $pneu_id, PDO::PARAM_INT);
-            $stmt->bindValue(':empresa_id', $_SESSION['empresa_id']);
+            $stmt->bindValue(':empresa_id', $empresa_id);
             $stmt->execute();
             $manutencoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
             echo json_encode(['success' => true, 'data' => $manutencoes]);
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            echo json_encode(['success' => false, 'error' => 'Erro ao processar solicitação']);
         }
         break;
         

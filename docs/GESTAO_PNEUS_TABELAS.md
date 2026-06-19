@@ -89,8 +89,33 @@ O código que altera estado do pneu (cadastro, alocação, remoção, manutenç�
 
 ---
 
+## 8. Módulo nível mercado (v2)
+
+**DDL:** `sql/pneus_mercado_v2.sql`  
+**Helpers:** `includes/pneus_mercado_helpers.php`  
+**API:** `api/pneus_mercado.php`  
+**Portal motorista:** `pages_motorista/pneus.php` + `pages_motorista/api/pneus.php`  
+**Inventário QR:** `pages/pneus_inventario.php`
+
+| Tabela | Finalidade |
+|--------|------------|
+| **filiais** | Unidades (matriz/filiais) para estoque e transferências |
+| **pneu_motivos_remocao** | Catálogo de motivos (desgaste, corte, furo, etc.) |
+| **pneu_garantias** | Garantias fabricante / revenda / recapadora |
+| **pneu_anexos** | Fotos e laudos (compra, instalação, remoção, sucata, inspeção) |
+| **pneu_sucata** | Registro de sucata com valor recuperado e destino |
+| **pneu_inspecoes** | Checklist motorista/gestor (pressão, sulco, cortes, bolhas) |
+| **pneu_inventario_sessoes** / **pneu_inventario_itens** | Inventário por leitura QR |
+| **pneu_auditoria** | Log detalhado (usuário, IP, ação) |
+
+**Colunas extras:** `pneus.filial_id`, `pneus.carcaca_codigo`, `pneus.tipo_rodado_ideal`, `posicoes_pneus.tipo_rodado`, auditoria em `pneu_movimentacoes` (`usuario_id`, `ip_origem`, `motivo_remocao_id`, `filial_id`).
+
+**Integrações:** alertas DOT/garantia no sininho (`notificacoes_sync_operacional.php`); insights IA cruzam abastecimento × sulco (`pneus_build_insights_payload`); validação de posição na instalação (`eixos_veiculos.php` action `alocar_pneu`); motivo obrigatório na remoção (UI gestão interativa).
+
+---
+
 ## 7. Referência
 
-- **Roadmap:** `docs/GESTAO_PNEUS_ROADMAP.md`  
-- **Regras e queries de movimentações:** `docs/GESTAO_PNEUS_MOVIMENTACOES.md`  
+- **Roadmap:** `docs/GESTAO_PNEUS_ROADMAP.md`
+- **Regras e queries de movimentações:** `docs/GESTAO_PNEUS_MOVIMENTACOES.md`
 - **Análise de melhorias:** `docs/GESTAO_PNEUS_ANALISE.md`

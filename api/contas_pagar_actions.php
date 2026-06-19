@@ -282,7 +282,7 @@ try {
     http_response_code(400);
     echo json_encode([
         'success' => false,
-        'message' => $e->getMessage(),
+        'message' => 'Não foi possível processar a solicitação.',
         'error' => 'validation',
     ], JSON_UNESCAPED_UNICODE);
     exit;

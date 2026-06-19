@@ -51,26 +51,26 @@ try {
     $stmt->execute([$rota_id, $empresa_id]);
     $exists = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    $fields = ['descarga','pedagios','caixinha','estacionamento','lavagem','borracharia','eletrica_mecanica','adiantamento','total_despviagem'];
+    $fields = ['descarga','pedagios','caixinha','estacionamento','lavagem','borracharia','eletrica_mecanica','adiantamento','outros'];
     $data = [];
     foreach ($fields as $f) {
         $data[$f] = isset($_POST[$f]) ? $_POST[$f] : null;
     }
 
     if ($exists) {
-        $sql = "UPDATE despesas_viagem SET descarga=?, pedagios=?, caixinha=?, estacionamento=?, lavagem=?, borracharia=?, eletrica_mecanica=?, adiantamento=?, total_despviagem=?, updated_at=NOW() WHERE rota_id=? AND empresa_id=?";
+        $sql = "UPDATE despesas_viagem SET descarga=?, pedagios=?, caixinha=?, estacionamento=?, lavagem=?, borracharia=?, eletrica_mecanica=?, adiantamento=?, outros=?, updated_at=NOW() WHERE rota_id=? AND empresa_id=?";
         $stmt = $conn->prepare($sql);
         $ok = $stmt->execute([
             $data['descarga'], $data['pedagios'], $data['caixinha'], $data['estacionamento'], $data['lavagem'],
-            $data['borracharia'], $data['eletrica_mecanica'], $data['adiantamento'], $data['total_despviagem'], $rota_id, $empresa_id
+            $data['borracharia'], $data['eletrica_mecanica'], $data['adiantamento'], $data['outros'], $rota_id, $empresa_id
         ]);
     } else {
-        $sql = "INSERT INTO despesas_viagem (empresa_id, rota_id, descarga, pedagios, caixinha, estacionamento, lavagem, borracharia, eletrica_mecanica, adiantamento, total_despviagem, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+        $sql = "INSERT INTO despesas_viagem (empresa_id, rota_id, descarga, pedagios, caixinha, estacionamento, lavagem, borracharia, eletrica_mecanica, adiantamento, outros, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
         $stmt = $conn->prepare($sql);
         $ok = $stmt->execute([
             $empresa_id, $rota_id,
             $data['descarga'], $data['pedagios'], $data['caixinha'], $data['estacionamento'], $data['lavagem'],
-            $data['borracharia'], $data['eletrica_mecanica'], $data['adiantamento'], $data['total_despviagem']
+            $data['borracharia'], $data['eletrica_mecanica'], $data['adiantamento'], $data['outros']
         ]);
     }
 

@@ -1,18 +1,29 @@
 document.addEventListener('DOMContentLoaded', function() {
   const fab = document.getElementById('iaFabBtn');
-  if (!fab) return; // Não faz nada se não existir
+  const sf = window.sfNotif;
+  if (!fab || !sf) return;
+
+  const badge = document.getElementById('iaNotificationBadge');
 
   const panel = document.createElement('div');
   panel.className = 'ia-notification-panel';
-  panel.innerHTML = `<div class="ia-notification-header"><h3 style='margin:0;font-size:1.1rem;font-weight:600;display:inline-block;'>Notificações IA</h3>
-    <button class='notification-clear-btn' style='float:right;margin:0;'>Limpar</button></div><div class="ia-notification-list"></div>`;
+  panel.innerHTML = '<div class="ia-notification-header"><h3 style="margin:0;font-size:1.1rem;font-weight:600;display:inline-block;">Notificações IA</h3>' +
+    '<button type="button" class="notification-clear-btn" style="float:right;margin:0;">Limpar</button></div>' +
+    '<div class="ia-notification-list"></div>';
   document.body.appendChild(panel);
 
-  // Referência ao badge de notificações
-  const badge = document.getElementById('iaNotificationBadge');
+  const listEl = panel.querySelector('.ia-notification-list');
+  sf.bindItemClicks(listEl);
+  listEl.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-notif-acao]');
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    sf.runAction(btn.getAttribute('data-notif-acao'), btn.getAttribute('data-notif-ref'), btn.getAttribute('data-notif-id'))
+      .then(function(data) { if (data && data.success) carregarIANotificacoes(false); });
+  });
 
   function positionPanel() {
-    // Se for botão IA do header, posiciona abaixo dele
     if (fab && fab.id === 'iaFabBtn') {
       const rect = fab.getBoundingClientRect();
       panel.style.position = 'absolute';
@@ -20,21 +31,62 @@ document.addEventListener('DOMContentLoaded', function() {
       panel.style.left = (window.scrollX + rect.left) + 'px';
       panel.style.right = 'auto';
       panel.style.bottom = 'auto';
-      panel.style.zIndex = 10001;
+      panel.style.zIndex = '10001';
       panel.style.width = '350px';
-      panel.style.maxHeight = '60vh';
+      panel.style.maxHeight = 'min(75vh, 640px)';
     } else {
-      // fallback: canto inferior direito
       panel.style.position = 'fixed';
       panel.style.bottom = '110px';
       panel.style.right = '32px';
       panel.style.left = 'auto';
       panel.style.top = 'auto';
-      panel.style.zIndex = 10000;
+      panel.style.zIndex = '10000';
       panel.style.width = '350px';
-      panel.style.maxHeight = '60vh';
+      panel.style.maxHeight = 'min(75vh, 640px)';
     }
   }
+
+  function carregarIANotificacoes(verTodas) {
+    const url = sf.buildListUrl('ia', !!verTodas);
+    return fetch(url, { credentials: 'same-origin' })
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(data) {
+        listEl.innerHTML = '';
+        if (data.success && data.notificacoes && data.notificacoes.length) {
+          listEl.innerHTML = data.notificacoes.map(function(n) {
+            return sf.renderItem(n, {
+              showIaTip: true,
+              itemClass: 'ia-notification-item',
+              iconWrapClass: 'ia-notification-icon',
+              contentClass: 'ia-notification-content',
+              titleClass: 'ia-notification-title',
+              textClass: 'ia-notification-msg',
+              timeClass: 'ia-notification-time'
+            });
+          }).join('');
+        } else if (data.sistema_ativo === false) {
+          listEl.innerHTML = '<div style="color:#b8c2d0;text-align:center;padding:20px;">Notificações desativadas nas configurações.</div>';
+        } else {
+          listEl.innerHTML = '<div style="color:#b8c2d0;text-align:center;padding:20px;">Nenhuma notificação IA encontrada.</div>';
+        }
+        sf.updateBadge(badge, data.total_nao_lidas ?? data.total_real_nao_lidas ?? 0);
+        return data;
+      })
+      .catch(function(error) {
+        console.error('Erro ao carregar notificações IA:', error);
+        listEl.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">Erro ao carregar notificações</div>';
+        if (badge) {
+          badge.textContent = '!';
+          badge.style.display = 'flex';
+          badge.style.backgroundColor = '#ef4444';
+        }
+      });
+  }
+
+  window.carregarIANotificacoes = carregarIANotificacoes;
 
   fab.addEventListener('click', function() {
     if (panel.classList.contains('active')) {
@@ -42,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
       panel.classList.add('active');
       positionPanel();
-      carregarIANotificacoes();
+      carregarIANotificacoes(false);
     }
   });
 
@@ -53,171 +105,47 @@ document.addEventListener('DOMContentLoaded', function() {
     if (panel.classList.contains('active')) positionPanel();
   });
 
-  function carregarIANotificacoes(verTodas = false) {
-    const url = verTodas ? sfAppUrl('notificacoes/notificacoes.php?todas=1') : sfAppUrl('notificacoes/notificacoes.php');
-    fetch(url, {
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-      .then(res => {
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        }
-        return res.json();
-      })
-      .then(data => {
-        const list = panel.querySelector('.ia-notification-list');
-        list.innerHTML = '';
-        let unreadCount = 0;
-        
-        if (data.success && data.notificacoes && data.notificacoes.length) {
-          data.notificacoes.forEach(n => {
-            const item = document.createElement('div');
-            item.className = 'ia-notification-item';
-            if (n.lida == 0) {
-              item.classList.add('unread');
-              unreadCount++;
-            } else {
-              item.classList.add('lida');
-            }
-            
-            // Determina o ícone baseado no tipo
-            let iconClass = 'info';
-            let icon = 'fa-bell';
-            if (n.tipo === 'manutencao') {
-              iconClass = 'warning';
-              icon = 'fa-tools';
-            } else if (n.tipo === 'alerta') {
-              iconClass = 'warning';
-              icon = 'fa-exclamation-triangle';
-            } else if (n.tipo === 'pneu') {
-              iconClass = 'success';
-              icon = 'fa-tire';
-            } else if (n.tipo === 'documento') {
-              iconClass = 'info';
-              icon = 'fa-file-alt';
-            } else if (n.tipo === 'financeiro') {
-              iconClass = 'danger';
-              icon = 'fa-dollar-sign';
-            } else if (n.tipo === 'rota') {
-              iconClass = 'info';
-              icon = 'fa-route';
-            } else if (n.tipo === 'abastecimento') {
-              iconClass = 'warning';
-              icon = 'fa-gas-pump';
-            }
-            
-            // Formatar data de forma mais amigável
-            const dataNotif = new Date(n.data_criacao);
-            const agora = new Date();
-            const diffDias = Math.floor((agora - dataNotif) / (1000 * 60 * 60 * 24));
-            
-            let tempoAtraso = '';
-            if (diffDias === 0) {
-              tempoAtraso = 'Hoje';
-            } else if (diffDias === 1) {
-              tempoAtraso = 'Ontem';
-            } else if (diffDias < 7) {
-              tempoAtraso = `${diffDias} dias atrás`;
-            } else {
-              tempoAtraso = dataNotif.toLocaleDateString('pt-BR');
-            }
-            
-            item.innerHTML = `
-              <div class='ia-notification-icon ${iconClass}'>
-                <i class='fas ${icon}'></i>
-              </div>
-              <div class='ia-notification-content'>
-                <div class='ia-notification-title'>${n.titulo}</div>
-                <div class='ia-notification-msg'>${n.mensagem}</div>
-                ${n.ia_mensagem ? `<div class='ia-dica'><i class='fas fa-lightbulb'></i> <b>Dica IA:</b> ${n.ia_mensagem}</div>` : ''}
-                <div class='ia-notification-time'>${tempoAtraso} às ${dataNotif.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</div>
-              </div>
-            `;
-            list.appendChild(item);
-          });
-        } else {
-          list.innerHTML = '<div style="color:#b8c2d0; text-align: center; padding: 20px;">Nenhuma notificação IA encontrada.</div>';
-        }
-        
-        // Usar o total real de notificações não lidas se disponível
-        const totalReal = data.total_real_nao_lidas || unreadCount;
-        badge.textContent = totalReal;
-        badge.style.display = totalReal > 0 ? 'flex' : 'none';
-      })
-      .catch(error => {
-        console.error('Erro ao carregar notificações IA:', error);
-        const list = panel.querySelector('.ia-notification-list');
-        list.innerHTML = '<div style="color:#ef4444; text-align: center; padding: 20px;">Erro ao carregar notificações</div>';
-        
-        // Mostrar erro no badge
-        badge.textContent = '!';
-        badge.style.display = 'flex';
-        badge.style.backgroundColor = '#ef4444';
-      });
-  }
-
-  // Fecha o painel IA ao clicar fora
   document.addEventListener('click', function(e) {
     if (panel.classList.contains('active') && !panel.contains(e.target) && e.target !== fab) {
       panel.classList.remove('active');
     }
   });
 
-  // Fecha o painel IA ao clicar no botão de notificações regular
   const notificationBtn = document.getElementById('notificationBtn');
   if (notificationBtn) {
     notificationBtn.addEventListener('click', function() {
-      if (panel.classList.contains('active')) {
-        panel.classList.remove('active');
-      }
+      if (panel.classList.contains('active')) panel.classList.remove('active');
     });
   }
 
-  // Limpar notificações IA (marca como lidas)
   const clearBtn = panel.querySelector('.notification-clear-btn');
   clearBtn.addEventListener('click', function(e) {
     e.stopPropagation();
-    fetch(sfAppUrl('notificacoes/limpar_notificacoes_ia.php'), { method: 'POST' })
-      .then(res => res.json())
-      .then(data => {
+    fetch(sfAppUrl('notificacoes/limpar_notificacoes_ia.php'), {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: sf.mutationHeaders()
+    })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
         if (data.success) {
-          const list = panel.querySelector('.ia-notification-list');
-          list.innerHTML = '<div style="color:#b8c2d0">Nenhuma notificação IA encontrada.</div>';
-          // Atualiza o badge
-          badge.textContent = '0';
-          badge.style.display = 'none';
-          
-          // Atualiza também o badge das notificações regulares se existir
-          const regularBadge = document.getElementById('notificationBadge');
-          if (regularBadge && data.total_restantes !== undefined) {
-            regularBadge.textContent = data.total_restantes;
-            regularBadge.style.display = data.total_restantes > 0 ? 'flex' : 'none';
-          }
+          listEl.innerHTML = '<div style="color:#b8c2d0">Nenhuma notificação IA encontrada.</div>';
+          sf.updateBadge(badge, data.ia ?? 0);
+          sf.updateBadge(document.getElementById('notificationBadge'), data.operacional ?? 0);
         }
       });
   });
 
-  // Adiciona footer com 'Ver todas'
   const footerDiv = document.createElement('div');
   footerDiv.className = 'ia-notification-footer';
-  footerDiv.style = 'padding: 10px 0; text-align: center; border-top: 1px solid #243041; background: #1a2332;';
-  footerDiv.innerHTML = `<a href='#' class='view-all-link'>Ver todas</a>`;
+  footerDiv.style.cssText = 'padding:10px 0;text-align:center;border-top:1px solid #243041;background:#1a2332;';
+  footerDiv.innerHTML = '<a href="' + sfAppUrl('pages/notificacoes.php') + '" class="view-all-link">Ver todas</a>';
   panel.appendChild(footerDiv);
-  const viewAllBtn = footerDiv.querySelector('.view-all-link');
 
-  // 'Ver todas' mostra todas as notificações IA
-  viewAllBtn.addEventListener('click', function(e) {
+  footerDiv.querySelector('.view-all-link').addEventListener('click', function(e) {
     e.preventDefault();
     e.stopPropagation();
     carregarIANotificacoes(true);
+    listEl.scrollTop = 0;
   });
-
-  // Carrega as notificações inicialmente
-  carregarIANotificacoes();
-  
-  // Torna a função global para ser chamada de outros scripts
-  window.carregarIANotificacoes = carregarIANotificacoes;
-}); 
+});

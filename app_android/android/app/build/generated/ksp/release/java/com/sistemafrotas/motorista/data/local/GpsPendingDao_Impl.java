@@ -14,6 +14,7 @@ import androidx.sqlite.db.SupportSQLiteStatement;
 import java.lang.Class;
 import java.lang.Double;
 import java.lang.Exception;
+import java.lang.Float;
 import java.lang.Integer;
 import java.lang.Long;
 import java.lang.Object;
@@ -43,7 +44,7 @@ public final class GpsPendingDao_Impl implements GpsPendingDao {
       @Override
       @NonNull
       protected String createQuery() {
-        return "INSERT OR ABORT INTO `gps_pending` (`id`,`veiculo_id`,`motorista_id`,`latitude`,`longitude`,`velocidade`,`data_hora`,`created_at`) VALUES (nullif(?, 0),?,?,?,?,?,?,?)";
+        return "INSERT OR ABORT INTO `gps_pending` (`id`,`veiculo_id`,`motorista_id`,`latitude`,`longitude`,`velocidade`,`bateria_pct`,`accuracy_metros`,`provider`,`location_mock`,`data_hora`,`created_at`) VALUES (nullif(?, 0),?,?,?,?,?,?,?,?,?,?,?)";
       }
 
       @Override
@@ -59,8 +60,28 @@ public final class GpsPendingDao_Impl implements GpsPendingDao {
         } else {
           statement.bindDouble(6, entity.getVelocidade());
         }
-        statement.bindString(7, entity.getDataHora());
-        statement.bindLong(8, entity.getCreatedAt());
+        if (entity.getBateriaPct() == null) {
+          statement.bindNull(7);
+        } else {
+          statement.bindLong(7, entity.getBateriaPct());
+        }
+        if (entity.getAccuracyMetros() == null) {
+          statement.bindNull(8);
+        } else {
+          statement.bindDouble(8, entity.getAccuracyMetros());
+        }
+        if (entity.getProvider() == null) {
+          statement.bindNull(9);
+        } else {
+          statement.bindString(9, entity.getProvider());
+        }
+        if (entity.getLocationMock() == null) {
+          statement.bindNull(10);
+        } else {
+          statement.bindLong(10, entity.getLocationMock());
+        }
+        statement.bindString(11, entity.getDataHora());
+        statement.bindLong(12, entity.getCreatedAt());
       }
     };
     this.__preparedStmtOfDeleteById = new SharedSQLiteStatement(__db) {
@@ -137,6 +158,10 @@ public final class GpsPendingDao_Impl implements GpsPendingDao {
           final int _cursorIndexOfLatitude = CursorUtil.getColumnIndexOrThrow(_cursor, "latitude");
           final int _cursorIndexOfLongitude = CursorUtil.getColumnIndexOrThrow(_cursor, "longitude");
           final int _cursorIndexOfVelocidade = CursorUtil.getColumnIndexOrThrow(_cursor, "velocidade");
+          final int _cursorIndexOfBateriaPct = CursorUtil.getColumnIndexOrThrow(_cursor, "bateria_pct");
+          final int _cursorIndexOfAccuracyMetros = CursorUtil.getColumnIndexOrThrow(_cursor, "accuracy_metros");
+          final int _cursorIndexOfProvider = CursorUtil.getColumnIndexOrThrow(_cursor, "provider");
+          final int _cursorIndexOfLocationMock = CursorUtil.getColumnIndexOrThrow(_cursor, "location_mock");
           final int _cursorIndexOfDataHora = CursorUtil.getColumnIndexOrThrow(_cursor, "data_hora");
           final int _cursorIndexOfCreatedAt = CursorUtil.getColumnIndexOrThrow(_cursor, "created_at");
           final List<GpsPendingEntity> _result = new ArrayList<GpsPendingEntity>(_cursor.getCount());
@@ -158,11 +183,35 @@ public final class GpsPendingDao_Impl implements GpsPendingDao {
             } else {
               _tmpVelocidade = _cursor.getDouble(_cursorIndexOfVelocidade);
             }
+            final Integer _tmpBateriaPct;
+            if (_cursor.isNull(_cursorIndexOfBateriaPct)) {
+              _tmpBateriaPct = null;
+            } else {
+              _tmpBateriaPct = _cursor.getInt(_cursorIndexOfBateriaPct);
+            }
+            final Float _tmpAccuracyMetros;
+            if (_cursor.isNull(_cursorIndexOfAccuracyMetros)) {
+              _tmpAccuracyMetros = null;
+            } else {
+              _tmpAccuracyMetros = _cursor.getFloat(_cursorIndexOfAccuracyMetros);
+            }
+            final String _tmpProvider;
+            if (_cursor.isNull(_cursorIndexOfProvider)) {
+              _tmpProvider = null;
+            } else {
+              _tmpProvider = _cursor.getString(_cursorIndexOfProvider);
+            }
+            final Integer _tmpLocationMock;
+            if (_cursor.isNull(_cursorIndexOfLocationMock)) {
+              _tmpLocationMock = null;
+            } else {
+              _tmpLocationMock = _cursor.getInt(_cursorIndexOfLocationMock);
+            }
             final String _tmpDataHora;
             _tmpDataHora = _cursor.getString(_cursorIndexOfDataHora);
             final long _tmpCreatedAt;
             _tmpCreatedAt = _cursor.getLong(_cursorIndexOfCreatedAt);
-            _item = new GpsPendingEntity(_tmpId,_tmpVeiculoId,_tmpMotoristaId,_tmpLatitude,_tmpLongitude,_tmpVelocidade,_tmpDataHora,_tmpCreatedAt);
+            _item = new GpsPendingEntity(_tmpId,_tmpVeiculoId,_tmpMotoristaId,_tmpLatitude,_tmpLongitude,_tmpVelocidade,_tmpBateriaPct,_tmpAccuracyMetros,_tmpProvider,_tmpLocationMock,_tmpDataHora,_tmpCreatedAt);
             _result.add(_item);
           }
           return _result;

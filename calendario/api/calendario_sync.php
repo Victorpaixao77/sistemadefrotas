@@ -1,33 +1,11 @@
 <?php
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+require_once __DIR__ . '/calendario_api_base.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit(0);
-}
-
-require_once '../../includes/config.php';
-require_once '../../includes/db_connect.php';
-require_once '../../includes/functions.php';
-
-// Start session
-session_start();
-
-// Check if user is logged in
-if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
-}
-
-$empresa_id = $_SESSION['empresa_id'];
+$empresa_id = calendario_api_require_get();
 $action = $_GET['action'] ?? 'status';
 
 try {
     $conn = getConnection();
-    
     switch ($action) {
         case 'status':
             // Verificar status da sincronização
@@ -68,7 +46,7 @@ try {
 } catch (Exception $e) {
     error_log("Erro na API de sincronização: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['error' => 'Erro interno do servidor: ' . $e->getMessage()]);
+    echo json_encode(['error' => 'Erro interno do servidor']);
 }
 
 function getSyncStatus($conn, $empresa_id) {

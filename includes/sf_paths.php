@@ -8,18 +8,31 @@ if (!function_exists('sf_app_web_base')) {
     function sf_app_web_base(): string
     {
         $sn = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '/index.php');
-        // Se a página está dentro de `fiscal/`, a base do app deve ser o diretório raiz
-        // (evita que links viram `/.../fiscal/pages/...` e chamadas viram `/.../fiscal/fiscal/api/...`).
-        $fiscalPos = strpos($sn, '/fiscal/');
-        if ($fiscalPos !== false) {
-            $base = substr($sn, 0, $fiscalPos);
-        } elseif (($calPos = strpos($sn, '/calendario/')) !== false) {
-            /* calendario/index.php: assets e header usam sf_app_url a partir da raiz do app */
-            $base = substr($sn, 0, $calPos);
-        } elseif (preg_match('#/pages/[^/]+\.php$#', $sn)) {
-            $base = dirname(dirname($sn));
-        } else {
-            $base = dirname($sn);
+        // Módulos sob a raiz do app: links devem apontar para /app/..., não /app/modulo/...
+        $modulePrefixes = [
+            '/fiscal/',
+            '/calendario/',
+            '/notificacoes/',
+            '/api/',
+            '/pages_motorista/',
+            '/pages_adm/',
+            '/IA/',
+            '/google-maps/',
+        ];
+        $base = null;
+        foreach ($modulePrefixes as $prefix) {
+            $pos = strpos($sn, $prefix);
+            if ($pos !== false) {
+                $base = substr($sn, 0, $pos);
+                break;
+            }
+        }
+        if ($base === null) {
+            if (preg_match('#/pages/[^/]+\.php$#', $sn)) {
+                $base = dirname(dirname($sn));
+            } else {
+                $base = dirname($sn);
+            }
         }
         $base = str_replace('\\', '/', (string) $base);
         if ($base === '/' || $base === '.' || $base === '') {
@@ -81,5 +94,26 @@ if (!function_exists('sf_app_web_base')) {
             return (string) APP_VERSION;
         }
         return '1';
+    }
+
+    /**
+     * URL do site institucional (landing) para links “Voltar ao site”.
+     * Padrão: https://frotec.online (constante SF_MARKETING_SITE em config.php).
+     * Sobrescreva com SF_MARKETING_SITE_URL no ambiente (ex.: http://localhost:8080 em dev).
+     */
+    function sf_marketing_site_url(): string
+    {
+        $raw = '';
+        $env = getenv('SF_MARKETING_SITE_URL');
+        if (is_string($env) && trim($env) !== '') {
+            $raw = trim($env);
+        } elseif (defined('SF_MARKETING_SITE')) {
+            $raw = trim((string) SF_MARKETING_SITE);
+        }
+        if ($raw === '') {
+            return 'https://frotec.online';
+        }
+        $out = rtrim($raw, '/');
+        return $out !== '' ? $out : 'https://frotec.online';
     }
 }

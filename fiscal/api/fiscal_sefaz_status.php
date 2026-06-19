@@ -30,13 +30,18 @@ require_once '../../includes/config.php';
 require_once '../../includes/functions.php';
 
 try {
-    // Configurar sessão
     configure_session();
     session_start();
-    
-    // Obter dados do POST
-    $input = json_decode(file_get_contents('php://input'), true);
-    $empresa_id = $input['empresa_id'] ?? 1; // Usar empresa_id padrão se não fornecido
+    require_authentication();
+
+    $empresa_id = (int)($_SESSION['empresa_id'] ?? 0);
+    if ($empresa_id < 1) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Não autorizado']);
+        exit;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
     
     // Preferir cache já calculado pelo endpoint real `sefaz_status.php`
     $sefaz_status = [

@@ -3,10 +3,12 @@ require_once dirname(__DIR__) . '/includes/config.php';
 require_once dirname(__DIR__) . '/includes/functions.php';
 require_once dirname(__DIR__) . '/includes/sf_api_base.php';
 require_once dirname(__DIR__) . '/includes/permissions.php';
+require_once dirname(__DIR__) . '/includes/sf_page_help.php';
 
 configure_session();
 session_start();
 require_authentication();
+require_permission('view_fleet_map');
 
 $page_title = 'Mapa da frota (GPS)';
 
@@ -46,6 +48,9 @@ if ($eid_mapa > 0) {
     <link rel="stylesheet" href="../css/fornc-modern-page.css">
     <link rel="stylesheet" href="../css/routes.css?v=1.0.1">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    <?php sf_page_help_css('..'); ?>
     <style>
         /* Mesma barra que Rotas (.fornc-toolbar): ajustes só para datetime e veículo no mapa */
         .mapa-frota-wrap .fornc-filters-inline input[type="datetime-local"] {
@@ -58,6 +63,7 @@ if ($eid_mapa > 0) {
             background: var(--bg-secondary);
             color: var(--text-primary);
         }
+        .mapa-frota-wrap .fornc-filters-inline #rtVeiculo,
         .mapa-frota-wrap .fornc-filters-inline #histVeiculo { min-width: 11rem; }
         .mapa-frota-wrap .fornc-filters-inline .fg--rt {
             flex-direction: row;
@@ -170,6 +176,16 @@ if ($eid_mapa > 0) {
         .mapa-frota-resumo-frota .badge-sts--oci { background: rgba(234, 179, 8, 0.25); color: #a16207; }
         .mapa-frota-resumo-frota .badge-mock { color: #b45309; font-weight: 600; font-size: 0.7rem; }
         .mapa-frota-resumo-frota .lista-empty { margin: 0.5rem 0 0 0; color: var(--text-muted); font-size: 0.85rem; }
+        /* Tabela ↔ mapa: clique, destaque de problema e botão seguir */
+        .mapa-frota-resumo-frota tbody tr { transition: background 0.12s ease; }
+        .mapa-frota-resumo-frota tbody tr:hover { background: var(--bg-tertiary, rgba(127,127,127,0.10)); }
+        .mapa-frota-resumo-frota tbody tr.is-stale { background: rgba(239, 68, 68, 0.08); }
+        .mapa-frota-resumo-frota tbody tr.is-stale:hover { background: rgba(239, 68, 68, 0.16); }
+        .mapa-frota-resumo-frota tbody tr.is-following { box-shadow: inset 3px 0 0 #2563eb; }
+        .mapa-frota-resumo-frota .badge-stale { color: #fff; background: #dc2626; font-weight: 700; font-size: 0.62rem; padding: 1px 6px; border-radius: 999px; margin-left: 4px; }
+        .mapa-frota-resumo-frota .mapa-follow-btn { border: 1px solid var(--border-color); background: var(--card-bg, var(--bg-secondary)); color: var(--text-muted); border-radius: 6px; padding: 2px 7px; cursor: pointer; font-size: 0.75rem; }
+        .mapa-frota-resumo-frota .mapa-follow-btn:hover { color: var(--text-primary); }
+        .mapa-frota-resumo-frota .mapa-follow-btn.is-on { background: #2563eb; border-color: #2563eb; color: #fff; }
         .page-mapa-frota .top-header { z-index: 2000; }
         .page-mapa-frota .notification-dropdown,
         .page-mapa-frota .profile-dropdown,
@@ -196,6 +212,18 @@ if ($eid_mapa > 0) {
         .sf-mapa-frota-balao__sep { opacity: 0.55; user-select: none; }
         .sf-mapa-frota-balao__dt { color: var(--text-secondary, #64748b); }
         .sf-mapa-frota-balao__sub { margin-top: 0.2rem; font-size: 0.75rem; color: var(--text-muted, #64748b); line-height: 1.3; }
+        .sf-mapa-frota-balao__end { margin-top: 0.25rem; font-size: 0.78rem; color: var(--text-secondary, #475569); line-height: 1.3; }
+        .sf-mapa-frota-balao__end i { color: var(--accent-primary, #3b82f6); margin-right: 3px; }
+        .sf-mapa-frota-balao__nav { margin-top: 0.3rem; font-size: 0.78rem; }
+        .sf-mapa-frota-balao__nav a { color: var(--accent-primary, #3b82f6); text-decoration: none; font-weight: 600; }
+        .sf-mapa-frota-balao__nav a:hover { text-decoration: underline; }
+        .mapa-frota-legend i.dot { width: 12px; height: 12px; border-radius: 50%; }
+        .mapa-frota-updated { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.15rem; }
+        .mapa-frota-map-wrap.is-fullscreen { background: var(--bg-primary, #fff); padding: 0; }
+        .mapa-frota-map-wrap.is-fullscreen .mapa-frota-canvas { height: 100vh !important; }
+        /* Cluster com algum veículo sem sinal: bolha vermelha de alerta */
+        .marker-cluster.sf-cluster-alerta { background: rgba(220, 38, 38, 0.30); }
+        .marker-cluster.sf-cluster-alerta div { background: rgba(220, 38, 38, 0.85); color: #fff; }
         /* Leaflet: largura para caber Vel · Bat · data na horizontal; quebra só se a tela for estreita */
         .leaflet-tooltip.sf-mapa-frota-tip {
             white-space: normal;
@@ -213,6 +241,30 @@ if ($eid_mapa > 0) {
         }
         #mapaOpcoesPanel.is-open { display: block; }
         #mapaOpcoesPanel label { display: flex; align-items: center; gap: 0.5rem; margin: 0.35rem 0; cursor: pointer; }
+        .mapa-frota-ajuda.is-hidden { display: none; }
+        body.page-mapa-frota .dashboard-header { display: none; }
+        body.page-mapa-frota .dashboard-content.routes-modern-page { padding-top: 8px; }
+        .mapa-frota-score-wrap {
+            margin: 0 0 1rem 0;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--card-bg, var(--bg-secondary));
+        }
+        .mapa-frota-score-wrap summary {
+            cursor: pointer;
+            padding: 0.65rem 0.85rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            list-style: none;
+        }
+        .mapa-frota-score-wrap summary::-webkit-details-marker { display: none; }
+        .mapa-frota-score-wrap .mapa-frota-score-inner { padding: 0 0.85rem 0.85rem; }
+        .mapa-frota-tipos-alertas {
+            margin: 0.35rem 0 0.75rem 0;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
         .mapa-frota-kpis {
             margin: 0 0 1.25rem 0;
             padding: 1rem 1.1rem;
@@ -288,57 +340,48 @@ if ($eid_mapa > 0) {
     <?php include dirname(__DIR__) . '/includes/sidebar_pages.php'; ?>
     <div class="main-content">
         <?php include dirname(__DIR__) . '/includes/header.php'; ?>
-        <div class="dashboard-content routes-modern-page mapa-frota-wrap">
-            <div class="dashboard-header">
-                <h1>Mapa da frota</h1>
-            </div>
+        <div class="dashboard-content routes-modern-page mapa-frota-wrap fornc-page">
 
-            <section class="mapa-frota-kpis" aria-label="Indicadores e inteligência GPS">
-                <h2><i class="fas fa-chart-line" style="opacity:.85;"></i> Indicadores (24 h) · inteligência no servidor</h2>
-                <p class="form-text" style="margin:0 0 0.75rem 0;font-size:0.8rem;opacity:0.9;">
-                    Alertas avançados (excesso de velocidade, perda de sinal, bateria crítica, salto suspeito, ignição parado) exigem
-                    <code style="font-size:0.85em;">SF_GPS_ALERTAS_OPERACIONAIS=1</code> no ambiente PHP. Regras e limites via variáveis
-                    <code style="font-size:0.85em;">SF_GPS_ALERTA_*</code> (ver <code style="font-size:0.85em;">includes/gps_operational_alerts.php</code>).
-                </p>
-                <div class="mapa-frota-kpis__grid">
-                    <div class="mapa-frota-kpi-card">
-                        <div class="v"><?php echo (int) ($mapa_kpis['veiculos_sinal_recente'] ?? 0); ?></div>
-                        <div class="l">Veículos com sinal ≤15 min</div>
-                    </div>
-                    <div class="mapa-frota-kpi-card mapa-frota-kpi-card--warn">
-                        <div class="v"><?php echo (int) ($mapa_kpis['veiculos_sem_sinal_30m'] ?? 0); ?></div>
-                        <div class="l">Sem atualizar há &gt;30 min</div>
-                    </div>
-                    <div class="mapa-frota-kpi-card">
-                        <div class="v"><?php echo number_format((int) ($mapa_kpis['pontos_gps_24h'] ?? 0), 0, ',', '.'); ?></div>
-                        <div class="l">Pontos GPS gravados (24 h)</div>
-                    </div>
-                    <div class="mapa-frota-kpi-card mapa-frota-kpi-card--warn">
-                        <div class="v"><?php echo (int) ($mapa_kpis['alertas_24h'] ?? 0); ?></div>
-                        <div class="l">Alertas operacionais (24 h)</div>
-                    </div>
+            <div class="fornc-kpi-strip" aria-label="Indicadores GPS (24 h)">
+                <div class="fornc-kpi-cell">
+                    <div class="fornc-kpi-head"><i class="fas fa-satellite-dish fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Sinal ≤15 min</span></div>
+                    <span class="val" id="kpiSinalRecente"><?php echo (int) ($mapa_kpis['veiculos_sinal_recente'] ?? 0); ?></span>
                 </div>
-                <?php
-                $porTipo = $mapa_kpis['alertas_por_tipo'] ?? [];
-                if (is_array($porTipo) && count($porTipo) > 0) :
-                    ksort($porTipo);
-                    ?>
-                <p style="margin:0.65rem 0 0 0;font-size:0.8rem;color:var(--text-secondary);">
-                    <?php foreach ($porTipo as $tipo => $q) : ?>
-                        <span style="margin-right:10px;"><strong><?php echo htmlspecialchars((string) $tipo); ?></strong>: <?php echo (int) $q; ?></span>
-                    <?php endforeach; ?>
-                </p>
-                <?php endif; ?>
+                <div class="fornc-kpi-cell">
+                    <div class="fornc-kpi-head"><i class="fas fa-triangle-exclamation fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Sem sinal &gt;30 min</span></div>
+                    <span class="val" id="kpiSemSinal"><?php echo (int) ($mapa_kpis['veiculos_sem_sinal_30m'] ?? 0); ?></span>
+                </div>
+                <div class="fornc-kpi-cell">
+                    <div class="fornc-kpi-head"><i class="fas fa-location-dot fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Pontos GPS 24 h</span></div>
+                    <span class="val"><?php echo number_format((int) ($mapa_kpis['pontos_gps_24h'] ?? 0), 0, ',', '.'); ?></span>
+                </div>
+                <div class="fornc-kpi-cell">
+                    <div class="fornc-kpi-head"><i class="fas fa-bell fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Alertas 24 h</span></div>
+                    <span class="val"><?php echo (int) ($mapa_kpis['alertas_24h'] ?? 0); ?></span>
+                </div>
+            </div>
+            <?php
+            $porTipo = $mapa_kpis['alertas_por_tipo'] ?? [];
+            if (is_array($porTipo) && count($porTipo) > 0) :
+                ksort($porTipo);
+                ?>
+            <p class="mapa-frota-tipos-alertas">
+                <?php foreach ($porTipo as $tipo => $q) : ?>
+                    <span style="margin-right:10px;"><strong><?php echo htmlspecialchars((string) $tipo); ?></strong>: <?php echo (int) $q; ?></span>
+                <?php endforeach; ?>
+            </p>
+            <?php endif; ?>
 
-                <div class="mapa-frota-score">
-                    <h3>Score do motorista (7 dias, heurística por alertas)</h3>
+            <details class="mapa-frota-score-wrap">
+                <summary><i class="fas fa-chart-line" style="opacity:.85;margin-right:6px;"></i> Score motoristas (7 dias) — <?php echo count($mapa_scores) > 0 ? count($mapa_scores) . ' com alertas' : 'sem alertas recentes'; ?></summary>
+                <div class="mapa-frota-score-inner">
                     <p class="form-text" style="margin:0 0 0.5rem 0;font-size:0.78rem;opacity:0.88;">
-                        Quanto <strong>menor</strong> o score, mais eventos de risco nos últimos dias. Apenas motoristas com pelo menos um alerta aparecem na lista.
+                        Quanto menor o score, mais eventos de risco nos últimos dias. Inclui veículos sem nunca ter enviado GPS no KPI “sem sinal”.
                     </p>
                     <?php if (count($mapa_scores) === 0) : ?>
-                        <p class="lista-empty" style="margin:0;">Nenhum alerta operacional nos últimos 7 dias (ou tabela ainda vazia).</p>
+                        <p class="lista-empty" style="margin:0;">Nenhum alerta operacional nos últimos 7 dias — frota OK neste critério.</p>
                     <?php else : ?>
-                    <table>
+                    <table class="mapa-frota-score">
                         <thead>
                             <tr>
                                 <th>Motorista</th>
@@ -361,15 +404,7 @@ if ($eid_mapa > 0) {
                     </table>
                     <?php endif; ?>
                 </div>
-            </section>
-
-            <div class="mapa-frota-ajuda" id="mapaFrotaAjuda">
-                <h2><i class="fas fa-circle-info" style="opacity:.85;"></i> Como usar</h2>
-                <ul>
-                    <li><strong>Onde está agora</strong> (marcador <span style="color:#dc2626;">vermelho</span>): ajuste busca, motorista ou veículo e clique em <strong>Pesquisar</strong>. Opcional: <strong>Atualizar tempo real (30 s)</strong> para renovar sozinho.</li>
-                    <li><strong>Por onde passou</strong> (linha <span style="color:#3b82f6;">azul</span>): escolha o <strong>veículo</strong>, defina <strong>Início</strong> e <strong>Fim</strong> (ou use <strong>6 h</strong> / <strong>24 h</strong> / <strong>3 dias</strong>) e clique em <strong>Carregar rota</strong>. A trilha usa os pontos gravados no período. <strong>Limpar rota</strong> remove só o histórico do mapa.</li>
-                </ul>
-            </div>
+            </details>
 
             <div class="fornc-toolbar">
                 <div class="fornc-search-block">
@@ -387,8 +422,14 @@ if ($eid_mapa > 0) {
                         </select>
                     </div>
                     <div class="fg">
-                        <label for="histVeiculo">Veículo</label>
-                        <select id="histVeiculo" title="Mapa em tempo real: só este veículo. Para trilha azul, use o período abaixo e Carregar rota.">
+                        <label for="rtVeiculo">Veículo (tempo real)</label>
+                        <select id="rtVeiculo" title="Filtra apenas o mapa e a tabela em tempo real">
+                            <option value="">Todos os veículos</option>
+                        </select>
+                    </div>
+                    <div class="fg">
+                        <label for="histVeiculo">Veículo (rota)</label>
+                        <select id="histVeiculo" title="Veículo da trilha azul — use com Carregar rota">
                             <option value="">Carregando…</option>
                         </select>
                     </div>
@@ -413,9 +454,11 @@ if ($eid_mapa > 0) {
                     <button type="button" class="fornc-btn fornc-btn--muted" id="histBtnLimpar">Limpar rota</button>
                     <button type="button" class="fornc-btn fornc-btn--accent" id="applyRouteFilters"><i class="fas fa-search"></i> Pesquisar</button>
                     <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn"><i class="fas fa-sliders-h"></i> Opções</button>
+                    <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
                     <button type="button" class="fornc-btn fornc-btn--ghost" id="btnMapaToggle" title="Alternar entre OpenStreetMap e Google Maps">
                         <i class="fas fa-map"></i> <span id="btnMapaToggleLabel">Google Maps</span>
                     </button>
+                    <button type="button" class="fornc-btn fornc-btn--ghost" id="btnMapaFullscreen" title="Tela cheia do mapa"><i class="fas fa-expand"></i></button>
                     <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn"><i class="fas fa-file-export"></i> Exportar</button>
                 </div>
             </div>
@@ -431,22 +474,26 @@ if ($eid_mapa > 0) {
                 <div id="mapaFrotaGoogle" class="mapa-frota-canvas" style="display:none;"></div>
             </div>
             <div class="mapa-frota-legend" id="mapaFrotaLegend">
-                <span><i style="background:#3b82f6;"></i> Histórico</span>
-                <span><i style="background:#dc2626;"></i> Última posição</span>
+                <span><i class="dot" style="background:#16a34a;"></i> Em movimento</span>
+                <span><i class="dot" style="background:#f59e0b;"></i> Ocioso</span>
+                <span><i class="dot" style="background:#dc2626;"></i> Parado</span>
+                <span><i class="dot" style="background:#9ca3af;"></i> Sem sinal &gt;30 min</span>
+                <span><i style="background:#3b82f6;"></i> Trilha (histórico)</span>
                 <span><i style="background:#16a34a;"></i> Cerca</span>
             </div>
             <p class="mapa-frota-meta" id="mapaFrotaStatus" aria-live="polite">Carregando…</p>
+            <p class="mapa-frota-meta mapa-frota-updated" id="mapaFrotaUpdated" aria-live="polite"></p>
             <div class="mapa-frota-alertas" id="mapaAlertasBox" aria-live="polite">
                 <h3>Alertas</h3>
                 <p class="mapa-frota-alertas__subtit">Cercas eletrônicas</p>
                 <ul id="mapaAlertasListCerca"><li>Carregando…</li></ul>
                 <p class="mapa-frota-alertas__subtit">Operacionais (GPS)</p>
-                <p class="form-text" style="margin:0 0 0.35rem 0;font-size:0.8rem;opacity:0.9;">Inclui bateria, velocidade, mock, perda de sinal, salto suspeito, ignição parado etc. (conforme envio GPS e variáveis <code style="font-size:0.85em;">SF_GPS_ALERTA_*</code>).</p>
+                <p class="form-text" style="margin:0 0 0.35rem 0;font-size:0.8rem;opacity:0.9;">Bateria, velocidade, mock, perda de sinal, salto suspeito, ignição parado etc.</p>
                 <ul id="mapaAlertasListOper"><li>Carregando…</li></ul>
             </div>
             <div class="mapa-frota-resumo-frota" id="mapaResumoFrotaWrap" aria-live="polite">
                 <h3>Situação por veículo (tempo real)</h3>
-                <p class="form-text" style="margin:0 0 0.5rem 0;font-size:0.8rem;opacity:0.9;">Resumo das últimas posições; respeita busca, filtro de motorista e veículo selecionado no histórico (quando houver).</p>
+                <p class="form-text" style="margin:0 0 0.5rem 0;font-size:0.8rem;opacity:0.9;">Resumo das últimas posições; respeita busca, motorista e filtro <strong>Veículo (tempo real)</strong>.</p>
                 <div class="mapa-frota-table-wrap" id="mapaListaVeiculosTableWrap">
                     <table class="mapa-frota-table" id="mapaListaVeiculosTable">
                         <thead>
@@ -471,11 +518,14 @@ if ($eid_mapa > 0) {
     </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="../google-maps/maps.js"></script>
-<script src="../js/mapa-frota.js?v=12"></script>
+<script src="../js/mapa-frota.js?v=17"></script>
 <script src="../js/theme.js"></script>
 <script src="../js/sidebar.js"></script>
 
 <?php include '../includes/scroll_to_top.php'; ?>
+<?php $sf_help_key = 'mapa_frota'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+<?php sf_page_help_js('..'); ?>
 </body>
 </html>

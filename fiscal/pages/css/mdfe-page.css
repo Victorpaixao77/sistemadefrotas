@@ -158,6 +158,27 @@ body.mdfe-modern .route-modal-tab-pane.is-active { display: block; }
     background: var(--bg-secondary);
 }
 .mdfe-inline-form.is-hidden { display: none; }
+.mdfe-doc-painel {
+    border: 2px solid var(--accent-primary, #2563eb);
+    border-radius: 10px;
+    padding: 14px;
+    margin: 12px 0 16px;
+    background: var(--bg-secondary, #f8fafc);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.1);
+    position: relative;
+    z-index: 2;
+}
+.mdfe-doc-painel.is-hidden { display: none !important; }
+#novoMDFEWizardModal .mdfe-doc-painel .cte-selector {
+    max-height: 280px;
+}
+/* Modais auxiliares abertos a partir do wizard ficam acima do assistente */
+body.mdfe-wizard-modal-open .modal.mdfe-modal-stack-top {
+    z-index: 1065 !important;
+}
+body.mdfe-wizard-modal-open .modal-backdrop.mdfe-modal-stack-top-backdrop {
+    z-index: 1060 !important;
+}
 .mdfe-simple-table {
     width: 100%;
     border-collapse: collapse;

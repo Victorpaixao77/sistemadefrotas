@@ -1,6 +1,7 @@
 <?php
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/sf_api_base.php';
 
@@ -10,6 +11,32 @@ require_authentication();
 
 $conn = getConnection();
 $page_title = "Multas";
+
+$empresa_id = (int) $_SESSION['empresa_id'];
+$mulFilterVeiculos = [];
+$mulFilterMotoristas = [];
+try {
+    $stV = $conn->prepare("
+        SELECT DISTINCT v.placa, v.modelo
+        FROM multas m
+        INNER JOIN veiculos v ON v.id = m.veiculo_id
+        WHERE m.empresa_id = ?
+        ORDER BY v.placa
+    ");
+    $stV->execute([$empresa_id]);
+    $mulFilterVeiculos = $stV->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $stM = $conn->prepare("
+        SELECT DISTINCT mo.nome
+        FROM multas m
+        INNER JOIN motoristas mo ON mo.id = m.motorista_id
+        WHERE m.empresa_id = ?
+        ORDER BY mo.nome
+    ");
+    $stM->execute([$empresa_id]);
+    $mulFilterMotoristas = $stM->fetchAll(PDO::FETCH_ASSOC) ?: [];
+} catch (PDOException $e) {
+    error_log('multas filter options: ' . $e->getMessage());
+}
 
 // Layout moderno (fornc-page); ?classic=1 para o layout anterior
 $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
@@ -223,6 +250,7 @@ $kpis = getMultasKPIs($conn);
             border-radius: 12px;
         }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'multas-modern' : ''; ?>">
     <div class="app-container">
@@ -235,10 +263,10 @@ $kpis = getMultasKPIs($conn);
                     Multas e consulta DETRAN. Use <code>?classic=1</code> para o layout anterior.
                 </p>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Multas (mês)</span><span class="val"><?php echo (int) $kpis['total_multas']; ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Valor total</span><span class="val">R$ <?php echo number_format($kpis['valor_total'], 2, ',', '.'); ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Pendentes</span><span class="val"><?php echo (int) $kpis['total_pendentes']; ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Pontos (mês)</span><span class="val"><?php echo (int) $kpis['pontos_total']; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-file-invoice fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Multas (mês)</span></div><span class="val"><?php echo (int) $kpis['total_multas']; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-coins fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Valor total</span></div><span class="val">R$ <?php echo number_format($kpis['valor_total'], 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-clock fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Pendentes</span></div><span class="val"><?php echo (int) $kpis['total_pendentes']; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-ban fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Pontos (mês)</span></div><span class="val"><?php echo (int) $kpis['pontos_total']; ?></span></div>
                 </div>
                 <p class="fornc-kpi-summary">Indicadores do mês corrente.</p>
                 <?php else: ?>
@@ -266,6 +294,7 @@ $kpis = getMultasKPIs($conn);
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-file-circle-exclamation kpi-card-icon" aria-hidden="true"></i>
                             <h3>Multas</h3>
                         </div>
                         <div class="card-body">
@@ -278,6 +307,7 @@ $kpis = getMultasKPIs($conn);
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-sack-dollar kpi-card-icon" aria-hidden="true"></i>
                             <h3>Valor Total</h3>
                         </div>
                         <div class="card-body">
@@ -290,6 +320,7 @@ $kpis = getMultasKPIs($conn);
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-hourglass-half kpi-card-icon" aria-hidden="true"></i>
                             <h3>Pendentes</h3>
                         </div>
                         <div class="card-body">
@@ -302,6 +333,7 @@ $kpis = getMultasKPIs($conn);
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-star kpi-card-icon" aria-hidden="true"></i>
                             <h3>Pontos</h3>
                         </div>
                         <div class="card-body">
@@ -317,7 +349,8 @@ $kpis = getMultasKPIs($conn);
                 <!-- Consulta DETRAN (WSDenatran) -->
                 <div class="dashboard-card denatran-consulta-card">
                     <div class="card-header">
-                        <h3><i class="fas fa-search"></i> Consulta de Multas no DETRAN</h3>
+                        <i class="fas fa-magnifying-glass kpi-card-icon" aria-hidden="true"></i>
+                        <h3>Consulta de Multas no DETRAN</h3>
                     </div>
                     <div class="card-body">
                         <p class="denatran-desc">Consulte infrações diretamente na base do Denatran (WSDenatran). É necessário certificado cadastrado e CPF do usuário autorizado.</p>
@@ -414,12 +447,18 @@ $kpis = getMultasKPIs($conn);
                             <label for="vehicleFilter">Veículo</label>
                             <select id="vehicleFilter">
                             <option value="">Todos os veículos</option>
+                            <?php foreach ($mulFilterVeiculos as $fv): ?>
+                            <option value="<?php echo htmlspecialchars(strtolower($fv['placa'])); ?>"><?php echo htmlspecialchars($fv['placa'] . ' - ' . ($fv['modelo'] ?? '')); ?></option>
+                            <?php endforeach; ?>
                         </select>
                         </div>
                         <div class="fg">
                             <label for="driverFilter">Motorista</label>
                             <select id="driverFilter">
                             <option value="">Todos os motoristas</option>
+                            <?php foreach ($mulFilterMotoristas as $fm): ?>
+                            <option value="<?php echo htmlspecialchars(strtolower($fm['nome'])); ?>"><?php echo htmlspecialchars($fm['nome']); ?></option>
+                            <?php endforeach; ?>
                         </select>
                         </div>
                         <div class="fg">
@@ -476,9 +515,15 @@ $kpis = getMultasKPIs($conn);
                         </form>
                         <select id="vehicleFilter">
                             <option value="">Todos os veículos</option>
+                            <?php foreach ($mulFilterVeiculos as $fv): ?>
+                            <option value="<?php echo htmlspecialchars(strtolower($fv['placa'])); ?>"><?php echo htmlspecialchars($fv['placa'] . ' - ' . ($fv['modelo'] ?? '')); ?></option>
+                            <?php endforeach; ?>
                         </select>
                         <select id="driverFilter">
                             <option value="">Todos os motoristas</option>
+                            <?php foreach ($mulFilterMotoristas as $fm): ?>
+                            <option value="<?php echo htmlspecialchars(strtolower($fm['nome'])); ?>"><?php echo htmlspecialchars($fm['nome']); ?></option>
+                            <?php endforeach; ?>
                         </select>
                         <select id="statusFilter">
                             <option value="">Todos os status</option>
@@ -495,9 +540,19 @@ $kpis = getMultasKPIs($conn);
                     </div>
                 </div>
                 <?php endif; ?>
+                <?php
+                $mul_modern_empty = !empty($is_modern) && empty($multas);
+                ?>
+                <?php if (!empty($is_modern)): ?>
+                <div class="fornc-empty-state<?php echo $mul_modern_empty ? ' visible' : ''; ?>" id="mulEmptyState" role="status" aria-live="polite">
+                    <p class="fornc-empty-state-title">Nenhuma multa encontrada</p>
+                    <p class="fornc-empty-state-hint">Ajuste os filtros ou registre uma nova multa.</p>
+                    <button type="button" class="fornc-btn fornc-btn--primary" onclick="document.getElementById('addMultaBtn').click()"><i class="fas fa-plus"></i> Registrar primeira multa</button>
+                </div>
+                <?php endif; ?>
 
                 <!-- Multas Table -->
-                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>" id="mulTableWrap"<?php echo $mul_modern_empty ? ' style="display:none"' : ''; ?>>
                     <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="multasTable">
                         <thead>
                             <tr>
@@ -557,7 +612,7 @@ $kpis = getMultasKPIs($conn);
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
-                            <?php else: ?>
+                            <?php elseif (empty($is_modern)): ?>
                                 <tr>
                                     <td colspan="10" class="text-center">Nenhuma multa encontrada</td>
                                 </tr>
@@ -699,23 +754,7 @@ $kpis = getMultasKPIs($conn);
                             <div class="form-group">
                                 <label for="rota_id">Rota (Opcional)</label>
                                 <select id="rota_id" name="rota_id">
-                                    <option value="">Selecione uma rota</option>
-                                    <?php
-                                    $sql = "SELECT r.id, r.data_rota, co.nome as cidade_origem, cd.nome as cidade_destino
-                                            FROM rotas r
-                                            LEFT JOIN cidades co ON r.cidade_origem_id = co.id
-                                            LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-                                            WHERE r.empresa_id = :empresa_id 
-                                            ORDER BY r.data_rota DESC, r.id DESC";
-                                    $stmt = $conn->prepare($sql);
-                                    $stmt->bindParam(':empresa_id', $_SESSION['empresa_id']);
-                                    $stmt->execute();
-                                    while ($rota = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                                        $data = $rota['data_rota'] ? date('d/m/Y', strtotime($rota['data_rota'])) : '';
-                                        $desc = $data . ' - ' . ($rota['cidade_origem'] ?? '-') . ' → ' . ($rota['cidade_destino'] ?? '-');
-                                        echo "<option value='" . $rota['id'] . "'>" . htmlspecialchars($desc) . "</option>";
-                                    }
-                                    ?>
+                                    <option value="">Selecione veículo/motorista para carregar rotas</option>
                                 </select>
                             </div>
                         </div>
@@ -817,66 +856,8 @@ $kpis = getMultasKPIs($conn);
             </div>
         </div>
     </div>
+    <?php $sf_help_key = 'multas'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
 
-    <!-- Modal de Ajuda -->
-    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpMultaModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Ajuda - Gestão de Multas</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="help-section">
-                    <h3>Visão Geral</h3>
-                    <p>A página de Multas permite gerenciar todas as infrações cometidas pelos veículos e motoristas da frota. Aqui você pode cadastrar, editar, visualizar e excluir registros de multas, além de acompanhar métricas importantes.</p>
-                </div>
-
-                <div class="help-section">
-                    <h3>Funcionalidades Principais</h3>
-                    <ul>
-                        <li><strong>Nova Multa:</strong> Cadastre uma nova infração com informações detalhadas sobre veículo, motorista e tipo de infração.</li>
-                        <li><strong>Consulta DETRAN:</strong> Consulte infrações diretamente na base do Denatran (WSDenatran) por CPF, placa ou CNPJ. Requer certificado cadastrado e configuração em <code>includes/denatran_config.php</code>.</li>
-                        <li><strong>Filtros:</strong> Use os filtros para encontrar multas específicas por veículo, motorista ou status.</li>
-                        <li><strong>Exportar:</strong> Exporte os dados das multas para análise externa.</li>
-                        <li><strong>Relatórios:</strong> Visualize relatórios e estatísticas de multas.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Indicadores (KPIs)</h3>
-                    <ul>
-                        <li><strong>Total de Multas:</strong> Número total de multas no mês atual.</li>
-                        <li><strong>Valor Total:</strong> Soma dos valores de todas as multas do mês.</li>
-                        <li><strong>Pendentes:</strong> Quantidade de multas ainda não pagas.</li>
-                        <li><strong>Pontos:</strong> Total de pontos na CNH acumulados no mês.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Ações Disponíveis</h3>
-                    <ul>
-                        <li><strong>Visualizar:</strong> Veja detalhes completos da multa, incluindo valor e status.</li>
-                        <li><strong>Editar:</strong> Modifique informações de uma multa existente.</li>
-                        <li><strong>Excluir:</strong> Remova um registro de multa do sistema (ação irreversível).</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Dicas Úteis</h3>
-                    <ul>
-                        <li>Mantenha um registro detalhado das infrações para histórico.</li>
-                        <li>Acompanhe os pontos na CNH dos motoristas para evitar suspensões.</li>
-                        <li>Monitore o valor total das multas para controle de custos.</li>
-                        <li>Utilize os relatórios para identificar padrões de infrações.</li>
-                        <li>Configure alertas para multas próximas do vencimento.</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeModal('helpMultaModal')">Fechar</button>
-            </div>
-        </div>
-    </div>
 
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
@@ -884,5 +865,6 @@ $kpis = getMultasKPIs($conn);
     <script src="../js/multas.js"></script>
 
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

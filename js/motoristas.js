@@ -1,8 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const motoristModal = document.getElementById('motoristModal');
-    const helpModal = document.getElementById('helpMotoristModal');
     const closeMotoristBtn = document.getElementById('closeMotoristBtn');
-    const helpBtn = document.getElementById('helpBtn');
 
     const listTable = document.getElementById('motoristsTable');
     const managementTable = document.getElementById('motoristTable');
@@ -18,35 +16,28 @@ document.addEventListener('DOMContentLoaded', () => {
         : [];
     const emptyRow = listTable ? listTable.querySelector('tbody .no-data-row') : null;
 
+    function hideModalEl(modal) {
+        if (!modal) return;
+        modal.classList.remove('active');
+        modal.style.removeProperty('display');
+    }
+
     if (closeMotoristBtn) {
         closeMotoristBtn.addEventListener('click', () => {
-            if (motoristModal) {
-                motoristModal.style.display = 'none';
-            }
+            hideModalEl(motoristModal);
         });
     }
 
-    if (helpBtn) {
-        helpBtn.addEventListener('click', () => {
-            if (helpModal) {
-                helpModal.style.display = 'block';
-            }
-        });
-    }
-
-    document.querySelectorAll('.close-modal').forEach(button => {
+    document.querySelectorAll('.modal:not(#helpModal) .close-modal').forEach(button => {
         button.addEventListener('click', () => {
-            const modal = button.closest('.modal');
-            if (modal) {
-                modal.style.display = 'none';
-            }
+            hideModalEl(button.closest('.modal'));
         });
     });
 
-    document.querySelectorAll('.modal').forEach(modal => {
+    document.querySelectorAll('.modal:not(#helpModal)').forEach(modal => {
         modal.addEventListener('click', event => {
             if (event.target === modal) {
-                modal.style.display = 'none';
+                hideModalEl(modal);
             }
         });
     });

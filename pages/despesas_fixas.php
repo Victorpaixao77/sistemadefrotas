@@ -1,6 +1,7 @@
 <?php
 // Include configuration and functions first
 require_once '../includes/config.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/sf_api_base.php';
@@ -99,13 +100,10 @@ function getDespesasFixas($page = 1, $per_page = 10) {
     }
 }
 
-// Pegar a página atual da URL ou definir como 1
-$pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-
-// Buscar despesas com paginação
-$resultado = getDespesasFixas($pagina_atual, $per_page);
-$despesas = $resultado['despesas'];
-$total_paginas = $resultado['total_paginas'];
+// Paginação e listagem são carregadas via API (js/despesas_fixas.js)
+$pagina_atual = 1;
+$total_paginas = 1;
+$despesas = [];
 ?>
 
 <!DOCTYPE html>
@@ -138,7 +136,7 @@ $total_paginas = $resultado['total_paginas'];
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <?php sf_render_api_scripts(); ?>
-    <script src="../js/despesas_fixas.js"></script>
+    <script src="../js/despesas_fixas.js?v=1.2"></script>
     
     <style>
         /* Modal financeiro: deixa os campos em 2 colunas (desktop) e 1 coluna (mobile) */
@@ -160,6 +158,7 @@ $total_paginas = $resultado['total_paginas'];
         #despesasTable thead th.sortable .sort-ind { font-size: 0.75rem; opacity: 0.85; margin-left: 0.15rem; }
         #despesasTable thead th.sortable.sorted { font-weight: 600; }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'despesas-fixas-modern' : ''; ?>">
     <div class="app-container">
@@ -178,10 +177,10 @@ $total_paginas = $resultado['total_paginas'];
                     Despesas fixas por veículo e tipo. Use <code>?classic=1</code> para o layout anterior.
                 </p>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Qtd. despesas</span><span class="val" id="dfKpiQtd">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Valor total</span><span class="val" id="dfKpiValor">R$ 0,00</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Pendentes</span><span class="val" id="dfKpiPendentes">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Vencidas</span><span class="val" id="dfKpiVencidas">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-list fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Qtd. despesas</span></div><span class="val" id="dfKpiQtd">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-coins fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Valor total</span></div><span class="val" id="dfKpiValor">R$ 0,00</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-clock fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Pendentes</span></div><span class="val" id="dfKpiPendentes">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-calendar-xmark fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Vencidas</span></div><span class="val" id="dfKpiVencidas">0</span></div>
                 </div>
                 <p class="fornc-kpi-summary" id="dfKpiSummary">Indicadores do período filtrado (via API).</p>
 
@@ -278,6 +277,7 @@ $total_paginas = $resultado['total_paginas'];
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-list-check kpi-card-icon" aria-hidden="true"></i>
                             <h3>Total de Despesas</h3>
                         </div>
                         <div class="card-body">
@@ -290,6 +290,7 @@ $total_paginas = $resultado['total_paginas'];
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-sack-dollar kpi-card-icon" aria-hidden="true"></i>
                             <h3>Valor Total</h3>
                         </div>
                         <div class="card-body">
@@ -302,6 +303,7 @@ $total_paginas = $resultado['total_paginas'];
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-hourglass-half kpi-card-icon" aria-hidden="true"></i>
                             <h3>Pendentes</h3>
                         </div>
                         <div class="card-body">
@@ -314,6 +316,7 @@ $total_paginas = $resultado['total_paginas'];
                     
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-calendar-xmark kpi-card-icon" aria-hidden="true"></i>
                             <h3>Vencidas</h3>
                         </div>
                         <div class="card-body">
@@ -382,9 +385,16 @@ $total_paginas = $resultado['total_paginas'];
                     </div>
                 </div>
                 <?php endif; ?>
+                <?php if (!empty($is_modern)): ?>
+                <div class="fornc-empty-state" id="dfEmptyState" role="status" aria-live="polite">
+                    <p class="fornc-empty-state-title" id="dfEmptyTitle">Nenhuma despesa fixa cadastrada</p>
+                    <p class="fornc-empty-state-hint" id="dfEmptyHint">Cadastre a primeira despesa recorrente da frota.</p>
+                    <button type="button" class="fornc-btn fornc-btn--primary" id="dfEmptyCreateBtn"><i class="fas fa-plus"></i> Cadastrar primeira despesa</button>
+                </div>
+                <?php endif; ?>
                 
                 <!-- Despesas Table -->
-                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>">
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>" id="dfTableWrap">
                     <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="despesasTable">
                         <thead>
                             <tr>
@@ -413,73 +423,21 @@ $total_paginas = $resultado['total_paginas'];
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if (!empty($despesas)): ?>
-                                <?php foreach ($despesas as $despesa): ?>
-                                <tr>
-                                    <td><?php echo date('d/m/Y', strtotime($despesa['vencimento'])); ?></td>
-                                    <td><?php echo htmlspecialchars($despesa['veiculo_placa']); ?></td>
-                                    <td><?php echo htmlspecialchars($despesa['tipo_nome']); ?></td>
-                                    <td><?php echo htmlspecialchars($despesa['descricao']); ?></td>
-                                    <td>R$ <?php echo number_format($despesa['valor'], 2, ',', '.'); ?></td>
-                                    <td><?php echo htmlspecialchars($despesa['status_nome']); ?></td>
-                                    <td><?php echo $despesa['data_pagamento'] ? date('d/m/Y', strtotime($despesa['data_pagamento'])) : '-'; ?></td>
-                                    <td><?php echo htmlspecialchars($despesa['forma_pagamento_nome']); ?></td>
-                                    <td><?php echo $despesa['repetir_automaticamente'] ? 'Sim' : 'Não'; ?></td>
-                                    <td class="actions">
-                                        <button class="btn-icon edit-btn" data-id="<?php echo $despesa['id']; ?>" title="Editar">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <?php if (!empty($despesa['comprovante'])): ?>
-                                            <button class="btn-icon view-comprovante-btn" data-comprovante="<?php echo htmlspecialchars($despesa['comprovante']); ?>" title="Ver Comprovante">
-                                                <i class="fas fa-file-alt"></i>
-                                            </button>
-                                        <?php endif; ?>
-                                        <button class="btn-icon delete-btn" data-id="<?php echo $despesa['id']; ?>" title="Excluir">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <tr>
-                                    <td colspan="10" class="text-center">Nenhuma despesa fixa encontrada</td>
-                                </tr>
-                            <?php endif; ?>
+                            <tr class="df-loading-row">
+                                <td colspan="10" class="text-center"><i class="fas fa-spinner fa-spin"></i> Carregando despesas…</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
                 
                 <!-- Paginação -->
-                <?php
-                $total_reg_df = (int)($resultado['total'] ?? 0);
-                $df_q = ['per_page' => (int) $per_page];
-                if (!$is_modern) {
-                    $df_q['classic'] = '1';
-                }
-                $df_allowed_keys = ['vencimento', 'veiculo_placa', 'tipo_nome', 'descricao', 'valor', 'status_nome', 'data_pagamento', 'forma_pagamento_nome', 'repetir'];
-                $df_sort_get = isset($_GET['sort']) ? trim((string) $_GET['sort']) : '';
-                if ($df_sort_get === '' || !in_array($df_sort_get, $df_allowed_keys, true)) {
-                    $df_sort_get = 'vencimento';
-                }
-                $df_dir_get = (isset($_GET['dir']) && strtoupper(trim((string) $_GET['dir'])) === 'ASC') ? 'ASC' : 'DESC';
-                if (!($df_sort_get === 'vencimento' && $df_dir_get === 'DESC')) {
-                    $df_q['sort'] = $df_sort_get;
-                    $df_q['dir'] = $df_dir_get;
-                }
-                $df_prev = array_merge($df_q, ['page' => max(1, $pagina_atual - 1)]);
-                $df_next = array_merge($df_q, ['page' => min($total_paginas, $pagina_atual + 1)]);
-                ?>
                 <?php if ($is_modern): ?><div class="fornc-pagination-bar"><?php endif; ?>
                 <div class="pagination<?php echo $is_modern ? ' fornc-modern-pagination' : ''; ?>">
-                    <a href="?<?php echo htmlspecialchars(http_build_query($df_prev)); ?>"
-                       class="pagination-btn <?php echo $pagina_atual <= 1 ? 'disabled' : ''; ?>">
+                    <a href="#" class="pagination-btn disabled">
                         <i class="fas fa-chevron-left"></i>
                     </a>
-                    <span class="pagination-info">
-                        Página <?php echo $pagina_atual; ?> de <?php echo $total_paginas; ?> (<?php echo $total_reg_df; ?> registros)
-                    </span>
-                    <a href="?<?php echo htmlspecialchars(http_build_query($df_next)); ?>"
-                       class="pagination-btn <?php echo $pagina_atual >= $total_paginas ? 'disabled' : ''; ?>">
+                    <span class="pagination-info">Carregando…</span>
+                    <a href="#" class="pagination-btn disabled">
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
@@ -676,99 +634,10 @@ $total_paginas = $resultado['total_paginas'];
             </div>
         </div>
     </div>
+    <?php $sf_help_key = 'despesas_fixas'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
 
-    <!-- Help Modal -->
-    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Ajuda - Despesas Fixas</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="help-section">
-                    <h3>Visão Geral</h3>
-                    <p>O módulo de Despesas Fixas permite gerenciar todas as despesas recorrentes da sua frota, como IPVA, seguro, licenciamento e outras despesas fixas.</p>
-                </div>
-
-                <div class="help-section">
-                    <h3>Funcionalidades Principais</h3>
-                    <ul>
-                        <li><strong>Nova Despesa Fixa:</strong> Registre novas despesas com informações como:
-                            <ul>
-                                <li>Tipo de despesa</li>
-                                <li>Veículo associado</li>
-                                <li>Valor e vencimento</li>
-                                <li>Status de pagamento</li>
-                                <li>Forma de pagamento</li>
-                                <li>Opção de repetição automática</li>
-                            </ul>
-                        </li>
-                        <li><strong>Filtros:</strong> Filtre os dados por:
-                            <ul>
-                                <li>Mês/Ano</li>
-                                <li>Veículo</li>
-                                <li>Tipo de despesa</li>
-                                <li>Status de pagamento</li>
-                                <li>Forma de pagamento</li>
-                            </ul>
-                        </li>
-                        <li><strong>Análises:</strong> Visualize:
-                            <ul>
-                                <li>Total de despesas no período</li>
-                                <li>Valor total das despesas</li>
-                                <li>Despesas pendentes e vencidas</li>
-                                <li>Gráficos de distribuição e evolução</li>
-                            </ul>
-                        </li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Como Usar</h3>
-                    <ol>
-                        <li><strong>Registrar Despesa:</strong>
-                            <ul>
-                                <li>Clique no botão "Nova Despesa Fixa"</li>
-                                <li>Preencha todos os campos obrigatórios (*)</li>
-                                <li>Configure as opções de repetição e notificação</li>
-                                <li>Clique em "Salvar"</li>
-                            </ul>
-                        </li>
-                        <li><strong>Filtrar Dados:</strong>
-                            <ul>
-                                <li>Use os filtros rápidos na página</li>
-                                <li>Ou clique no botão de filtro para opções avançadas</li>
-                                <li>Selecione o período e outros critérios</li>
-                                <li>Clique em "Aplicar" para ver os dados filtrados</li>
-                            </ul>
-                        </li>
-                        <li><strong>Gerenciar Registros:</strong>
-                            <ul>
-                                <li>Use os botões de editar para modificar uma despesa</li>
-                                <li>Use os botões de excluir para remover uma despesa</li>
-                                <li>Acompanhe os status e vencimentos</li>
-                            </ul>
-                        </li>
-                    </ol>
-                </div>
-
-                <div class="help-section">
-                    <h3>Dicas Úteis</h3>
-                    <ul>
-                        <li>Configure notificações para não perder vencimentos</li>
-                        <li>Use a repetição automática para despesas recorrentes</li>
-                        <li>Mantenha os comprovantes de pagamento organizados</li>
-                        <li>Acompanhe a evolução das despesas nos gráficos</li>
-                        <li>Exporte os dados para análises detalhadas</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeModal('helpModal')">Fechar</button>
-            </div>
-        </div>
-    </div>
 
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

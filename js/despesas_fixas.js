@@ -15,6 +15,43 @@ var dfSortDir = 'DESC';
 
 var DF_ALLOWED_SORT = ['vencimento', 'veiculo_placa', 'tipo_nome', 'descricao', 'valor', 'status_nome', 'data_pagamento', 'forma_pagamento_nome', 'repetir'];
 
+function dfEscapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+}
+
+function exportVisibleTableCsv(tableId, filename) {
+    var table = document.getElementById(tableId);
+    if (!table) return;
+    var lines = [];
+    var headerCells = table.querySelectorAll('thead th');
+    var skipLast = headerCells.length > 0;
+    var headers = [];
+    headerCells.forEach(function (th, idx) {
+        if (skipLast && idx === headerCells.length - 1) return;
+        headers.push('"' + String(th.textContent || '').trim().replace(/"/g, '""') + '"');
+    });
+    if (headers.length) lines.push(headers.join(';'));
+    table.querySelectorAll('tbody tr').forEach(function (row) {
+        if (row.style.display === 'none') return;
+        var cols = [];
+        row.querySelectorAll('td').forEach(function (td, idx) {
+            if (skipLast && idx === row.querySelectorAll('td').length - 1) return;
+            cols.push('"' + String(td.textContent || '').trim().replace(/"/g, '""') + '"');
+        });
+        if (cols.length) lines.push(cols.join(';'));
+    });
+    var blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename || 'export.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+}
+
 function dfDefaultSortDir(field) {
     const textLike = ['veiculo_placa', 'tipo_nome', 'descricao', 'status_nome', 'forma_pagamento_nome'];
     if (textLike.indexOf(field) >= 0) return 'ASC';
@@ -312,11 +349,16 @@ async function loadDespesasData(page = null) {
         }
         
         // Get filter values
-        const search = document.getElementById('searchDespesa').value;
-        const vehicleFilter = document.getElementById('vehicleFilter').value;
-        const tipoFilter = document.getElementById('tipoFilter').value;
-        const statusFilter = document.getElementById('statusFilter').value;
-        const paymentFilter = document.getElementById('paymentFilter').value;
+        const searchEl = document.getElementById('searchDespesa');
+        const search = searchEl ? searchEl.value : '';
+        const vehicleFilterEl = document.getElementById('vehicleFilter');
+        const vehicleFilter = vehicleFilterEl ? vehicleFilterEl.value : '';
+        const tipoFilterEl = document.getElementById('tipoFilter');
+        const tipoFilter = tipoFilterEl ? tipoFilterEl.value : '';
+        const statusFilterEl = document.getElementById('statusFilter');
+        const statusFilter = statusFilterEl ? statusFilterEl.value : '';
+        const paymentFilterEl = document.getElementById('paymentFilter');
+        const paymentFilter = paymentFilterEl ? paymentFilterEl.value : '';
         
         // Build URL with filters (per_page igual ao select da página)
         const perPageSelect = document.querySelector('select.filter-per-page');
@@ -351,13 +393,23 @@ async function loadDespesasData(page = null) {
             window.history.replaceState({}, '', window.location.pathname + desiredSearch);
         }
 
+        if (isModern) {
+            syncDfEmptyState({ mode: 'hidden' });
+            const tbody = document.querySelector('#despesasTable tbody');
+            if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="text-center">Carregando…</td></tr>';
+        }
+
         const response = await fetch(url);
         if (!response.ok) throw new Error('Erro ao carregar dados');
         
         const data = await response.json();
         
         // Update table and pagination (padrão: "Página X de Y (N registros)")
-        updateDespesasTable(data.despesas);
+        updateDespesasTable(data.despesas, {
+            totalCadastrados: data.total_cadastrados != null
+                ? data.total_cadastrados
+                : (data.metrics && data.metrics.total_despesas) || 0
+        });
         updatePagination(data.pagina_atual, data.total_paginas, data.total_registros || 0);
         syncDfSortIndicators();
         updateKPICards(data.metrics);
@@ -369,32 +421,87 @@ async function loadDespesasData(page = null) {
 }
 
 // Update UI functions
-function updateDespesasTable(despesas) {
+function syncDfEmptyState(opts) {
+    opts = opts || {};
+    var el = document.getElementById('dfEmptyState');
+    var wrap = document.getElementById('dfTableWrap');
+    if (!el || !wrap) return;
+
+    var mode = opts.mode || 'hidden';
+    var title = document.getElementById('dfEmptyTitle');
+    var hint = document.getElementById('dfEmptyHint');
+    var btn = document.getElementById('dfEmptyCreateBtn');
+
+    if (mode === 'hidden') {
+        el.classList.remove('visible');
+        wrap.style.display = '';
+        return;
+    }
+
+    el.classList.add('visible');
+    wrap.style.display = 'none';
+
+    if (mode === 'empty_db') {
+        if (title) title.textContent = 'Nenhuma despesa fixa cadastrada';
+        if (hint) hint.textContent = 'Cadastre a primeira despesa recorrente da frota.';
+        if (btn) btn.style.display = '';
+    } else {
+        if (title) title.textContent = 'Nenhuma despesa encontrada com esses filtros';
+        if (hint) hint.textContent = 'Ajuste a busca ou os filtros e tente novamente.';
+        if (btn) btn.style.display = 'none';
+    }
+}
+
+function updateDespesasTable(despesas, listContext) {
     const tbody = document.querySelector('#despesasTable tbody');
+    if (!tbody) return;
     tbody.innerHTML = '';
+
+    listContext = listContext || {};
+    var totalCadastrados = listContext.totalCadastrados != null ? listContext.totalCadastrados : 0;
+    var isModern = document.body.classList.contains('despesas-fixas-modern');
+
+    if (!despesas || !despesas.length) {
+        if (isModern) {
+            if (totalCadastrados === 0) {
+                syncDfEmptyState({ mode: 'empty_db' });
+            } else {
+                syncDfEmptyState({ mode: 'no_results' });
+            }
+        } else {
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center">Nenhuma despesa fixa encontrada</td></tr>';
+        }
+        return;
+    }
+
+    if (isModern) {
+        syncDfEmptyState({ mode: 'hidden' });
+    }
     
     despesas.forEach(despesa => {
         const tr = document.createElement('tr');
+        const id = parseInt(despesa.id, 10) || 0;
+        const comprovante = despesa.comprovante ? dfEscapeHtml(despesa.comprovante) : '';
         tr.innerHTML = `
-            <td>${formatDate(despesa.vencimento)}</td>
-            <td>${despesa.veiculo_placa || '-'}</td>
-            <td>${despesa.tipo_nome || '-'}</td>
-            <td>${despesa.descricao || '-'}</td>
-            <td>R$ ${formatNumber(despesa.valor, 2)}</td>
-            <td>${despesa.status_nome || '-'}</td>
-            <td>${despesa.data_pagamento ? formatDate(despesa.data_pagamento) : '-'}</td>
-            <td>${despesa.forma_pagamento_nome || '-'}</td>
+            <td>${dfEscapeHtml(formatDate(despesa.vencimento))}</td>
+            <td>${dfEscapeHtml(despesa.veiculo_placa || '-')}</td>
+            <td>${dfEscapeHtml(despesa.tipo_nome || '-')}</td>
+            <td>${dfEscapeHtml(despesa.descricao || '-')}</td>
+            <td>R$ ${dfEscapeHtml(formatNumber(despesa.valor, 2))}</td>
+            <td>${dfEscapeHtml(despesa.status_nome || '-')}</td>
+            <td>${despesa.data_pagamento ? dfEscapeHtml(formatDate(despesa.data_pagamento)) : '-'}</td>
+            <td>${dfEscapeHtml(despesa.forma_pagamento_nome || '-')}</td>
             <td>${despesa.repetir_automaticamente ? 'Sim' : 'Não'}</td>
             <td class="actions">
-                <button class="btn-icon edit-btn" data-id="${despesa.id}" title="Editar">
+                <button class="btn-icon edit-btn" data-id="${id}" title="Editar">
                     <i class="fas fa-edit"></i>
                 </button>
-                ${despesa.comprovante ? `
-                    <button class="btn-icon view-comprovante-btn" data-comprovante="${despesa.comprovante}" title="Ver Comprovante">
+                ${comprovante ? `
+                    <button class="btn-icon view-comprovante-btn" data-comprovante="${comprovante}" title="Ver Comprovante">
                         <i class="fas fa-file-alt"></i>
                     </button>
                 ` : ''}
-                <button class="btn-icon delete-btn" data-id="${despesa.id}" title="Excluir">
+                <button class="btn-icon delete-btn" data-id="${id}" title="Excluir">
                     <i class="fas fa-trash"></i>
                 </button>
             </td>
@@ -545,10 +652,6 @@ function showFilterModal() {
     document.getElementById('filterModal').classList.add('active');
 }
 
-function showHelpModal() {
-    document.getElementById('helpModal').classList.add('active');
-}
-
 // Form handling
 async function handleDespesaSubmit(event) {
     if (event && event.preventDefault) {
@@ -678,15 +781,24 @@ function setupTableButtons() {
 
 async function deleteDespesa(id) {
     try {
-        const response = await fetch(sfApiUrl(`despesas_fixas.php?action=delete&id=${id}`), {
-            method: 'DELETE'
+        const fd = new FormData();
+        fd.append('id', String(id));
+        if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+            fd.append('csrf_token', window.__SF_CSRF__);
+        }
+        const response = await fetch(sfApiUrl('despesas_fixas.php?action=delete'), {
+            method: 'POST',
+            body: fd,
+            credentials: 'same-origin'
         });
-        
-        if (!response.ok) throw new Error('Erro ao excluir despesa');
-        
+        const data = await response.json().catch(function () { return {}; });
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || 'Erro ao excluir despesa');
+        }
         loadDespesasData();
     } catch (error) {
         console.error('Erro ao excluir despesa:', error);
+        alert(error.message || 'Erro ao excluir despesa.');
     }
 }
 
@@ -740,8 +852,18 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         // Setup filter event listeners
         document.getElementById('filterBtn').addEventListener('click', showFilterModal);
-        document.getElementById('helpBtn').addEventListener('click', showHelpModal);
         document.getElementById('addDespesaBtn').addEventListener('click', showAddDespesaModal);
+
+        var dfEmptyCreateBtn = document.getElementById('dfEmptyCreateBtn');
+        if (dfEmptyCreateBtn) {
+            dfEmptyCreateBtn.addEventListener('click', showAddDespesaModal);
+        }
+
+        document.querySelectorAll('#exportBtn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                exportVisibleTableCsv('despesasTable', 'despesas_fixas.csv');
+            });
+        });
         
         // Setup search and filter events
         const searchDespesaEl = document.getElementById('searchDespesa');

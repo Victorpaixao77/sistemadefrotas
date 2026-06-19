@@ -2,6 +2,7 @@ package com.sistemafrotas.motorista.data.local;
 
 import android.database.Cursor;
 import androidx.annotation.NonNull;
+import androidx.room.CoroutinesRoom;
 import androidx.room.EntityInsertionAdapter;
 import androidx.room.RoomDatabase;
 import androidx.room.RoomSQLiteQuery;
@@ -11,14 +12,19 @@ import androidx.room.util.DBUtil;
 import androidx.sqlite.db.SupportSQLiteStatement;
 import java.lang.Class;
 import java.lang.Double;
+import java.lang.Exception;
 import java.lang.Integer;
+import java.lang.Object;
 import java.lang.Override;
 import java.lang.String;
 import java.lang.SuppressWarnings;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Callable;
 import javax.annotation.processing.Generated;
+import kotlin.Unit;
+import kotlin.coroutines.Continuation;
 
 @Generated("androidx.room.RoomProcessor")
 @SuppressWarnings({"unchecked", "deprecation"})
@@ -28,6 +34,8 @@ public final class RotaDao_Impl implements RotaDao {
   private final EntityInsertionAdapter<RotaEntity> __insertionAdapterOfRotaEntity;
 
   private final SharedSQLiteStatement __preparedStmtOfDeleteAll;
+
+  private final SharedSQLiteStatement __preparedStmtOfDeleteById;
 
   public RotaDao_Impl(@NonNull final RoomDatabase __db) {
     this.__db = __db;
@@ -93,6 +101,14 @@ public final class RotaDao_Impl implements RotaDao {
         return _query;
       }
     };
+    this.__preparedStmtOfDeleteById = new SharedSQLiteStatement(__db) {
+      @Override
+      @NonNull
+      public String createQuery() {
+        final String _query = "DELETE FROM rotas_cache WHERE id = ?";
+        return _query;
+      }
+    };
   }
 
   @Override
@@ -122,6 +138,31 @@ public final class RotaDao_Impl implements RotaDao {
     } finally {
       __preparedStmtOfDeleteAll.release(_stmt);
     }
+  }
+
+  @Override
+  public Object deleteById(final int id, final Continuation<? super Unit> $completion) {
+    return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
+      @Override
+      @NonNull
+      public Unit call() throws Exception {
+        final SupportSQLiteStatement _stmt = __preparedStmtOfDeleteById.acquire();
+        int _argIndex = 1;
+        _stmt.bindLong(_argIndex, id);
+        try {
+          __db.beginTransaction();
+          try {
+            _stmt.executeUpdateDelete();
+            __db.setTransactionSuccessful();
+            return Unit.INSTANCE;
+          } finally {
+            __db.endTransaction();
+          }
+        } finally {
+          __preparedStmtOfDeleteById.release(_stmt);
+        }
+      }
+    }, $completion);
   }
 
   @Override

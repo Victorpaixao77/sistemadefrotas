@@ -182,6 +182,6 @@ try {
     error_log("Stack trace: " . $e->getTraceAsString());
     echo json_encode([
         'success' => false,
-        'message' => $e->getMessage()
+        'message' => 'Não foi possível carregar os dados analíticos.'
     ]);
 } 

@@ -1,7 +1,17 @@
 // Motorists management JavaScript
 
+// Escapa dados do servidor antes de injetar via innerHTML (previne XSS armazenado).
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Page loaded, initializing...');
     
     // Initialize page
     initializePage();
@@ -46,9 +56,121 @@ let currentMotoristId = null;
 let performanceChart = null;
 let currentSort = 'nome';
 let currentOrder = 'ASC';
+let _motoristsPaginationWired = false;
+let _motoristsFiltersWired = false;
+let _motoristsHelpWired = false;
+let _motoristsSortWired = false;
+let _motoristsFavoritesWired = false;
+
+function restoreMotoristsFiltersFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchInput = document.getElementById('searchMotorist');
+    const statusFilter = document.getElementById('statusFilter');
+    const catCnh = document.getElementById('categoriaCnhFilter');
+    const tipoContrato = document.getElementById('tipoContratoFilter');
+    const onlyFav = document.getElementById('filterOnlyFavoritos');
+    if (searchInput && urlParams.has('search')) searchInput.value = urlParams.get('search') || '';
+    if (statusFilter && urlParams.has('status')) statusFilter.value = urlParams.get('status') || '';
+    if (catCnh && urlParams.has('categoria_cnh')) catCnh.value = urlParams.get('categoria_cnh') || '';
+    if (tipoContrato && urlParams.has('tipo_contrato')) tipoContrato.value = urlParams.get('tipo_contrato') || '';
+    if (onlyFav && urlParams.has('only_favoritos')) onlyFav.checked = urlParams.get('only_favoritos') === '1';
+    if (urlParams.has('sort')) currentSort = urlParams.get('sort') || 'nome';
+    if (urlParams.has('order')) {
+        currentOrder = (urlParams.get('order') || '').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+    }
+}
+
+function syncMotoristsBrowserUrl(page, limit) {
+    const searchInput = document.getElementById('searchMotorist');
+    const statusFilter = document.getElementById('statusFilter');
+    const catCnh = document.getElementById('categoriaCnhFilter');
+    const tipoContrato = document.getElementById('tipoContratoFilter');
+    const onlyFav = document.getElementById('filterOnlyFavoritos');
+    const search = searchInput ? searchInput.value.trim() : '';
+    const status = statusFilter ? statusFilter.value : '';
+    const categoria = catCnh ? catCnh.value : '';
+    const tipo = tipoContrato ? tipoContrato.value : '';
+    const favoritos = onlyFav && onlyFav.checked;
+    const sortDefault = currentSort === 'nome' && currentOrder === 'ASC';
+    const isDefault = parseInt(page, 10) === 1 && parseInt(limit, 10) === 10
+        && !search && !status && !categoria && !tipo && !favoritos && sortDefault;
+
+    const urlParams = new URLSearchParams();
+    if (document.body.classList.contains('motorists-modern')) {
+        if (!isDefault) {
+            if (parseInt(page, 10) !== 1) urlParams.set('page', page);
+            if (parseInt(limit, 10) !== 10) urlParams.set('per_page', limit);
+            if (search) urlParams.set('search', search);
+            if (status) urlParams.set('status', status);
+            if (categoria) urlParams.set('categoria_cnh', categoria);
+            if (tipo) urlParams.set('tipo_contrato', tipo);
+            if (favoritos) urlParams.set('only_favoritos', '1');
+            if (!sortDefault) {
+                urlParams.set('sort', currentSort);
+                urlParams.set('order', currentOrder);
+            }
+        }
+    } else {
+        urlParams.set('classic', '1');
+        if (!isDefault) {
+            urlParams.set('page', page);
+            urlParams.set('per_page', limit);
+            if (search) urlParams.set('search', search);
+            if (status) urlParams.set('status', status);
+            if (categoria) urlParams.set('categoria_cnh', categoria);
+            if (tipo) urlParams.set('tipo_contrato', tipo);
+            if (favoritos) urlParams.set('only_favoritos', '1');
+            if (!sortDefault) {
+                urlParams.set('sort', currentSort);
+                urlParams.set('order', currentOrder);
+            }
+        }
+    }
+
+    let desiredSearch = urlParams.toString() ? ('?' + urlParams.toString()) : '';
+    if (window.location.search !== desiredSearch) {
+        window.history.replaceState({}, '', window.location.pathname + desiredSearch);
+    }
+}
+
+function updateMotoristsKpis(summary) {
+    if (!summary) return;
+    const elTotal = document.getElementById('totalMotorists');
+    const elActive = document.getElementById('activeMotorists');
+    const elIndisp = document.getElementById('kpiIndisponiveis');
+    const elComissao = document.getElementById('kpiComissaoMedia');
+    if (elTotal) elTotal.textContent = summary.total_motorists || 0;
+    if (elActive) elActive.textContent = summary.motorists_ativos || 0;
+    const indisp = (summary.motorists_ferias || 0) + (summary.motorists_licenca || 0)
+        + (summary.motorists_inativos || 0) + (summary.motorists_afastados || 0);
+    if (elIndisp) elIndisp.textContent = indisp;
+    if (elComissao) {
+        const avg = summary.media_comissao_pct != null ? parseFloat(summary.media_comissao_pct) : null;
+        if (avg != null && !Number.isNaN(avg)) {
+            elComissao.textContent = avg.toFixed(2).replace('.', ',') + '%';
+        }
+    }
+}
+
+function setupMotoristsFilterBtn() {
+    const filterBtn = document.getElementById('filterBtn');
+    const toolbar = document.querySelector('.fornc-toolbar, .filter-section');
+    if (!filterBtn || filterBtn.dataset.mntFilterWired) return;
+    filterBtn.dataset.mntFilterWired = '1';
+    filterBtn.addEventListener('click', function () {
+        const target = document.getElementById('searchMotorist')
+            || document.getElementById('statusFilter')
+            || toolbar;
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (target.focus) target.focus();
+        }
+    });
+}
 
 function initializePage() {
     const urlParams = new URLSearchParams(window.location.search);
+    restoreMotoristsFiltersFromUrl();
     const page = parseInt(urlParams.get('page'), 10) || 1;
     const perPageFromUrl = parseInt(urlParams.get('per_page'), 10);
     const perPageEl = document.getElementById('perPageMotorists');
@@ -63,15 +185,23 @@ function initializePage() {
     
     // Setup button events
     document.getElementById('addMotoristBtn')?.addEventListener('click', showAddMotoristModal);
+    document.getElementById('motoristsEmptyCreateBtn')?.addEventListener('click', showAddMotoristModal);
     
-    // Setup table buttons
+    // Setup table buttons (delegação de favoritos)
     setupTableButtons();
     
-    // Delegação de cliques na lista (tabela/cards) para que Editar, Visualizar, Histórico e Excluir
-    // continuem funcionando após abrir/fechar o modal de histórico
+    // Delegação de cliques na lista (tabela/cards)
     const listContainer = document.getElementById('motoristsTableContainer');
-    if (listContainer) {
+    if (listContainer && !listContainer.dataset.mntListWired) {
+        listContainer.dataset.mntListWired = '1';
         listContainer.addEventListener('click', function(e) {
+            const favBtn = e.target.closest('.favorite-btn');
+            if (favBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleMotoristFavorite(favBtn);
+                return;
+            }
             const btn = e.target.closest('.view-btn, .edit-btn, .history-btn, .delete-btn');
             if (!btn) return;
             const motoristId = btn.getAttribute('data-id');
@@ -93,8 +223,7 @@ function initializePage() {
     // Setup pagination
     setupPagination();
     
-    // Setup help button
-    setupHelpButton();
+    setupMotoristsFilterBtn();
     
     // Máscaras e atalhos
     setupInputMasks();
@@ -154,9 +283,9 @@ function loadCnhAlertas() {
                 return;
             }
             const parts = [];
-            if (a30.length > 0) parts.push(`<span style="color: var(--danger-color,#dc3545);"><strong>${a30.length}</strong> em até 30 dias: ${a30.map(m => m.nome).join(', ')}</span>`);
-            if (a60.length > 0) parts.push(`<span style="color: var(--warning-color,#f59e0b);"><strong>${a60.length}</strong> em 31–60 dias: ${a60.map(m => m.nome).join(', ')}</span>`);
-            if (a90.length > 0) parts.push(`<span style="color: var(--info-color,#3b82f6);"><strong>${a90.length}</strong> em 61–90 dias: ${a90.map(m => m.nome).join(', ')}</span>`);
+            if (a30.length > 0) parts.push(`<span style="color: var(--danger-color,#dc3545);"><strong>${a30.length}</strong> em até 30 dias: ${a30.map(m => escapeHtml(m.nome)).join(', ')}</span>`);
+            if (a60.length > 0) parts.push(`<span style="color: var(--warning-color,#f59e0b);"><strong>${a60.length}</strong> em 31–60 dias: ${a60.map(m => escapeHtml(m.nome)).join(', ')}</span>`);
+            if (a90.length > 0) parts.push(`<span style="color: var(--info-color,#3b82f6);"><strong>${a90.length}</strong> em 61–90 dias: ${a90.map(m => escapeHtml(m.nome)).join(', ')}</span>`);
             content.innerHTML = parts.join(' &nbsp;|&nbsp; ');
             widget.style.display = 'block';
         })
@@ -164,8 +293,8 @@ function loadCnhAlertas() {
 }
 
 function setupModals() {
-    // Close modal when clicking outside (exclude help modal)
-    document.querySelectorAll('.modal:not(#helpMotoristsModal)').forEach(modal => {
+    // Close modal when clicking outside (exclude help modal — sf_page_help.js)
+    document.querySelectorAll('.modal:not(#helpModal)').forEach(modal => {
         modal.addEventListener('click', function(e) {
             if (e.target === this) {
                 closeAllModals();
@@ -174,7 +303,7 @@ function setupModals() {
     });
     
     // Close modal when clicking X button (exclude help modal)
-    document.querySelectorAll('.modal:not(#helpMotoristsModal) .close-modal').forEach(button => {
+    document.querySelectorAll('.modal:not(#helpModal) .close-modal').forEach(button => {
         button.addEventListener('click', function() {
             const modal = this.closest('.modal');
             if (modal) {
@@ -187,29 +316,9 @@ function setupModals() {
     document.getElementById('cancelMotoristBtn')?.addEventListener('click', function() {
         closeModal('motoristModal');
     });
-    
-    // Special handling for help modal
-    const helpModal = document.getElementById('helpMotoristsModal');
-    if (helpModal) {
-        // Close help modal when clicking outside
-        helpModal.addEventListener('click', function(e) {
-            if (e.target === this) {
-                this.classList.remove('active');
-            }
-        });
-        
-        // Close help modal when clicking X button
-        const helpCloseBtn = helpModal.querySelector('.close-modal');
-        if (helpCloseBtn) {
-            helpCloseBtn.addEventListener('click', function() {
-                helpModal.classList.remove('active');
-            });
-        }
-    }
 }
 
 function switchTab(tabId) {
-    console.log('Switching to tab:', tabId, 'Current motorist ID:', currentMotoristId);
     
     if (!currentMotoristId) {
         console.error('No motorist selected');
@@ -264,7 +373,6 @@ function switchTab(tabId) {
     }
     
     // Load tab-specific data
-    console.log('Loading data for tab:', tabId);
     switch(tabId) {
         case 'routeHistory':
             initializeRouteHistoryTab();
@@ -322,42 +430,7 @@ function loadMotorists(page = 1) {
             
             // Update statistics
             if (data.summary) {
-                document.getElementById('totalMotorists').textContent = data.summary.total_motorists || 0;
-                document.getElementById('activeMotorists').textContent = data.summary.motorists_ativos || 0;
-                
-                // Update Status KPI - show distribution with better formatting
-                const statusItems = [];
-                if (data.summary.motorists_ativos > 0) statusItems.push(`${data.summary.motorists_ativos} Ativos`);
-                if (data.summary.motorists_ferias > 0) statusItems.push(`${data.summary.motorists_ferias} Férias`);
-                if (data.summary.motorists_licenca > 0) statusItems.push(`${data.summary.motorists_licenca} Licença`);
-                if (data.summary.motorists_inativos > 0) statusItems.push(`${data.summary.motorists_inativos} Inativos`);
-                if (data.summary.motorists_afastados > 0) statusItems.push(`${data.summary.motorists_afastados} Afastados`);
-                
-                if (statusItems.length > 0) {
-                    document.getElementById('totalTrips').textContent = statusItems.join(', ');
-                } else {
-                    document.getElementById('totalTrips').textContent = 'N/A';
-                }
-                
-                // Update Commission KPI - show total paid this month
-                if (data.summary.total_comissao_mes > 0 && data.summary.motorists_com_comissao_mes > 0) {
-                    const totalComissao = parseFloat(data.summary.total_comissao_mes) || 0;
-                    document.getElementById('averageRating').textContent = `R$ ${totalComissao.toFixed(2)}`;
-                    
-                    const subtitle = document.querySelector('#averageRating + .metric-subtitle');
-                    if (subtitle) {
-                        subtitle.textContent = `${data.summary.motorists_com_comissao_mes} motoristas`;
-                    }
-                } else {
-                    document.getElementById('averageRating').textContent = 'R$ 0,00';
-                    const subtitle = document.querySelector('#averageRating + .metric-subtitle');
-                    if (subtitle) {
-                        subtitle.textContent = 'Sem comissão no mês';
-                    }
-                }
-                
-                // Log para debug
-                console.log('📊 KPIs atualizados:', data.summary);
+                updateMotoristsKpis(data.summary);
             }
             
             // Update pagination
@@ -375,26 +448,7 @@ function loadMotorists(page = 1) {
                 }
 
                 updatePaginationButtons(data.pagination);
-                const urlParams = new URLSearchParams(window.location.search);
-                urlParams.set('page', page);
-                urlParams.set('per_page', limit);
-                if (document.body.classList.contains('motorists-modern')) {
-                    urlParams.delete('classic');
-                } else {
-                    urlParams.set('classic', '1');
-                }
-                const isDefault = parseInt(page, 10) === 1 && parseInt(limit, 10) === 10;
-                let desiredSearch;
-                if (isDefault && document.body.classList.contains('motorists-modern')) {
-                    desiredSearch = '';
-                } else if (isDefault) {
-                    desiredSearch = '?classic=1';
-                } else {
-                    desiredSearch = '?' + urlParams.toString();
-                }
-                if (window.location.search !== desiredSearch) {
-                    window.history.replaceState({}, '', window.location.pathname + desiredSearch);
-                }
+                syncMotoristsBrowserUrl(page, limit);
             }
             
             // Update table
@@ -405,23 +459,35 @@ function loadMotorists(page = 1) {
             }
 
             tbody.innerHTML = '';
+
+            const motoristsList = data.motorists || [];
+            const emptyEl = document.getElementById('motoristsEmptyState');
+            const wrapEl = document.getElementById('motoristsTableContainer');
+            const useModernMotoristEmpty = emptyEl && wrapEl && document.body.classList.contains('motorists-modern');
+            if (useModernMotoristEmpty) {
+                const empty = motoristsList.length === 0;
+                emptyEl.classList.toggle('visible', empty);
+                wrapEl.style.display = empty ? 'none' : '';
+            }
             
             const fotoUrl = (m) => m.foto_motorista ? `../uploads/motoristas/foto/${(m.foto_motorista || '').split('/').pop()}` : '';
             const fotoHtml = (m) => m.foto_motorista
-                ? `<img src="${fotoUrl(m)}" alt="" class="motorist-thumb" style="width:36px;height:36px;object-fit:cover;border-radius:50%;">`
+                ? `<img src="${encodeURI(fotoUrl(m))}" alt="" class="motorist-thumb" style="width:36px;height:36px;object-fit:cover;border-radius:50%;">`
                 : `<span class="motorist-thumb-placeholder" style="width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;background:var(--bg-tertiary);border-radius:50%;font-size:0.8rem;color:var(--text-muted);"><i class="fas fa-user"></i></span>`;
-            data.motorists.forEach(motorist => {
+            motoristsList.forEach(motorist => {
                 const row = document.createElement('tr');
+                const dispNome = motorist.disponibilidade_nome || 'N/A';
+                const dispClass = (motorist.disponibilidade_nome || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
                 row.innerHTML = `
                     <td>${fotoHtml(motorist)}</td>
-                    <td>${motorist.nome}</td>
-                    <td>${motorist.cpf || '-'}</td>
-                    <td>${motorist.cnh || '-'}</td>
-                    <td>${motorist.categoria_cnh_nome || '-'}</td>
-                    <td>${motorist.telefone || '-'}</td>
-                    <td>${motorist.email || '-'}</td>
-                    <td><span class="status-badge ${motorist.disponibilidade_nome?.toLowerCase()}">${motorist.disponibilidade_nome || 'N/A'}</span></td>
-                    <td>${motorist.porcentagem_comissao ? motorist.porcentagem_comissao + '%' : '-'}</td>
+                    <td>${escapeHtml(motorist.nome)}</td>
+                    <td>${escapeHtml(motorist.cpf) || '-'}</td>
+                    <td>${escapeHtml(motorist.cnh) || '-'}</td>
+                    <td>${escapeHtml(motorist.categoria_cnh_nome) || '-'}</td>
+                    <td>${escapeHtml(motorist.telefone) || '-'}</td>
+                    <td>${escapeHtml(motorist.email) || '-'}</td>
+                    <td><span class="status-badge ${dispClass}">${escapeHtml(dispNome)}</span></td>
+                    <td>${motorist.porcentagem_comissao ? escapeHtml(motorist.porcentagem_comissao) + '%' : '-'}</td>
                     <td class="actions">
                         <button class="btn-icon view-btn" data-id="${motorist.id}" title="Ver detalhes">
                             <i class="fas fa-eye"></i>
@@ -443,10 +509,6 @@ function loadMotorists(page = 1) {
                 tbody.appendChild(row);
             });
             
-            // Setup new buttons
-            setupTableButtons();
-            syncMotoristsSortIndicators();
-
             // View mode: table vs cards
             const viewMode = localStorage.getItem('motorists_view_mode') || 'table';
             const tableEl = document.getElementById('motoristsTable');
@@ -454,17 +516,17 @@ function loadMotorists(page = 1) {
             if (viewMode === 'cards' && cardsEl) {
                 if (tableEl) tableEl.style.display = 'none';
                 cardsEl.style.display = 'grid';
-                cardsEl.innerHTML = data.motorists.map(m => {
+                cardsEl.innerHTML = motoristsList.length ? motoristsList.map(m => {
                     const favClass = m.is_favorite ? ' is-favorite' : '';
                     const photoSrc = fotoUrl(m);
                     const photoHtml = photoSrc
-                        ? `<img class="card-foto" src="${photoSrc}" alt="">`
+                        ? `<img class="card-foto" src="${encodeURI(photoSrc)}" alt="">`
                         : `<span class="card-foto" style="background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:var(--text-muted);"><i class="fas fa-user"></i></span>`;
                     return `<div class="motorist-card" data-id="${m.id}">
                         ${photoHtml}
                         <div class="card-body">
-                            <div class="card-name">${(m.nome || '').replace(/</g,'&lt;')}</div>
-                            <div class="card-meta">${(m.categoria_cnh_nome || '-')} · ${(m.disponibilidade_nome || '-')}</div>
+                            <div class="card-name">${escapeHtml(m.nome)}</div>
+                            <div class="card-meta">${escapeHtml(m.categoria_cnh_nome) || '-'} · ${escapeHtml(m.disponibilidade_nome) || '-'}</div>
                             <div class="card-actions">
                                 <button class="btn-icon view-btn" data-id="${m.id}" title="Ver"><i class="fas fa-eye"></i></button>
                                 <button class="btn-icon favorite-btn${favClass}" data-id="${m.id}" title="Favorito"><i class="fas fa-star"></i></button>
@@ -474,22 +536,26 @@ function loadMotorists(page = 1) {
                             </div>
                         </div>
                     </div>`;
-                }).join('');
-                if (data.motorists.length === 0) cardsEl.innerHTML = '<p class="text-muted">Nenhum motorista encontrado.</p>';
-                setupTableButtons();
+                }).join('') : '<p class="text-muted text-center" style="grid-column:1/-1;padding:1rem;">Nenhum motorista encontrado.</p>';
             } else {
                 if (tableEl) tableEl.style.display = '';
                 if (cardsEl) cardsEl.style.display = 'none';
             }
+            syncMotoristsSortIndicators();
         })
         .catch(error => {
             console.error('Error loading motorists:', error);
+            const emptyEl = document.getElementById('motoristsEmptyState');
+            const wrapEl = document.getElementById('motoristsTableContainer');
+            if (emptyEl && wrapEl && document.body.classList.contains('motorists-modern')) {
+                emptyEl.classList.remove('visible');
+                wrapEl.style.display = '';
+            }
             showNotification('Erro ao carregar motoristas', 'error');
         });
 }
 
 function loadMotoristDetails(id) {
-    console.log('Loading motorist details for ID:', id);
     currentMotoristId = id;
     
     if (!id) {
@@ -656,12 +722,12 @@ function loadMotoristDetails(id) {
                     data.routes.forEach(route => {
                         const row = document.createElement('tr');
                         row.innerHTML = `
-                            <td>${route.data}</td>
-                            <td>${route.origem}</td>
-                            <td>${route.destino}</td>
-                            <td>${route.veiculo}</td>
-                            <td>${route.km_percorrido}</td>
-                            <td><span class="status-badge ${route.status?.toLowerCase()}">${route.status}</span></td>
+                            <td>${escapeHtml(route.data)}</td>
+                            <td>${escapeHtml(route.origem)}</td>
+                            <td>${escapeHtml(route.destino)}</td>
+                            <td>${escapeHtml(route.veiculo)}</td>
+                            <td>${escapeHtml(route.km_percorrido)}</td>
+                            <td><span class="status-badge ${(route.status || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')}">${escapeHtml(route.status)}</span></td>
                         `;
                         tbody.appendChild(row);
                     });
@@ -671,7 +737,6 @@ function loadMotoristDetails(id) {
             }
         })
         .then(data => {
-            console.log('Route history data:', data);
         })
         .catch(error => {
             console.error('Error loading route history:', error);
@@ -682,7 +747,6 @@ function loadMotoristDetails(id) {
     fetch(`../api/motorist_performance_chart.php?id=${id}`)
         .then(response => response.json())
         .then(data => {
-            console.log('Performance data received:', data);
             
             if (data.success) {
                 const metrics = data.data;
@@ -736,12 +800,12 @@ function loadRouteHistory(motoristId) {
                 data.routes.forEach(route => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${formatDate(route.data)}</td>
-                        <td>${route.origem || '-'}</td>
-                        <td>${route.destino || '-'}</td>
-                        <td>${route.veiculo || '-'}</td>
-                        <td>${formatKm(route.km_percorrido)}</td>
-                        <td><span class="status-badge ${route.status?.toLowerCase() || ''}">${route.status || 'N/A'}</span></td>
+                        <td>${escapeHtml(formatDate(route.data))}</td>
+                        <td>${escapeHtml(route.origem) || '-'}</td>
+                        <td>${escapeHtml(route.destino) || '-'}</td>
+                        <td>${escapeHtml(route.veiculo) || '-'}</td>
+                        <td>${escapeHtml(formatKm(route.km_percorrido))}</td>
+                        <td><span class="status-badge ${(route.status || '').toLowerCase().replace(/[^a-z0-9_-]/g, '')}">${escapeHtml(route.status) || 'N/A'}</span></td>
                     `;
                     tbody.appendChild(row);
                 });
@@ -771,7 +835,6 @@ function destroyChart() {
 }
 
 function updatePerformanceChart(monthlyData) {
-    console.log('Updating performance chart with data:', monthlyData);
     
     // Primeiro, destruir o gráfico anterior
     destroyChart();
@@ -850,7 +913,6 @@ function updatePerformanceChart(monthlyData) {
 
             // Criar novo gráfico
             performanceChart = new Chart(ctx, config);
-            console.log('Performance chart updated successfully');
 
         } catch (error) {
             console.error('Error creating performance chart:', error);
@@ -860,7 +922,6 @@ function updatePerformanceChart(monthlyData) {
 }
 
 function loadPerformanceMetrics(motoristId) {
-    console.log('Loading performance metrics for motorist ID:', motoristId);
     
     if (!motoristId) {
         console.error('Motorist ID is required');
@@ -916,7 +977,6 @@ function loadPerformanceMetrics(motoristId) {
 
     // Atualizar os elementos de métricas antes de fazer a requisição
     const updateMetricElements = (metrics) => {
-        console.log('Updating metric elements with data:', metrics);
         
         const averageRating = document.getElementById('averageRating');
         const totalTrips = document.getElementById('totalTrips');
@@ -925,39 +985,32 @@ function loadPerformanceMetrics(motoristId) {
 
         if (averageRating) {
             averageRating.textContent = metrics.average_rating?.toFixed(1) || '0.0';
-            console.log('Updated average rating:', averageRating.textContent);
         }
 
         if (totalTrips) {
             totalTrips.textContent = metrics.total_trips || '0';
-            console.log('Updated total trips:', totalTrips.textContent);
         }
 
         if (totalDistance) {
             totalDistance.textContent = formatKm(metrics.total_distance);
-            console.log('Updated total distance:', totalDistance.textContent);
         }
 
         if (averageConsumption) {
             averageConsumption.textContent = `${metrics.average_consumption?.toFixed(1) || '0.0'} L/100km`;
-            console.log('Updated average consumption:', averageConsumption.textContent);
         }
     };
 
     fetch(`../api/motorist_performance_chart.php?id=${motoristId}`)
         .then(response => {
-            console.log('Performance API response status:', response.status);
             return response.json();
         })
         .then(data => {
-            console.log('Performance metrics response:', data);
             
             if (!data.success) {
                 throw new Error(data.error || 'Erro ao carregar métricas');
             }
             
             const metrics = data.data;
-            console.log('Performance metrics data:', metrics);
             
             // Update metrics
             updateMetricElements(metrics);
@@ -967,13 +1020,11 @@ function loadPerformanceMetrics(motoristId) {
             
             // Update chart if exists and has data
             if (metrics.monthly_metrics && metrics.monthly_metrics.length > 0) {
-                console.log('Updating performance chart with data:', metrics.monthly_metrics);
                 // Pequeno delay para garantir que o canvas esteja pronto
                 setTimeout(() => {
                     updatePerformanceChart(metrics.monthly_metrics);
                 }, 100);
             } else {
-                console.log('No monthly metrics data available');
                 newChartContainer.innerHTML = '<div class="no-data">Nenhum dado disponível</div>';
             }
         })
@@ -1023,6 +1074,8 @@ function loadDocuments(motoristId) {
 }
 
 function setupPagination() {
+    if (_motoristsPaginationWired) return;
+    _motoristsPaginationWired = true;
     const prevBtn = document.getElementById('prevPageBtn');
     const nextBtn = document.getElementById('nextPageBtn');
     
@@ -1087,52 +1140,83 @@ function closeAllModals() {
 }
 
 function showNotification(message, type = 'info') {
-    console.log(`${type.toUpperCase()}: ${message}`);
-    // You can implement a more visual notification system here
-    alert(message);
+    let host = document.getElementById('mtToastHost');
+    if (!host) {
+        host = document.createElement('div');
+        host.id = 'mtToastHost';
+        host.style.cssText = 'position:fixed;top:18px;right:18px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:360px;';
+        document.body.appendChild(host);
+    }
+    const colors = { success: '#16a34a', error: '#dc2626', warning: '#f59e0b', info: '#2563eb' };
+    const icons = { success: 'fa-circle-check', error: 'fa-circle-exclamation', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+    const el = document.createElement('div');
+    el.style.cssText = `display:flex;align-items:flex-start;gap:10px;background:#fff;border-left:4px solid ${colors[type] || colors.info};box-shadow:0 6px 20px rgba(0,0,0,.15);border-radius:8px;padding:12px 14px;font-size:0.9rem;color:#1f2937;opacity:0;transform:translateX(12px);transition:all .2s ease;`;
+    el.innerHTML = `<i class="fas ${icons[type] || icons.info}" style="color:${colors[type] || colors.info};margin-top:2px;"></i><span style="flex:1;"></span>`;
+    el.querySelector('span').textContent = message;
+    host.appendChild(el);
+    requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateX(0)'; });
+    setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(12px)'; setTimeout(() => el.remove(), 250); }, 3800);
 }
 
-function setupTableButtons() {
-    console.log('Setting up table buttons...');
-    
-    // View, Edit, Delete e History são tratados por delegação em #motoristsTableContainer (initializePage).
-    // Aqui só configuramos o botão de favorito que precisa de toggle de estado.
-    
-    // Favorite buttons
-    document.querySelectorAll('.favorite-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const motoristId = btn.getAttribute('data-id');
-            if (!motoristId) return;
-            fetch(`../api/motorist_data.php?action=favorito_toggle&id=${motoristId}`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success) {
-                        btn.classList.toggle('is-favorite', data.favorito);
-                        btn.title = data.favorito ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
-                    }
-                });
-        });
+// Confirmação via modal (promise) em vez do confirm() nativo.
+function mtConfirm(message, opts) {
+    opts = opts || {};
+    return new Promise((resolve) => {
+        const ov = document.createElement('div');
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;';
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#fff;border-radius:12px;max-width:420px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.3);overflow:hidden;';
+        box.innerHTML = `
+            <div style="padding:20px 22px 8px;display:flex;gap:12px;align-items:flex-start;">
+                <i class="fas fa-triangle-exclamation" style="color:#f59e0b;font-size:1.4rem;margin-top:2px;"></i>
+                <div style="font-size:0.95rem;color:#1f2937;line-height:1.45;"></div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;padding:14px 22px 18px;">
+                <button type="button" data-act="cancel" style="padding:8px 16px;border:1px solid #d1d5db;background:#fff;border-radius:8px;cursor:pointer;font-size:0.88rem;">Cancelar</button>
+                <button type="button" data-act="ok" style="padding:8px 16px;border:none;background:#dc2626;color:#fff;border-radius:8px;cursor:pointer;font-size:0.88rem;font-weight:600;"></button>
+            </div>`;
+        box.querySelector('div > div').textContent = message;
+        box.querySelector('[data-act="ok"]').textContent = opts.okLabel || 'Confirmar';
+        ov.appendChild(box);
+        document.body.appendChild(ov);
+        const done = (v) => { ov.remove(); resolve(v); };
+        box.querySelector('[data-act="cancel"]').onclick = () => done(false);
+        box.querySelector('[data-act="ok"]').onclick = () => done(true);
+        ov.addEventListener('click', (e) => { if (e.target === ov) done(false); });
     });
 }
 
+function toggleMotoristFavorite(btn) {
+    const motoristId = btn.getAttribute('data-id');
+    if (!motoristId) return;
+    fetch(`../api/motorist_data.php?action=favorito_toggle&id=${motoristId}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
+    })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                btn.classList.toggle('is-favorite', data.favorito);
+                btn.title = data.favorito ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
+            }
+        });
+}
+
+function setupTableButtons() {
+    // Ações delegadas em #motoristsTableContainer (initializePage).
+}
+
 function loadMotoristForEdit(id) {
-    console.log('Loading motorist for edit:', id);
     
     // Load dropdown options first
     loadDropdownOptions().then(() => {
         // After dropdowns are loaded, fetch motorist data
         fetch(`../api/motorist_data.php?action=view&id=${id}`)
             .then(response => {
-                console.log('Edit load response status:', response.status);
                 return response.json();
             })
             .then(data => {
-                console.log('Edit load data:', data);
                 if (!data.success) {
                     showNotification(data.error || 'Erro ao carregar dados do motorista', 'error');
                     return;
@@ -1176,7 +1260,6 @@ function loadMotoristForEdit(id) {
 }
 
 function loadDropdownOptions() {
-    console.log('Loading dropdown options...');
     
     // Return a promise that resolves when all dropdowns are loaded
     return Promise.all([
@@ -1193,9 +1276,8 @@ function loadDropdownOptions() {
                 if (data.success && data.types) {
                     select.innerHTML = '<option value="">Selecione...</option>';
                     data.types.forEach(type => {
-                        select.innerHTML += `<option value="${type.id}">${type.nome}</option>`;
+                        select.innerHTML += `<option value="${escapeHtml(type.id)}">${escapeHtml(type.nome)}</option>`;
                     });
-                    console.log('Contract types loaded:', data.types.length);
                 } else {
                     console.error('Error loading contract types:', data.error);
                 }
@@ -1214,9 +1296,8 @@ function loadDropdownOptions() {
                 if (data.success && data.status) {
                     select.innerHTML = '<option value="">Selecione...</option>';
                     data.status.forEach(status => {
-                        select.innerHTML += `<option value="${status.id}">${status.nome}</option>`;
+                        select.innerHTML += `<option value="${escapeHtml(status.id)}">${escapeHtml(status.nome)}</option>`;
                     });
-                    console.log('Availability options loaded:', data.status.length);
                 } else {
                     console.error('Error loading availability status:', data.error);
                 }
@@ -1235,9 +1316,8 @@ function loadDropdownOptions() {
                 if (data.success && data.categories) {
                     select.innerHTML = '<option value="">Selecione...</option>';
                     data.categories.forEach(category => {
-                        select.innerHTML += `<option value="${category.id}">${category.nome}</option>`;
+                        select.innerHTML += `<option value="${escapeHtml(category.id)}">${escapeHtml(category.nome)}</option>`;
                     });
-                    console.log('CNH categories loaded:', data.categories.length);
                 } else {
                     console.error('Error loading CNH categories:', data.error);
                 }
@@ -1249,6 +1329,8 @@ function loadDropdownOptions() {
 }
 
 function setupFilters() {
+    if (_motoristsFiltersWired) return;
+    _motoristsFiltersWired = true;
     const searchInput = document.getElementById('searchMotorist');
     const statusFilter = document.getElementById('statusFilter');
     const applyFiltersBtn = document.getElementById('applyMotoristFilters');
@@ -1387,7 +1469,6 @@ function setupFormSubmission() {
     if (saveBtn) {
         saveBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            console.log('Save button clicked');
             saveMotorist();
         });
     } else {
@@ -1396,15 +1477,12 @@ function setupFormSubmission() {
 }
 
 function saveMotorist() {
-    console.log('Saving motorist...');
     const form = document.getElementById('motoristForm');
     const formData = new FormData(form);
     const motoristId = document.getElementById('motoristId').value;
     
     // Debug: Log form data
-    console.log('Form data values:');
     for (let pair of formData.entries()) {
-        console.log(pair[0] + ': ' + pair[1]);
     }
     
     // Validar CPF se preenchido (campo opcional)
@@ -1440,7 +1518,6 @@ function saveMotorist() {
     }
     
     const action = motoristId ? 'update' : 'add';
-    console.log('Action:', action, 'ID:', motoristId);
     if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
         formData.append('csrf_token', window.__SF_CSRF__);
     }
@@ -1452,11 +1529,9 @@ function saveMotorist() {
         headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
     })
     .then(response => {
-        console.log('Save response status:', response.status);
         return response.json();
     })
     .then(data => {
-        console.log('Save response data:', data);
         if (!data.success) {
             showNotification(data.error || 'Erro ao salvar motorista', 'error');
             return;
@@ -1474,36 +1549,30 @@ function saveMotorist() {
 }
 
 function showDeleteConfirmation(motoristId) {
-    if (confirm('Tem certeza que deseja excluir este motorista?')) {
-        console.log('Attempting to delete motorist:', motoristId);
-        
+    mtConfirm('Tem certeza que deseja excluir este motorista? Esta ação não pode ser desfeita.', { okLabel: 'Excluir' }).then(function (ok) {
+        if (!ok) return;
         fetch(`../api/motorist_data.php?action=delete&id=${motoristId}`, {
             method: 'POST',
             credentials: 'include',
             headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
         })
         .then(response => {
-            console.log('Delete response status:', response.status);
-            return response.json().catch(error => {
-                console.error('Error parsing JSON:', error);
+            return response.json().catch(() => {
                 throw new Error('Failed to parse server response');
             });
         })
         .then(data => {
-            console.log('Delete response data:', data);
             if (!data.success) {
                 showNotification(data.error || 'Erro ao excluir motorista', 'error');
                 return;
             }
-            
             showNotification(data.message || 'Motorista excluído com sucesso', 'success');
             loadMotorists(currentPage);
         })
         .catch(error => {
-            console.error('Error in delete operation:', error);
-            showNotification('Erro ao excluir motorista: ' + error.message, 'error');
+            showNotification('Erro ao excluir motorista: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : 'falha na operação'), 'error');
         });
-    }
+    });
 }
 
 function showAddMotoristModal() {
@@ -1528,20 +1597,12 @@ function showAddMotoristModal() {
 
 function initializeCharts() {
     // Initialize any charts if needed
-    console.log('Charts initialized');
 }
 
-// Função para configurar botão de ajuda
+// Função para configurar botão de ajuda (delegado a js/sf_page_help.js)
 function setupHelpButton() {
-    const helpBtn = document.getElementById('helpBtn');
-    if (helpBtn) {
-        helpBtn.addEventListener('click', function() {
-            const helpModal = document.getElementById('helpMotoristsModal');
-            if (helpModal) {
-                helpModal.classList.add('active');
-            }
-        });
-    }
+    if (_motoristsHelpWired) return;
+    _motoristsHelpWired = true;
 }
 
 // Máscara CPF: 000.000.000-00
@@ -1616,6 +1677,8 @@ function exportMotoristsCSV() {
     if (catCnh && catCnh.value) params.append('categoria_cnh', catCnh.value);
     const tipoContrato = document.getElementById('tipoContratoFilter');
     if (tipoContrato && tipoContrato.value) params.append('tipo_contrato', tipoContrato.value);
+    const filterOnlyFav = document.getElementById('filterOnlyFavoritos');
+    if (filterOnlyFav && filterOnlyFav.checked) params.append('only_favoritos', '1');
     params.append('sort', currentSort);
     params.append('order', currentOrder);
     fetch(`../api/motorist_data.php?${params.toString()}`)
@@ -1659,6 +1722,8 @@ function syncMotoristsSortIndicators() {
 }
 
 function setupSortableColumns() {
+    if (_motoristsSortWired) return;
+    _motoristsSortWired = true;
     document.querySelectorAll('#motoristsTable th.sortable').forEach(th => {
         th.title = 'Clique para ordenar (A–Z ou maior/menor conforme a coluna)';
         th.addEventListener('click', function() {
@@ -1740,7 +1805,7 @@ function openMotoristLogModal(motoristId) {
         if (v === null || v === undefined || v === '') return '—';
         if (v === true || v === '1') return 'Sim';
         if (v === false || v === '0') return 'Não';
-        return String(v);
+        return escapeHtml(v);
     }
     function buildDetailsHtml(entry) {
         const ant = entry.dados_anteriores || {};
@@ -1751,7 +1816,7 @@ function openMotoristLogModal(motoristId) {
             const a = ant[k];
             const b = nov[k];
             if (formatVal(a) === formatVal(b)) return;
-            const label = fieldLabels[k] || k;
+            const label = fieldLabels[k] || escapeHtml(k);
             lines.push(`${label}: ${formatVal(a)} → ${formatVal(b)}`);
         });
         return lines.length ? lines.join('<br>') : '—';
@@ -1764,9 +1829,9 @@ function openMotoristLogModal(motoristId) {
                 data.entries.forEach(entry => {
                     const tr = document.createElement('tr');
                     const acaoLabel = entry.acao === 'create' ? 'Cadastro' : (entry.acao === 'update' ? 'Alteração' : 'Exclusão');
-                    const alteradoPor = entry.nome_usuario || (entry.ip_origem ? `IP ${entry.ip_origem}` : '—');
+                    const alteradoPor = entry.nome_usuario ? escapeHtml(entry.nome_usuario) : (entry.ip_origem ? `IP ${escapeHtml(entry.ip_origem)}` : '—');
                     const detalhes = buildDetailsHtml(entry);
-                    tr.innerHTML = `<td>${entry.created_at_formatted || '-'}</td><td>${acaoLabel}</td><td>${alteradoPor}</td><td>${entry.descricao || '-'}</td><td class="log-details">${detalhes}</td>`;
+                    tr.innerHTML = `<td>${escapeHtml(entry.created_at_formatted) || '-'}</td><td>${acaoLabel}</td><td>${alteradoPor}</td><td>${escapeHtml(entry.descricao) || '-'}</td><td class="log-details">${detalhes}</td>`;
                     tbody.appendChild(tr);
                 });
                 emptyEl.style.display = 'none';

@@ -3,6 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once __DIR__ . '/../includes/csrf.php';
 require_once __DIR__ . '/../includes/api_json.php';
+require_once __DIR__ . '/../includes/security.php';
 
 configure_session();
 session_start();
@@ -14,6 +15,20 @@ if (!isset($_SESSION['empresa_id'])) {
 
 $empresa_id = $_SESSION['empresa_id'];
 $conn = getConnection();
+$sec_cfg = sf_security_config((int) $empresa_id);
+
+/** Valida senha forte conforme política da empresa; encerra com JSON em caso de falha. */
+function sf_validar_senha_ou_falhar(string $senha, array $cfg): void
+{
+    if (empty($cfg['senha_forte'])) {
+        return;
+    }
+    $v = sf_password_validate($senha);
+    if (!$v['ok']) {
+        echo json_encode(['success' => false, 'error' => 'Senha fraca: ' . implode(' ', $v['erros'])]);
+        exit;
+    }
+}
 
 // Protege mutações (POST/PUT/PATCH/DELETE) com CSRF e retorno JSON padronizado.
 api_require_csrf_json();
@@ -46,6 +61,9 @@ switch ($action) {
             echo json_encode(['success' => false, 'error' => 'Este email já está em uso']);
             exit;
         }
+
+        // Política de senha forte
+        sf_validar_senha_ou_falhar((string) $_POST['senha'], $sec_cfg);
 
         // Inserir novo usuário
         try {
@@ -149,6 +167,7 @@ switch ($action) {
 
             // Se senha foi fornecida, atualizar senha
             if (!empty($_POST['senha'])) {
+                sf_validar_senha_ou_falhar((string) $_POST['senha'], $sec_cfg);
                 $stmt = $conn->prepare('
                     UPDATE usuarios 
                     SET nome = :nome, email = :email, senha = :senha, 

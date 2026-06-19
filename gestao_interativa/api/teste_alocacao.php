@@ -1,7 +1,12 @@
 <?php
 header('Content-Type: application/json');
 
-// Prevenir qualquer saída antes do JSON
+if (!defined('DEBUG_MODE') || !DEBUG_MODE) {
+    http_response_code(404);
+    echo json_encode(['success' => false, 'error' => 'Endpoint indisponível']);
+    exit;
+}
+
 ob_start();
 
 // Incluir configuração de sessão do sistema principal
@@ -84,9 +89,10 @@ try {
     // Limpar qualquer saída anterior
     ob_clean();
     
+    error_log('teste_alocacao: ' . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => $e->getMessage()
+        'error' => 'Erro ao processar a requisição.'
     ]);
 }
 

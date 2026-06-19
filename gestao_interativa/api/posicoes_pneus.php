@@ -16,6 +16,21 @@ try {
     }
 
     // Verificar autenticação
+    if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
+        ob_clean();
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Usuário não autenticado']);
+        exit;
+    }
+
+    require_once dirname(__DIR__, 2) . '/includes/permissions.php';
+    if (!can_access_tire_management()) {
+        ob_clean();
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Sem permissão para gestão de pneus']);
+        exit;
+    }
+
     if (!isset($_SESSION['empresa_id']) || empty($_SESSION['empresa_id'])) {
         ob_clean();
         http_response_code(401);
@@ -32,12 +47,11 @@ try {
     }
 } catch (Exception $e) {
     ob_clean();
+    error_log("Erro ao inicializar API de posições: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
-        'success' => false, 
-        'error' => 'Erro ao inicializar: ' . $e->getMessage(),
-        'file' => $e->getFile(),
-        'line' => $e->getLine()
+        'success' => false,
+        'error' => 'Erro ao inicializar a API de posições.'
     ]);
     exit;
 }
@@ -70,9 +84,8 @@ try {
     error_log("Erro na API de posições: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
-        'success' => false, 
-        'error' => $e->getMessage(),
-        'trace' => $e->getTraceAsString()
+        'success' => false,
+        'error' => 'Erro ao carregar as posições de pneus.'
     ]);
 }
 ?>

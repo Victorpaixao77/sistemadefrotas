@@ -1,17 +1,9 @@
 <?php
-require_once '../includes/config.php';
-require_once '../includes/functions.php';
+require_once '../includes/pneus_api_base.php';
 require_once __DIR__ . '/../includes/pneu_movimentacoes_helper.php';
-require_once __DIR__ . '/../includes/csrf.php';
-require_once __DIR__ . '/../includes/api_json.php';
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
-configure_session();
-session_start();
-require_authentication();
-
-// Protege mutações (POST) com CSRF e retorno JSON padronizado.
 api_require_csrf_json();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

@@ -395,48 +395,195 @@ body.abastecimentos-modern .fornc-page #refuelingTable .percentual-arla {
     overflow-x: hidden;
 }
 
-/* Estilos para o modal de ajuda */
-.help-section {
-    margin-bottom: 24px;
-}
+/* Modal de ajuda unificado: css/sf-page-help.css */
 
-.help-section h3 {
-    color: var(--primary-color);
-    margin-bottom: 12px;
-    font-size: 1.1rem;
-}
-
-.help-section p {
-    margin-bottom: 12px;
-    line-height: 1.5;
-}
-
-.help-section ul, .help-section ol {
-    padding-left: 20px;
-    margin-bottom: 12px;
-}
-
-.help-section ul ul, .help-section ol ul {
-    margin-top: 8px;
-    margin-bottom: 8px;
-}
-
-.help-section li {
-    margin-bottom: 8px;
-    line-height: 1.5;
-}
-
-.help-section strong {
-    color: var(--text-primary);
-}
-
-/* Ajuste do modal de ajuda (layout clássico; no moderno usa #helpModal.fornc-modal em fornc-modern-page.css) */
-body:not(.abastecimentos-modern) #helpModal .modal-content {
+body:not(.abastecimentos-modern) #helpModal .modal-content:not(.sf-help-modal-content) {
     max-width: 700px;
     max-height: 80vh;
 }
 
-body:not(.abastecimentos-modern) #helpModal .modal-body {
+body:not(.abastecimentos-modern) #helpModal .modal-body:not(.sf-help-modal-body) {
     overflow-y: auto;
     padding: 20px;
 }
+
+/* Importar abastecimentos (CSV/JSON) */
+.refuel-import-intro {
+    font-size: 0.9rem;
+    line-height: 1.45;
+    margin-bottom: 0.65rem;
+}
+
+.refuel-import-intro code {
+    font-size: 0.85em;
+}
+
+.refuel-import-model-link {
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--primary-color, #2563eb);
+}
+
+.refuel-import-model-link:hover {
+    text-decoration: underline;
+}
+
+.refuel-import-error {
+    color: #b91c1c;
+    font-size: 0.875rem;
+    margin: 0.5rem 0 0.75rem;
+    min-height: 1.25rem;
+}
+
+/* Import em massa: campos compartilhados */
+.refuel-import-shared {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    background: var(--bg-secondary, rgba(0, 0, 0, 0.02));
+}
+
+.refuel-import-shared-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.6rem 0.75rem;
+}
+
+.refuel-import-shared-grid .form-group {
+    margin: 0;
+}
+
+.refuel-import-shared-grid label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-muted, #64748b);
+    margin-bottom: 0.2rem;
+}
+
+.refuel-import-shared-grid select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.4rem 0.5rem;
+    font-size: 0.85rem;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 6px;
+    background: var(--bg-primary, #fff);
+    color: var(--text-primary, #1e293b);
+}
+
+.refuel-import-result {
+    font-size: 0.85rem;
+    font-weight: 600;
+    align-self: center;
+}
+
+.refuel-import-preview-wrap {
+    max-height: min(50vh, 320px);
+    overflow: auto;
+    margin-top: 0.75rem;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+}
+
+.refuel-import-preview {
+    width: 100%;
+    margin: 0;
+    font-size: 0.875rem;
+}
+
+.refuel-import-preview th,
+.refuel-import-preview td {
+    padding: 0.45rem 0.5rem;
+    vertical-align: middle;
+}
+
+button.refuel-import-apply {
+    font-size: 0.8125rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    background: var(--primary-color, #2563eb);
+    color: #fff;
+}
+
+button.refuel-import-apply:hover {
+    filter: brightness(1.05);
+}
+
+body.abastecimentos-modern #refuelImportModal .refuel-import-error {
+    color: #fecaca;
+}
+
+body.abastecimentos-modern #refuelImportModal .refuel-import-model-link {
+    color: #93c5fd;
+}
+
+.refuel-import-progress {
+    font-size: 0.875rem;
+    color: var(--text-secondary, #64748b);
+    margin: 0.35rem 0 0.25rem;
+    min-height: 1.25rem;
+}
+
+.refuel-import-ocr-details {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.refuel-import-ocr-details summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--primary-color, #2563eb);
+}
+
+.refuel-import-ocr-pre {
+    max-height: 200px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    margin: 0.5rem 0 0;
+    padding: 0.65rem;
+    background: rgba(0, 0, 0, 0.04);
+    border-radius: 8px;
+    border: 1px solid var(--border-color, #e2e8f0);
+}
+
+body.abastecimentos-modern .refuel-import-ocr-pre {
+    background: rgba(15, 23, 42, 0.45);
+    border-color: rgba(148, 163, 184, 0.25);
+    color: #e2e8f0;
+}
+
+/* Painel de anomalias/fraude de abastecimento */
+.ab-anomalies { border: 1px solid var(--border-color); border-radius: 10px; margin-bottom: 1rem; overflow: hidden; background: var(--card-bg, var(--bg-secondary)); }
+.ab-anomalies.has-erros { border-color: #dc2626; }
+.ab-anomalies.has-avisos { border-color: #f59e0b; }
+.ab-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.6rem 0.5rem 0.85rem; }
+.ab-toggle { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: none; border: none; cursor: pointer; color: var(--text-primary); font-weight: 600; font-size: 0.9rem; text-align: left; padding: 0.2rem 0; }
+.ab-caret { transition: transform 0.2s ease; color: var(--text-muted); }
+.ab-toggle[aria-expanded="true"] .ab-caret { transform: rotate(180deg); }
+.ab-summary .ab-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; margin-left: 6px; }
+.ab-pill.erro { background: rgba(220,38,38,0.12); color: #dc2626; }
+.ab-pill.aviso { background: rgba(245,158,11,0.14); color: #b45309; }
+.ab-pill.ok { background: rgba(22,163,74,0.12); color: #16a34a; }
+.ab-list { max-height: 360px; overflow: auto; padding: 0.25rem 0.85rem 0.6rem; }
+.ab-item { display: flex; gap: 0.6rem; padding: 0.55rem 0; border-top: 1px solid var(--border-color); }
+.ab-item:first-child { border-top: none; }
+.ab-sev { flex: 0 0 auto; font-size: 1rem; line-height: 1.4; }
+.ab-sev.erro { color: #dc2626; }
+.ab-sev.aviso { color: #f59e0b; }
+.ab-info { flex: 1; min-width: 0; }
+.ab-meta { font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.2rem; }
+.ab-meta strong { color: var(--text-primary); }
+.ab-motivos { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; color: var(--text-primary); }
+.ab-motivos li { margin: 0; }
+.ab-empty { font-size: 0.83rem; color: var(--text-muted); padding: 0.2rem 0; }
+.ab-edit { flex: 0 0 auto; align-self: center; }

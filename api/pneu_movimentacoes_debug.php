@@ -19,6 +19,14 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_
     exit;
 }
 
+require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/pneus_helpers.php';
+if (!can_access_tire_management()) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Sem permissão para gestão de pneus']);
+    exit;
+}
+
 $empresa_id = (int) $_SESSION['empresa_id'];
 $action = $_GET['action'] ?? '';
 

@@ -1,6 +1,7 @@
 <?php
 // Include configuration and functions first (display_errors / error_reporting em config.php)
 require_once '../includes/config.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
 require_once '../includes/sf_api_base.php';
 
@@ -55,6 +56,7 @@ if (array_key_exists('modern', $_GET)) {
     <!-- Route Profitability Analysis -->
     <script src="../js/route-profitability.js"></script>
     <link rel="stylesheet" href="../css/routes.css?v=1.0.2">
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="routes-modern">
     <div class="app-container">
@@ -68,10 +70,6 @@ if (array_key_exists('modern', $_GET)) {
             
             <!-- Page Content -->
             <div class="dashboard-content routes-modern-page">
-                <div class="dashboard-header">
-                    <h1>Rotas</h1>
-                </div>
-                
                 <!-- KPI Cards Row -->
                 <div class="dashboard-grid">
                     <div class="dashboard-card" data-kpi="total" title="Clique para ver todas as rotas do período">
@@ -248,15 +246,27 @@ if (array_key_exists('modern', $_GET)) {
                     </div>
                 </div>
                 
+                <!-- Painel de inconsistências/anomalias -->
+                <div class="route-anomalies" id="routeAnomalies" style="display:none;">
+                    <div class="ra-head">
+                        <button type="button" class="ra-toggle" id="raToggle" aria-expanded="false" aria-controls="raList">
+                            <span class="ra-summary" id="raSummary"></span>
+                            <i class="fas fa-chevron-down ra-caret" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon ra-refresh" id="raRefresh" title="Reanalisar inconsistências" aria-label="Reanalisar inconsistências"><i class="fas fa-sync-alt"></i></button>
+                    </div>
+                    <div class="ra-list" id="raList" style="display:none;"></div>
+                </div>
+
                 <!-- Route Table -->
                 <div class="routes-batch-bar" id="routesBatchBar">
                     <span id="routesBatchCount">0 selecionada(s)</span>
                     <button type="button" class="fornc-btn fornc-btn--muted" id="routesExportSelectedBtn"><i class="fas fa-file-csv"></i> CSV selecionadas</button>
                     <button type="button" class="fornc-btn fornc-btn--ghost" id="routesClearSelectionBtn">Limpar seleção</button>
                 </div>
-                <div class="routes-empty-state" id="routesEmptyState">
-                    <p style="margin:0 0 8px 0; font-weight:600; color:var(--text-primary);">Nenhuma rota encontrada</p>
-                    <p style="margin:0 0 14px 0; font-size:0.85rem; color:var(--text-secondary);">Ajuste os filtros ou cadastre uma nova rota.</p>
+                <div class="fornc-empty-state" id="routesEmptyState">
+                    <p class="fornc-empty-state-title">Nenhuma rota encontrada</p>
+                    <p class="fornc-empty-state-hint">Ajuste os filtros ou cadastre uma nova rota.</p>
                     <button type="button" class="fornc-btn fornc-btn--primary" id="routesEmptyCreateBtn"><i class="fas fa-plus"></i> Criar primeira rota</button>
                 </div>
                 <div class="table-container routes-table-wrap" id="routeTableContainer">
@@ -840,7 +850,7 @@ if (array_key_exists('modern', $_GET)) {
         </div>
     </div>
 
-    <div class="modal" id="columnsModal">
+    <div class="modal fornc-modal fornc-columns-modal" id="columnsModal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Colunas da tabela</h2>
@@ -893,26 +903,78 @@ if (array_key_exists('modern', $_GET)) {
                     <div class="simulation-form">
                         <h3 class="route-sim-section-title">📍 Configuração da Rota</h3>
                         
-                        <div class="form-group">
-                            <label for="simOrigin">Origem:</label>
-                            <input type="text" id="simOrigin" class="route-sim-input" placeholder="Ex: São Paulo, SP">
+                        <div class="form-section">
+                            <h4 class="route-sim-subsection-title">Origem</h4>
+                            <div class="form-grid route-sim-form-grid">
+                                <div class="form-group">
+                                    <label for="sim_estado_origem">Estado</label>
+                                    <select id="sim_estado_origem" class="route-sim-input">
+                                        <option value="">Selecione o estado</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="sim_cidade_origem_id">Cidade</label>
+                                    <select id="sim_cidade_origem_id" class="route-sim-input" disabled>
+                                        <option value="">Selecione primeiro o estado</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h4 class="route-sim-subsection-title">Destino</h4>
+                            <div class="form-grid route-sim-form-grid">
+                                <div class="form-group">
+                                    <label for="sim_estado_destino">Estado</label>
+                                    <select id="sim_estado_destino" class="route-sim-input">
+                                        <option value="">Selecione o estado</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="sim_cidade_destino_id">Cidade</label>
+                                    <select id="sim_cidade_destino_id" class="route-sim-input" disabled>
+                                        <option value="">Selecione primeiro o estado</option>
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="form-group">
-                            <label for="simDestination">Destino:</label>
-                            <input type="text" id="simDestination" class="route-sim-input" placeholder="Ex: Rio de Janeiro, RJ">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="simVehicle">Veículo:</label>
+                            <label for="simVehicle">Veículo (cadastro)</label>
                             <select id="simVehicle" class="route-sim-input">
                                 <option value="">Selecione um veículo</option>
+                            </select>
+                            <p id="simVehicleCarretaLine" class="route-sim-vehicle-meta" aria-live="polite"></p>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="simFuelType">Combustível:</label>
+                            <select id="simFuelType" class="route-sim-input">
+                                <option value="DIESEL" selected>Diesel</option>
+                                <option value="GASOLINE">Gasolina</option>
+                                <option value="HYBRID">Híbrido</option>
+                                <option value="ELECTRIC">Elétrico</option>
                             </select>
                         </div>
                         
                         <div class="form-group">
                             <label for="simFuelPrice">Preço do Combustível (R$/L):</label>
                             <input type="number" id="simFuelPrice" class="route-sim-input" step="0.01" value="5.50">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="simTollPass">TAG / pedágio (Google Routes)</label>
+                            <select id="simTollPass" class="route-sim-input">
+                                <option value="">Não informar (preço padrão da API)</option>
+                                <option value="BR_SEM_PARAR">Sem Parar</option>
+                                <option value="BR_CONECTCAR">ConectCar</option>
+                                <option value="BR_VELOE">Veloe</option>
+                                <option value="BR_MOVE_MAIS">Move Mais</option>
+                                <option value="BR_TAGGY">Taggy</option>
+                                <option value="BR_AUTO_EXPRESO">Auto Expresso</option>
+                                <option value="BR_PASSA_RAPIDO">Passa Rápido</option>
+                            </select>
+                            <p class="route-sim-vehicle-meta" aria-live="polite">Opcional: a Google pode aplicar tarifa de TAG onde o modelo cobrir. Continua sendo estimativa (não comercial / praças BR).</p>
                         </div>
                         
                         <button type="button" id="simulateRouteBtnModal" class="btn-route-sim-calc">
@@ -990,70 +1052,8 @@ if (array_key_exists('modern', $_GET)) {
             </div>
         </div>
     </div>
+    <?php $sf_help_key = 'routes'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
 
-    <!-- Help Modal -->
-    <div class="modal" id="helpRouteModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Ajuda - Rotas</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="help-section">
-                    <h3>Visão Geral</h3>
-                    <p>A página de Rotas permite gerenciar todas as rotas de transporte da sua frota. Aqui você pode:</p>
-                    <ul>
-                        <li>Visualizar todas as rotas ativas e concluídas</li>
-                        <li>Adicionar novas rotas</li>
-                        <li>Editar rotas existentes</li>
-                        <li>Excluir rotas</li>
-                        <li>Gerenciar despesas de viagem</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Dashboard</h3>
-                    <p>O dashboard mostra os principais indicadores de desempenho:</p>
-                    <ul>
-                        <li><strong>Total de Rotas:</strong> Número total de rotas cadastradas</li>
-                        <li><strong>Rotas Concluídas:</strong> Rotas finalizadas no período</li>
-                        <li><strong>Distância Total:</strong> Quilômetros percorridos</li>
-                        <li><strong>Frete Total:</strong> Valor total dos fretes</li>
-                        <li><strong>Eficiência:</strong> Taxa de eficiência das rotas</li>
-                        <li><strong>KM Vazio:</strong> Percentual de quilômetros sem carga</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Gráficos</h3>
-                    <p>Os gráficos fornecem uma visão detalhada do desempenho:</p>
-                    <ul>
-                        <li><strong>Distância por Motorista:</strong> KM percorridos por motorista</li>
-                        <li><strong>Eficiência por Motorista:</strong> Taxa de eficiência individual</li>
-                        <li><strong>Rotas no Prazo:</strong> Distribuição de entregas no prazo</li>
-                        <li><strong>Frete por Motorista:</strong> Valor dos fretes por motorista</li>
-                        <li><strong>Evolução de KM:</strong> Histórico de quilometragem</li>
-                        <li><strong>Indicadores:</strong> Análise multidimensional do desempenho</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Filtros</h3>
-                    <p>Use os filtros para:</p>
-                    <ul>
-                        <li>Buscar rotas específicas</li>
-                        <li>Filtrar por status</li>
-                        <li>Filtrar por motorista</li>
-                        <li>Filtrar por veículo</li>
-                        <li>Filtrar por período</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-primary close-modal">Fechar</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Expenses Modal -->
     <div class="modal" id="expensesModal">
@@ -1105,6 +1105,11 @@ if (array_key_exists('modern', $_GET)) {
                         <div class="form-group">
                             <label for="adiantamento">Adiantamento</label>
                             <input type="number" id="adiantamento" name="adiantamento" step="0.01" min="0">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="outros">Outros</label>
+                            <input type="number" id="outros" name="outros" step="0.01" min="0">
                         </div>
                         
                         <div class="form-group">
@@ -1205,7 +1210,8 @@ if (array_key_exists('modern', $_GET)) {
     <!-- JavaScript Files (header.js já é carregado pelo includes/header.php) -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
-    <script src="../js/routes.js"></script>
+    <script src="../js/sf_insights.js?v=1.3"></script>
+    <script src="../js/routes.js?v=1.0.6"></script>
     <script>
     // Garantir dropdown do perfil no menu superior (igual às outras páginas)
     (function() {
@@ -1248,10 +1254,58 @@ if (array_key_exists('modern', $_GET)) {
 
     <!-- Mapa + simulação: URLs via window.__SF_ROUTES_MAP_IMG__ -->
     <script>window.__SF_ROUTES_MAP_IMG__=<?php echo json_encode(sf_app_url('uploads/mapa/mapa-brasil.png'), JSON_UNESCAPED_SLASHES); ?>;</script>
-    <script src="../js/routes-simulation.js?v=1.0.1"></script>
+    <script src="../js/routes-simulation.js?v=1.0.6"></script>
     <script src="../js/routes-map.js?v=1.0.1"></script>
 
+    <!-- Modal de confirmação (substitui confirm() nativo) -->
+    <div class="rt-confirm" id="rtConfirm" role="dialog" aria-modal="true" aria-labelledby="rtConfirmTitle" style="display:none;">
+        <div class="rt-confirm-box">
+            <div class="rt-confirm-ico"><i class="fas fa-triangle-exclamation"></i></div>
+            <h4 id="rtConfirmTitle">Confirmar</h4>
+            <p id="rtConfirmMsg">Tem certeza?</p>
+            <div class="rt-confirm-actions">
+                <button type="button" class="fornc-btn fornc-btn--ghost" id="rtConfirmCancel"><i class="fas fa-times"></i> Cancelar</button>
+                <button type="button" class="fornc-btn fornc-btn--primary" id="rtConfirmOk" style="background:#dc2626;"><i class="fas fa-check"></i> Confirmar</button>
+            </div>
+        </div>
+    </div>
+    <style>
+        .rt-confirm { position: fixed; inset: 0; z-index: 10060; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.5); padding: 1rem; box-sizing: border-box; }
+        .rt-confirm-box { background: var(--card-bg, var(--bg-secondary)); color: var(--text-primary); border-radius: 12px; padding: 1.25rem; max-width: 380px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.3); text-align: center; }
+        .rt-confirm-ico { font-size: 2rem; color: #dc2626; margin-bottom: 0.5rem; }
+        .rt-confirm-box h4 { margin: 0 0 0.4rem; font-size: 1.05rem; }
+        .rt-confirm-box p { margin: 0 0 1rem; color: var(--text-secondary); font-size: 0.9rem; }
+        .rt-confirm-actions { display: flex; gap: 0.5rem; justify-content: center; }
+
+        /* Painel de inconsistências */
+        .route-anomalies { border: 1px solid var(--border-color); border-radius: 10px; margin-bottom: 1rem; overflow: hidden; background: var(--card-bg, var(--bg-secondary)); }
+        .route-anomalies.has-erros { border-color: #dc2626; }
+        .route-anomalies.has-avisos { border-color: #f59e0b; }
+        .ra-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.6rem 0.5rem 0.85rem; }
+        .ra-toggle { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: none; border: none; cursor: pointer; color: var(--text-primary); font-weight: 600; font-size: 0.9rem; text-align: left; padding: 0.2rem 0; }
+        .ra-caret { transition: transform 0.2s ease; color: var(--text-muted); }
+        .ra-toggle[aria-expanded="true"] .ra-caret { transform: rotate(180deg); }
+        .ra-summary .ra-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; margin-left: 6px; }
+        .ra-pill.erro { background: rgba(220,38,38,0.12); color: #dc2626; }
+        .ra-pill.aviso { background: rgba(245,158,11,0.14); color: #b45309; }
+        .ra-pill.ok { background: rgba(22,163,74,0.12); color: #16a34a; }
+        .ra-list { max-height: 360px; overflow: auto; padding: 0.25rem 0.85rem 0.6rem; }
+        .ra-item { display: flex; gap: 0.6rem; padding: 0.55rem 0; border-top: 1px solid var(--border-color); }
+        .ra-item:first-child { border-top: none; }
+        .ra-sev { flex: 0 0 auto; font-size: 1rem; line-height: 1.4; }
+        .ra-sev.erro { color: #dc2626; }
+        .ra-sev.aviso { color: #f59e0b; }
+        .ra-info { flex: 1; min-width: 0; }
+        .ra-meta { font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.2rem; }
+        .ra-meta strong { color: var(--text-primary); }
+        .ra-motivos { margin: 0; padding-left: 1.1rem; font-size: 0.85rem; color: var(--text-primary); }
+        .ra-motivos li { margin: 0; }
+        .ra-edit { flex: 0 0 auto; align-self: center; }
+        .ra-empty { font-size: 0.83rem; color: var(--text-muted); padding: 0.2rem 0; }
+    </style>
+
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html>
 

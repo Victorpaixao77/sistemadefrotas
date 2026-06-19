@@ -2,6 +2,7 @@
 // Include configuration and functions first
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
+require_once __DIR__ . '/includes/sf_page_help.php';
 
 // Configure session before starting it
 configure_session();
@@ -9,12 +10,11 @@ configure_session();
 // Start the session
 session_start();
 
-// Check if user is logged in and has empresa_id
-if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
-    // Clear session and redirect to login
-    session_unset();
-    session_destroy();
-    header("location: login.php");
+require_authentication();
+
+// Check empresa context
+if (!isset($_SESSION['empresa_id'])) {
+    header('location: selecionar_empresa.php');
     exit;
 }
 
@@ -23,19 +23,18 @@ $empresa_id = $_SESSION['empresa_id'];
 // Verify if empresa is still active
 try {
     $conn = getConnection();
-    $stmt = $conn->prepare("SELECT status FROM empresa_clientes WHERE id = :empresa_id AND status = 'ativo'");
-    $stmt->bindParam(':empresa_id', $empresa_id);
+    $stmt = $conn->prepare("SELECT status FROM empresa_clientes WHERE id = :empresa_id LIMIT 1");
+    $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
     $stmt->execute();
-    
-    if ($stmt->rowCount() === 0 || $stmt->fetch()['status'] !== 'ativo') {
+    $empresa_row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$empresa_row || ($empresa_row['status'] ?? '') !== 'ativo') {
         session_unset();
         session_destroy();
-        header("location: login.php?error=empresa_inativa");
+        header('location: login.php?error=empresa_inativa');
         exit;
     }
-} catch(PDOException $e) {
-    // Log error but don't show to user
-    error_log("Erro ao verificar status da empresa: " . $e->getMessage());
+} catch (PDOException $e) {
+    error_log('Erro ao verificar status da empresa: ' . $e->getMessage());
 }
 
 // Get company data
@@ -53,8 +52,30 @@ $can_access_pneus = function_exists('can_access_tire_management') && can_access_
 require_once __DIR__ . '/includes/dashboard_home_metrics.php';
 require_once __DIR__ . '/includes/sf_api_base.php';
 $home_period = dashboard_home_normalize_period($_GET['period'] ?? 'year');
+if (!empty($_GET['refresh'])) {
+    dashboard_home_cache_clear_empresa((int) $empresa_id);
+}
 $dash_home = dashboard_home_load_all($conn, (int) $empresa_id, $home_period, $can_view_financial_data);
 extract($dash_home, EXTR_OVERWRITE);
+
+// CNH vencida/vencendo (usado nas "Pendências de hoje" e nos alertas)
+$cnh_vencidas = 0;
+$cnh_vencendo = 0;
+try {
+    $stmt = $conn->prepare("SELECT
+            SUM(CASE WHEN data_validade_cnh IS NOT NULL AND data_validade_cnh <> '0000-00-00'
+                     AND data_validade_cnh < CURRENT_DATE THEN 1 ELSE 0 END) AS vencidas,
+            SUM(CASE WHEN data_validade_cnh IS NOT NULL AND data_validade_cnh <> '0000-00-00'
+                     AND data_validade_cnh BETWEEN CURRENT_DATE AND DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY) THEN 1 ELSE 0 END) AS vencendo
+        FROM motoristas WHERE empresa_id = :empresa_id");
+    $stmt->bindParam(':empresa_id', $empresa_id);
+    $stmt->execute();
+    $cnh_row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $cnh_vencidas = (int) ($cnh_row['vencidas'] ?? 0);
+    $cnh_vencendo = (int) ($cnh_row['vencendo'] ?? 0);
+} catch (Exception $e) {
+    error_log("Erro ao verificar CNH no dashboard: " . $e->getMessage());
+}
 
 $dashboard_export_rows = [
     ['Indicador', 'Valor'],
@@ -64,21 +85,23 @@ $dashboard_export_rows = [
     ['Rotas concluídas', (string) $total_rotas_concluidas],
     ['Rotas (total no período)', (string) $total_rotas],
     ['Abastecimentos (qtd)', (string) $total_abastecimentos],
-    ['Abastecimentos (R$)', number_format($valor_total_abastecimentos, 2, ',', '.')],
-    ['Despesas viagem (R$)', number_format($total_desp_viagem, 2, ',', '.')],
-    ['Despesas fixas pagas (R$)', number_format($total_desp_fixas, 2, ',', '.')],
-    ['Contas pagas (R$)', number_format($total_contas_pagas, 2, ',', '.')],
-    ['Manutenções veículos (R$)', number_format($total_manutencoes, 2, ',', '.')],
-    ['Manutenções pneus (R$)', number_format($total_pneu_manutencao, 2, ',', '.')],
-    ['Parcelas financ. pagas (R$)', number_format($total_parcelas_financiamento, 2, ',', '.')],
     ['Rotas pendentes', (string) $rotas_pendentes_count],
-    ['Contas vencidas (qtd)', (string) $contas_vencidas_count],
-    ['Contas vencidas (R$)', number_format($contas_vencidas_valor, 2, ',', '.')],
 ];
 if ($can_view_financial_data) {
+    $dashboard_export_rows[] = ['Abastecimentos (R$)', number_format($valor_total_abastecimentos, 2, ',', '.')];
+    $dashboard_export_rows[] = ['Despesas viagem (R$)', number_format($total_desp_viagem, 2, ',', '.')];
+    $dashboard_export_rows[] = ['Despesas fixas pagas (R$)', number_format($total_desp_fixas, 2, ',', '.')];
+    $dashboard_export_rows[] = ['Contas pagas (R$)', number_format($total_contas_pagas, 2, ',', '.')];
+    $dashboard_export_rows[] = ['Manutenções veículos (R$)', number_format($total_manutencoes, 2, ',', '.')];
+    $dashboard_export_rows[] = ['Manutenções pneus (R$)', number_format($total_pneu_manutencao, 2, ',', '.')];
+    $dashboard_export_rows[] = ['Parcelas financ. pagas (R$)', number_format($total_parcelas_financiamento, 2, ',', '.')];
+    $dashboard_export_rows[] = ['Contas vencidas (qtd)', (string) $contas_vencidas_count];
+    $dashboard_export_rows[] = ['Contas vencidas (R$)', number_format($contas_vencidas_valor, 2, ',', '.')];
     $dashboard_export_rows[] = ['Fretes aprovados (R$)', number_format($total_fretes, 2, ',', '.')];
     $dashboard_export_rows[] = ['Comissões (R$)', number_format($total_comissoes, 2, ',', '.')];
     $dashboard_export_rows[] = ['Lucro líquido (R$)', number_format($lucro_liquido, 2, ',', '.')];
+} else {
+    $dashboard_export_rows[] = ['Contas vencidas (qtd)', (string) $contas_vencidas_count];
 }
 ?>
 
@@ -95,7 +118,9 @@ if ($can_view_financial_data) {
     <link rel="stylesheet" href="css/theme.css">
     <link rel="stylesheet" href="css/responsive.css">
     <link rel="stylesheet" href="css/fornc-modern-page.css">
-    
+    <link rel="stylesheet" href="css/dashboard.css?v=1.4">
+    <?php sf_page_help_css(''); ?>
+
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="logo.png">
     
@@ -104,250 +129,8 @@ if ($can_view_financial_data) {
     
     <!-- Sortable.js for drag-and-drop -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
-    
-    <style>
-        .main-content {
-            margin-left: var(--sidebar-width);
-            transition: margin-left var(--transition-speed) ease;
-            width: calc(100% - var(--sidebar-width));
-            min-height: 100vh;
-            background: var(--bg-primary);
-        }
-        
-        .sidebar-collapsed .main-content {
-            margin-left: var(--sidebar-collapsed-width);
-            width: calc(100% - var(--sidebar-collapsed-width));
-        }
-        
-        .dashboard-content {
-            padding: 20px;
-            width: 100%;
-            max-width: 100%;
-            overflow-x: hidden;
-        }
-        
-        @media (max-width: 768px) {
-            .main-content {
-                margin-left: 0 !important;
-                width: 100% !important;
-            }
-        }
-
-        /* Dashboard principal — modo moderno (alinhado ao fornc-modern-page) */
-        body.index-dashboard-modern .dashboard-content.fornc-page {
-            padding-top: 8px;
-        }
-        body.index-dashboard-modern .index-alerts-modern {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 1rem !important;
-        }
-        body.index-dashboard-modern .alerta-card--modern {
-            flex: 1 1 240px;
-            min-width: 200px;
-            background: var(--card-bg, var(--bg-secondary)) !important;
-            color: var(--text-primary) !important;
-            border: 1px solid var(--border-color) !important;
-            border-left: 4px solid var(--alert-accent, var(--accent-primary)) !important;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06) !important;
-            padding: 0.75rem 1rem !important;
-            font-weight: 500 !important;
-        }
-        body.index-dashboard-modern .alerta-card--modern i {
-            color: var(--alert-accent, var(--accent-primary)) !important;
-        }
-        body.index-dashboard-modern .dashboard-grid {
-            display: grid !important;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)) !important;
-            gap: 0.65rem !important;
-            max-width: 100% !important;
-        }
-        body.index-dashboard-modern .dashboard-card {
-            background: var(--card-bg, var(--bg-secondary));
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-            overflow: hidden;
-        }
-        body.index-dashboard-modern .dashboard-card .card-header {
-            padding: 0.55rem 0.7rem;
-        }
-        body.index-dashboard-modern .dashboard-card .card-body {
-            padding: 0.65rem 0.75rem 0.85rem;
-        }
-        body.index-dashboard-modern .analytics-section .section-header h2 {
-            font-size: 1rem;
-            margin: 0 0 0.5rem 0;
-        }
-        body.index-dashboard-modern .analytics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 0.65rem;
-        }
-        body.index-dashboard-modern .analytics-card {
-            background: var(--card-bg, var(--bg-secondary));
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-        }
-        body.index-dashboard-modern .analytics-card .card-header {
-            padding: 0.55rem 0.7rem;
-        }
-        body.index-dashboard-modern .analytics-card .card-body {
-            padding: 0.5rem 0.65rem 0.75rem;
-            min-height: 220px;
-        }
-        body.index-dashboard-modern .card {
-            background: var(--card-bg, var(--bg-secondary));
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-            margin-bottom: 1rem;
-            overflow: hidden;
-        }
-        body.index-dashboard-modern .card .card-header {
-            padding: 0.55rem 0.75rem;
-        }
-        body.index-dashboard-modern .card .card-body {
-            padding: 0.65rem 0.85rem;
-        }
-        body.index-dashboard-modern .index-home-subbar {
-            margin-bottom: 0.5rem;
-        }
-        body.index-dashboard-modern .index-home-toolbar.fornc-toolbar {
-            display: block;
-            padding-bottom: 0.45rem;
-        }
-        body.index-dashboard-modern .index-home-toolbar .index-home-toolbar-title {
-            font-size: 0.58rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            font-weight: 700;
-            margin-bottom: 0.35rem;
-        }
-        body.index-dashboard-modern .index-home-updated {
-            margin: 0.35rem 0 0;
-            font-size: 0.72rem;
-            color: var(--text-muted);
-        }
-        body.index-dashboard-modern .index-home-kpi-strip.fornc-kpi-strip {
-            grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)) !important;
-        }
-        body.index-dashboard-modern .index-kpi-delta {
-            display: block;
-            font-size: 0.58rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            margin-top: 0.15rem;
-            line-height: 1.2;
-        }
-        body.index-dashboard-modern .index-proximas-rotas .fornc-table {
-            font-size: 0.72rem;
-        }
-        body.index-dashboard-modern .index-proximas-rotas .fornc-table td {
-            text-transform: none;
-            letter-spacing: normal;
-        }
-        @media print {
-            body.index-dashboard-modern .sidebar,
-            body.index-dashboard-modern .sidebar-toggle,
-            body.index-dashboard-modern .no-print,
-            body.index-dashboard-modern .top-header,
-            body.index-dashboard-modern footer {
-                display: none !important;
-            }
-            body.index-dashboard-modern .main-content {
-                margin-left: 0 !important;
-                width: 100% !important;
-            }
-            body.index-dashboard-modern .dashboard-content > *:not(#dashboardPrintArea) {
-                display: none !important;
-            }
-            body.index-dashboard-modern #dashboardPrintArea {
-                display: block !important;
-            }
-        }
-        #dashboardPrintArea {
-            display: none;
-            padding: 1rem;
-            font-size: 12px;
-        }
-        #dashboardPrintArea table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        #dashboardPrintArea th, #dashboardPrintArea td {
-            border: 1px solid #ccc;
-            padding: 6px 8px;
-            text-align: left;
-        }
-        body.index-dashboard-modern .sortable-ghost {
-            opacity: 0.45;
-        }
-        body.index-dashboard-modern .index-kpi-lucro {
-            background: rgba(16, 185, 129, 0.1);
-            border: 1px solid rgba(16, 185, 129, 0.45);
-        }
-        body.index-dashboard-modern .index-kpi-lucro .card-header h3 {
-            color: var(--accent-success, #059669);
-            margin: 0;
-            font-size: 0.95rem;
-        }
-        body.index-dashboard-modern .index-kpi-lucro__value {
-            color: var(--accent-success, #059669);
-            font-size: 1.65rem;
-            font-weight: 700;
-        }
-
-        /* KPI Abastecimentos: qtd + valor na mesma altura (evita card “duplo”) */
-        body.index-dashboard-modern .kpi-abast-dual {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-            gap: 0.5rem 0.75rem;
-            align-items: start;
-        }
-        body.index-dashboard-modern .kpi-abast-dual .kpi-abast-item {
-            min-width: 0;
-        }
-        body.index-dashboard-modern .kpi-abast-dual .kpi-abast-item:first-child {
-            padding-right: 0.65rem;
-            border-right: 1px solid var(--border-color, #e5e7eb);
-        }
-        body.index-dashboard-modern .kpi-abast-dual .metric-value {
-            font-size: 1.35rem;
-            line-height: 1.15;
-        }
-        body.index-dashboard-modern .kpi-abast-dual .kpi-abast-item--valor .metric-value {
-            font-size: 1.15rem;
-            font-weight: 700;
-            word-break: break-word;
-        }
-        body.index-dashboard-modern .kpi-abast-dual .metric-subtitle {
-            font-size: 0.68rem;
-            margin-top: 0.15rem;
-        }
-        @media (max-width: 380px) {
-            body.index-dashboard-modern .kpi-abast-dual {
-                grid-template-columns: 1fr;
-            }
-            body.index-dashboard-modern .kpi-abast-dual .kpi-abast-item:first-child {
-                padding-right: 0;
-                border-right: none;
-                padding-bottom: 0.5rem;
-                border-bottom: 1px solid var(--border-color, #e5e7eb);
-            }
-        }
-        body.index-dashboard-modern .fornc-kpi-cell .val .kpi-strip-sep {
-            opacity: 0.45;
-            font-weight: 600;
-            margin: 0 0.15rem;
-        }
-    </style>
 </head>
-<body class="index-dashboard-modern">
+<body class="index-dashboard-modern" data-dashboard-home="1" data-dash-period="<?php echo htmlspecialchars($home_period, ENT_QUOTES, 'UTF-8'); ?>">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include __DIR__ . '/includes/sidebar_pages.php'; ?>
@@ -359,6 +142,71 @@ if ($can_view_financial_data) {
             
             <!-- Dashboard Content -->
             <div class="dashboard-content fornc-page">
+                <?php
+                $hora = (int) date('H');
+                $saudacao = $hora < 12 ? 'Bom dia' : ($hora < 18 ? 'Boa tarde' : 'Boa noite');
+                $dias_semana = ['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'];
+                $meses_ano = ['', 'janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+                $data_br = $dias_semana[(int) date('w')] . ', ' . (int) date('d') . ' de ' . $meses_ano[(int) date('n')] . ' de ' . date('Y');
+                $primeiro_nome = trim(explode(' ', (string) ($_SESSION['nome'] ?? ''))[0]);
+                $nome_empresa = '';
+                if (is_array($empresa)) {
+                    $nome_empresa = (string) ($empresa['nome_fantasia'] ?? $empresa['razao_social'] ?? $empresa['nome_empresa'] ?? $empresa['nome'] ?? '');
+                }
+                $cnh_total_pend = $cnh_vencidas + $cnh_vencendo;
+                $rotas_pend = (int) ($rotas_pendentes_count ?? 0);
+                $contas_pend = (int) ($contas_vencidas_count ?? 0);
+                $despesas_pend = (int) ($despesas_pendentes_count ?? 0);
+                $checklists_pend = (int) ($checklists_problema_count ?? 0);
+                $notif_op = (int) ($notif_nao_lidas_operacional ?? 0);
+                $notif_ia = (int) ($notif_nao_lidas_ia ?? 0);
+                $total_pendencias = $rotas_pend + $contas_pend + $cnh_total_pend + $despesas_pend + $checklists_pend;
+                ?>
+                <?php if (isset($_GET['error']) && $_GET['error'] === 'access_denied'): ?>
+                <div class="index-flash index-flash--warn dashboard-print-hidden" role="alert">
+                    <i class="fas fa-lock" aria-hidden="true"></i> Você não tem permissão para acessar a página solicitada.
+                </div>
+                <?php endif; ?>
+                <!-- Saudação + pendências do dia -->
+                <div class="index-greeting dashboard-print-hidden">
+                    <div class="index-greeting-text">
+                        <h1 class="index-greeting-title"><?php echo htmlspecialchars($saudacao . ($primeiro_nome !== '' ? ', ' . $primeiro_nome : '')); ?>!</h1>
+                        <p class="index-greeting-sub">
+                            <?php echo htmlspecialchars($nome_empresa !== '' ? $nome_empresa . ' · ' : ''); ?><?php echo htmlspecialchars(ucfirst($data_br)); ?><?php
+                            $gps_veic = (int) ($gps_veiculos_sinal_recente ?? 0);
+                            if ($gps_veic > 0):
+                            ?> · <a href="pages/mapa_frota.php" class="index-gps-link" title="Ver no mapa da frota"><i class="fas fa-satellite-dish" aria-hidden="true"></i> <?php echo $gps_veic; ?> veíc. com GPS ativo</a><?php endif; ?>
+                        </p>
+                    </div>
+                    <div class="index-pendencias" aria-label="Pendências que exigem ação">
+                        <?php if ($total_pendencias === 0 && $notif_op === 0 && $notif_ia === 0): ?>
+                            <span class="index-pend-ok"><i class="fas fa-circle-check"></i> Tudo em dia — nenhuma pendência</span>
+                        <?php else: ?>
+                            <?php if ($rotas_pend > 0): ?>
+                            <a href="pages/routes.php" class="index-pend-pill is-warn"><i class="fas fa-route"></i> <strong><?php echo $rotas_pend; ?></strong> rota(s) a aprovar</a>
+                            <?php endif; ?>
+                            <?php if ($despesas_pend > 0): ?>
+                            <a href="pages/routes.php" class="index-pend-pill is-warn"><i class="fas fa-receipt"></i> <strong><?php echo $despesas_pend; ?></strong> despesa(s) pendente(s)</a>
+                            <?php endif; ?>
+                            <?php if ($checklists_pend > 0): ?>
+                            <a href="pages/checklists.php" class="index-pend-pill is-danger"><i class="fas fa-clipboard-check"></i> <strong><?php echo $checklists_pend; ?></strong> checklist(s) com problema</a>
+                            <?php endif; ?>
+                            <?php if ($contas_pend > 0): ?>
+                            <a href="pages/contas_pagar.php" class="index-pend-pill is-danger"><i class="fas fa-file-invoice-dollar"></i> <strong><?php echo $contas_pend; ?></strong> conta(s) vencida(s)</a>
+                            <?php endif; ?>
+                            <?php if ($cnh_total_pend > 0): ?>
+                            <a href="pages/motorists.php" class="index-pend-pill <?php echo $cnh_vencidas > 0 ? 'is-danger' : 'is-warn'; ?>"><i class="fas fa-id-card"></i> <strong><?php echo $cnh_total_pend; ?></strong> CNH a renovar</a>
+                            <?php endif; ?>
+                            <?php if ($notif_op > 0): ?>
+                            <a href="pages/notificacoes.php" class="index-pend-pill is-info"><i class="fas fa-bell"></i> <strong><?php echo $notif_op; ?></strong> alerta(s) operacional(is)</a>
+                            <?php endif; ?>
+                            <?php if ($notif_ia > 0): ?>
+                            <a href="pages/notificacoes.php" class="index-pend-pill is-info"><i class="fas fa-robot"></i> <strong><?php echo $notif_ia; ?></strong> insight(s) de IA</a>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
                 <!-- Alertas Inteligentes -->
                 <div class="alertas-inteligentes mb-4 index-alerts-modern">
                     <?php
@@ -386,10 +234,17 @@ if ($can_view_financial_data) {
                         $manutencao_urgente = $stmt->fetch(PDO::FETCH_ASSOC);
                         
                         if ($manutencao_urgente) {
+                            $diasManut = $manutencao_urgente['dias_sem_manutencao'];
+                            if ($diasManut === null || $diasManut === '') {
+                                $msgManut = "Veículo {$manutencao_urgente['placa']} nunca teve manutenção registrada.";
+                            } else {
+                                $msgManut = "Veículo {$manutencao_urgente['placa']} precisa de manutenção preventiva há " . (int) $diasManut . " dias.";
+                            }
                             $alertas[] = [
                                 'tipo' => 'Manutenção Urgente',
-                                'mensagem' => "Veículo {$manutencao_urgente['placa']} precisa de manutenção preventiva há " . $manutencao_urgente['dias_sem_manutencao'] . " dias.",
-                                'cor' => '#e74c3c'
+                                'mensagem' => $msgManut,
+                                'cor' => '#e74c3c',
+                                'link' => 'pages/manutencoes.php',
                             ];
                         }
                         
@@ -414,19 +269,24 @@ if ($can_view_financial_data) {
                             $alertas[] = [
                                 'tipo' => 'Pneu Antigo',
                                 'mensagem' => "Pneu {$pneu_antigo['marca']} {$pneu_antigo['modelo']} com DOT {$pneu_antigo['dot']} tem mais de 4 anos.",
-                                'cor' => '#f39c12'
+                                'cor' => '#f39c12',
+                                'link' => 'pages/pneus.php',
                             ];
                         }
                         
-                        // 3. Despesa alta (combustível acima da média do mês)
-                        $sql_despesa_alta = "SELECT AVG(a.valor_total) as media_mensal, 
-                                           (SELECT SUM(valor_total) FROM abastecimentos 
-                                            WHERE empresa_id = :empresa_id 
-                                            AND MONTH(data_abastecimento) = MONTH(CURRENT_DATE)
-                                            AND YEAR(data_abastecimento) = YEAR(CURRENT_DATE)) as total_mes
-                                           FROM abastecimentos a 
-                                           WHERE a.empresa_id = :empresa_id2 
-                                           AND a.data_abastecimento >= DATE_SUB(CURRENT_DATE, INTERVAL 3 MONTH)";
+                        // 3. Despesa alta (combustível do mês acima da média mensal dos últimos 3 meses)
+                        $sql_despesa_alta = "SELECT
+                            (SELECT COALESCE(SUM(valor_total), 0) FROM abastecimentos
+                             WHERE empresa_id = :empresa_id
+                             AND MONTH(data_abastecimento) = MONTH(CURRENT_DATE)
+                             AND YEAR(data_abastecimento) = YEAR(CURRENT_DATE)) AS total_mes,
+                            (SELECT COALESCE(AVG(mes_total), 0) FROM (
+                                SELECT SUM(valor_total) AS mes_total
+                                FROM abastecimentos
+                                WHERE empresa_id = :empresa_id2
+                                AND data_abastecimento >= DATE_SUB(CURRENT_DATE, INTERVAL 3 MONTH)
+                                GROUP BY YEAR(data_abastecimento), MONTH(data_abastecimento)
+                            ) t) AS media_mensal";
                         
                         $stmt = $conn->prepare($sql_despesa_alta);
                         $stmt->bindParam(':empresa_id', $empresa_id);
@@ -434,11 +294,13 @@ if ($can_view_financial_data) {
                         $stmt->execute();
                         $despesa_data = $stmt->fetch(PDO::FETCH_ASSOC);
                         
-                        if ($despesa_data && $despesa_data['total_mes'] > ($despesa_data['media_mensal'] * 1.2)) {
+                        if ($despesa_data && (float) $despesa_data['media_mensal'] > 0
+                            && (float) $despesa_data['total_mes'] > ((float) $despesa_data['media_mensal'] * 1.2)) {
                             $alertas[] = [
                                 'tipo' => 'Despesa Alta',
                                 'mensagem' => "Despesa de combustível 20% acima da média dos últimos 3 meses.",
-                                'cor' => '#2980b9'
+                                'cor' => '#2980b9',
+                                'link' => 'pages/abastecimentos.php',
                             ];
                         }
                         
@@ -449,18 +311,37 @@ if ($can_view_financial_data) {
                     if (!empty($rotas_pendentes_count)) {
                         $alertas[] = [
                             'tipo' => 'Rotas pendentes',
-                            'mensagem' => $rotas_pendentes_count . ' rota(s) aguardando análise. Acesse Rotas no menu.',
+                            'mensagem' => $rotas_pendentes_count . ' rota(s) aguardando análise.',
                             'cor' => '#f39c12',
+                            'link' => 'pages/routes.php',
                         ];
                     }
                     if (!empty($contas_vencidas_count)) {
                         $alertas[] = [
                             'tipo' => 'Contas em atraso',
-                            'mensagem' => $contas_vencidas_count . ' conta(s) vencidas (R$ ' . number_format($contas_vencidas_valor, 2, ',', '.') . '). Veja Contas a pagar.',
+                            'mensagem' => $contas_vencidas_count . ' conta(s) vencidas (R$ ' . number_format($contas_vencidas_valor, 2, ',', '.') . ').',
                             'cor' => '#e74c3c',
+                            'link' => 'pages/contas_pagar.php',
                         ];
                     }
-                    
+
+                    // CNH vencida / vencendo (risco legal: multa + veículo parado) — contagens já computadas no topo
+                    if ($cnh_vencidas > 0) {
+                        $alertas[] = [
+                            'tipo' => 'CNH vencida',
+                            'mensagem' => $cnh_vencidas . ' motorista(s) com CNH vencida — risco de multa e veículo parado.',
+                            'cor' => '#e74c3c',
+                            'link' => 'pages/motorists.php',
+                        ];
+                    } elseif ($cnh_vencendo > 0) {
+                        $alertas[] = [
+                            'tipo' => 'CNH vencendo',
+                            'mensagem' => $cnh_vencendo . ' motorista(s) com CNH vencendo nos próximos 30 dias.',
+                            'cor' => '#f39c12',
+                            'link' => 'pages/motorists.php',
+                        ];
+                    }
+
                     // Se não houver alertas reais, mostrar alertas padrão
                     if (empty($alertas)) {
                         $alertas = [
@@ -473,145 +354,50 @@ if ($can_view_financial_data) {
                         <?php
                         $alert_accent = htmlspecialchars($alerta['cor'], ENT_QUOTES, 'UTF-8');
                         $icon_alert = ($alerta['cor'] == '#27ae60') ? 'check-circle' : 'exclamation-triangle';
+                        $alert_link = isset($alerta['link']) ? htmlspecialchars($alerta['link'], ENT_QUOTES, 'UTF-8') : '';
+                        $alert_tag = $alert_link !== '' ? 'a' : 'div';
                         ?>
-                        <div class="alerta-card alerta-card--modern"
+                        <<?php echo $alert_tag; ?> class="alerta-card alerta-card--modern<?php echo $alert_link !== '' ? ' alerta-card--link' : ''; ?>"
+                             <?php if ($alert_link !== ''): ?>href="<?php echo $alert_link; ?>"<?php endif; ?>
                              style="--alert-accent: <?php echo $alert_accent; ?>; display: flex; align-items: center; gap: 12px; border-radius: 8px;">
                             <i class="fas fa-<?php echo $icon_alert; ?>"></i>
                             <span><?= htmlspecialchars($alerta['tipo']) ?>: <?= htmlspecialchars($alerta['mensagem']) ?></span>
-                        </div>
+                            <?php if ($alert_link !== ''): ?><i class="fas fa-chevron-right alerta-card-go" aria-hidden="true"></i><?php endif; ?>
+                        </<?php echo $alert_tag; ?>>
                     <?php endforeach; ?>
                 </div>
 
                 <?php $home_updated_at = date('d/m/Y \à\s H:i'); ?>
-                <div class="index-home-subbar">
-                    <div class="fornc-toolbar index-home-toolbar">
-                        <div class="index-home-toolbar-title">Período: <?php echo htmlspecialchars($home_period_label, ENT_QUOTES, 'UTF-8'); ?></div>
-                        <form method="get" action="" class="fornc-filters-inline" style="align-items: flex-end;">
-                            <div class="fg">
-                                <label for="dashPeriod">Consolidar indicadores</label>
-                                <select name="period" id="dashPeriod" onchange="this.form.submit()" title="Filtra valores abaixo (exceto cadastros). Padrão: ano calendário atual.">
-                                    <option value="year" <?php echo $home_period === 'year' ? 'selected' : ''; ?>>Ano atual (padrão)</option>
-                                    <option value="month" <?php echo $home_period === 'month' ? 'selected' : ''; ?>>Mês atual</option>
-                                    <option value="quarter" <?php echo $home_period === 'quarter' ? 'selected' : ''; ?>>Trimestre atual</option>
-                                    <option value="all" <?php echo $home_period === 'all' ? 'selected' : ''; ?>>Todo o período</option>
-                                </select>
-                            </div>
-                        </form>
-                        <div class="fornc-btn-row no-print">
-                            <button type="button" class="fornc-btn fornc-btn--muted" id="btnDashboardPrint" title="Imprimir resumo"><i class="fas fa-print"></i> Imprimir resumo</button>
-                            <button type="button" class="fornc-btn fornc-btn--ghost" id="btnDashboardCsv" title="Exportar CSV"><i class="fas fa-file-csv"></i> Exportar CSV</button>
-                        </div>
+                <div class="index-home-controls no-print">
+                    <form method="get" action="" class="index-period-form">
+                        <label for="dashPeriod"><i class="fas fa-sliders-h" aria-hidden="true"></i> Período</label>
+                        <select name="period" id="dashPeriod" onchange="this.form.submit()" title="Filtra os indicadores abaixo (exceto cadastros).">
+                            <option value="year" <?php echo $home_period === 'year' ? 'selected' : ''; ?>>Ano atual</option>
+                            <option value="month" <?php echo $home_period === 'month' ? 'selected' : ''; ?>>Mês atual</option>
+                            <option value="quarter" <?php echo $home_period === 'quarter' ? 'selected' : ''; ?>>Trimestre atual</option>
+                            <option value="all" <?php echo $home_period === 'all' ? 'selected' : ''; ?>>Todo o período</option>
+                        </select>
+                    </form>
+                    <div class="index-home-controls-actions">
+                        <span class="index-home-updated" title="Atualizado em <?php echo htmlspecialchars($home_updated_at, ENT_QUOTES, 'UTF-8'); ?>">Atualizado em <?php echo htmlspecialchars($home_updated_at, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <a href="?period=<?php echo urlencode($home_period); ?>&amp;refresh=1" class="fornc-btn fornc-btn--ghost" title="Recarregar indicadores (ignora cache)"><i class="fas fa-rotate"></i></a>
+                        <button type="button" class="fornc-btn fornc-btn--muted" id="btnDashboardPrint" title="Imprimir resumo"><i class="fas fa-print"></i></button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="btnDashboardCsv" title="Exportar CSV"><i class="fas fa-file-csv"></i></button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
                     </div>
-                    <div class="fornc-toolbar index-home-toolbar">
-                        <div class="index-home-toolbar-title">Acesso rápido</div>
-                        <div class="fornc-btn-row">
-                            <a href="pages/routes.php" class="fornc-btn fornc-btn--ghost"><i class="fas fa-route"></i> Rotas</a>
-                            <a href="pages/abastecimentos.php" class="fornc-btn fornc-btn--ghost"><i class="fas fa-gas-pump"></i> Abastecimento</a>
-                            <a href="pages/manutencoes.php" class="fornc-btn fornc-btn--ghost"><i class="fas fa-tools"></i> Manutenções</a>
-                            <a href="pages/vehicles.php" class="fornc-btn fornc-btn--ghost"><i class="fas fa-truck"></i> Veículos</a>
-                            <a href="pages/motorists.php" class="fornc-btn fornc-btn--ghost"><i class="fas fa-user-tie"></i> Motoristas</a>
-                            <a href="pages/multas.php" class="fornc-btn fornc-btn--ghost"><i class="fas fa-exclamation-triangle"></i> Multas</a>
-                            <a href="pages/contas_pagar.php" class="fornc-btn fornc-btn--ghost"><i class="fas fa-file-invoice-dollar"></i> Contas a pagar</a>
-                            <a href="pages/fornecedores.php" class="fornc-btn fornc-btn--ghost"><i class="fas fa-truck-loading"></i> Fornecedores</a>
-                            <?php if ($can_access_pneus): ?>
-                            <a href="pages/pneus.php" class="fornc-btn fornc-btn--ghost"><i class="fas fa-circle"></i> Pneus</a>
-                            <?php endif; ?>
-                            <?php if ($can_access_fiscal): ?>
-                            <a href="fiscal/pages/nfe.php" class="fornc-btn fornc-btn--ghost"><i class="fas fa-receipt"></i> NF-e</a>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <p class="index-home-updated">Indicadores consolidados · Atualizado em <?php echo htmlspecialchars($home_updated_at, ENT_QUOTES, 'UTF-8'); ?><?php echo $home_compare_available ? ' · Comparação com período anterior' : ''; ?></p>
                 </div>
 
-                <div class="fornc-kpi-strip index-home-kpi-strip mb-4 dashboard-print-hidden" aria-label="Resumo rápido">
-                    <div class="fornc-kpi-cell"><span class="lbl">Veículos</span><span class="val"><?php echo (int) $total_veiculos; ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Motoristas</span><span class="val"><?php echo (int) $total_motoristas; ?></span></div>
-                    <div class="fornc-kpi-cell">
-                        <span class="lbl">Rotas (concl. / total)</span>
-                        <span class="val"><?php echo (int) $total_rotas_concluidas; ?> / <?php echo (int) $total_rotas; ?></span>
-                        <?php if ($home_compare_available && $delta_rotas_concl_pct !== null): ?>
-                        <span class="index-kpi-delta"><?php echo htmlspecialchars(dashboard_home_format_delta($delta_rotas_concl_pct), ENT_QUOTES, 'UTF-8'); ?> (concluídas)</span>
-                        <?php endif; ?>
-                    </div>
-                    <div class="fornc-kpi-cell">
-                        <span class="lbl">Abastecimentos</span>
-                        <span class="val"><?php echo (int) $total_abastecimentos; ?><span class="kpi-strip-sep">·</span>R$ <?php echo number_format($valor_total_abastecimentos, 0, ',', '.'); ?></span>
-                    </div>
-                    <?php if ($rotas_pendentes_count > 0): ?>
-                    <div class="fornc-kpi-cell is-warn"><span class="lbl">Rotas pendentes</span><span class="val"><?php echo (int) $rotas_pendentes_count; ?></span></div>
-                    <?php endif; ?>
-                    <?php if ($contas_vencidas_count > 0): ?>
-                    <div class="fornc-kpi-cell is-warn"><span class="lbl">Contas vencidas</span><span class="val"><?php echo (int) $contas_vencidas_count; ?></span></div>
-                    <?php endif; ?>
-                    <?php if (((int) ($gps_veiculos_sinal_recente ?? 0)) > 0 || ((int) ($gps_pontos_hoje ?? 0)) > 0): ?>
-                    <div class="fornc-kpi-cell" title="Rastreamento GPS (últimos 45 min / pontos hoje)">
-                        <span class="lbl">GPS ativo</span>
-                        <span class="val"><?php echo (int) ($gps_veiculos_sinal_recente ?? 0); ?> veíc.<span class="kpi-strip-sep">·</span><?php echo (int) ($gps_pontos_hoje ?? 0); ?> pts/hoje</span>
-                    </div>
-                    <?php endif; ?>
-                    <?php if ($can_view_financial_data): ?>
-                    <div class="fornc-kpi-cell">
-                        <span class="lbl">Fretes (aprov.)</span>
-                        <span class="val">R$ <?php echo number_format($total_fretes, 0, ',', '.'); ?></span>
-                        <?php if ($home_compare_available && $delta_fretes_pct !== null): ?>
-                        <span class="index-kpi-delta"><?php echo htmlspecialchars(dashboard_home_format_delta($delta_fretes_pct), ENT_QUOTES, 'UTF-8'); ?></span>
-                        <?php endif; ?>
-                    </div>
-                    <div class="fornc-kpi-cell<?php echo $lucro_liquido >= 0 ? ' is-ok' : ' is-warn'; ?>">
-                        <span class="lbl">Lucro líquido</span>
-                        <span class="val">R$ <?php echo number_format($lucro_liquido, 0, ',', '.'); ?></span>
-                        <?php if ($home_compare_available && $delta_lucro_pct !== null): ?>
-                        <span class="index-kpi-delta"><?php echo htmlspecialchars(dashboard_home_format_delta($delta_lucro_pct), ENT_QUOTES, 'UTF-8'); ?></span>
-                        <?php endif; ?>
-                    </div>
-                    <?php endif; ?>
+                <!-- Dashboard KPIs (agrupados em seções para reduzir poluição visual) -->
+                <div class="dash-customize-row no-print" style="margin:0.25rem 0 0.5rem;">
+                    <button type="button" class="fornc-btn fornc-btn--ghost" id="toggleLayoutBtn" title="Alternar entre cards normais e compactos"><i class="fas fa-compress"></i> Compactar</button>
+                    <button type="button" class="fornc-btn fornc-btn--muted" id="restoreLayoutBtn" title="Restaurar a ordem padrão dos cards"><i class="fas fa-rotate-left"></i> Restaurar ordem</button>
                 </div>
-
-                <div class="card index-proximas-rotas mb-4 dashboard-print-hidden">
-                    <div class="card-header"><h2>Próximas rotas (7 dias)</h2></div>
-                    <div class="card-body" style="padding:0;">
-                        <?php if (empty($proximas_rotas)): ?>
-                        <p style="padding:0.75rem 1rem;margin:0;font-size:0.85rem;color:var(--text-secondary);">Nenhuma rota prevista neste intervalo.</p>
-                        <?php else: ?>
-                        <div class="fornc-table-wrap">
-                            <table class="fornc-table">
-                                <thead>
-                                    <tr>
-                                        <th>Data</th>
-                                        <th>Motorista</th>
-                                        <th>Veículo</th>
-                                        <th>Trajeto</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($proximas_rotas as $pr): ?>
-                                    <?php
-                                    $dref = !empty($pr['data_saida']) ? $pr['data_saida'] : $pr['data_rota'];
-                                    $dshow = $dref ? date('d/m/Y', strtotime($dref)) : '—';
-                                    $orig = $pr['cidade_origem'] ? $pr['cidade_origem'] . '/' . $pr['estado_origem'] : $pr['estado_origem'];
-                                    $dst = $pr['cidade_destino'] ? $pr['cidade_destino'] . '/' . $pr['estado_destino'] : $pr['estado_destino'];
-                                    ?>
-                                    <tr>
-                                        <td><?php echo htmlspecialchars($dshow, ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo htmlspecialchars($pr['motorista'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo htmlspecialchars($pr['placa'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo htmlspecialchars($orig . ' → ' . $dst, ENT_QUOTES, 'UTF-8'); ?></td>
-                                        <td><?php echo htmlspecialchars($pr['status'] ?? '', ENT_QUOTES, 'UTF-8'); ?></td>
-                                    </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-                
-                <!-- Dashboard KPIs -->
-                <div class="dashboard-grid mb-4 dashboard-print-hidden" id="dashboardGrid">
-                    <div class="dashboard-card" data-card-id="kpi-veiculos">
+                <div class="dash-section">
+                    <div class="dash-section-title"><i class="fas fa-truck-fast"></i> Operação</div>
+                    <div class="dashboard-grid dashboard-print-hidden" id="dashboardGrid" data-dash-section="operacao">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-veiculos" data-href="pages/vehicles.php" tabindex="0" role="link" aria-label="Ver veículos">
                         <div class="card-header">
+                            <i class="fas fa-truck kpi-card-icon" aria-hidden="true"></i>
                             <h3>Total de Veículos</h3>
                         </div>
                         <div class="card-body">
@@ -621,8 +407,9 @@ if ($can_view_financial_data) {
                             </div>
                         </div>
                     </div>
-                    <div class="dashboard-card" data-card-id="kpi-motoristas">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-motoristas" data-href="pages/motorists.php" tabindex="0" role="link" aria-label="Ver motoristas">
                         <div class="card-header">
+                            <i class="fas fa-users kpi-card-icon" aria-hidden="true"></i>
                             <h3>Motoristas/Colaboradores</h3>
                         </div>
                         <div class="card-body">
@@ -632,8 +419,9 @@ if ($can_view_financial_data) {
                             </div>
                         </div>
                     </div>
-                    <div class="dashboard-card" data-card-id="kpi-rotas">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-rotas" data-href="pages/routes.php" tabindex="0" role="link" aria-label="Ver rotas">
                         <div class="card-header">
+                            <i class="fas fa-route kpi-card-icon" aria-hidden="true"></i>
                             <h3>Rotas Realizadas</h3>
                         </div>
                         <div class="card-body">
@@ -646,8 +434,9 @@ if ($can_view_financial_data) {
                             <?php endif; ?>
                         </div>
                     </div>
-                    <div class="dashboard-card" data-card-id="kpi-abastecimentos">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-abastecimentos" data-href="pages/abastecimentos.php" tabindex="0" role="link" aria-label="Ver abastecimentos">
                         <div class="card-header">
+                            <i class="fas fa-gas-pump kpi-card-icon" aria-hidden="true"></i>
                             <h3>Abastecimentos</h3>
                         </div>
                         <div class="card-body">
@@ -656,18 +445,27 @@ if ($can_view_financial_data) {
                                     <span class="metric-value"><?php echo (int) $total_abastecimentos; ?></span>
                                     <span class="metric-subtitle">Registros no período</span>
                                 </div>
+                                <?php if ($can_view_financial_data): ?>
                                 <div class="metric kpi-abast-item kpi-abast-item--valor">
                                     <span class="metric-value">R$ <?php echo number_format($valor_total_abastecimentos, 2, ',', '.'); ?></span>
                                     <span class="metric-subtitle">Total gasto</span>
                                 </div>
+                                <?php endif; ?>
                             </div>
                             <?php if ($home_compare_available && $delta_abast_valor_pct !== null): ?>
                             <p class="index-kpi-delta" style="margin:0.45rem 0 0;"><?php echo htmlspecialchars(dashboard_home_format_delta($delta_abast_valor_pct), ENT_QUOTES, 'UTF-8'); ?> (valor)</p>
                             <?php endif; ?>
                         </div>
                     </div>
-                    <div class="dashboard-card" data-card-id="kpi-desp-viagem">
+                    </div>
+                </div>
+                <?php if ($can_view_financial_data): ?>
+                <div class="dash-section">
+                    <div class="dash-section-title"><i class="fas fa-coins"></i> Custos</div>
+                    <div class="dashboard-grid dashboard-print-hidden" data-dash-section="custos">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-desp-viagem" data-href="pages/routes.php" tabindex="0" role="link">
                         <div class="card-header">
+                            <i class="fas fa-suitcase-rolling kpi-card-icon" aria-hidden="true"></i>
                             <h3>Despesas de Viagem</h3>
                         </div>
                         <div class="card-body">
@@ -677,8 +475,9 @@ if ($can_view_financial_data) {
                             </div>
                         </div>
                     </div>
-                    <div class="dashboard-card" data-card-id="kpi-desp-fixas">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-desp-fixas" data-href="pages/despesas_fixas.php" tabindex="0" role="link">
                         <div class="card-header">
+                            <i class="fas fa-file-invoice-dollar kpi-card-icon" aria-hidden="true"></i>
                             <h3>Despesas Fixas</h3>
                         </div>
                         <div class="card-body">
@@ -688,8 +487,9 @@ if ($can_view_financial_data) {
                             </div>
                         </div>
                     </div>
-                    <div class="dashboard-card" data-card-id="kpi-contas">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-contas" data-href="pages/contas_pagar.php" tabindex="0" role="link">
                         <div class="card-header">
+                            <i class="fas fa-money-check-dollar kpi-card-icon" aria-hidden="true"></i>
                             <h3>Contas Pagas</h3>
                         </div>
                         <div class="card-body">
@@ -699,8 +499,9 @@ if ($can_view_financial_data) {
                             </div>
                         </div>
                     </div>
-                    <div class="dashboard-card" data-card-id="kpi-manut-veiculos">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-manut-veiculos" data-href="pages/manutencoes.php" tabindex="0" role="link">
                         <div class="card-header">
+                            <i class="fas fa-screwdriver-wrench kpi-card-icon" aria-hidden="true"></i>
                             <h3>Manutenções de Veículos</h3>
                         </div>
                         <div class="card-body">
@@ -711,8 +512,9 @@ if ($can_view_financial_data) {
                         </div>
                     </div>
                     <?php if ($can_access_pneus): ?>
-                    <div class="dashboard-card" data-card-id="kpi-manut-pneus">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-manut-pneus" data-href="pages/manutencao_pneus.php" tabindex="0" role="link">
                         <div class="card-header">
+                            <i class="fas fa-circle-dot kpi-card-icon" aria-hidden="true"></i>
                             <h3>Manutenções de Pneus</h3>
                         </div>
                         <div class="card-body">
@@ -723,8 +525,9 @@ if ($can_view_financial_data) {
                         </div>
                     </div>
                     <?php endif; ?>
-                    <div class="dashboard-card" data-card-id="kpi-financiamento">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-financiamento" data-href="pages/financiamento.php" tabindex="0" role="link">
                         <div class="card-header">
+                            <i class="fas fa-landmark kpi-card-icon" aria-hidden="true"></i>
                             <h3>Parcelas de Financiamento</h3>
                         </div>
                         <div class="card-body">
@@ -734,8 +537,15 @@ if ($can_view_financial_data) {
                             </div>
                         </div>
                     </div>
-                    <div class="dashboard-card" data-card-id="kpi-fretes">
+                    </div>
+                </div>
+                <?php endif; ?>
+                <div class="dash-section">
+                    <div class="dash-section-title"><i class="fas fa-chart-line"></i> Financeiro</div>
+                    <div class="dashboard-grid dashboard-print-hidden" data-dash-section="financeiro">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-fretes" data-href="<?php echo $can_view_financial_data ? 'pages/lucratividade.php' : 'pages/routes.php'; ?>" tabindex="0" role="link">
                         <div class="card-header">
+                            <i class="fas <?php echo $can_view_financial_data ? 'fa-sack-dollar' : 'fa-route'; ?> kpi-card-icon" aria-hidden="true"></i>
                             <h3><?php echo $can_view_financial_data ? 'Faturamento (Fretes)' : 'Rotas no período'; ?></h3>
                         </div>
                         <div class="card-body">
@@ -754,8 +564,9 @@ if ($can_view_financial_data) {
                         </div>
                     </div>
                     <?php if ($can_view_financial_data): ?>
-                    <div class="dashboard-card" data-card-id="kpi-comissoes">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-comissoes" data-href="pages/comissoes.php" tabindex="0" role="link">
                         <div class="card-header">
+                            <i class="fas fa-hand-holding-dollar kpi-card-icon" aria-hidden="true"></i>
                             <h3>Comissões</h3>
                         </div>
                         <div class="card-body">
@@ -766,8 +577,9 @@ if ($can_view_financial_data) {
                         </div>
                     </div>
                     <?php else: ?>
-                    <div class="dashboard-card" data-card-id="kpi-comissoes-pct">
+                    <div class="dashboard-card dashboard-card--link" data-card-id="kpi-comissoes-pct" data-href="pages/comissoes.php" tabindex="0" role="link">
                         <div class="card-header">
+                            <i class="fas fa-percent kpi-card-icon" aria-hidden="true"></i>
                             <h3>Comissões</h3>
                         </div>
                         <div class="card-body">
@@ -782,8 +594,9 @@ if ($can_view_financial_data) {
                     </div>
                     <?php endif; ?>
                     <?php if ($can_view_financial_data): ?>
-                    <div class="dashboard-card index-kpi-lucro" data-card-id="kpi-lucro">
+                    <div class="dashboard-card index-kpi-lucro dashboard-card--link" data-card-id="kpi-lucro" data-href="pages/lucratividade.php" tabindex="0" role="link">
                         <div class="card-header">
+                            <i class="fas fa-chart-line kpi-card-icon" aria-hidden="true"></i>
                             <h3>Lucro líquido geral</h3>
                         </div>
                         <div class="card-body">
@@ -797,14 +610,46 @@ if ($can_view_financial_data) {
                         </div>
                     </div>
                     <?php endif; ?>
+                    </div>
                 </div>
-                
+
+                <?php if (!empty($proximas_rotas)): ?>
+                <div class="card dashboard-print-hidden index-proximas-rotas">
+                    <div class="card-header">
+                        <h2><i class="fas fa-calendar-week" aria-hidden="true"></i> Próximas rotas (7 dias)</h2>
+                    </div>
+                    <div class="card-body">
+                        <ul class="index-proximas-list">
+                            <?php foreach ($proximas_rotas as $pr):
+                                $prData = $pr['data_saida'] ?? $pr['data_rota'] ?? '';
+                                $prOrigem = trim(($pr['cidade_origem'] ?? '') . ($pr['estado_origem'] ? '/' . $pr['estado_origem'] : ''));
+                                $prDestino = trim(($pr['cidade_destino'] ?? '') . ($pr['estado_destino'] ? '/' . $pr['estado_destino'] : ''));
+                                if ($prOrigem === '') {
+                                    $prOrigem = (string) ($pr['estado_origem'] ?? '—');
+                                }
+                                if ($prDestino === '') {
+                                    $prDestino = (string) ($pr['estado_destino'] ?? '—');
+                                }
+                            ?>
+                            <li>
+                                <a href="pages/routes.php" class="index-proximas-item">
+                                    <span class="index-proximas-data"><?php echo $prData ? htmlspecialchars(date('d/m', strtotime($prData)), ENT_QUOTES, 'UTF-8') : '—'; ?></span>
+                                    <span class="index-proximas-rota"><?php echo htmlspecialchars($prOrigem . ' → ' . $prDestino, ENT_QUOTES, 'UTF-8'); ?></span>
+                                    <span class="index-proximas-meta"><?php echo htmlspecialchars(($pr['motorista'] ?? '') . ' · ' . ($pr['placa'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></span>
+                                </a>
+                            </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                </div>
+                <?php endif; ?>
+
                 <!-- Gráfico Financeiro -->
                 <?php if ($can_view_financial_data): ?>
                 <div class="analytics-section dashboard-print-hidden" id="dashboardAnalyticsSection">
                     <div class="section-header">
                         <h2>Análise Financeira</h2>
-                        <p style="margin:0.25rem 0 0;font-size:0.78rem;color:var(--text-muted);font-weight:normal;">Gráficos consolidados por <strong>ano calendário atual</strong> (<?php echo (int) date('Y'); ?>), independente do filtro de período acima.</p>
+                        <p style="margin:0.25rem 0 0;font-size:0.78rem;color:var(--text-muted);font-weight:normal;">Gráficos no período: <strong><?php echo htmlspecialchars($home_period_label, ENT_QUOTES, 'UTF-8'); ?></strong> (mesmo filtro dos indicadores acima).</p>
                     </div>
                     <div class="analytics-grid">
                         <div class="analytics-card">
@@ -818,7 +663,7 @@ if ($can_view_financial_data) {
 
                         <div class="analytics-card">
                     <div class="card-header">
-                                <h3>Distribuição de Despesas (<?= date('Y') ?>)</h3>
+                                <h3>Distribuição de Despesas (<?php echo htmlspecialchars($home_period_label, ENT_QUOTES, 'UTF-8'); ?>)</h3>
                     </div>
                     <div class="card-body">
                                 <canvas id="expensesDistributionChart"></canvas>
@@ -827,7 +672,7 @@ if ($can_view_financial_data) {
 
                         <div class="analytics-card">
                     <div class="card-header">
-                                <h3>Comissões Pagas (<?= date('Y') ?>)</h3>
+                                <h3>Comissões Pagas (<?php echo htmlspecialchars($home_period_label, ENT_QUOTES, 'UTF-8'); ?>)</h3>
                     </div>
                     <div class="card-body">
                         <canvas id="commissionsChart"></canvas>
@@ -836,7 +681,7 @@ if ($can_view_financial_data) {
 
                         <div class="analytics-card">
                     <div class="card-header">
-                                <h3>Faturamento Líquido (<?= date('Y') ?>)</h3>
+                                <h3>Lucro Líquido (<?php echo htmlspecialchars($home_period_label, ENT_QUOTES, 'UTF-8'); ?>)</h3>
                     </div>
                     <div class="card-body">
                         <canvas id="netRevenueChart"></canvas>
@@ -858,7 +703,7 @@ if ($can_view_financial_data) {
                             $atividades = [];
                             
                             // Últimas rotas
-                            $sql_rotas = "SELECT r.id, r.estado_origem, r.estado_destino, r.data_saida, m.nome as motorista, v.placa,
+                            $sql_rotas = "SELECT r.id, r.estado_origem, r.estado_destino, r.data_saida, r.data_rota, m.nome as motorista, v.placa,
                                          co.nome as cidade_origem, cd.nome as cidade_destino
                                          FROM rotas r 
                                          JOIN motoristas m ON r.motorista_id = m.id 
@@ -866,7 +711,7 @@ if ($can_view_financial_data) {
                                          LEFT JOIN cidades co ON r.cidade_origem_id = co.id
                                          LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
                                          WHERE r.empresa_id = :empresa_id 
-                                         ORDER BY r.data_saida DESC LIMIT 3";
+                                         ORDER BY COALESCE(r.data_saida, r.data_rota) DESC LIMIT 3";
                             $stmt = $conn->prepare($sql_rotas);
                             $stmt->bindParam(':empresa_id', $empresa_id);
                             $stmt->execute();
@@ -875,8 +720,10 @@ if ($can_view_financial_data) {
                             foreach ($rotas_recentes as $rota) {
                                 $origem = $rota['cidade_origem'] ? $rota['cidade_origem'] . '/' . $rota['estado_origem'] : $rota['estado_origem'];
                                 $destino = $rota['cidade_destino'] ? $rota['cidade_destino'] . '/' . $rota['estado_destino'] : $rota['estado_destino'];
+                                $dataRef = $rota['data_saida'] ?: $rota['data_rota'];
                                 $atividades[] = [
-                                    'data' => date('d/m/Y', strtotime($rota['data_saida'])),
+                                    'ts' => $dataRef ? strtotime($dataRef) : 0,
+                                    'data' => $dataRef ? date('d/m/Y', strtotime($dataRef)) : '—',
                                     'descricao' => "Rota: {$origem} → {$destino} ({$rota['motorista']})",
                                     'tipo' => 'rota',
                                     'cor' => '#3498db'
@@ -897,6 +744,7 @@ if ($can_view_financial_data) {
                             
                             foreach ($abastecimentos_recentes as $abastecimento) {
                                 $atividades[] = [
+                                    'ts' => strtotime($abastecimento['data_abastecimento']),
                                     'data' => date('d/m/Y', strtotime($abastecimento['data_abastecimento'])),
                                     'descricao' => "Abastecimento: {$abastecimento['placa']} - {$abastecimento['litros']}L (R$ " . number_format($abastecimento['valor_total'], 2, ',', '.') . ")",
                                     'tipo' => 'abastecimento',
@@ -917,6 +765,7 @@ if ($can_view_financial_data) {
                             
                             foreach ($manutencoes_recentes as $manutencao) {
                                 $atividades[] = [
+                                    'ts' => strtotime($manutencao['data_manutencao']),
                                     'data' => date('d/m/Y', strtotime($manutencao['data_manutencao'])),
                                     'descricao' => "Manutenção: {$manutencao['placa']} - " . substr($manutencao['descricao'], 0, 50) . "... (R$ " . number_format($manutencao['valor'], 2, ',', '.') . ")",
                                     'tipo' => 'manutencao',
@@ -925,8 +774,8 @@ if ($can_view_financial_data) {
                             }
                             
                             // Ordenar por data (mais recentes primeiro)
-                            usort($atividades, function($a, $b) {
-                                return strtotime($b['data']) - strtotime($a['data']);
+                            usort($atividades, function ($a, $b) {
+                                return ($b['ts'] ?? 0) <=> ($a['ts'] ?? 0);
                             });
                             
                             // Pegar apenas as 4 mais recentes
@@ -941,15 +790,15 @@ if ($can_view_financial_data) {
                         <?php if (empty($atividades)): ?>
                             <p style="color: #666; font-style: italic;">Nenhuma atividade recente encontrada.</p>
                         <?php else: ?>
-                            <ul style="list-style: none; padding: 0; margin: 0;">
+                            <ul class="index-atividades-list">
                                 <?php foreach ($atividades as $atividade): ?>
-                                    <li style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; padding: 16px 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 15px; transition: all 0.2s ease;">
-                                        <span style="font-size: 1.3rem; color: <?= $atividade['cor'] ?>; min-width: 24px;">
-                                            <i class="fas fa-<?= $atividade['tipo']=='rota'?'road':($atividade['tipo']=='abastecimento'?'gas-pump':($atividade['tipo']=='manutencao'?'wrench':'money-bill')) ?>"></i>
+                                    <li class="index-atividade-item">
+                                        <span class="index-atividade-icon" style="color: <?php echo htmlspecialchars($atividade['cor'], ENT_QUOTES, 'UTF-8'); ?>">
+                                            <i class="fas fa-<?php echo $atividade['tipo'] === 'rota' ? 'road' : ($atividade['tipo'] === 'abastecimento' ? 'gas-pump' : ($atividade['tipo'] === 'manutencao' ? 'wrench' : 'money-bill')); ?>"></i>
                                         </span>
-                                        <div style="flex: 1;">
-                                            <div style="font-weight: 600; color: #2c3e50; margin-bottom: 4px;"><?= $atividade['descricao'] ?></div>
-                                            <div style="font-size: 0.9rem; color: #7f8c8d;"><?= $atividade['data'] ?></div>
+                                        <div class="index-atividade-body">
+                                            <div class="index-atividade-desc"><?php echo htmlspecialchars($atividade['descricao'], ENT_QUOTES, 'UTF-8'); ?></div>
+                                            <div class="index-atividade-data"><?php echo htmlspecialchars($atividade['data'], ENT_QUOTES, 'UTF-8'); ?></div>
                                         </div>
                                     </li>
                                 <?php endforeach; ?>
@@ -965,144 +814,141 @@ if ($can_view_financial_data) {
                         </div>
                         <div class="card-body">
                         <?php
-                        // Buscar insights reais do banco de dados
-                        $insights = [];
-                        
+                        $insights_list = [];
+
                         try {
-                            // 1. Análise de custos de manutenção por fornecedor
                             $sql_custos_fornecedor = "SELECT f.nome as fornecedor, AVG(m.valor) as custo_medio, COUNT(*) as total_manutencoes
-                                                     FROM manutencoes m 
-                                                     JOIN fornecedores f ON m.fornecedor_id = f.id 
-                                                     WHERE m.empresa_id = :empresa_id 
-                                                     AND m.data_manutencao >= DATE_SUB(CURRENT_DATE, INTERVAL 6 MONTH)
-                                                     GROUP BY f.id 
-                                                     HAVING total_manutencoes >= 3
-                                                     ORDER BY custo_medio DESC 
-                                                     LIMIT 1";
-                            
+                                FROM manutencoes m
+                                JOIN fornecedores f ON m.fornecedor_id = f.id
+                                WHERE m.empresa_id = :empresa_id
+                                AND m.data_manutencao >= DATE_SUB(CURRENT_DATE, INTERVAL 6 MONTH)
+                                GROUP BY f.id
+                                HAVING total_manutencoes >= 3
+                                ORDER BY custo_medio DESC
+                                LIMIT 1";
                             $stmt = $conn->prepare($sql_custos_fornecedor);
-                            $stmt->bindParam(':empresa_id', $empresa_id);
+                            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
                             $stmt->execute();
                             $fornecedor_caro = $stmt->fetch(PDO::FETCH_ASSOC);
-                            
                             if ($fornecedor_caro) {
-                                echo "Reduza custos de manutenção trocando fornecedor {$fornecedor_caro['fornecedor']} (média R$ " . number_format($fornecedor_caro['custo_medio'], 2, ',', '.') . ").";
+                                $insights_list[] = 'Reduza custos de manutenção trocando fornecedor '
+                                    . $fornecedor_caro['fornecedor'] . ' (média R$ '
+                                    . number_format((float) $fornecedor_caro['custo_medio'], 2, ',', '.') . ').';
                             } else {
-                                // Se não há dados suficientes, buscar fornecedor com maior custo médio
                                 $sql_fornecedor_alt = "SELECT f.nome as fornecedor, AVG(m.valor) as custo_medio
-                                                      FROM manutencoes m 
-                                                      JOIN fornecedores f ON m.fornecedor_id = f.id 
-                                                      WHERE m.empresa_id = :empresa_id 
-                                                      AND m.data_manutencao >= DATE_SUB(CURRENT_DATE, INTERVAL 12 MONTH)
-                                                      GROUP BY f.id 
-                                                      ORDER BY custo_medio DESC 
-                                                      LIMIT 1";
+                                    FROM manutencoes m
+                                    JOIN fornecedores f ON m.fornecedor_id = f.id
+                                    WHERE m.empresa_id = :empresa_id
+                                    AND m.data_manutencao >= DATE_SUB(CURRENT_DATE, INTERVAL 12 MONTH)
+                                    GROUP BY f.id
+                                    ORDER BY custo_medio DESC
+                                    LIMIT 1";
                                 $stmt = $conn->prepare($sql_fornecedor_alt);
-                                $stmt->bindParam(':empresa_id', $empresa_id);
+                                $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
                                 $stmt->execute();
                                 $fornecedor_alt = $stmt->fetch(PDO::FETCH_ASSOC);
-                                
                                 if ($fornecedor_alt) {
-                                    echo "Reduza custos de manutenção trocando fornecedor {$fornecedor_alt['fornecedor']} (média R$ " . number_format($fornecedor_alt['custo_medio'], 2, ',', '.') . ").";
+                                    $insights_list[] = 'Reduza custos de manutenção trocando fornecedor '
+                                        . $fornecedor_alt['fornecedor'] . ' (média R$ '
+                                        . number_format((float) $fornecedor_alt['custo_medio'], 2, ',', '.') . ').';
                                 } else {
-                                    echo "Analise os custos de manutenção por fornecedor para otimizar gastos.";
+                                    $insights_list[] = 'Analise os custos de manutenção por fornecedor para otimizar gastos.';
                                 }
                             }
-                            
                         } catch (Exception $e) {
-                            echo "Analise os custos de manutenção por fornecedor para otimizar gastos.";
+                            $insights_list[] = 'Analise os custos de manutenção por fornecedor para otimizar gastos.';
+                        }
+
+                        try {
+                            $sql_motorista_consumo = "SELECT m.nome as motorista,
+                                AVG(a.litros / NULLIF(r.distancia_km, 0)) as consumo_medio,
+                                COUNT(DISTINCT r.id) as total_rotas
+                                FROM motoristas m
+                                JOIN rotas r ON m.id = r.motorista_id
+                                JOIN abastecimentos a ON r.id = a.rota_id
+                                WHERE m.empresa_id = :empresa_id
+                                AND r.data_saida >= DATE_SUB(CURRENT_DATE, INTERVAL 3 MONTH)
+                                AND r.distancia_km > 0 AND a.litros > 0
+                                GROUP BY m.id
+                                HAVING total_rotas >= 3
+                                ORDER BY consumo_medio ASC
+                                LIMIT 1";
+                            $stmt = $conn->prepare($sql_motorista_consumo);
+                            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+                            $stmt->execute();
+                            $melhor_motorista = $stmt->fetch(PDO::FETCH_ASSOC);
+                            if ($melhor_motorista) {
+                                $consumo_l_100km = (float) $melhor_motorista['consumo_medio'] * 100;
+                                $insights_list[] = 'Motorista ' . $melhor_motorista['motorista']
+                                    . ' tem melhor desempenho de consumo (' . number_format($consumo_l_100km, 1, ',', '.') . ' L/100 km).';
+                            } else {
+                                $sql_motorista_alt = "SELECT m.nome as motorista, COUNT(r.id) as total_rotas
+                                    FROM motoristas m
+                                    LEFT JOIN rotas r ON m.id = r.motorista_id
+                                    WHERE m.empresa_id = :empresa_id
+                                    AND r.data_saida >= DATE_SUB(CURRENT_DATE, INTERVAL 6 MONTH)
+                                    GROUP BY m.id
+                                    HAVING total_rotas > 0
+                                    ORDER BY total_rotas DESC
+                                    LIMIT 1";
+                                $stmt = $conn->prepare($sql_motorista_alt);
+                                $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+                                $stmt->execute();
+                                $motorista_alt = $stmt->fetch(PDO::FETCH_ASSOC);
+                                if ($motorista_alt) {
+                                    $insights_list[] = 'Motorista ' . $motorista_alt['motorista']
+                                        . ' realizou ' . (int) $motorista_alt['total_rotas'] . ' rotas nos últimos 6 meses.';
+                                } else {
+                                    $insights_list[] = 'Monitore o desempenho de consumo dos motoristas para otimizar gastos com combustível.';
+                                }
+                            }
+                        } catch (Exception $e) {
+                            $insights_list[] = 'Monitore o desempenho de consumo dos motoristas para otimizar gastos com combustível.';
+                        }
+
+                        if ($can_view_financial_data) {
+                            try {
+                                $sql_lucratividade_horario = "SELECT
+                                    CASE
+                                        WHEN HOUR(r.data_saida) BETWEEN 22 AND 23 OR HOUR(r.data_saida) BETWEEN 0 AND 6 THEN 'Noturno'
+                                        WHEN HOUR(r.data_saida) BETWEEN 6 AND 17 THEN 'Diurno'
+                                        ELSE 'Vespertino'
+                                    END as horario,
+                                    AVG(r.frete - r.comissao) as lucro_medio,
+                                    COUNT(*) as total_rotas
+                                    FROM rotas r
+                                    WHERE r.empresa_id = :empresa_id
+                                    AND r.data_saida >= DATE_SUB(CURRENT_DATE, INTERVAL 6 MONTH)
+                                    GROUP BY horario
+                                    HAVING total_rotas >= 3
+                                    ORDER BY lucro_medio DESC
+                                    LIMIT 1";
+                                $stmt = $conn->prepare($sql_lucratividade_horario);
+                                $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+                                $stmt->execute();
+                                $melhor_horario = $stmt->fetch(PDO::FETCH_ASSOC);
+                                if ($melhor_horario) {
+                                    $insights_list[] = 'Rotas ' . $melhor_horario['horario']
+                                        . ' apresentam maior lucratividade média (R$ '
+                                        . number_format((float) $melhor_horario['lucro_medio'], 2, ',', '.') . ').';
+                                } else {
+                                    $insights_list[] = 'Analise a lucratividade por horário de rotas para otimizar operações.';
+                                }
+                            } catch (Exception $e) {
+                                $insights_list[] = 'Analise a lucratividade por horário de rotas para otimizar operações.';
+                            }
                         }
                         ?>
-                        
-                        <ul style="list-style: disc inside; color: #2d3436; font-size: 1.1rem;">
-                            <li><?php
-                                try {
-                                    // 2. Motorista com melhor desempenho de consumo
-                                    $sql_motorista_consumo = "SELECT m.nome as motorista, 
-                                                             AVG(a.litros / NULLIF(r.distancia_km, 0)) as consumo_medio,
-                                                             COUNT(DISTINCT r.id) as total_rotas
-                                                             FROM motoristas m 
-                                                             JOIN rotas r ON m.id = r.motorista_id 
-                                                             JOIN abastecimentos a ON r.id = a.rota_id 
-                                                             WHERE m.empresa_id = :empresa_id 
-                                                             AND r.data_saida >= DATE_SUB(CURRENT_DATE, INTERVAL 3 MONTH)
-                                                             AND r.distancia_km > 0
-                                                             AND a.litros > 0
-                                                             GROUP BY m.id 
-                                                             HAVING total_rotas >= 3
-                                                             ORDER BY consumo_medio ASC 
-                                                             LIMIT 1";
-                                    
-                                    $stmt = $conn->prepare($sql_motorista_consumo);
-                                    $stmt->bindParam(':empresa_id', $empresa_id);
-                                    $stmt->execute();
-                                    $melhor_motorista = $stmt->fetch(PDO::FETCH_ASSOC);
-                                    
-                                    if ($melhor_motorista) {
-                                        $consumo_l_100km = $melhor_motorista['consumo_medio'] * 100;
-                                        echo "Motorista {$melhor_motorista['motorista']} tem melhor desempenho de consumo (" . number_format($consumo_l_100km, 1) . "L/100km).";
-                                    } else {
-                                        // Se não há dados suficientes, buscar motorista com mais rotas
-                                        $sql_motorista_alt = "SELECT m.nome as motorista, COUNT(r.id) as total_rotas
-                                                             FROM motoristas m 
-                                                             LEFT JOIN rotas r ON m.id = r.motorista_id 
-                                                             WHERE m.empresa_id = :empresa_id 
-                                                             AND r.data_saida >= DATE_SUB(CURRENT_DATE, INTERVAL 6 MONTH)
-                                                             GROUP BY m.id 
-                                                             HAVING total_rotas > 0
-                                                             ORDER BY total_rotas DESC 
-                                                             LIMIT 1";
-                                        $stmt = $conn->prepare($sql_motorista_alt);
-                                        $stmt->bindParam(':empresa_id', $empresa_id);
-                                        $stmt->execute();
-                                        $motorista_alt = $stmt->fetch(PDO::FETCH_ASSOC);
-                                        
-                                        if ($motorista_alt) {
-                                            echo "Motorista {$motorista_alt['motorista']} realizou {$motorista_alt['total_rotas']} rotas nos últimos 6 meses.";
-                                        } else {
-                                            echo "Monitore o desempenho de consumo dos motoristas para otimizar gastos com combustível.";
-                                        }
-                                    }
-                                    
-                                } catch (Exception $e) {
-                                    echo "Monitore o desempenho de consumo dos motoristas para otimizar gastos com combustível.";
-                                }
-                            ?></li>
-                            <li><?php
-                                try {
-                                    // 3. Análise de lucratividade por horário de rota
-                                    $sql_lucratividade_horario = "SELECT 
-                                                                 CASE 
-                                                                     WHEN HOUR(r.data_saida) BETWEEN 22 AND 6 THEN 'Noturno'
-                                                                     WHEN HOUR(r.data_saida) BETWEEN 6 AND 18 THEN 'Diurno'
-                                                                     ELSE 'Vespertino'
-                                                                 END as horario,
-                                                                 AVG(r.frete - r.comissao) as lucro_medio,
-                                                                 COUNT(*) as total_rotas
-                                                                 FROM rotas r 
-                                                                 WHERE r.empresa_id = :empresa_id 
-                                                                 AND r.data_saida >= DATE_SUB(CURRENT_DATE, INTERVAL 6 MONTH)
-                                                                 GROUP BY horario 
-                                                                 HAVING total_rotas >= 3
-                                                                 ORDER BY lucro_medio DESC 
-                                                                 LIMIT 1";
-                                    
-                                    $stmt = $conn->prepare($sql_lucratividade_horario);
-                                    $stmt->bindParam(':empresa_id', $empresa_id);
-                                    $stmt->execute();
-                                    $melhor_horario = $stmt->fetch(PDO::FETCH_ASSOC);
-                                    
-                                    if ($melhor_horario) {
-                                        echo "Rotas {$melhor_horario['horario']} apresentam maior lucratividade média (R$ " . number_format($melhor_horario['lucro_medio'], 2, ',', '.') . ").";
-                                    } else {
-                                        echo "Analise a lucratividade por horário de rotas para otimizar operações.";
-                                    }
-                                    
-                                } catch (Exception $e) {
-                                    echo "Analise a lucratividade por horário de rotas para otimizar operações.";
-                                }
-                            ?></li>
+
+                        <?php if (empty($insights_list)): ?>
+                            <p style="color: var(--text-muted, #666); font-style: italic;">Sem insights suficientes no momento.</p>
+                        <?php else: ?>
+                        <ul class="index-insights-list">
+                            <?php foreach ($insights_list as $insight): ?>
+                            <li><?php echo htmlspecialchars($insight, ENT_QUOTES, 'UTF-8'); ?></li>
+                            <?php endforeach; ?>
                         </ul>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -1138,10 +984,16 @@ if ($can_view_financial_data) {
     <?php include 'includes/footer.php'; ?>
     
     <!-- JavaScript Files (sfApiUrl/sfAppUrl vêm de includes/header.php) -->
-    <script src="js/dashboard.js"></script>
+    <script src="js/dashboard.js?v=2.2"></script>
     <script src="js/theme.js"></script>
     <script src="js/sidebar.js"></script>
     <script>
+        var sfDashPeriod = <?php echo json_encode($home_period, JSON_UNESCAPED_UNICODE); ?>;
+        function sfChartApiUrl(path) {
+            var sep = path.indexOf('?') >= 0 ? '&' : '?';
+            return sfApiUrl(path + sep + 'period=' + encodeURIComponent(sfDashPeriod));
+        }
+
         // Função para inicializar o gráfico de distribuição de despesas
         async function initExpensesDistributionChart() {
             try {
@@ -1151,7 +1003,7 @@ if ($can_view_financial_data) {
                     existingChart.destroy();
                 }
 
-                const response = await fetch(sfApiUrl('expenses_distribution.php'));
+                const response = await fetch(sfChartApiUrl('expenses_distribution.php'));
                 if (!response.ok) {
                     throw new Error('Erro ao carregar dados de distribuição de despesas');
                 }
@@ -1200,7 +1052,7 @@ if ($can_view_financial_data) {
                     existingChart.destroy();
                 }
 
-                const response = await fetch(sfApiUrl('commissions_analytics.php'));
+                const response = await fetch(sfChartApiUrl('commissions_analytics.php'));
                 if (!response.ok) {
                     throw new Error('Erro ao carregar dados de comissões');
                 }
@@ -1263,7 +1115,7 @@ if ($can_view_financial_data) {
                     existingChart.destroy();
                 }
 
-                const response = await fetch(sfApiUrl('net_revenue_analytics.php'));
+                const response = await fetch(sfChartApiUrl('net_revenue_analytics.php'));
                 if (!response.ok) {
                     throw new Error('Erro ao carregar dados de faturamento líquido');
                 }
@@ -1353,7 +1205,7 @@ if ($can_view_financial_data) {
                     return;
                 }
 
-                const response = await fetch(sfApiUrl('financial_analytics.php'));
+                const response = await fetch(sfChartApiUrl('financial_analytics.php'));
                 if (!response.ok) {
                     throw new Error('Erro ao carregar dados financeiros');
                 }
@@ -1560,5 +1412,7 @@ if ($can_view_financial_data) {
     </script>
 
     <?php include 'includes/scroll_to_top.php'; ?>
+    <?php $sf_help_key = 'dashboard'; $sf_help_modern = true; $sf_help_base = ''; include 'includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js(''); ?>
 </body>
 </html>

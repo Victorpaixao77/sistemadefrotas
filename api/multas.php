@@ -48,6 +48,9 @@ try {
         case 'list':
             listMultas($conn);
             break;
+        case 'list_rotas_select':
+            listRotasSelect($conn);
+            break;
         default:
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Ação inválida']);
@@ -55,24 +58,17 @@ try {
 } catch (Exception $e) {
     error_log("Erro na API de multas: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Erro interno do servidor: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Erro interno do servidor.']);
 }
+
+require_once $base_path . '/includes/upload_comprovante.php';
 
 function handleComprovanteUpload($field = 'comprovante') {
     if (!isset($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) {
         return null;
     }
     $upload_dir = dirname(__DIR__) . '/uploads/comprovantes/';
-    if (!is_dir($upload_dir)) {
-        mkdir($upload_dir, 0777, true);
-    }
-    $ext = pathinfo($_FILES[$field]['name'], PATHINFO_EXTENSION);
-    $filename = uniqid() . '.' . $ext;
-    $dest = $upload_dir . $filename;
-    if (move_uploaded_file($_FILES[$field]['tmp_name'], $dest)) {
-        return $filename;
-    }
-    return null;
+    return sf_save_comprovante_upload($_FILES[$field], $upload_dir, 'uploads/comprovantes', true);
 }
 
 function createMulta($conn) {
@@ -322,4 +318,49 @@ function listMultas($conn) {
         'total_pages' => ceil($total / $limit)
     ]);
 }
-?> 
+
+function listRotasSelect($conn) {
+    $empresa_id = (int) $_SESSION['empresa_id'];
+    $veiculo_id = isset($_GET['veiculo_id']) ? (int) $_GET['veiculo_id'] : 0;
+    $motorista_id = isset($_GET['motorista_id']) ? (int) $_GET['motorista_id'] : 0;
+    $limit = 150;
+
+    $sql = "SELECT r.id, r.data_rota, co.nome AS cidade_origem, cd.nome AS cidade_destino
+            FROM rotas r
+            LEFT JOIN cidades co ON r.cidade_origem_id = co.id
+            LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
+            WHERE r.empresa_id = :empresa_id";
+    $params = [':empresa_id' => $empresa_id];
+
+    if ($veiculo_id > 0) {
+        $sql .= ' AND r.veiculo_id = :veiculo_id';
+        $params[':veiculo_id'] = $veiculo_id;
+    }
+    if ($motorista_id > 0) {
+        $sql .= ' AND r.motorista_id = :motorista_id';
+        $params[':motorista_id'] = $motorista_id;
+    }
+
+    $sql .= ' ORDER BY r.data_rota DESC, r.id DESC LIMIT ' . (int) $limit;
+
+    $stmt = $conn->prepare($sql);
+    foreach ($params as $key => $value) {
+        $stmt->bindValue($key, $value, PDO::PARAM_INT);
+    }
+    $stmt->execute();
+    $rotas = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+    $items = [];
+    foreach ($rotas as $rota) {
+        $data = !empty($rota['data_rota']) ? date('d/m/Y', strtotime($rota['data_rota'])) : '';
+        $origem = $rota['cidade_origem'] ?? '-';
+        $destino = $rota['cidade_destino'] ?? '-';
+        $items[] = [
+            'id' => (int) $rota['id'],
+            'label' => trim($data . ' - ' . $origem . ' → ' . $destino),
+        ];
+    }
+
+    echo json_encode(['success' => true, 'rotas' => $items], JSON_UNESCAPED_UNICODE);
+}
+?>

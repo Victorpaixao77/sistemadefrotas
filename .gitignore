@@ -1,0 +1,30 @@
+# Dependências (reinstaláveis via composer install)
+/vendor/
+
+# Logs (podem conter dados sensíveis)
+/logs/
+*.log
+
+# Sessões, cache e temporários
+/sessions/
+/cache/
+/tmp/
+
+# Uploads de usuários
+/uploads/
+
+# Configuração local com segredos (não versionar)
+/includes/config.local.php
+.env
+.env.local
+
+# Artefatos de SO / editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Arquivos vazios criados por engano no shell
+/cd
+/composer
+/LO

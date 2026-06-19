@@ -26,6 +26,15 @@
     }
 }
 
+/* Desktop: nunca deixar overlay do menu mobile bloquear o viewport (classe .active presa no DOM) */
+@media (min-width: 768px) {
+    .sidebar-overlay,
+    .sidebar-overlay.active {
+        display: none !important;
+        pointer-events: none !important;
+    }
+}
+
 /* Mobile Devices (< 768px) */
 @media (max-width: 767px) {
     /* Layout Structure */

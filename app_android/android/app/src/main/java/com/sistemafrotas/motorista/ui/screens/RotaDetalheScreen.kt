@@ -112,7 +112,7 @@ fun RotaDetalheScreen(
         } else if (error != null) {
             Box(Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(error!!, color = MaterialTheme.colorScheme.error)
+                    Text(error ?: "", color = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.height(8.dp))
                     Button(onClick = { error = null; load() }) { Text("Tentar novamente") }
                 }
@@ -120,7 +120,7 @@ fun RotaDetalheScreen(
         } else {
             val r = rota ?: return@Scaffold
             val totalDespesas = (r.despesas?.sumOf { (it.totalDespviagem ?: 0.0) } ?: 0.0).takeIf { it > 0 }
-                ?: (r.despesas?.sumOf { listOfNotNull(it.descarga, it.pedagios, it.caixinha, it.estacionamento, it.lavagem, it.borracharia, it.eletricaMecanica, it.adiantamento).sum() } ?: 0.0)
+                ?: (r.despesas?.sumOf { listOfNotNull(it.descarga, it.pedagios, it.caixinha, it.estacionamento, it.lavagem, it.borracharia, it.eletricaMecanica, it.adiantamento, it.outros).sum() } ?: 0.0)
             val totalAbast = r.abastecimentos?.sumOf { it.valorTotal ?: 0.0 } ?: 0.0
             val frete = r.frete ?: 0.0
             val comissao = r.comissao ?: 0.0
@@ -205,7 +205,7 @@ fun RotaDetalheScreen(
                     Text("Despesas vinculadas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
                     r.despesas!!.forEach { d ->
-                        val tot = d.totalDespviagem ?: listOfNotNull(d.descarga, d.pedagios, d.caixinha, d.estacionamento, d.lavagem, d.borracharia, d.eletricaMecanica, d.adiantamento).sum()
+                        val tot = d.totalDespviagem ?: listOfNotNull(d.descarga, d.pedagios, d.caixinha, d.estacionamento, d.lavagem, d.borracharia, d.eletricaMecanica, d.adiantamento, d.outros).sum()
                         Card(Modifier.fillMaxWidth().padding(vertical = 4.dp), shape = RoundedCornerShape(8.dp)) {
                             Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Filled.Receipt, contentDescription = null, tint = MaterialTheme.colorScheme.primary)

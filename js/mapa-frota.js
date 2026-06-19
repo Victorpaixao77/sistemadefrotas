@@ -10,7 +10,8 @@
     var statusEl = document.getElementById('mapaFrotaStatus');
     var mapLeafletEl = document.getElementById('mapaFrotaLeaflet');
     var mapGoogleEl = document.getElementById('mapaFrotaGoogle');
-    var selVeiculo = document.getElementById('histVeiculo');
+    var selHistVeiculo = document.getElementById('histVeiculo');
+    var selRtVeiculo = document.getElementById('rtVeiculo');
     var inpIni = document.getElementById('histIni');
     var inpFim = document.getElementById('histFim');
     var chkRt = document.getElementById('rtAtivo');
@@ -30,6 +31,16 @@
     var layerHistorico = null;
     var layerRealtime = null;
     var rtTimer = null;
+    var cercasTimer = null;
+    var alertasTimer = null;
+    /** Markers de tempo real (Leaflet) por id de veículo — reaproveitados entre atualizações. */
+    var rtMarkers = {};
+    /** Assinatura do conjunto de veículos exibido — evita re-enquadrar o mapa a cada atualização. */
+    var rtFitSignature = '';
+    /** Id do veículo sendo "seguido" (mapa centraliza nele a cada atualização). */
+    var followId = null;
+    /** Momento da última atualização de posições bem-sucedida (para o "atualizado há Xs"). */
+    var lastRtUpdate = null;
 
     var gMap = null;
     /** @type {{ ref: object, cleanup?: function(): void }[]} */
@@ -43,11 +54,36 @@
     var gRtInfoWindow = null;
     var gRtInfoCloseTimer = null;
 
-    /** Map ID público de demonstração (exige AdvancedMarker); produção: criar Map ID no Google Cloud */
-    var GOOGLE_FROTA_MAP_ID = 'DEMO_MAP_ID';
-
     /** Última rota histórica carregada (para redesenhar ao trocar de mapa) */
     var histCache = null;
+
+    var MAP_MARKER_CAP = 300;
+    var mapaCapAviso = false;
+
+    function fillVeiculoSelect(selectEl, list, placeholderTodos) {
+        if (!selectEl) return;
+        var prev = selectEl.value;
+        selectEl.innerHTML = '';
+        var opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = placeholderTodos;
+        selectEl.appendChild(opt0);
+        list.forEach(function (v) {
+            var o = document.createElement('option');
+            o.value = v.id;
+            o.textContent = (v.placa || '') + (v.modelo ? ' — ' + v.modelo : '');
+            selectEl.appendChild(o);
+        });
+        if (prev) selectEl.value = prev;
+    }
+
+    function getRtVeiculoId() {
+        return selRtVeiculo ? String(selRtVeiculo.value || '').trim() : '';
+    }
+
+    function getHistVeiculoId() {
+        return selHistVeiculo ? String(selHistVeiculo.value || '').trim() : '';
+    }
 
     function apiPosicoesUrl() {
         if (typeof sfApiUrl === 'function') return sfApiUrl('gps_posicoes.php');
@@ -74,7 +110,7 @@
     }
     function apiAlertasOperacionaisUrl() {
         var q = 'limite=120';
-        var vid = selVeiculo ? String(selVeiculo.value || '').trim() : '';
+        var vid = getRtVeiculoId();
         if (vid) q += '&veiculo_id=' + encodeURIComponent(vid);
         if (typeof sfApiUrl === 'function') return sfApiUrl('gps_alertas_operacionais.php?' + q);
         return '../api/gps_alertas_operacionais.php?' + q;
@@ -124,6 +160,40 @@
         if (!isFinite(n) || n < 0) return null;
         return '±' + Math.round(n) + ' m';
     }
+    /** Idade da última posição em minutos (null se não der pra calcular). */
+    function posIdadeMin(p) {
+        if (!p) return null;
+        // Preferir a idade calculada no servidor (NOW() do MySQL) — imune a fuso.
+        if (p.idade_seg != null && isFinite(Number(p.idade_seg))) {
+            return Number(p.idade_seg) / 60;
+        }
+        // Fallback: parse de data_hora contra o relógio do navegador (sujeito a fuso).
+        if (p.data_hora == null || p.data_hora === '') return null;
+        var d = new Date(String(p.data_hora).replace(' ', 'T'));
+        if (isNaN(d.getTime())) return null;
+        return (Date.now() - d.getTime()) / 60000;
+    }
+    var STALE_MIN = 30;
+    function posSemSinal(p) {
+        var m = posIdadeMin(p);
+        return m != null && m > STALE_MIN;
+    }
+    /** Cor do veículo no mapa conforme situação: sem sinal, movimento, ocioso, parado. */
+    function posStatusColor(p) {
+        if (posSemSinal(p)) return '#9ca3af'; // cinza — sem sinal recente
+        var s = String((p && p.status) || '').toLowerCase();
+        if (s === 'movimento') return '#16a34a'; // verde
+        if (s === 'ocioso') return '#f59e0b';     // amarelo
+        return '#dc2626';                          // vermelho — parado/desconhecido
+    }
+    /** divIcon do marker de tempo real com a cor da situação. */
+    function rtDivIcon(cor) {
+        return L.divIcon({
+            className: 'sf-map-marker-rt',
+            html: '<div style="width:12px;height:12px;background:' + cor + ';border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4);"></div>',
+            iconSize: [16, 16], iconAnchor: [8, 8]
+        });
+    }
     function buildPosicaoPopupHtml(p) {
         var title = (p.placa || 'Veículo') + ' · ' + (p.motorista_nome || 'Motorista');
         var vel = formatVelocidadeKmH(p.velocidade);
@@ -131,12 +201,20 @@
         var when = p.data_hora != null ? String(p.data_hora) : '—';
         var sts = formatGpsStatus(p.status);
         var acc = formatAccuracyM(p.accuracy_metros);
+        var endereco = (p.endereco != null && String(p.endereco).trim() !== '') ? String(p.endereco) : '';
         var sub = [];
         if (acc) sub.push('Prec.: ' + acc);
         if (p.provider) sub.push(escapeHtml(String(p.provider)));
         if (p.location_mock === 1 || p.location_mock === '1') sub.push('<span style="color:#b45309">mock</span>');
         var subHtml = sub.length
             ? '<div class="sf-mapa-frota-balao__sub">' + sub.join(' · ') + '</div>'
+            : '';
+        var endHtml = endereco
+            ? '<div class="sf-mapa-frota-balao__end"><i class="fas fa-location-dot" aria-hidden="true"></i> ' + escapeHtml(endereco) + '</div>'
+            : '';
+        var navHtml = (p.latitude != null && p.longitude != null)
+            ? '<div class="sf-mapa-frota-balao__nav"><a href="https://www.google.com/maps/dir/?api=1&destination=' +
+                encodeURIComponent(p.latitude + ',' + p.longitude) + '" target="_blank" rel="noopener">Abrir no Google Maps →</a></div>'
             : '';
         return (
             '<div class="sf-mapa-frota-balao">' +
@@ -149,7 +227,7 @@
             '<span>Bat.: ' + bat + '</span>' +
             '<span class="sf-mapa-frota-balao__sep" aria-hidden="true">·</span>' +
             '<span class="sf-mapa-frota-balao__dt">' + escapeHtml(when) + '</span>' +
-            '</div>' + subHtml + '</div>'
+            '</div>' + endHtml + subHtml + navHtml + '</div>'
         );
     }
     function setPresetHours(h) {
@@ -162,11 +240,11 @@
     function filterPosicoes(list) {
         var q = (searchEl && searchEl.value ? searchEl.value : '').trim().toLowerCase();
         var mid = driverFilter ? String(driverFilter.value || '') : '';
-        var vidSel = selVeiculo ? String(selVeiculo.value || '').trim() : '';
+        var vidRt = getRtVeiculoId();
 
         var out = list.slice();
-        if (vidSel) {
-            out = out.filter(function (p) { return String(p.veiculo_id || '') === vidSel; });
+        if (vidRt) {
+            out = out.filter(function (p) { return String(p.veiculo_id || '') === vidRt; });
         }
         if (mid) {
             out = out.filter(function (p) { return String(p.motorista_id || '') === mid; });
@@ -180,8 +258,10 @@
                 return placa.indexOf(q) !== -1 || mot.indexOf(q) !== -1 || mod.indexOf(q) !== -1 || end.indexOf(q) !== -1;
             });
         }
-        if (!vidSel && out.length > 300) {
-            out = out.slice(0, 300);
+        mapaCapAviso = false;
+        if (!vidRt && out.length > MAP_MARKER_CAP) {
+            mapaCapAviso = true;
+            out = out.slice(0, MAP_MARKER_CAP);
         }
         return out;
     }
@@ -221,17 +301,80 @@
             var mock = (p.location_mock === 1 || p.location_mock === '1')
                 ? ' <span class="badge-mock" title="Localização fictícia">MOCK</span>'
                 : '';
+            var semSinal = posSemSinal(p);
+            var seguindo = followId != null && String(p.veiculo_id) === String(followId);
+            if (semSinal) tr.classList.add('is-stale');
+            if (seguindo) tr.classList.add('is-following');
+            if (p.veiculo_id != null) {
+                tr.dataset.veiculoId = String(p.veiculo_id);
+                tr.style.cursor = 'pointer';
+                tr.title = 'Clique para centralizar no mapa';
+                tr.tabIndex = 0;
+                tr.setAttribute('role', 'button');
+                tr.setAttribute('aria-label', 'Centralizar ' + (p.placa || 'veículo') + ' no mapa');
+            }
+            var seguirBtn = (p.veiculo_id != null)
+                ? '<button type="button" class="mapa-follow-btn' + (seguindo ? ' is-on' : '') + '" data-follow-id="' + escapeHtml(String(p.veiculo_id)) +
+                    '" title="' + (seguindo ? 'Parar de seguir' : 'Seguir este veículo') + '"><i class="fas fa-' + (seguindo ? 'crosshairs' : 'location-arrow') + '"></i></button>'
+                : '';
             tr.innerHTML =
-                '<td class="cell-placa">' + escapeHtml(p.placa || '—') + mock + '</td>' +
+                '<td class="cell-placa">' + escapeHtml(p.placa || '—') + mock + (semSinal ? ' <span class="badge-stale" title="Sem sinal há mais de 30 min">SEM SINAL</span>' : '') + '</td>' +
                 '<td>' + escapeHtml(p.modelo || '—') + '</td>' +
                 '<td>' + escapeHtml(p.motorista_nome || '—') + '</td>' +
                 '<td><span class="' + badgeCls + '">' + stsLabel + '</span></td>' +
                 '<td>' + vel + '</td>' +
                 '<td>' + bat + '</td>' +
                 '<td>' + (acc || '—') + '</td>' +
-                '<td>' + escapeHtml(p.data_hora != null ? String(p.data_hora) : '—') + '</td>';
+                '<td>' + escapeHtml(p.data_hora != null ? String(p.data_hora) : '—') + ' ' + seguirBtn + '</td>';
             tbody.appendChild(tr);
         });
+    }
+
+    /** Atualiza os KPIs do topo que dependem do tempo real (frota inteira, sem filtro). */
+    function atualizarKpisTempoReal() {
+        var recente = 0, semSinal = 0;
+        mapaPosicoesRaw.forEach(function (p) {
+            var m = posIdadeMin(p);
+            if (m == null) return;
+            if (m <= 15) recente++;
+            else if (m > 30) semSinal++;
+        });
+        var elR = document.getElementById('kpiSinalRecente');
+        var elS = document.getElementById('kpiSemSinal');
+        if (elR) elR.textContent = recente;
+        if (elS) elS.textContent = semSinal;
+    }
+
+    /** Centraliza o mapa no veículo e abre o popup (chamado ao clicar na linha da tabela). */
+    function focusVeiculoNoMapa(vid) {
+        if (vid == null) return;
+        var svid = String(vid);
+        if (mapProvider === 'leaflet') {
+            var mk = rtMarkers[svid];
+            if (mk) {
+                // Se estiver dentro de um cluster, expande até o marker antes de abrir.
+                if (typeof layerRealtime.zoomToShowLayer === 'function') {
+                    layerRealtime.zoomToShowLayer(mk, function () { mk.openPopup(); });
+                } else {
+                    map.setView(mk.getLatLng(), Math.max(map.getZoom(), 15), { animate: true });
+                    mk.openPopup();
+                }
+                return;
+            }
+        }
+        // Fallback (Google ou marker ainda não criado): usa a posição crua.
+        var pos = null;
+        for (var i = 0; i < mapaPosicoesRaw.length; i++) {
+            if (String(mapaPosicoesRaw[i].veiculo_id) === svid) { pos = mapaPosicoesRaw[i]; break; }
+        }
+        if (pos && pos.latitude != null && pos.longitude != null) {
+            if (mapProvider === 'leaflet' && map) {
+                map.setView([pos.latitude, pos.longitude], Math.max(map.getZoom(), 15), { animate: true });
+            } else if (gMap) {
+                gMap.setCenter({ lat: Number(pos.latitude), lng: Number(pos.longitude) });
+                gMap.setZoom(15);
+            }
+        }
     }
 
     function sfWaitForGoogleMapsReady(maxMs) {
@@ -497,8 +640,7 @@
         gMap = await window.googleMapsManager.createMap('mapaFrotaGoogle', {
             zoom: 5,
             center: { lat: -14.235, lng: -51.9253 },
-            mapTypeId: 'roadmap',
-            mapId: GOOGLE_FROTA_MAP_ID
+            mapTypeId: 'roadmap'
         });
         return gMap;
     }
@@ -551,7 +693,29 @@
     }).addTo(map);
     layerCercas = L.layerGroup().addTo(map);
     layerHistorico = L.layerGroup().addTo(map);
-    layerRealtime = L.layerGroup().addTo(map);
+    // Agrupa markers próximos quando há muitos veículos sobrepostos. Se a lib de
+    // cluster não carregar (CDN offline), usa layerGroup comum como fallback.
+    layerRealtime = (typeof L.markerClusterGroup === 'function')
+        ? L.markerClusterGroup({
+            showCoverageOnHover: false,
+            maxClusterRadius: 50,
+            spiderfyOnMaxZoom: true,
+            // Bolha do cluster fica vermelha se algum veículo dentro estiver sem sinal.
+            iconCreateFunction: function (cluster) {
+                var filhos = cluster.getAllChildMarkers();
+                var temSemSinal = filhos.some(function (m) { return m._sfSemSinal; });
+                var n = cluster.getChildCount();
+                var tam = n < 10 ? 'small' : (n < 100 ? 'medium' : 'large');
+                var extra = temSemSinal ? ' sf-cluster-alerta' : '';
+                return L.divIcon({
+                    html: '<div><span>' + n + '</span></div>',
+                    className: 'marker-cluster marker-cluster-' + tam + extra,
+                    iconSize: L.point(40, 40)
+                });
+            }
+        })
+        : L.layerGroup();
+    layerRealtime.addTo(map);
 
     function loadCercas() {
         if (optCercas && !optCercas.checked) {
@@ -574,7 +738,7 @@
                             weight: 2,
                             fillColor: '#22c55e',
                             fillOpacity: 0.12
-                        }).bindPopup('Cerca: <strong>' + (c.nome || '') + '</strong><br>Raio: ' + c.raio_metros + ' m').addTo(layerCercas);
+                        }).bindPopup('Cerca: <strong>' + escapeHtml(c.nome || '') + '</strong><br>Raio: ' + escapeHtml(c.raio_metros) + ' m').addTo(layerCercas);
                     } else if (gMap) {
                         var circle = new google.maps.Circle({
                             center: { lat: Number(c.latitude), lng: Number(c.longitude) },
@@ -587,7 +751,7 @@
                         });
                         circle.addListener('click', function () {
                             var inf = new google.maps.InfoWindow({
-                                content: 'Cerca: <strong>' + (c.nome || '') + '</strong><br>Raio: ' + c.raio_metros + ' m'
+                                content: 'Cerca: <strong>' + escapeHtml(c.nome || '') + '</strong><br>Raio: ' + escapeHtml(c.raio_metros) + ' m'
                             });
                             inf.setPosition(circle.getCenter());
                             inf.open(gMap);
@@ -617,7 +781,7 @@
                     return;
                 }
                 var arr = j.data.alertas.slice();
-                var vidSel = selVeiculo ? String(selVeiculo.value || '').trim() : '';
+                var vidSel = getRtVeiculoId();
                 if (vidSel) {
                     arr = arr.filter(function (a) { return String(a.veiculo_id || '') === vidSel; });
                 }
@@ -702,16 +866,23 @@
     function renderRealtimeFromCache() {
         var list = filterPosicoes(mapaPosicoesRaw);
         renderListaVeiculosResumo(list);
-        layerRealtime.clearLayers();
         clearGoogleRealtime();
+        // No Leaflet usamos diff (markers reaproveitados); só limpamos a camada
+        // quando o provedor ativo é o Google, para não deixar markers órfãos.
+        if (mapProvider !== 'leaflet') {
+            layerRealtime.clearLayers();
+            rtMarkers = {};
+        }
+        var rtSeen = {};
 
         if (list.length === 0) {
+            if (mapProvider === 'leaflet') { layerRealtime.clearLayers(); rtMarkers = {}; rtFitSignature = ''; }
             if (mapaPosicoesRaw.length === 0) {
                 statusEl.textContent = 'Tempo real: nenhuma posição. Histórico: escolha veículo e período.';
             } else {
-                var vSel = selVeiculo && selVeiculo.value;
+                var vSel = getRtVeiculoId();
                 if (vSel) {
-                    statusEl.textContent = 'Nenhuma posição em tempo real para o veículo selecionado (ou combine com motorista/busca).';
+                    statusEl.textContent = 'Nenhuma posição em tempo real para o veículo filtrado (ou combine com motorista/busca).';
                 } else {
                     statusEl.textContent = 'Nenhum veículo com os filtros atuais. Ajuste busca ou motorista.';
                 }
@@ -729,25 +900,41 @@
             if (lat == null || lng == null) return;
             var titlePlain = (p.placa || 'Veículo') + ' · ' + (p.motorista_nome || 'Motorista');
             var html = buildPosicaoPopupHtml(p);
+            var cor = posStatusColor(p);
             var tipEl = document.createElement('div');
             tipEl.innerHTML = html;
 
             if (mapProvider === 'leaflet') {
-                var mk = L.marker([lat, lng], { icon: L.divIcon({
-                    className: 'sf-map-marker-rt',
-                    html: '<div style="width:12px;height:12px;background:#dc2626;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4);"></div>',
-                    iconSize: [16, 16], iconAnchor: [8, 8]
-                }) });
-                mk.bindPopup(html);
-                /* className: tooltip Leaflet usa nowrap por padrão e cortava bateria/data */
-                mk.bindTooltip(tipEl, {
-                    sticky: true,
-                    direction: 'top',
-                    opacity: 0.98,
-                    interactive: true,
-                    className: 'sf-mapa-frota-tip'
-                });
-                mk.addTo(layerRealtime);
+                var rtId = String(p.veiculo_id != null ? p.veiculo_id : (p.placa || (lat + ',' + lng)));
+                rtSeen[rtId] = true;
+                var semSinal = posSemSinal(p);
+                var existente = rtMarkers[rtId];
+                if (existente) {
+                    // Reaproveita o marker: só move e atualiza o conteúdo (popup aberto permanece, sem piscar).
+                    existente.setLatLng([lat, lng]);
+                    existente.setPopupContent(html);
+                    existente.setTooltipContent(tipEl);
+                    existente._sfSemSinal = semSinal;
+                    if (existente._sfCor !== cor) {
+                        existente.setIcon(rtDivIcon(cor));
+                        existente._sfCor = cor;
+                    }
+                } else {
+                    var mk = L.marker([lat, lng], { icon: rtDivIcon(cor) });
+                    mk._sfCor = cor;
+                    mk._sfSemSinal = semSinal;
+                    mk.bindPopup(html);
+                    /* className: tooltip Leaflet usa nowrap por padrão e cortava bateria/data */
+                    mk.bindTooltip(tipEl, {
+                        sticky: true,
+                        direction: 'top',
+                        opacity: 0.98,
+                        interactive: true,
+                        className: 'sf-mapa-frota-tip'
+                    });
+                    mk.addTo(layerRealtime);
+                    rtMarkers[rtId] = mk;
+                }
                 bounds.push([lat, lng]);
             } else if (gMap) {
                 var pos = { lat: Number(lat), lng: Number(lng) };
@@ -758,7 +945,7 @@
                 if (Adv && Pin) {
                     try {
                         var pinEl = new Pin({
-                            background: '#dc2626',
+                            background: cor,
                             borderColor: '#ffffff',
                             glyphColor: '#ffffff',
                             scale: 1.05
@@ -782,7 +969,7 @@
                             icon: {
                                 path: google.maps.SymbolPath.CIRCLE,
                                 scale: 7,
-                                fillColor: '#dc2626',
+                                fillColor: cor,
                                 fillOpacity: 1,
                                 strokeColor: '#ffffff',
                                 strokeWeight: 2
@@ -801,7 +988,7 @@
                         icon: {
                             path: google.maps.SymbolPath.CIRCLE,
                             scale: 7,
-                            fillColor: '#dc2626',
+                            fillColor: cor,
                             fillOpacity: 1,
                             strokeColor: '#ffffff',
                             strokeWeight: 2
@@ -815,11 +1002,47 @@
             }
         });
 
+        // Remove markers Leaflet de veículos que saíram do filtro/da lista.
         if (mapProvider === 'leaflet') {
-            if (bounds.length && layerHistorico.getLayers().length === 0) {
+            Object.keys(rtMarkers).forEach(function (id) {
+                if (!rtSeen[id]) {
+                    layerRealtime.removeLayer(rtMarkers[id]);
+                    delete rtMarkers[id];
+                }
+            });
+            // Markers que se moveram precisam ser re-agrupados no cluster.
+            if (typeof layerRealtime.refreshClusters === 'function') {
+                layerRealtime.refreshClusters();
+            }
+        }
+
+        // Modo "seguir": mantém o mapa centralizado no veículo selecionado.
+        var seguindoAgora = false;
+        if (followId != null) {
+            if (mapProvider === 'leaflet' && rtMarkers[String(followId)]) {
+                map.panTo(rtMarkers[String(followId)].getLatLng(), { animate: true });
+                seguindoAgora = true;
+            } else if (mapProvider !== 'leaflet' && gMap) {
+                for (var fi = 0; fi < list.length; fi++) {
+                    if (String(list[fi].veiculo_id) === String(followId) && list[fi].latitude != null) {
+                        gMap.panTo({ lat: Number(list[fi].latitude), lng: Number(list[fi].longitude) });
+                        seguindoAgora = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (mapProvider === 'leaflet') {
+            // Só reenquadra quando o conjunto de veículos muda (entrou/saiu veículo
+            // ou filtro), não a cada atualização de posição — evita "pulos" no mapa.
+            // Em modo "seguir", não reenquadra (o panTo acima já cuida).
+            var rtSig = Object.keys(rtMarkers).sort().join(',');
+            if (!seguindoAgora && bounds.length && layerHistorico.getLayers().length === 0 && rtSig !== rtFitSignature) {
                 map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
             }
-        } else if (gMap && boundsG && !boundsG.isEmpty()) {
+            rtFitSignature = rtSig;
+        } else if (!seguindoAgora && gMap && boundsG && !boundsG.isEmpty()) {
             if (!histCache) {
                 gMap.fitBounds(boundsG);
             }
@@ -827,13 +1050,14 @@
 
         var hasHist = mapProvider === 'leaflet' ? layerHistorico.getLayers().length : (gHistPolyline ? 1 : 0);
         var histNote = hasHist ? ' Rota histórica visível.' : '';
-        var vSel = selVeiculo && selVeiculo.value;
         var onlyNote = '';
-        if (vSel && selVeiculo.options[selVeiculo.selectedIndex]) {
-            onlyNote = ' Somente: ' + selVeiculo.options[selVeiculo.selectedIndex].text + '.';
+        var vSel = getRtVeiculoId();
+        if (vSel && selRtVeiculo && selRtVeiculo.options[selRtVeiculo.selectedIndex]) {
+            onlyNote = ' Filtro tempo real: ' + selRtVeiculo.options[selRtVeiculo.selectedIndex].text + '.';
         }
+        var capNote = mapaCapAviso ? (' Limite de ' + MAP_MARKER_CAP + ' marcadores — refine busca ou filtre por veículo.') : '';
         var mapLabel = mapProvider === 'google' ? ' [Google Maps]' : ' [OpenStreetMap]';
-        statusEl.textContent = 'Tempo real: ' + list.length + ' veículo(s) exibido(s).' + onlyNote + histNote + (chkRt.checked ? ' Atualiza a cada 30 s.' : '') + mapLabel;
+        statusEl.textContent = 'Tempo real: ' + list.length + ' veículo(s) exibido(s).' + onlyNote + capNote + histNote + (chkRt.checked ? ' Atualiza a cada 30 s.' : '') + mapLabel;
     }
 
     function drawHistoricoFromCache() {
@@ -848,14 +1072,17 @@
         var placa = histCache.placa || '';
         var pts = histCache.pts || [];
 
+        var placaEsc = escapeHtml(placa);
+        var dhIni = escapeHtml(pts[0] && pts[0].data_hora ? pts[0].data_hora : '');
+        var dhFim = escapeHtml(pts[pts.length - 1] && pts[pts.length - 1].data_hora ? pts[pts.length - 1].data_hora : '');
         if (mapProvider === 'leaflet') {
             if (latlngs.length >= 2) {
                 L.polyline(latlngs, { color: '#3b82f6', weight: 4, opacity: 0.88 }).addTo(layerHistorico);
-                L.marker(latlngs[0]).bindPopup('<strong>Início</strong><br>' + (pts[0] && pts[0].data_hora ? pts[0].data_hora : '') + '<br>' + placa).addTo(layerHistorico);
-                L.marker(latlngs[latlngs.length - 1]).bindPopup('<strong>Fim</strong><br>' + (pts[pts.length - 1] && pts[pts.length - 1].data_hora ? pts[pts.length - 1].data_hora : '') + '<br>' + placa).addTo(layerHistorico);
+                L.marker(latlngs[0]).bindPopup('<strong>Início</strong><br>' + dhIni + '<br>' + placaEsc).addTo(layerHistorico);
+                L.marker(latlngs[latlngs.length - 1]).bindPopup('<strong>Fim</strong><br>' + dhFim + '<br>' + placaEsc).addTo(layerHistorico);
                 map.fitBounds(L.latLngBounds(latlngs), { padding: [48, 48], maxZoom: 15 });
             } else {
-                L.marker(latlngs[0]).bindPopup('<strong>Único ponto</strong><br>' + (pts[0] && pts[0].data_hora ? pts[0].data_hora : '') + '<br>' + placa).addTo(layerHistorico);
+                L.marker(latlngs[0]).bindPopup('<strong>Único ponto</strong><br>' + dhIni + '<br>' + placaEsc).addTo(layerHistorico);
                 map.setView(latlngs[0], 14);
             }
         } else if (gMap) {
@@ -868,12 +1095,12 @@
                 map: gMap
             });
             if (latlngs.length >= 2) {
-                var htmlIni = '<strong>Início</strong><br>' + (pts[0] && pts[0].data_hora ? pts[0].data_hora : '') + '<br>' + placa;
-                var htmlFim = '<strong>Fim</strong><br>' + (pts[pts.length - 1] && pts[pts.length - 1].data_hora ? pts[pts.length - 1].data_hora : '') + '<br>' + placa;
+                var htmlIni = '<strong>Início</strong><br>' + dhIni + '<br>' + placaEsc;
+                var htmlFim = '<strong>Fim</strong><br>' + dhFim + '<br>' + placaEsc;
                 addGoogleHistoricoMarker(latlngs[0][0], latlngs[0][1], htmlIni, 'A', 'Início — ' + placa);
                 addGoogleHistoricoMarker(latlngs[latlngs.length - 1][0], latlngs[latlngs.length - 1][1], htmlFim, 'B', 'Fim — ' + placa);
             } else if (latlngs.length === 1) {
-                var htmlUnico = '<strong>Único ponto</strong><br>' + (pts[0] && pts[0].data_hora ? pts[0].data_hora : '') + '<br>' + placa;
+                var htmlUnico = '<strong>Único ponto</strong><br>' + dhIni + '<br>' + placaEsc;
                 addGoogleHistoricoMarker(latlngs[0][0], latlngs[0][1], htmlUnico, '', placa);
             }
             var b = new google.maps.LatLngBounds();
@@ -894,6 +1121,8 @@
                     return;
                 }
                 mapaPosicoesRaw = j.data.posicoes;
+                lastRtUpdate = Date.now();
+                atualizarKpisTempoReal();
                 renderRealtimeFromCache();
             })
             .catch(function () {
@@ -905,29 +1134,23 @@
         fetch(apiVeiculosUrl(), { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (j) {
-                selVeiculo.innerHTML = '';
                 var list = (j.veiculos || j.data || []);
                 if (j.success === false || !Array.isArray(list)) {
-                    selVeiculo.innerHTML = '<option value="">Erro ao listar veículos</option>';
+                    if (selHistVeiculo) selHistVeiculo.innerHTML = '<option value="">Erro ao listar veículos</option>';
+                    if (selRtVeiculo) selRtVeiculo.innerHTML = '<option value="">Erro ao listar veículos</option>';
                     return;
                 }
                 if (list.length === 0) {
-                    selVeiculo.innerHTML = '<option value="">Nenhum veículo</option>';
+                    if (selHistVeiculo) selHistVeiculo.innerHTML = '<option value="">Nenhum veículo</option>';
+                    if (selRtVeiculo) selRtVeiculo.innerHTML = '<option value="">Nenhum veículo</option>';
                     return;
                 }
-                var opt0 = document.createElement('option');
-                opt0.value = '';
-                opt0.textContent = 'Selecione…';
-                selVeiculo.appendChild(opt0);
-                list.forEach(function (v) {
-                    var o = document.createElement('option');
-                    o.value = v.id;
-                    o.textContent = (v.placa || '') + (v.modelo ? ' — ' + v.modelo : '');
-                    selVeiculo.appendChild(o);
-                });
+                fillVeiculoSelect(selRtVeiculo, list, 'Todos os veículos');
+                fillVeiculoSelect(selHistVeiculo, list, 'Selecione…');
             })
             .catch(function () {
-                selVeiculo.innerHTML = '<option value="">Falha ao carregar veículos</option>';
+                if (selHistVeiculo) selHistVeiculo.innerHTML = '<option value="">Falha ao carregar veículos</option>';
+                if (selRtVeiculo) selRtVeiculo.innerHTML = '<option value="">Falha ao carregar veículos</option>';
             });
     }
 
@@ -988,7 +1211,7 @@
     }
 
     function carregarHistorico() {
-        var vid = selVeiculo.value;
+        var vid = getHistVeiculoId();
         if (!vid) {
             statusEl.textContent = 'Selecione um veículo para o histórico.';
             return;
@@ -1043,11 +1266,14 @@
         statusEl.textContent = 'Rota histórica removida.';
         loadRealtime();
     });
-    function applyPresetHistorico(h) {
+    function applyPresetHistorico(h, autoLoad) {
         if (!inpIni || !inpFim) return;
         setPresetHours(h);
         if (statusEl) {
             statusEl.textContent = 'Período do histórico: últimas ' + h + ' horas (Início/Fim atualizados).';
+        }
+        if (autoLoad !== false && getHistVeiculoId()) {
+            carregarHistorico();
         }
     }
     [['mapaFrotaPreset6h', 6], ['mapaFrotaPreset24h', 24], ['mapaFrotaPreset72h', 72]].forEach(function (pair) {
@@ -1078,7 +1304,33 @@
     });
     if (searchEl) searchEl.addEventListener('input', function () { renderRealtimeFromCache(); });
     if (driverFilter) driverFilter.addEventListener('change', function () { renderRealtimeFromCache(); });
-    if (selVeiculo) selVeiculo.addEventListener('change', function () { renderRealtimeFromCache(); loadAlertas(); });
+    if (selRtVeiculo) selRtVeiculo.addEventListener('change', function () { renderRealtimeFromCache(); loadAlertas(); });
+
+    // Tabela "Situação por veículo": clicar na linha centraliza no mapa; botão "seguir" fixa o veículo.
+    var rtTbody = document.getElementById('mapaListaVeiculosTbody');
+    if (rtTbody) {
+        rtTbody.addEventListener('click', function (e) {
+            var followBtn = e.target.closest('[data-follow-id]');
+            if (followBtn) {
+                e.stopPropagation();
+                var fid = followBtn.getAttribute('data-follow-id');
+                followId = (String(followId) === String(fid)) ? null : fid;
+                if (followId != null) focusVeiculoNoMapa(followId);
+                renderRealtimeFromCache();
+                return;
+            }
+            var row = e.target.closest('tr[data-veiculo-id]');
+            if (row) focusVeiculoNoMapa(row.dataset.veiculoId);
+        });
+        rtTbody.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            var row = e.target.closest('tr[data-veiculo-id]');
+            if (row) {
+                e.preventDefault();
+                focusVeiculoNoMapa(row.dataset.veiculoId);
+            }
+        });
+    }
 
     document.getElementById('filterBtn').addEventListener('click', function () {
         mapaOpcoes.classList.toggle('is-open');
@@ -1094,6 +1346,39 @@
         });
     }
 
+    // Tela cheia do mapa
+    var btnFs = document.getElementById('btnMapaFullscreen');
+    var mapWrap = document.querySelector('.mapa-frota-map-wrap');
+    if (btnFs && mapWrap) {
+        btnFs.addEventListener('click', function () {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else if (mapWrap.requestFullscreen) {
+                mapWrap.requestFullscreen();
+            }
+        });
+        document.addEventListener('fullscreenchange', function () {
+            var on = document.fullscreenElement === mapWrap;
+            btnFs.innerHTML = on ? '<i class="fas fa-compress"></i>' : '<i class="fas fa-expand"></i>';
+            mapWrap.classList.toggle('is-fullscreen', on);
+            // O mapa precisa recalcular o tamanho ao mudar de dimensão.
+            setTimeout(function () {
+                if (mapProvider === 'leaflet' && map) map.invalidateSize();
+                else if (gMap && window.google) google.maps.event.trigger(gMap, 'resize');
+            }, 120);
+        });
+    }
+
+    // "Atualizado há X s" — atualiza a cada segundo.
+    var updatedEl = document.getElementById('mapaFrotaUpdated');
+    if (updatedEl) {
+        setInterval(function () {
+            if (lastRtUpdate == null) { updatedEl.textContent = ''; return; }
+            var s = Math.round((Date.now() - lastRtUpdate) / 1000);
+            updatedEl.textContent = s < 5 ? 'Atualizado agora' : ('Atualizado há ' + (s < 60 ? s + ' s' : Math.floor(s / 60) + ' min') + '.');
+        }, 1000);
+    }
+
     setPresetHours(24);
     applyProviderLayout();
     renderListaVeiculosResumo(filterPosicoes(mapaPosicoesRaw));
@@ -1101,13 +1386,47 @@
     loadVeiculos();
     loadCercas();
     loadAlertas();
+    // Polling gerenciado: religa só o necessário e pausa quando a aba sai de foco
+    // (economiza bateria/dados do celular e carga no servidor).
+    function startTimers() {
+        stopTimers();
+        if (chkRt.checked) rtTimer = setInterval(loadRealtime, 30000);
+        cercasTimer = setInterval(loadCercas, 120000);
+        alertasTimer = setInterval(loadAlertas, 60000);
+    }
+    function stopTimers() {
+        if (rtTimer) { clearInterval(rtTimer); rtTimer = null; }
+        if (cercasTimer) { clearInterval(cercasTimer); cercasTimer = null; }
+        if (alertasTimer) { clearInterval(alertasTimer); alertasTimer = null; }
+    }
+
     loadRealtime();
-    rtTimer = setInterval(loadRealtime, 30000);
-    setInterval(loadCercas, 120000);
-    setInterval(loadAlertas, 60000);
+    startTimers();
+
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+            stopTimers();
+        } else {
+            // Voltou ao primeiro plano: atualiza na hora e religa os timers.
+            if (chkRt.checked) loadRealtime();
+            loadCercas();
+            loadAlertas();
+            startTimers();
+        }
+    });
 
     if (savedGooglePreference) {
-        switchMapProvider().catch(function () {});
+        fetch(googleMapsConfigUrl(), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success && data.data && data.data.google_maps_api_key) {
+                    return switchMapProvider();
+                }
+                localStorage.removeItem(MAP_STORAGE_KEY);
+            })
+            .catch(function () {
+                localStorage.removeItem(MAP_STORAGE_KEY);
+            });
     }
 })();
 

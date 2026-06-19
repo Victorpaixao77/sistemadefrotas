@@ -1,93 +1,62 @@
 <?php
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/permissions.php';
+require_once '../includes/dashboard_analytics_period.php';
 
-// Configurar sessão antes de iniciá-la
 configure_session();
-
-// Iniciar sessão
 session_start();
 
-// Verificar se o usuário está autenticado
+header('Content-Type: application/json');
+
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
     http_response_code(401);
     echo json_encode(['error' => 'Não autorizado']);
     exit;
 }
 
+if (!can_view_financial_data()) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Sem permissão financeira']);
+    exit;
+}
+
 try {
     $conn = getConnection();
-    $empresa_id = $_SESSION['empresa_id'];
-    $current_year = date('Y');
-    
-    // Query para buscar comissões pagas por mês
-    $query = "
-        SELECT 
-            MONTH(data_rota) as mes,
-            SUM(comissao) as total_comissao
+    $empresa_id = (int) $_SESSION['empresa_id'];
+    $ctx = sf_dashboard_analytics_context();
+    $series = sf_dashboard_analytics_series($ctx['d1'], $ctx['d2'], $ctx['bucket']);
+    $values = array_fill_keys($series['keys'], 0.0);
+
+    $st = $conn->prepare("
+        SELECT DATE(COALESCE(data_saida, data_rota)) AS d, SUM(comissao) AS total
         FROM rotas
-        WHERE empresa_id = :empresa_id
-        AND YEAR(data_rota) = :year
-        AND no_prazo = 1
-        GROUP BY MONTH(data_rota)
-        ORDER BY mes";
-    
-    $stmt = $conn->prepare($query);
-    $stmt->bindParam(':empresa_id', $empresa_id);
-    $stmt->bindParam(':year', $current_year);
-    $stmt->execute();
-    
-    $commissions_data = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Preparar os dados para o gráfico
-    $labels = [];
-    $data = [];
-    
-    // Array com nomes dos meses em português
-    $meses = [
-        1 => 'Janeiro',
-        2 => 'Fevereiro',
-        3 => 'Março',
-        4 => 'Abril',
-        5 => 'Maio',
-        6 => 'Junho',
-        7 => 'Julho',
-        8 => 'Agosto',
-        9 => 'Setembro',
-        10 => 'Outubro',
-        11 => 'Novembro',
-        12 => 'Dezembro'
-    ];
-    
-    // Inicializar todos os meses com zero
-    for ($i = 1; $i <= 12; $i++) {
-        $labels[] = $meses[$i];
-        $data[$i] = 0;
+        WHERE empresa_id = :e AND status = 'aprovado'
+        AND DATE(COALESCE(data_saida, data_rota)) BETWEEN :d1 AND :d2
+        GROUP BY DATE(COALESCE(data_saida, data_rota))
+    ");
+    $st->execute([':e' => $empresa_id, ':d1' => $ctx['d1'], ':d2' => $ctx['d2']]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $k = sf_dashboard_analytics_bucket_key((string) $row['d'], $ctx['bucket']);
+        if ($k !== '' && isset($values[$k])) {
+            $values[$k] += (float) $row['total'];
+        }
     }
-    
-    // Preencher os dados reais
-    foreach ($commissions_data as $row) {
-        $data[$row['mes']] = floatval($row['total_comissao']);
-    }
-    
-    // Retornar os dados no formato esperado pelo Chart.js
+
     echo json_encode([
-        'labels' => $labels,
-        'datasets' => [
-            [
-                'label' => 'Comissões Pagas',
-                'data' => array_values($data),
-                'borderColor' => '#FF6384',
-                'backgroundColor' => 'rgba(255, 99, 132, 0.1)',
-                'fill' => true,
-                'tension' => 0.4
-            ]
-        ]
+        'labels' => $series['labels'],
+        'datasets' => [[
+            'label' => 'Comissões',
+            'data' => array_values($values),
+            'borderColor' => '#FF6384',
+            'backgroundColor' => 'rgba(255, 99, 132, 0.1)',
+            'fill' => true,
+            'tension' => 0.4,
+        ]],
+        'period_label' => $ctx['label'],
     ]);
-    
-} catch (Exception $e) {
-    error_log("Commissions Analytics API Error: " . $e->getMessage());
+} catch (Throwable $e) {
+    error_log('Commissions Analytics API Error: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['error' => 'Erro ao buscar dados de comissões: ' . $e->getMessage()]);
-    exit;
-} 
+    echo json_encode(['error' => 'Erro ao buscar comissões']);
+}

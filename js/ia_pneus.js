@@ -10,11 +10,12 @@ function analisarPneuIA(pneu) {
             prioridade: 'baixa'
         };
         
-        // Análise de quilometragem
-        const kmAtual = pneu.quilometragem || 0;
-        const kmLimite = 80000; // Limite recomendado
-        const kmCritico = 100000; // Limite crítico
-        const kmAlerta = 60000; // Limite para alerta (verificação de sulco)
+        // Análise de quilometragem (km na instalação / vida útil)
+        const kmAtual = parseFloat(pneu.km_instalacao || pneu.quilometragem || 0);
+        const vidaUtil = parseFloat(pneu.vida_util_km || 80000);
+        const kmLimite = vidaUtil > 0 ? vidaUtil * 0.9 : 80000;
+        const kmCritico = vidaUtil > 0 ? vidaUtil : 100000;
+        const kmAlerta = vidaUtil > 0 ? vidaUtil * 0.75 : 60000;
         
         if (kmAtual > kmCritico) {
             analise.status = 'critico';
@@ -71,10 +72,11 @@ function analisarPneuIA(pneu) {
             analise.prioridade = 'media';
         }
         
-        // Análise de pressão (simulada)
-        const pressaoAtual = pneu.pressao || 32; // PSI
-        const pressaoIdeal = 35; // PSI
-        const pressaoMinima = 30; // PSI
+        // Pressão: só analisa se o campo existir no payload
+        if (pneu.pressao != null && pneu.pressao !== '') {
+        const pressaoAtual = parseFloat(pneu.pressao);
+        const pressaoIdeal = 35;
+        const pressaoMinima = 30;
         
         if (pressaoAtual < pressaoMinima) {
             analise.alertas.push('💨 Pressão baixa - calibrar imediatamente');
@@ -90,6 +92,12 @@ function analisarPneuIA(pneu) {
                 analise.status = 'alerta';
                 analise.prioridade = 'media';
             }
+        }
+        } else if (pneu.sulco_inicial != null && parseFloat(pneu.sulco_inicial) <= 2) {
+            analise.alertas.push('📏 Sulco crítico (≤ 2 mm)');
+            analise.recomendacoes.push('Substituir ou recapar o pneu');
+            analise.status = 'critico';
+            analise.prioridade = 'alta';
         }
         
         // Análise de custo-benefício
@@ -220,7 +228,7 @@ function executarAcaoIA(acao, slotId) {
                         Modelo: ${pneu.modelo}
                         Medida: ${pneu.medida}
                         Status: ${pneu.status_nome || 'N/A'}
-                        KM: ${pneu.quilometragem || 'N/A'}
+                        KM: ${pneu.km_instalacao || pneu.quilometragem || 'N/A'}
                         DOT: ${pneu.dot || 'N/A'}
                         Pressão: ${pneu.pressao || 'N/A'} PSI
                     `;
@@ -243,7 +251,7 @@ function executarAcaoIA(acao, slotId) {
 // Análise preditiva de desgaste
 function analisePreditivaDesgaste(pneu) {
     try {
-        const kmAtual = pneu.quilometragem || 0;
+        const kmAtual = parseFloat(pneu.km_instalacao || pneu.quilometragem || 0);
         const kmPorMes = 5000; // Estimativa
         const kmRestante = 80000 - kmAtual;
         const mesesRestante = Math.floor(kmRestante / kmPorMes);
@@ -264,7 +272,7 @@ function analisePreditivaDesgaste(pneu) {
 function calcularCustoAcumulado(pneu) {
     try {
         // Simular cálculo de custo baseado em quilometragem e manutenções
-        const kmAtual = pneu.quilometragem || 0;
+        const kmAtual = parseFloat(pneu.km_instalacao || pneu.quilometragem || 0);
         const custoPorKm = 0.05; // R$ 0,05 por km
         const custoManutencao = 500; // R$ 500 por manutenção
         const manutencoesEstimadas = Math.floor(kmAtual / 40000); // Manutenção a cada 40k km

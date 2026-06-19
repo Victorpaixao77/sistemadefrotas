@@ -1,20 +1,17 @@
 <?php
-// Dashboard data API
-
-// Initialize session and include necessary files
+/**
+ * Dashboard data API — dados reais (legado para expand card / manutenções).
+ */
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once '../includes/permissions.php';
+require_once '../includes/dashboard_home_metrics.php';
 
-// Configure session before starting it
 configure_session();
-
-// Start session
 session_start();
 
-// Set content type to JSON
 header('Content-Type: application/json');
 
-// Check if user is authenticated
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized access']);
@@ -22,420 +19,87 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_
 }
 
 try {
-    // Check for detail parameter
-    $detail = isset($_GET['detail']) ? $_GET['detail'] : null;
+    $conn = getConnection();
+    $empresa_id = (int) $_SESSION['empresa_id'];
+    $canFin = can_view_financial_data();
+    $detail = isset($_GET['detail']) ? (string) $_GET['detail'] : null;
 
-    // If detail parameter is provided, return detailed data for specific widget
-    if ($detail) {
-        echo json_encode(getDetailedData($detail));
+    if ($detail !== null && $detail !== '') {
+        echo json_encode(getDashboardDetailData($conn, $empresa_id, $detail, $canFin));
         exit;
     }
 
-    // Otherwise return general dashboard data
-    echo json_encode(getDashboardData());
-} catch (Exception $e) {
+    $period = dashboard_home_normalize_period($_GET['period'] ?? 'year');
+    $dash = dashboard_home_load_all($conn, $empresa_id, $period, $canFin);
+
+    $maintenanceData = [];
+    $st = $conn->prepare("
+        SELECT m.data_manutencao, v.placa, COALESCE(tm.nome, 'Manutenção') AS tipo, m.valor
+        FROM manutencoes m
+        INNER JOIN veiculos v ON v.id = m.veiculo_id AND v.empresa_id = m.empresa_id
+        LEFT JOIN tipos_manutencao tm ON tm.id = m.tipo_manutencao_id
+        WHERE m.empresa_id = :e
+        ORDER BY m.data_manutencao DESC
+        LIMIT 10
+    ");
+    $st->execute([':e' => $empresa_id]);
+    foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $maintenanceData[] = [
+            'date' => $row['data_manutencao'],
+            'vehicle' => $row['placa'],
+            'type' => $row['tipo'] ?? 'manutenção',
+            'value' => (float) $row['valor'],
+        ];
+    }
+
+    echo json_encode([
+        'vehicleCount' => (int) ($dash['total_veiculos'] ?? 0),
+        'motoristCount' => (int) ($dash['total_motoristas'] ?? 0),
+        'supplyData' => [
+            'count' => (int) ($dash['total_abastecimentos'] ?? 0),
+            'total' => (float) ($dash['valor_total_abastecimentos'] ?? 0),
+        ],
+        'liquidValue' => $canFin ? (float) ($dash['lucro_liquido'] ?? 0) : null,
+        'routes' => [
+            'completed' => (int) ($dash['total_rotas_concluidas'] ?? 0),
+            'total' => (int) ($dash['total_rotas'] ?? 0),
+        ],
+        'maintenanceData' => $maintenanceData,
+        'period' => $period,
+        'period_label' => $dash['home_period_label'] ?? '',
+    ]);
+} catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => 'Internal server error']);
-    error_log("Dashboard API Error: " . $e->getMessage());
-    exit;
+    error_log('Dashboard API Error: ' . $e->getMessage());
 }
 
-/**
- * Get general dashboard data
- * 
- * @return array Dashboard data
- */
-function getDashboardData() {
-    // In a real application, this would fetch from the database
-    // For now, we'll return sample data matching the UI mockup
-    
-    return [
-        'vehicleCount' => 2,
-        'motoristCount' => 2,
-        'supplyData' => [
-            'count' => 2,
-            'total' => 355.56
-        ],
-        'liquidValue' => 12082.50,
-        'routes' => [
-            'completed' => 2,
-            'total' => 3
-        ],
-        'productivity' => 92,
-        'maintenanceData' => [
-            [
-                'date' => '2025-05-06',
-                'vehicle' => '333333',
-                'type' => 'corretiva',
-                'value' => 50.00
-            ],
-            [
-                'date' => '2025-05-05',
-                'vehicle' => '333333',
-                'type' => 'corretiva',
-                'value' => 80.00
-            ],
-            [
-                'date' => '2025-05-02',
-                'vehicle' => '333333',
-                'type' => 'corretiva',
-                'value' => 1222.00
-            ]
-        ]
-    ];
-}
-
-/**
- * Get detailed data for a specific dashboard widget
- * 
- * @param string $widget Widget identifier
- * @return array Detailed widget data
- */
-function getDetailedData($widget) {
-    // Return different data based on the requested widget
+function getDashboardDetailData(PDO $conn, int $empresa_id, string $widget, bool $canFin): array
+{
     switch ($widget) {
+        case 'kpi-veiculos':
         case 'vehicles':
-            return getVehicleDetailedData();
-        
+            $st = $conn->prepare('SELECT placa, modelo, ano, status FROM veiculos WHERE empresa_id = :e ORDER BY placa LIMIT 50');
+            $st->execute([':e' => $empresa_id]);
+            return ['vehicles' => $st->fetchAll(PDO::FETCH_ASSOC)];
+        case 'kpi-motoristas':
         case 'motorists':
-            return getMotoristDetailedData();
-        
-        case 'supply':
-            return getSupplyDetailedData();
-        
+            $st = $conn->prepare('SELECT nome, cpf, telefone FROM motoristas WHERE empresa_id = :e ORDER BY nome LIMIT 50');
+            $st->execute([':e' => $empresa_id]);
+            return ['motorists' => $st->fetchAll(PDO::FETCH_ASSOC)];
+        case 'kpi-rotas':
         case 'routes':
-            return getRouteDetailedData();
-        
-        case 'productivity':
-            return getProductivityDetailedData();
-        
-        case 'liquid-value':
-            return getFinancialDetailedData();
-        
+            $st = $conn->prepare("SELECT id, status, frete, comissao, DATE(COALESCE(data_saida, data_rota)) AS data_ref FROM rotas WHERE empresa_id = :e ORDER BY COALESCE(data_saida, data_rota) DESC LIMIT 30");
+            $st->execute([':e' => $empresa_id]);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+            if (!$canFin) {
+                foreach ($rows as &$r) {
+                    unset($r['frete'], $r['comissao']);
+                }
+                unset($r);
+            }
+            return ['routes' => $rows];
         default:
-            return ['error' => 'Unknown widget type'];
+            return ['error' => 'Widget não suportado'];
     }
-}
-
-/**
- * Get detailed vehicle data
- * 
- * @return array Vehicle data
- */
-function getVehicleDetailedData() {
-    // Sample vehicle data
-    return [
-        'vehicles' => [
-            [
-                'plate' => 'ABC-1234',
-                'model' => 'Mercedes-Benz Actros',
-                'year' => '2022',
-                'status' => 'Ativo',
-                'mileage' => '45,890',
-                'lastMaintenance' => '28/04/2025'
-            ],
-            [
-                'plate' => 'DEF-5678',
-                'model' => 'Volvo FH 540',
-                'year' => '2023',
-                'status' => 'Ativo',
-                'mileage' => '32,150',
-                'lastMaintenance' => '15/04/2025'
-            ]
-        ],
-        'chart' => [
-            'title' => 'Quilometragem por Veículo',
-            'labels' => ['ABC-1234', 'DEF-5678'],
-            'data' => [45890, 32150],
-            'colors' => ['#3b82f6', '#10b981']
-        ]
-    ];
-}
-
-/**
- * Get detailed motorist data
- * 
- * @return array Motorist data
- */
-function getMotoristDetailedData() {
-    // Sample motorist data
-    return [
-        'motorists' => [
-            [
-                'name' => 'João Silva',
-                'license' => 'AE12345678',
-                'status' => 'Ativo',
-                'trips' => '28',
-                'rating' => '4.8',
-                'lastTrip' => '07/05/2025'
-            ],
-            [
-                'name' => 'Maria Oliveira',
-                'license' => 'AE87654321',
-                'status' => 'Ativo',
-                'trips' => '32',
-                'rating' => '4.9',
-                'lastTrip' => '08/05/2025'
-            ]
-        ],
-        'chart' => [
-            'title' => 'Desempenho dos Motoristas',
-            'labels' => ['João Silva', 'Maria Oliveira'],
-            'datasets' => [
-                [
-                    'label' => 'Viagens Concluídas',
-                    'data' => [28, 32],
-                    'backgroundColor' => '#3b82f6'
-                ],
-                [
-                    'label' => 'Avaliação (x10)',
-                    'data' => [48, 49],
-                    'backgroundColor' => '#10b981'
-                ]
-            ]
-        ]
-    ];
-}
-
-/**
- * Get detailed supply data
- * 
- * @return array Supply data
- */
-function getSupplyDetailedData() {
-    // Sample supply data
-    return [
-        'supplies' => [
-            [
-                'date' => '05/05/2025',
-                'vehicle' => 'ABC-1234',
-                'fuelType' => 'Diesel S10',
-                'liters' => '180.5',
-                'value' => '987.56',
-                'station' => 'Posto ABC'
-            ],
-            [
-                'date' => '03/05/2025',
-                'vehicle' => 'DEF-5678',
-                'fuelType' => 'Diesel S10',
-                'liters' => '150.0',
-                'value' => '825.00',
-                'station' => 'Posto XYZ'
-            ]
-        ],
-        'chart' => [
-            'title' => 'Consumo de Combustível (Últimos 6 Meses)',
-            'labels' => ['Dez', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai'],
-            'datasets' => [
-                [
-                    'label' => 'Litros',
-                    'data' => [720, 680, 750, 710, 690, 730],
-                    'backgroundColor' => '#3b82f6'
-                ],
-                [
-                    'label' => 'Custo (R$)',
-                    'data' => [3600, 3400, 3750, 3550, 3450, 3650],
-                    'backgroundColor' => '#f59e0b',
-                    'yAxisID' => 'y2'
-                ]
-            ],
-            'options' => [
-                'scales' => [
-                    'y' => [
-                        'title' => ['text' => 'Litros'],
-                        'position' => 'left'
-                    ],
-                    'y2' => [
-                        'title' => ['text' => 'Custo (R$)'],
-                        'position' => 'right',
-                        'grid' => ['drawOnChartArea' => false]
-                    ]
-                ]
-            ]
-        ],
-        'summary' => [
-            'totalLiters' => '3350.5',
-            'totalCost' => '18427.75',
-            'avgCostPerLiter' => '5.50'
-        ]
-    ];
-}
-
-/**
- * Get detailed route data
- * 
- * @return array Route data
- */
-function getRouteDetailedData() {
-    // Sample route data
-    return [
-        'routes' => [
-            [
-                'id' => '1',
-                'origin' => 'São Paulo, SP',
-                'destination' => 'Rio de Janeiro, RJ',
-                'distance' => '430',
-                'status' => 'Concluída',
-                'driver' => 'João Silva',
-                'vehicle' => 'ABC-1234',
-                'date' => '06/05/2025'
-            ],
-            [
-                'id' => '2',
-                'origin' => 'Rio de Janeiro, RJ',
-                'destination' => 'Belo Horizonte, MG',
-                'distance' => '435',
-                'status' => 'Concluída',
-                'driver' => 'Maria Oliveira',
-                'vehicle' => 'DEF-5678',
-                'date' => '07/05/2025'
-            ],
-            [
-                'id' => '3',
-                'origin' => 'Belo Horizonte, MG',
-                'destination' => 'São Paulo, SP',
-                'distance' => '585',
-                'status' => 'Em andamento',
-                'driver' => 'João Silva',
-                'vehicle' => 'ABC-1234',
-                'date' => '09/05/2025'
-            ]
-        ],
-        'chart' => [
-            'title' => 'Rotas por Status',
-            'type' => 'pie',
-            'labels' => ['Concluídas', 'Em andamento', 'Programadas'],
-            'data' => [2, 1, 0],
-            'colors' => ['#10b981', '#3b82f6', '#f59e0b']
-        ],
-        'summary' => [
-            'totalRoutes' => 3,
-            'completedRoutes' => 2,
-            'totalDistance' => '1450',
-            'completionRate' => '66.67'
-        ]
-    ];
-}
-
-/**
- * Get detailed productivity data
- * 
- * @return array Productivity data
- */
-function getProductivityDetailedData() {
-    // Sample productivity data
-    return [
-        'current' => 92,
-        'previous' => 87,
-        'change' => 5.75,
-        'breakdown' => [
-            [
-                'category' => 'Eficiência de Combustível',
-                'value' => 90,
-                'previous' => 85
-            ],
-            [
-                'category' => 'Tempo de Entrega',
-                'value' => 94,
-                'previous' => 89
-            ],
-            [
-                'category' => 'Quilometragem Diária',
-                'value' => 88,
-                'previous' => 84
-            ],
-            [
-                'category' => 'Manutenção Preventiva',
-                'value' => 95,
-                'previous' => 90
-            ]
-        ],
-        'chart' => [
-            'title' => 'Produtividade ao Longo do Tempo',
-            'labels' => ['Jan', 'Fev', 'Mar', 'Abr', 'Mai'],
-            'datasets' => [
-                [
-                    'label' => 'Produtividade (%)',
-                    'data' => [80, 83, 85, 87, 92],
-                    'borderColor' => '#10b981',
-                    'backgroundColor' => 'rgba(16, 185, 129, 0.1)'
-                ],
-                [
-                    'label' => 'Meta (%)',
-                    'data' => [85, 85, 85, 90, 90],
-                    'borderColor' => '#f59e0b',
-                    'backgroundColor' => 'transparent',
-                    'borderDashed' => true
-                ]
-            ]
-        ]
-    ];
-}
-
-/**
- * Get detailed financial data
- * 
- * @return array Financial data
- */
-function getFinancialDetailedData() {
-    // Sample financial data
-    return [
-        'current' => [
-            'revenue' => 58750.00,
-            'expenses' => 46667.50,
-            'profit' => 12082.50,
-            'margin' => 20.57
-        ],
-        'lastMonth' => [
-            'revenue' => 55230.00,
-            'expenses' => 44960.50,
-            'profit' => 10269.50,
-            'margin' => 18.59
-        ],
-        'chart' => [
-            'title' => 'Receita vs. Despesas (Últimos 6 Meses)',
-            'labels' => ['Dez', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai'],
-            'datasets' => [
-                [
-                    'label' => 'Receita',
-                    'data' => [52480, 53150, 54920, 56780, 55230, 58750],
-                    'borderColor' => '#10b981',
-                    'backgroundColor' => 'rgba(16, 185, 129, 0.1)'
-                ],
-                [
-                    'label' => 'Despesas',
-                    'data' => [43270, 43980, 45120, 46350, 44960, 46670],
-                    'borderColor' => '#ef4444',
-                    'backgroundColor' => 'rgba(239, 68, 68, 0.1)'
-                ]
-            ]
-        ],
-        'expenses' => [
-            [
-                'category' => 'Combustível',
-                'value' => 18650.00,
-                'percentage' => 39.96
-            ],
-            [
-                'category' => 'Manutenção',
-                'value' => 8760.50,
-                'percentage' => 18.77
-            ],
-            [
-                'category' => 'Salários',
-                'value' => 12450.00,
-                'percentage' => 26.68
-            ],
-            [
-                'category' => 'Impostos',
-                'value' => 4250.00,
-                'percentage' => 9.11
-            ],
-            [
-                'category' => 'Outros',
-                'value' => 2557.00,
-                'percentage' => 5.48
-            ]
-        ]
-    ];
 }

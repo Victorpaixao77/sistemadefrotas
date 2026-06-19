@@ -1,138 +1,80 @@
 <?php
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+require_once __DIR__ . '/calendario_api_base.php';
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit(0);
-}
-
-require_once '../../includes/config.php';
-require_once '../../includes/db_connect.php';
-require_once '../../includes/functions.php';
-
-// Start session
-session_start();
-
-// Check if user is logged in
-if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
-}
-
-$empresa_id = $_SESSION['empresa_id'];
+$empresa_id = calendario_api_require_get();
 
 try {
     $conn = getConnection();
-    
-    // Buscar motoristas com CNH vencendo
-    $sql = "SELECT 
-                m.id,
-                m.nome,
-                COALESCE(m.cnh, 'N/A') as cnh_numero,
-                m.data_validade_cnh,
-                DATEDIFF(m.data_validade_cnh, CURRENT_DATE) as dias_para_vencimento
-            FROM motoristas m 
-            WHERE m.empresa_id = :empresa_id 
-            AND m.data_validade_cnh IS NOT NULL 
+    $sql = "SELECT m.id, m.nome, COALESCE(m.cnh, 'N/A') AS cnh_numero, m.data_validade_cnh,
+                   DATEDIFF(m.data_validade_cnh, CURRENT_DATE) AS dias_para_vencimento
+            FROM motoristas m
+            WHERE m.empresa_id = :empresa_id
+            AND m.data_validade_cnh IS NOT NULL
             AND m.data_validade_cnh >= CURRENT_DATE
             ORDER BY m.data_validade_cnh ASC";
-    
     $stmt = $conn->prepare($sql);
-    $stmt->bindParam(':empresa_id', $empresa_id);
-    $stmt->execute();
-    
+    $stmt->execute([':empresa_id' => $empresa_id]);
+
     $events = [];
-    
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $dias_para_vencimento = $row['dias_para_vencimento'];
-        
-        // Criar eventos para diferentes alertas
-        if ($dias_para_vencimento <= 30) {
-            // Vencimento em 30 dias ou menos - ALERTA VERMELHO
+        $dias = (int) $row['dias_para_vencimento'];
+        $base = [
+            'category' => 'CNH',
+            'description' => 'CNH do motorista ' . $row['nome'] . ' (Número: ' . $row['cnh_numero'] . ').',
+            'motorista_id' => (int) $row['id'],
+            'cnh_numero' => $row['cnh_numero'],
+            'dias_para_vencimento' => $dias,
+            'source' => 'automatic',
+        ];
+
+        if ($dias === 0) {
             $events[] = [
-                'id' => 'cnh_' . $row['id'] . '_30',
-                'title' => 'CNH Vence em 30 dias: ' . $row['nome'],
+                'id' => 'cnh_' . $row['id'] . '_hoje',
+                'title' => 'CNH VENCE HOJE: ' . $row['nome'],
                 'start' => $row['data_validade_cnh'],
                 'end' => $row['data_validade_cnh'],
                 'allDay' => true,
-                'backgroundColor' => '#ef4444',
-                'borderColor' => '#ef4444',
-                'extendedProps' => [
-                    'category' => 'cnh',
-                    'description' => 'CNH do motorista ' . $row['nome'] . ' (Número: ' . $row['cnh_numero'] . ') vence em ' . $dias_para_vencimento . ' dias.',
-                    'motorista_id' => $row['id'],
-                    'cnh_numero' => $row['cnh_numero'],
-                    'dias_para_vencimento' => $dias_para_vencimento,
-                    'priority' => 'high'
-                ]
+                'backgroundColor' => '#dc2626',
+                'borderColor' => '#dc2626',
+                'editable' => false,
+                'extendedProps' => array_merge($base, ['priority' => 'critical', 'description' => 'ATENÇÃO: CNH vence hoje!']),
             ];
-        } elseif ($dias_para_vencimento <= 60) {
-            // Vencimento em 60 dias ou menos - ALERTA AMARELO
-            $events[] = [
-                'id' => 'cnh_' . $row['id'] . '_60',
-                'title' => 'CNH Vence em 60 dias: ' . $row['nome'],
-                'start' => $row['data_validade_cnh'],
-                'end' => $row['data_validade_cnh'],
-                'allDay' => true,
-                'backgroundColor' => '#f59e0b',
-                'borderColor' => '#f59e0b',
-                'extendedProps' => [
-                    'category' => 'cnh',
-                    'description' => 'CNH do motorista ' . $row['nome'] . ' (Número: ' . $row['cnh_numero'] . ') vence em ' . $dias_para_vencimento . ' dias.',
-                    'motorista_id' => $row['id'],
-                    'cnh_numero' => $row['cnh_numero'],
-                    'dias_para_vencimento' => $dias_para_vencimento,
-                    'priority' => 'medium'
-                ]
-            ];
-        } elseif ($dias_para_vencimento <= 90) {
-            // Vencimento em 90 dias ou menos - ALERTA AZUL
-            $events[] = [
-                'id' => 'cnh_' . $row['id'] . '_90',
-                'title' => 'CNH Vence em 90 dias: ' . $row['nome'],
-                'start' => $row['data_validade_cnh'],
-                'end' => $row['data_validade_cnh'],
-                'allDay' => true,
-                'backgroundColor' => '#3b82f6',
-                'borderColor' => '#3b82f6',
-                'extendedProps' => [
-                    'category' => 'cnh',
-                    'description' => 'CNH do motorista ' . $row['nome'] . ' (Número: ' . $row['cnh_numero'] . ') vence em ' . $dias_para_vencimento . ' dias.',
-                    'motorista_id' => $row['id'],
-                    'cnh_numero' => $row['cnh_numero'],
-                    'dias_para_vencimento' => $dias_para_vencimento,
-                    'priority' => 'low'
-                ]
-            ];
+            continue;
         }
-        
-        // Evento no dia exato do vencimento
+
+        if ($dias <= 30) {
+            $color = '#ef4444';
+            $label = '30 dias';
+            $priority = 'high';
+        } elseif ($dias <= 60) {
+            $color = '#f59e0b';
+            $label = '60 dias';
+            $priority = 'medium';
+        } elseif ($dias <= 90) {
+            $color = '#3b82f6';
+            $label = '90 dias';
+            $priority = 'low';
+        } else {
+            continue;
+        }
+
         $events[] = [
-            'id' => 'cnh_' . $row['id'] . '_vencimento',
-            'title' => 'CNH VENCE HOJE: ' . $row['nome'],
+            'id' => 'cnh_' . $row['id'] . '_' . $dias,
+            'title' => 'CNH Vence em ' . $label . ': ' . $row['nome'],
             'start' => $row['data_validade_cnh'],
             'end' => $row['data_validade_cnh'],
             'allDay' => true,
-            'backgroundColor' => '#dc2626',
-            'borderColor' => '#dc2626',
-            'extendedProps' => [
-                'category' => 'cnh',
-                'description' => 'ATENÇÃO: CNH do motorista ' . $row['nome'] . ' (Número: ' . $row['cnh_numero'] . ') vence hoje!',
-                'motorista_id' => $row['id'],
-                'cnh_numero' => $row['cnh_numero'],
-                'dias_para_vencimento' => 0,
-                'priority' => 'critical'
-            ]
+            'backgroundColor' => $color,
+            'borderColor' => $color,
+            'editable' => false,
+            'extendedProps' => array_merge($base, [
+                'priority' => $priority,
+                'description' => $base['description'] . ' Vence em ' . $dias . ' dias.',
+            ]),
         ];
     }
-    
+
     echo json_encode($events);
-    
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(['error' => 'Erro interno do servidor: ' . $e->getMessage()]);
+} catch (Throwable $e) {
+    calendario_api_fail('calendario_cnh', $e);
 }
-?>

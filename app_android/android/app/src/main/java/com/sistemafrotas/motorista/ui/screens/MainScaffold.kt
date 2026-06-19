@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.TireRepair
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -51,14 +53,17 @@ fun MainScaffold(
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var showConfig by remember { mutableStateOf(false) }
+    var maisInicial by remember { mutableStateOf<String?>(null) }
     var subScreenTitle by remember { mutableStateOf<String?>(null) }
     var subScreenOnBack by remember { mutableStateOf<(() -> Unit)?>(null) }
     val tabs = listOf(
         "Início" to Icons.Filled.Dashboard,
         "Rotas" to Icons.Filled.Route,
-        "Abastecimentos" to Icons.Filled.LocalGasStation,
-        "Checklists" to Icons.Outlined.Checklist,
+        "Abastec." to Icons.Filled.LocalGasStation,
+        "Checklist" to Icons.Outlined.Checklist,
         "Despesas" to Icons.Filled.Receipt,
+        "Pneus" to Icons.Filled.TireRepair,
+        "Mais" to Icons.Filled.Apps,
     )
 
     val snackbarHostState = remember { SnackbarHostState() }
@@ -81,7 +86,7 @@ fun MainScaffold(
                     ),
                 )
             } else if (selectedTab != 0) {
-                val tabTitles = listOf("", "Rotas", "Abastecimentos", "Checklists", "Despesas")
+                val tabTitles = listOf("", "Rotas", "Abastecimentos", "Checklists", "Despesas", "Pneus", "Mais")
                 val title = tabTitles.getOrElse(selectedTab) { "Portal do Motorista" }
                 TopAppBar(
                     title = { Text(title) },
@@ -195,6 +200,7 @@ fun MainScaffold(
                         authRepository = authRepository,
                         onSessionExpired = onSessionExpired,
                         onNavigateToTab = { selectedTab = it },
+                        onAbrirMais = { feature -> maisInicial = feature; selectedTab = 6 },
                         onLogout = onLogout,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -229,6 +235,20 @@ fun MainScaffold(
                             subScreenTitle = title
                             subScreenOnBack = onBack
                         },
+                    )
+                    5 -> PneusScreen(
+                        authRepository = authRepository,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    6 -> MaisScreen(
+                        authRepository = authRepository,
+                        modifier = Modifier.fillMaxSize(),
+                        onSubScreenChange = { title, onBack ->
+                            subScreenTitle = title
+                            subScreenOnBack = onBack
+                        },
+                        inicial = maisInicial,
+                        onInicialConsumed = { maisInicial = null },
                     )
                 }
             }

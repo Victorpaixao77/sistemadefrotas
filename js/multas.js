@@ -22,7 +22,6 @@ function initializeMultas() {
     const addMultaBtn = document.getElementById('addMultaBtn');
     const filterBtn = document.getElementById('filterBtn');
     const exportBtn = document.getElementById('exportBtn');
-    const helpBtn = document.getElementById('helpBtn');
 
     // Event listeners para botões principais
     if (addMultaBtn) {
@@ -37,8 +36,13 @@ function initializeMultas() {
         exportBtn.addEventListener('click', exportMultas);
     }
 
-    if (helpBtn) {
-        helpBtn.addEventListener('click', showHelp);
+    const veiculoSelect = document.getElementById('veiculo_id');
+    const motoristaSelect = document.getElementById('motorista_id');
+    if (veiculoSelect) {
+        veiculoSelect.addEventListener('change', loadRotasSelect);
+    }
+    if (motoristaSelect) {
+        motoristaSelect.addEventListener('change', loadRotasSelect);
     }
 
     // Event listeners para botões de ação na tabela
@@ -553,7 +557,50 @@ function openNewMultaModal() {
     // Definir data atual como padrão
     document.getElementById('data_infracao').value = new Date().toISOString().split('T')[0];
 
+    resetRotasSelect();
     modal.style.display = 'block';
+}
+
+function resetRotasSelect() {
+    const rotaSelect = document.getElementById('rota_id');
+    if (!rotaSelect) return;
+    rotaSelect.innerHTML = '<option value="">Selecione veículo/motorista para carregar rotas</option>';
+}
+
+function loadRotasSelect(selectedId) {
+    const rotaSelect = document.getElementById('rota_id');
+    const veiculoId = document.getElementById('veiculo_id') ? document.getElementById('veiculo_id').value : '';
+    const motoristaId = document.getElementById('motorista_id') ? document.getElementById('motorista_id').value : '';
+    if (!rotaSelect) return;
+
+    if (!veiculoId && !motoristaId) {
+        resetRotasSelect();
+        return;
+    }
+
+    rotaSelect.innerHTML = '<option value="">Carregando rotas…</option>';
+
+    let url = sfApiUrl('multas.php?action=list_rotas_select');
+    if (veiculoId) url += '&veiculo_id=' + encodeURIComponent(veiculoId);
+    if (motoristaId) url += '&motorista_id=' + encodeURIComponent(motoristaId);
+
+    fetch(url, { credentials: 'include' })
+        .then(function (response) { return response.json(); })
+        .then(function (data) {
+            if (!data.success) {
+                resetRotasSelect();
+                return;
+            }
+            const opts = ['<option value="">Nenhuma rota (opcional)</option>'];
+            (data.rotas || []).forEach(function (r) {
+                const sel = selectedId && String(selectedId) === String(r.id) ? ' selected' : '';
+                opts.push('<option value="' + r.id + '"' + sel + '>' + escapeHtml(r.label) + '</option>');
+            });
+            rotaSelect.innerHTML = opts.join('');
+        })
+        .catch(function () {
+            resetRotasSelect();
+        });
 }
 
 function editMulta(multaId) {
@@ -579,7 +626,7 @@ function fillMultaForm(multa) {
     document.getElementById('data_infracao').value = multa.data_infracao;
     document.getElementById('veiculo_id').value = multa.veiculo_id;
     document.getElementById('motorista_id').value = multa.motorista_id;
-    document.getElementById('rota_id').value = multa.rota_id || '';
+    loadRotasSelect(multa.rota_id || '');
     document.getElementById('tipo_infracao').value = multa.tipo_infracao;
     document.getElementById('pontos').value = multa.pontos;
     document.getElementById('valor').value = multa.valor;
@@ -755,14 +802,45 @@ function showFilters() {
     }
 }
 
-function exportMultas() {
-    // Implementar exportação
-    showAlert('Funcionalidade de exportação em desenvolvimento', 'info');
+function mulEscapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
 }
 
-function showHelp() {
-    const modal = document.getElementById('helpMultaModal');
-    modal.style.display = 'block';
+function exportVisibleTableCsv(tableId, filename) {
+    var table = document.getElementById(tableId);
+    if (!table) return;
+    var lines = [];
+    var headerCells = table.querySelectorAll('thead th');
+    var skipLast = headerCells.length > 0;
+    var headers = [];
+    headerCells.forEach(function(th, idx) {
+        if (skipLast && idx === headerCells.length - 1) return;
+        headers.push('"' + String(th.textContent || '').trim().replace(/"/g, '""') + '"');
+    });
+    if (headers.length) lines.push(headers.join(';'));
+    table.querySelectorAll('tbody tr').forEach(function(row) {
+        if (row.style.display === 'none') return;
+        var cols = [];
+        row.querySelectorAll('td').forEach(function(td, idx) {
+            if (skipLast && idx === row.querySelectorAll('td').length - 1) return;
+            cols.push('"' + String(td.textContent || '').trim().replace(/"/g, '""') + '"');
+        });
+        if (cols.length) lines.push(cols.join(';'));
+    });
+    var blob = new Blob(['\ufeff' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename || 'export.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+}
+
+function exportMultas() {
+    exportVisibleTableCsv('multasTable', 'multas.csv');
 }
 
 function closeModal(modalId) {
@@ -782,25 +860,22 @@ function viewComprovante(comprovante) {
 }
 
 function showAlert(message, type = 'info') {
-    // Criar elemento de alerta
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${type}`;
-    alertDiv.innerHTML = `
-        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle'}"></i>
-        <span>${message}</span>
-        <button class="alert-close" onclick="this.parentElement.remove()">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-
-    // Adicionar ao body
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-' + (type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : type === 'warning' ? 'exclamation-triangle' : 'info-circle');
+    const span = document.createElement('span');
+    span.textContent = message == null ? '' : String(message);
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'alert-close';
+    closeBtn.innerHTML = '<i class="fas fa-times"></i>';
+    closeBtn.addEventListener('click', function() { alertDiv.remove(); });
+    alertDiv.appendChild(icon);
+    alertDiv.appendChild(span);
+    alertDiv.appendChild(closeBtn);
     document.body.appendChild(alertDiv);
-
-    // Remover automaticamente após 5 segundos
-    setTimeout(() => {
-        if (alertDiv.parentElement) {
-            alertDiv.remove();
-        }
+    setTimeout(function() {
+        if (alertDiv.parentElement) alertDiv.remove();
     }, 5000);
 }
 

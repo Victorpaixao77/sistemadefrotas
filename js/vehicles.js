@@ -11,8 +11,50 @@
     };
 })(typeof window !== 'undefined' ? window : this);
 
+// Escapa dados do servidor antes de injetar via innerHTML (previne XSS armazenado).
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// Toast não-bloqueante (substitui alert()).
+function vehNotify(message, type) {
+    type = type || 'error';
+    let host = document.getElementById('vehToastHost');
+    if (!host) {
+        host = document.createElement('div');
+        host.id = 'vehToastHost';
+        host.style.cssText = 'position:fixed;top:18px;right:18px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:360px;';
+        document.body.appendChild(host);
+    }
+    const colors = { success: '#16a34a', error: '#dc2626', warning: '#f59e0b', info: '#2563eb' };
+    const icons = { success: 'fa-circle-check', error: 'fa-circle-exclamation', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+    const el = document.createElement('div');
+    el.style.cssText = `display:flex;align-items:flex-start;gap:10px;background:#fff;border-left:4px solid ${colors[type] || colors.info};box-shadow:0 6px 20px rgba(0,0,0,.15);border-radius:8px;padding:12px 14px;font-size:0.9rem;color:#1f2937;opacity:0;transform:translateX(12px);transition:all .2s ease;`;
+    el.innerHTML = `<i class="fas ${icons[type] || icons.info}" style="color:${colors[type] || colors.info};margin-top:2px;"></i><span style="flex:1;"></span>`;
+    el.querySelector('span').textContent = message;
+    host.appendChild(el);
+    requestAnimationFrame(() => { el.style.opacity = '1'; el.style.transform = 'translateX(0)'; });
+    setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateX(12px)'; setTimeout(() => el.remove(), 250); }, 3800);
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     wireVehicleSortHeaders();
+    if (document.body.classList.contains('vehicles-modern') && typeof window.initForncTableColumns === 'function') {
+        window.initForncTableColumns({
+            tableSelector: '#vehiclesTable',
+            toggleListSelector: '#vehiclesColumnsToggleList',
+            storageKey: 'sf_modern_vehicle_cols_v1',
+            columnsBtnId: 'vehiclesColumnsBtn',
+            modalId: 'vehiclesColumnsModal',
+            saveBtnId: 'vehiclesColumnsSaveBtn'
+        });
+    }
     // Initialize page
     initializePage();
     
@@ -40,6 +82,86 @@ let currentPage = 1;
 let totalPages = 1;
 let currentVehicleSortField = 'placa';
 let currentVehicleSortDir = 'ASC';
+let _vehPaginationWired = false;
+let _vehTableWired = false;
+let _vehFiltersWired = false;
+let fleetFuelChart = null;
+let fleetMaintChart = null;
+
+function restoreVehicleFiltersFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchEl = document.getElementById('searchVehicle');
+    const statusEl = document.getElementById('statusFilter');
+    const marcaEl = document.getElementById('marcaFilter');
+    if (searchEl && urlParams.has('search')) searchEl.value = urlParams.get('search') || '';
+    if (statusEl && urlParams.has('status')) statusEl.value = urlParams.get('status') || '';
+    if (marcaEl && urlParams.has('marca')) marcaEl.value = urlParams.get('marca') || '';
+}
+
+function syncVehicleBrowserUrl(page, limit) {
+    const search = document.getElementById('searchVehicle')?.value?.trim() || '';
+    const status = document.getElementById('statusFilter')?.value || '';
+    const marca = document.getElementById('marcaFilter')?.value?.trim() || '';
+    const sortDefault = currentVehicleSortField === 'placa' && currentVehicleSortDir === 'ASC';
+    const isDefault = parseInt(page, 10) === 1 && parseInt(limit, 10) === 10
+        && !search && !status && !marca && sortDefault;
+
+    const urlParams = new URLSearchParams();
+    if (document.body.classList.contains('vehicles-modern')) {
+        if (!isDefault) {
+            if (parseInt(page, 10) !== 1) urlParams.set('page', page);
+            if (parseInt(limit, 10) !== 10) urlParams.set('per_page', limit);
+            if (search) urlParams.set('search', search);
+            if (status) urlParams.set('status', status);
+            if (marca) urlParams.set('marca', marca);
+            if (!sortDefault) {
+                urlParams.set('sort', currentVehicleSortField);
+                urlParams.set('dir', currentVehicleSortDir);
+            }
+        }
+    } else {
+        urlParams.set('classic', '1');
+        if (!isDefault) {
+            urlParams.set('page', page);
+            urlParams.set('per_page', limit);
+            if (search) urlParams.set('search', search);
+            if (status) urlParams.set('status', status);
+            if (marca) urlParams.set('marca', marca);
+            if (!sortDefault) {
+                urlParams.set('sort', currentVehicleSortField);
+                urlParams.set('dir', currentVehicleSortDir);
+            }
+        }
+    }
+
+    const desiredSearch = urlParams.toString() ? ('?' + urlParams.toString()) : '';
+    if (window.location.search !== desiredSearch) {
+        window.history.replaceState({}, '', window.location.pathname + desiredSearch);
+    }
+}
+
+function setupVehicleFilterBtn() {
+    const filterBtn = document.getElementById('filterBtn');
+    if (!filterBtn || filterBtn.dataset.vehFilterWired) return;
+    filterBtn.dataset.vehFilterWired = '1';
+    filterBtn.addEventListener('click', function () {
+        const target = document.getElementById('searchVehicle')
+            || document.getElementById('statusFilter')
+            || document.querySelector('.fornc-toolbar, .filter-section');
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (target.focus) target.focus();
+        }
+    });
+}
+
+function vehRowIsActive(row) {
+    const statusCell = row.cells[4];
+    if (!statusCell) return false;
+    const badge = statusCell.querySelector('.status-badge');
+    const text = (badge ? badge.textContent : statusCell.textContent).trim().toLowerCase();
+    return text === 'ativo' || text.includes('ativo');
+}
 
 function vehicleDefaultSortDir(field) {
     const textLike = ['placa', 'modelo', 'marca', 'status_nome', 'cavalo_nome', 'carreta_nome'];
@@ -80,6 +202,7 @@ function wireVehicleSortHeaders() {
 }
 
 function initializePage() {
+    restoreVehicleFiltersFromUrl();
     // Get current page and per_page from URL or use default
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('sort')) currentVehicleSortField = urlParams.get('sort') || 'placa';
@@ -98,15 +221,19 @@ function initializePage() {
     loadVehicleData(page);
     
     // Setup button events
-    document.getElementById('addVehicleBtn').addEventListener('click', showAddVehicleModal);
+    const addVeh = document.getElementById('addVehicleBtn');
+    if (addVeh) addVeh.addEventListener('click', showAddVehicleModal);
+    const vehEmptyCreate = document.getElementById('vehiclesEmptyCreateBtn');
+    if (vehEmptyCreate) vehEmptyCreate.addEventListener('click', showAddVehicleModal);
     
     // Por página: recarregar lista sem recarregar a página
     if (perPageEl) {
         perPageEl.addEventListener('change', () => loadVehicleData(1));
     }
     
-    // Setup table buttons (após primeira carga os botões são ligados em loadVehicleData)
+    // Setup table buttons (delegação)
     setupTableButtons();
+    setupVehicleFilterBtn();
     
     // Load select options
     loadSelectOptions();
@@ -184,6 +311,8 @@ function closeAllModals() {
 }
 
 function setupFilters() {
+    if (_vehFiltersWired) return;
+    _vehFiltersWired = true;
     const searchInput = document.getElementById('searchVehicle');
     const statusFilter = document.getElementById('statusFilter');
     const marcaFilter = document.getElementById('marcaFilter');
@@ -274,7 +403,7 @@ function loadSelectOptions() {
         })
         .catch(error => {
             console.error('Error loading tipos de combustível:', error);
-            alert('Erro ao carregar tipos de combustível. Por favor, recarregue a página.');
+            vehNotify('Erro ao carregar tipos de combustível. Por favor, recarregue a página.');
         });
     
     // Load carrocerias
@@ -308,7 +437,7 @@ function loadSelectOptions() {
         })
         .catch(error => {
             console.error('Error loading carrocerias:', error);
-            alert('Erro ao carregar tipos de carroceria. Por favor, recarregue a página.');
+            vehNotify('Erro ao carregar tipos de carroceria. Por favor, recarregue a página.');
         });
 }
 
@@ -335,6 +464,12 @@ function loadVehicleData(page = 1) {
         .then(response => response.json())
         .then(data => {
             if (data.error || data.success === false) {
+                const emptyElErr = document.getElementById('vehiclesEmptyState');
+                const tableOuterErr = document.getElementById('vehiclesTableOuter');
+                if (emptyElErr && tableOuterErr && document.body.classList.contains('vehicles-modern')) {
+                    emptyElErr.classList.remove('visible');
+                    tableOuterErr.style.display = '';
+                }
                 const tbody = document.querySelector('#vehiclesTable tbody');
                 tbody.innerHTML = '<tr><td colspan="9" class="text-center">Erro ao carregar veículos</td></tr>';
                 document.getElementById('totalVehicles').textContent = '0';
@@ -357,56 +492,38 @@ function loadVehicleData(page = 1) {
                 document.getElementById('currentPage').textContent = pag.page;
                 document.getElementById('totalPages').textContent = pag.totalPages || 1;
                 updatePaginationButtons(pag);
-                const urlParams = new URLSearchParams(window.location.search);
-                urlParams.set('page', pag.page);
-                urlParams.set('per_page', limit);
-                if (document.body.classList.contains('vehicles-modern')) {
-                    urlParams.delete('classic');
-                } else {
-                    urlParams.set('classic', '1');
-                }
-                const sortDefault = currentVehicleSortField === 'placa' && currentVehicleSortDir === 'ASC';
-                if (sortDefault) {
-                    urlParams.delete('sort');
-                    urlParams.delete('dir');
-                } else {
-                    urlParams.set('sort', currentVehicleSortField);
-                    urlParams.set('dir', currentVehicleSortDir);
-                }
-                const isDefault = parseInt(pag.page, 10) === 1 && limit === 10 && !search && !status && !marca && sortDefault;
-                let desiredSearch;
-                if (isDefault && document.body.classList.contains('vehicles-modern')) {
-                    desiredSearch = '';
-                } else if (isDefault) {
-                    desiredSearch = '?classic=1';
-                } else {
-                    desiredSearch = '?' + urlParams.toString();
-                }
-                if (window.location.search !== desiredSearch) {
-                    window.history.replaceState({}, '', window.location.pathname + desiredSearch);
-                }
+                syncVehicleBrowserUrl(pag.page, limit);
             }
 
             const tbody = document.querySelector('#vehiclesTable tbody');
             tbody.innerHTML = '';
 
+            const emptyEl = document.getElementById('vehiclesEmptyState');
+            const tableOuter = document.getElementById('vehiclesTableOuter');
+            const useModernEmpty = emptyEl && tableOuter && document.body.classList.contains('vehicles-modern');
+            if (useModernEmpty) {
+                const empty = !data.data || data.data.length === 0;
+                emptyEl.classList.toggle('visible', empty);
+                tableOuter.style.display = empty ? 'none' : '';
+            }
+
             if (data.data && data.data.length > 0) {
                 data.data.forEach(vehicle => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
-                        <td>${vehicle.placa || '-'}</td>
-                        <td>${vehicle.modelo || '-'}</td>
-                        <td>${vehicle.marca || '-'}</td>
-                        <td>${vehicle.ano || '-'}</td>
-                        <td><span class="status-badge status-${vehicle.status_id || 1}">${vehicle.status_nome || 'Ativo'}</span></td>
-                        <td>${vehicle.cavalo_nome ? 
-                            `${vehicle.cavalo_nome} (${vehicle.cavalo_eixos} eixos, ${vehicle.cavalo_tracao})` : 
+                        <td data-col="placa">${escapeHtml(vehicle.placa) || '-'}</td>
+                        <td data-col="modelo">${escapeHtml(vehicle.modelo) || '-'}</td>
+                        <td data-col="marca">${escapeHtml(vehicle.marca) || '-'}</td>
+                        <td data-col="ano">${escapeHtml(vehicle.ano) || '-'}</td>
+                        <td data-col="status"><span class="status-badge status-${encodeURIComponent(vehicle.status_id || 1)}">${escapeHtml(vehicle.status_nome) || 'Ativo'}</span></td>
+                        <td data-col="cavalo">${vehicle.cavalo_nome ?
+                            `${escapeHtml(vehicle.cavalo_nome)} (${escapeHtml(vehicle.cavalo_eixos)} eixos, ${escapeHtml(vehicle.cavalo_tracao)})` :
                             '-'}</td>
-                        <td>${vehicle.carreta_nome ? 
-                            `${vehicle.carreta_nome} (${vehicle.carreta_capacidade} ton)` : 
+                        <td data-col="carreta">${vehicle.carreta_nome ?
+                            `${escapeHtml(vehicle.carreta_nome)} (${escapeHtml(vehicle.carreta_capacidade)} ton)` :
                             '-'}</td>
-                        <td>${formatKm(vehicle.km_atual)}</td>
-                        <td class="actions">
+                        <td data-col="km">${escapeHtml(formatKm(vehicle.km_atual))}</td>
+                        <td class="actions" data-col="acoes">
                             <div class="table-actions">
                                 <button class="btn-icon view-btn" data-id="${vehicle.id}" title="Ver detalhes">
                                     <i class="fas fa-eye"></i>
@@ -422,7 +539,7 @@ function loadVehicleData(page = 1) {
                     `;
                     tbody.appendChild(row);
                 });
-            } else {
+            } else if (!useModernEmpty) {
                 const row = document.createElement('tr');
                 row.innerHTML = '<td colspan="9" class="text-center">Nenhum veículo encontrado</td>';
                 tbody.appendChild(row);
@@ -430,9 +547,19 @@ function loadVehicleData(page = 1) {
 
             setupTableButtons();
             syncVehicleSortIndicators();
+            const vehTable = document.getElementById('vehiclesTable');
+            if (vehTable && typeof vehTable._forncColumnVisibilityApply === 'function') {
+                vehTable._forncColumnVisibilityApply();
+            }
         })
         .catch(error => {
             console.error('Error loading vehicle data:', error);
+            const emptyEl = document.getElementById('vehiclesEmptyState');
+            const tableOuter = document.getElementById('vehiclesTableOuter');
+            if (emptyEl && tableOuter && document.body.classList.contains('vehicles-modern')) {
+                emptyEl.classList.remove('visible');
+                tableOuter.style.display = '';
+            }
             const tbody = document.querySelector('#vehiclesTable tbody');
             tbody.innerHTML = '<tr><td colspan="9" class="text-center">Erro ao carregar dados dos veículos</td></tr>';
             document.getElementById('totalVehicles').textContent = '0';
@@ -443,28 +570,18 @@ function loadVehicleData(page = 1) {
 }
 
 function setupTableButtons() {
-    // View buttons
-    document.querySelectorAll('.view-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const vehicleId = this.getAttribute('data-id');
-            showVehicleDetails(vehicleId);
-        });
-    });
-    
-    // Edit buttons
-    document.querySelectorAll('.edit-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const vehicleId = this.getAttribute('data-id');
-            showEditVehicleModal(vehicleId);
-        });
-    });
-    
-    // Delete buttons
-    document.querySelectorAll('.delete-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const vehicleId = this.getAttribute('data-id');
-            showDeleteConfirmation(vehicleId);
-        });
+    const table = document.getElementById('vehiclesTable');
+    if (!table || _vehTableWired) return;
+    _vehTableWired = true;
+    table.addEventListener('click', function (e) {
+        const btn = e.target.closest('.view-btn, .edit-btn, .delete-btn');
+        if (!btn) return;
+        const vehicleId = btn.getAttribute('data-id');
+        if (!vehicleId) return;
+        e.preventDefault();
+        if (btn.classList.contains('view-btn')) showVehicleDetails(vehicleId);
+        else if (btn.classList.contains('edit-btn')) showEditVehicleModal(vehicleId);
+        else if (btn.classList.contains('delete-btn')) showDeleteConfirmation(vehicleId);
     });
 }
 
@@ -487,7 +604,7 @@ function showVehicleDetails(vehicleId) {
     const modal = document.getElementById('viewVehicleModal');
     if (!modal) {
         console.error('Modal de detalhes do veículo não encontrado');
-        alert('Erro: Modal não encontrado');
+        vehNotify('Erro: Modal não encontrado');
         return;
     }
 
@@ -500,7 +617,6 @@ function showVehicleDetails(vehicleId) {
                 const historicoKm = data.data.historico_km;
 
                 // Debug: log dos dados do veículo
-                console.log('Dados do veículo:', vehicle);
 
                 // Preenche os dados básicos do veículo
                 const vehicleModelYear = document.getElementById('vehicleModelYear');
@@ -590,9 +706,7 @@ function showVehicleDetails(vehicleId) {
                     if (totalRefuelsCount) totalRefuelsCount.textContent = totals.total_abastecimentos;
                     if (totalMaintenanceCount) totalMaintenanceCount.textContent = totals.total_manutencoes;
                     
-                    console.log('Totais atualizados:', totals);
                 } else {
-                    console.log('Totais não encontrados na resposta da API');
                 }
 
                 // Armazena o ID do veículo no modal para uso nas abas
@@ -603,12 +717,12 @@ function showVehicleDetails(vehicleId) {
                 
                 modal.classList.add('active');
             } else {
-                alert('Erro ao carregar dados do veículo');
+                vehNotify('Erro ao carregar dados do veículo');
             }
         })
         .catch(error => {
             console.error('Erro:', error);
-            alert('Erro ao carregar dados do veículo');
+            vehNotify('Erro ao carregar dados do veículo');
         });
 }
 
@@ -634,13 +748,13 @@ function loadMaintenanceHistory(vehicleId) {
             data.maintenanceRecords.forEach(record => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${record.date}</td>
-                    <td>${record.type}</td>
-                    <td>${record.description}</td>
-                    <td>${formatKm(record.mileage)}</td>
+                    <td>${escapeHtml(record.date)}</td>
+                    <td>${escapeHtml(record.type)}</td>
+                    <td>${escapeHtml(record.description)}</td>
+                    <td>${escapeHtml(formatKm(record.mileage))}</td>
                     <td>R$ ${parseFloat(record.cost).toFixed(2)}</td>
-                    <td>${record.mechanic}</td>
-                    <td>${record.notes || '-'}</td>
+                    <td>${escapeHtml(record.mechanic)}</td>
+                    <td>${escapeHtml(record.notes) || '-'}</td>
                 `;
                 maintenanceBody.appendChild(row);
             });
@@ -695,7 +809,7 @@ function showDeleteConfirmation(vehicleId) {
     })
     .catch(error => {
         console.error('Error loading vehicle data:', error);
-        alert('Erro ao carregar dados do veículo: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message));
+        vehNotify('Erro ao carregar dados do veículo: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message));
     });
 }
 
@@ -747,7 +861,7 @@ function showEditVehicleModal(vehicleId) {
         })
         .catch(error => {
             console.error('Error loading vehicle data:', error);
-            alert('Erro ao carregar dados do veículo: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message));
+            vehNotify('Erro ao carregar dados do veículo: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message));
         });
 }
 
@@ -756,7 +870,7 @@ function saveVehicle() {
     const placaRaw = (document.getElementById('placa').value || '').trim().toUpperCase();
     const placa = placaRaw.replace(/[^A-Z0-9]/g, '');
     if (!validarPlacaFront(placa)) {
-        alert('Placa inválida. Use o formato Mercosul (ex: ABC1D23) ou antigo (ex: ABC1234).');
+        vehNotify('Placa inválida. Use o formato Mercosul (ex: ABC1D23) ou antigo (ex: ABC1234).', 'warning');
         return;
     }
 
@@ -770,29 +884,24 @@ function saveVehicle() {
     if (vehicleId) {
         formData.append('id', vehicleId);
     }
-    
-    // Debug: Log form data
-    console.log('Form data being sent:', {
-        action: action,
-        id: vehicleId
-    });
-    for (let [key, value] of formData.entries()) {
-        console.log(key + ': ' + value);
+
+    // CSRF: token no corpo (FormData) e no header
+    if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+        formData.append('csrf_token', window.__SF_CSRF__);
     }
-    
+
     // API URL
     const url = '../actions/vehicle_actions.php';
-    
+
     // Send data to API
     fetch(url, {
         method: 'POST',
         body: formData,
-        credentials: 'include'
+        credentials: 'include',
+        headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
     })
     .then(response => {
-        // Debug: Log raw response
-        console.log('Raw response:', response);
-        
+
         // If response is not ok, try to parse it as JSON first
         if (!response.ok) {
             return response.text().then(text => {
@@ -824,12 +933,10 @@ function saveVehicle() {
         if (data.success) {
             // Close modal
             closeAllModals();
-            
+
             // Show success message
-            alert(data.message);
-            
-            // Reload page to show updated data
-            window.location.reload();
+            vehNotify(data.message || 'Veículo salvo com sucesso.', 'success');
+            loadVehicleData(currentPage);
         } else {
             if (data.redirect) {
                 window.location.href = data.redirect;
@@ -841,7 +948,7 @@ function saveVehicle() {
     .catch(error => {
         console.error('Error saving vehicle:', error);
         if (!error.message.includes('Redirecionado')) {
-            alert('Erro ao salvar veículo: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message));
+            vehNotify('Erro ao salvar veículo: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message));
         }
     });
 }
@@ -870,17 +977,18 @@ function deleteVehicle() {
             document.getElementById('totalVehicles').textContent = totalVehicles;
             
             // Update active vehicles count if applicable
-            const activeVehicles = parseInt(document.getElementById('activeVehicles').textContent);
-            if (row.cells[3].textContent.trim() === 'Ativo') {
-                document.getElementById('activeVehicles').textContent = activeVehicles - 1;
+            const activeVehicles = parseInt(document.getElementById('activeVehicles').textContent, 10);
+            if (vehRowIsActive(row)) {
+                document.getElementById('activeVehicles').textContent = Math.max(0, activeVehicles - 1);
             }
+            loadVehicleData(currentPage);
         } else {
-            alert('Erro: ' + (data.error || 'Falha ao excluir veículo.'));
+            vehNotify('Erro: ' + (data.error || 'Falha ao excluir veículo.'));
         }
     })
     .catch(error => {
         console.error('Error deleting vehicle:', error);
-        alert('Erro ao excluir veículo. Tente novamente.');
+        vehNotify('Erro ao excluir veículo. Tente novamente.');
     });
 }
 
@@ -908,213 +1016,116 @@ function formatDate(dateString) {
 }
 
 function initializeCharts() {
-    // Initialize Fuel Efficiency Chart
+    fetch(sfApiUrl('vehicle_data.php?action=fleet_analytics'), { credentials: 'include' })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (!data || !data.success) {
+                showFleetChartEmpty('fuelEfficiencyChart', 'Sem dados de consumo para exibir.');
+                showFleetChartEmpty('maintenanceCostChart', 'Sem dados de manutenção para exibir.');
+                return;
+            }
+            renderFleetFuelChart(data);
+            renderFleetMaintChart(data);
+        })
+        .catch(function () {
+            showFleetChartEmpty('fuelEfficiencyChart', 'Erro ao carregar consumo médio.');
+            showFleetChartEmpty('maintenanceCostChart', 'Erro ao carregar custos de manutenção.');
+        });
+}
+
+function showFleetChartEmpty(canvasId, message) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !canvas.parentNode) return;
+    canvas.parentNode.innerHTML = '<p class="text-muted text-center" style="padding:2rem 1rem;">' + escapeHtml(message) + '</p>';
+}
+
+function renderFleetFuelChart(data) {
     const fuelEfficiencyCtx = document.getElementById('fuelEfficiencyChart');
-    if (fuelEfficiencyCtx) {
-        new Chart(fuelEfficiencyCtx, {
-            type: 'line',
-            data: {
-                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-                datasets: [{
-                    label: 'Consumo Médio (km/l)',
-                    data: [8.5, 8.7, 8.3, 8.9, 8.6, 8.8, 9.1, 8.4, 8.7, 9.0, 8.6, 8.9],
-                    borderColor: 'rgba(46, 204, 64, 1)',
-                    backgroundColor: 'rgba(46, 204, 64, 0.2)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointBackgroundColor: 'rgba(46, 204, 64, 1)',
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointRadius: 4,
-                    pointHoverRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: {
-                            usePointStyle: true,
-                            padding: 20,
-                            font: {
-                                size: 12,
-                                weight: '500'
-                            }
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: 'rgba(46, 204, 64, 0.3)',
-                        borderWidth: 1,
-                        cornerRadius: 8,
-                        displayColors: false,
-                        callbacks: {
-                            label: function(context) {
-                                return `${context.parsed.y.toFixed(1)} km/l`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            font: {
-                                size: 11
-                            }
-                        }
-                    },
-                    y: {
-                        beginAtZero: false,
-                        min: 7,
-                        max: 10,
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.1)'
-                        },
-                        ticks: {
-                            font: {
-                                size: 11
-                            },
-                            callback: function(value) {
-                                return value.toFixed(1) + ' km/l';
-                            }
-                        }
-                    }
-                },
-                interaction: {
-                    intersect: false,
-                    mode: 'index'
-                }
-            }
-        });
+    if (!fuelEfficiencyCtx) return;
+    const values = (data.fuel_efficiency || []).map(function (v) { return v == null ? null : Number(v); });
+    const hasData = values.some(function (v) { return v != null && v > 0; });
+    if (!hasData) {
+        showFleetChartEmpty('fuelEfficiencyChart', 'Sem abastecimentos aprovados nos últimos 12 meses.');
+        return;
     }
+    if (fleetFuelChart) fleetFuelChart.destroy();
+    fleetFuelChart = new Chart(fuelEfficiencyCtx, {
+        type: 'line',
+        data: {
+            labels: data.labels || [],
+            datasets: [{
+                label: 'Consumo Médio (km/l)',
+                data: values,
+                borderColor: 'rgba(46, 204, 64, 1)',
+                backgroundColor: 'rgba(46, 204, 64, 0.2)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4,
+                spanGaps: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true, position: 'top' } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+}
 
-    // Initialize Maintenance Cost Chart
+function renderFleetMaintChart(data) {
     const maintenanceCostCtx = document.getElementById('maintenanceCostChart');
-    if (maintenanceCostCtx) {
-        new Chart(maintenanceCostCtx, {
-            type: 'bar',
-            data: {
-                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
-                datasets: [{
-                    label: 'Custo de Manutenção',
-                    data: [1200, 800, 1500, 600, 2000, 900, 1100, 1800, 750, 1300, 950, 1600],
-                    backgroundColor: 'rgba(231, 76, 60, 0.8)',
-                    borderColor: 'rgba(231, 76, 60, 1)',
-                    borderWidth: 2,
-                    borderRadius: 6,
-                    borderSkipped: false,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: {
-                            usePointStyle: true,
-                            padding: 20,
-                            font: {
-                                size: 12,
-                                weight: '500'
-                            }
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        borderColor: 'rgba(231, 76, 60, 0.3)',
-                        borderWidth: 1,
-                        cornerRadius: 8,
-                        displayColors: true,
-                        callbacks: {
-                            label: function(context) {
-                                return `R$ ${context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            font: {
-                                size: 11
-                            }
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.1)'
-                        },
-                        ticks: {
-                            font: {
-                                size: 11
-                            },
-                            callback: function(value) {
-                                return 'R$ ' + value.toLocaleString('pt-BR');
-                            }
-                        }
-                    }
-                },
-                interaction: {
-                    intersect: false,
-                    mode: 'index'
-                }
-            }
-        });
+    if (!maintenanceCostCtx) return;
+    const values = (data.maintenance_costs || []).map(function (v) { return Number(v) || 0; });
+    const hasData = values.some(function (v) { return v > 0; });
+    if (!hasData) {
+        showFleetChartEmpty('maintenanceCostChart', 'Sem manutenções registradas nos últimos 12 meses.');
+        return;
     }
-
-    // Initialize Vehicle Cost Chart in details modal
-    const vehicleCostCtx = document.getElementById('vehicleCostChart');
-    if (vehicleCostCtx) {
-        new Chart(vehicleCostCtx, {
-            type: 'line',
-            data: {
-                labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
-                datasets: [{
-                    label: 'Manutenção',
-                    data: [1200, 800, 1500, 600, 2000, 900],
-                    borderColor: '#4CAF50',
-                    tension: 0.4
-                }, {
-                    label: 'Combustível',
-                    data: [2000, 2200, 1800, 2100, 1900, 2300],
-                    borderColor: '#2196F3',
-                    tension: 0.4
-                }]
+    if (fleetMaintChart) fleetMaintChart.destroy();
+    fleetMaintChart = new Chart(maintenanceCostCtx, {
+        type: 'bar',
+        data: {
+            labels: data.labels || [],
+            datasets: [{
+                label: 'Custo de Manutenção',
+                data: values,
+                backgroundColor: 'rgba(231, 76, 60, 0.8)',
+                borderColor: 'rgba(231, 76, 60, 1)',
+                borderWidth: 2,
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: true, position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            return 'R$ ' + Number(context.parsed.y).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                        }
+                    }
+                }
             },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    },
-                    title: {
-                        display: true,
-                        text: 'Custos por Categoria'
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function (value) {
+                            return 'R$ ' + Number(value).toLocaleString('pt-BR');
+                        }
                     }
                 }
             }
-        });
-    }
+        }
+    });
 }
 
 function setupPagination() {
+    if (_vehPaginationWired) return;
+    _vehPaginationWired = true;
     const prevBtn = document.getElementById('prevPageBtn');
     const nextBtn = document.getElementById('nextPageBtn');
     
@@ -1216,16 +1227,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Função para configurar botões de ajuda e exportação
 function setupHelpAndExportButtons() {
-    const helpBtn = document.getElementById('helpBtn');
-    if (helpBtn) {
-        helpBtn.addEventListener('click', function() {
-            const helpModal = document.getElementById('helpVehiclesModal');
-            if (helpModal) {
-                helpModal.classList.add('active');
-            }
-        });
-    }
-
     const exportBtn = document.getElementById('exportBtn');
     if (exportBtn) {
         exportBtn.addEventListener('click', function() {
@@ -1243,13 +1244,11 @@ function setupHelpAndExportButtons() {
 }
 
 function loadVehicleCosts(vehicleId) {
-    console.log('Carregando custos para veículo:', vehicleId);
     
     fetch(sfApiUrl(`vehicle_data.php?action=costs&id=${vehicleId}`), {
         credentials: 'include'
     })
     .then(response => {
-        console.log('Response status:', response.status);
         if (!response.ok) {
             return response.json().then(data => {
                 throw new Error(data.error || 'Erro ao carregar custos do veículo');
@@ -1258,7 +1257,6 @@ function loadVehicleCosts(vehicleId) {
         return response.json();
     })
     .then(data => {
-        console.log('Dados de custos recebidos:', data);
         if (data.success && data.costs) {
             // Atualizar valores de custo
             const maintenanceCost = document.getElementById('maintenanceCostValue');
@@ -1282,33 +1280,20 @@ function loadVehicleCosts(vehicleId) {
             // Inicializar gráfico de custos se houver dados
             if (data.chart_data && data.chart_data.length > 0) {
                 initVehicleCostChart(data.chart_data);
-            } else {
-                // Dados de exemplo para demonstração
-                const exampleData = [
-                    { mes: '2025-01', combustivel: 1200, manutencao: 300 },
-                    { mes: '2025-02', combustivel: 1100, manutencao: 0 },
-                    { mes: '2025-03', combustivel: 1350, manutencao: 850 },
-                    { mes: '2025-04', combustivel: 1250, manutencao: 200 },
-                    { mes: '2025-05', combustivel: 1400, manutencao: 0 },
-                    { mes: '2025-06', combustivel: 1180, manutencao: 450 }
-                ];
-                initVehicleCostChart(exampleData);
             }
         }
     })
     .catch(error => {
         console.error('Erro ao carregar custos:', error);
-        
-        // Valores padrão em caso de erro
+        const zero = 'R$ 0,00';
         const maintenanceCost = document.getElementById('maintenanceCostValue');
         const fuelCost = document.getElementById('fuelCostValue');
         const totalCost = document.getElementById('totalCostValue');
         const costPerKm = document.getElementById('costPerKm');
-        
-        if (maintenanceCost) maintenanceCost.textContent = 'R$ 4.900,00';
-        if (fuelCost) fuelCost.textContent = 'R$ 16.417,00';
-        if (totalCost) totalCost.textContent = 'R$ 21.317,00';
-        if (costPerKm) costPerKm.textContent = 'R$ 0,77';
+        if (maintenanceCost) maintenanceCost.textContent = zero;
+        if (fuelCost) fuelCost.textContent = zero;
+        if (totalCost) totalCost.textContent = zero;
+        if (costPerKm) costPerKm.textContent = zero;
     });
 }
 

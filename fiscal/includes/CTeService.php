@@ -46,7 +46,11 @@ class CTeService
             session_start();
         }
 
-        $this->empresaId = $empresaId ?: ($_SESSION['empresa_id'] ?? 1);
+        $resolvedEmpresa = $empresaId ?: (int)($_SESSION['empresa_id'] ?? 0);
+        if ($resolvedEmpresa < 1) {
+            throw new RuntimeException('Empresa não identificada na sessão.');
+        }
+        $this->empresaId = $resolvedEmpresa;
         $this->bootstrapTools();
     }
 
@@ -150,18 +154,73 @@ class CTeService
                 return ['success' => false, 'message' => 'XML do CT-e vazio.'];
             }
 
-            // signCTe assina e adiciona QR quando aplicável (dependendo do modelo/tpCTe/modal).
             $signed = $this->tools->signCTe($cteProcXml);
             $responseSoap = $this->tools->sefazEnviaCTe($signed);
+            $parsed = $this->parseRetornoEnvio($responseSoap);
+
+            $success = in_array((string) ($parsed['cStat'] ?? ''), ['100', '103', '104', '150'], true)
+                || in_array((string) ($parsed['cStat_prot'] ?? ''), ['100', '150'], true);
 
             return [
-                'success' => true,
+                'success' => $success,
+                'message' => $parsed['xMotivo'] ?? ($success ? 'CT-e enviado à SEFAZ.' : 'SEFAZ rejeitou ou retornou status inesperado.'),
                 'signed_xml' => $signed,
                 'response_xml' => $responseSoap,
+                'protocolo' => $parsed['protocolo'] ?? null,
+                'cStat' => $parsed['cStat'] ?? null,
+                'cStat_prot' => $parsed['cStat_prot'] ?? null,
+                'chave_acesso' => $parsed['chave'] ?? null,
             ];
         } catch (Throwable $e) {
             return ['success' => false, 'message' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Interpreta retorno do envio síncrono/assíncrono do CT-e.
+     *
+     * @return array{cStat:?string,cStat_prot:?string,xMotivo:?string,protocolo:?string,chave:?string}
+     */
+    private function parseRetornoEnvio(string $xml): array
+    {
+        $out = ['cStat' => null, 'cStat_prot' => null, 'xMotivo' => null, 'protocolo' => null, 'chave' => null];
+        if ($xml === '') {
+            return $out;
+        }
+        libxml_use_internal_errors(true);
+        $sx = @simplexml_load_string($xml);
+        if ($sx === false) {
+            return $out;
+        }
+        $get = function (string $name) use ($sx): ?string {
+            try {
+                $nodes = $sx->xpath('//*[local-name()="' . $name . '"]');
+                if ($nodes && isset($nodes[0])) {
+                    $v = trim((string) $nodes[0]);
+                    return $v === '' ? null : $v;
+                }
+            } catch (Throwable $e) {
+            }
+            return null;
+        };
+        $out['cStat'] = $get('cStat');
+        $out['xMotivo'] = $get('xMotivo');
+        $out['protocolo'] = $get('nProt') ?? $get('nRec');
+        $out['chave'] = $get('chCTe');
+        $out['cStat_prot'] = $get('cStat');
+        $protCstat = $sx->xpath('//*[local-name()="protCTe"]//*[local-name()="cStat"]');
+        if ($protCstat && isset($protCstat[0])) {
+            $out['cStat_prot'] = trim((string) $protCstat[0]);
+        }
+        $protMot = $sx->xpath('//*[local-name()="protCTe"]//*[local-name()="xMotivo"]');
+        if ($protMot && isset($protMot[0]) && $out['xMotivo'] === null) {
+            $out['xMotivo'] = trim((string) $protMot[0]);
+        }
+        $protN = $sx->xpath('//*[local-name()="protCTe"]//*[local-name()="nProt"]');
+        if ($protN && isset($protN[0]) && $out['protocolo'] === null) {
+            $out['protocolo'] = trim((string) $protN[0]);
+        }
+        return $out;
     }
 
     /**
@@ -185,14 +244,269 @@ class CTeService
             }
 
             $responseSoap = $this->tools->sefazCancela($chave, $justificativa, $nProt);
+            $parsed = self::parseRetornoEventoCTe($responseSoap);
 
+            return array_merge([
+                'success' => (bool) ($parsed['evento_aceito'] ?? false),
+                'message' => $parsed['xMotivo_evento'] ?: ($parsed['evento_aceito'] ? 'Cancelamento homologado.' : 'SEFAZ não homologou o cancelamento.'),
+                'response_xml' => $responseSoap,
+            ], $parsed);
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Carta de Correção CT-e (110110).
+     *
+     * @param array<int,array<string,string>> $infCorrecao
+     */
+    public function enviarCartaCorrecaoCTe(string $chave, array $infCorrecao, int $nSeqEvento = 1): array
+    {
+        try {
+            $chave = preg_replace('/\D/', '', $chave);
+            if (strlen($chave) !== 44) {
+                return ['success' => false, 'message' => 'Chave do CT-e inválida (44 dígitos).'];
+            }
+            if (empty($infCorrecao)) {
+                return ['success' => false, 'message' => 'Dados da correção são obrigatórios.'];
+            }
+
+            $responseSoap = $this->tools->sefazCCe($chave, $infCorrecao, $nSeqEvento);
+            $parsed = self::parseRetornoEventoCTe($responseSoap);
+
+            return array_merge([
+                'success' => (bool) ($parsed['evento_aceito'] ?? false),
+                'message' => $parsed['xMotivo_evento'] ?: ($parsed['evento_aceito'] ? 'CC-e homologada.' : 'SEFAZ não homologou a CC-e.'),
+                'response_xml' => $responseSoap,
+            ], $parsed);
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /** Prestação de serviço em desacordo — tomador (610110). */
+    public function enviarDesacordoTomador(string $chave, string $xObs, string $ufEvento = 'RS'): array
+    {
+        try {
+            $chave = preg_replace('/\D/', '', $chave);
+            if (strlen($chave) !== 44) {
+                return ['success' => false, 'message' => 'Chave do CT-e inválida.'];
+            }
+            $xObs = trim($xObs);
+            if (strlen($xObs) < 15) {
+                return ['success' => false, 'message' => 'Observação mínima de 15 caracteres.'];
+            }
+
+            $responseSoap = $this->tools->sefazManifesta($chave, 610110, $xObs, 1, strtoupper(substr($ufEvento, 0, 2)));
+            $parsed = self::parseRetornoEventoCTe($responseSoap);
+
+            return array_merge([
+                'success' => (bool) ($parsed['evento_aceito'] ?? false),
+                'message' => $parsed['xMotivo_evento'] ?: ($parsed['evento_aceito'] ? 'Desacordo registrado.' : 'SEFAZ rejeitou o desacordo.'),
+                'response_xml' => $responseSoap,
+            ], $parsed);
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Comprovante de entrega (110180).
+     *
+     * @param array<int,string> $chavesNfe
+     */
+    public function enviarComprovanteEntrega(
+        string $chave,
+        string $nProt,
+        string $xNome,
+        string $nDoc,
+        string $hash,
+        ?string $latitude,
+        ?string $longitude,
+        int $nSeqEvento,
+        string $dhEventoEntrega,
+        array $chavesNfe = []
+    ): array {
+        try {
+            $chave = preg_replace('/\D/', '', $chave);
+            if (strlen($chave) !== 44 || $nProt === '') {
+                return ['success' => false, 'message' => 'Chave e protocolo do CT-e são obrigatórios.'];
+            }
+
+            $responseSoap = $this->tools->sefazCE(
+                $chave,
+                $nProt,
+                $xNome,
+                $nDoc,
+                $hash,
+                $latitude,
+                $longitude,
+                $nSeqEvento,
+                $dhEventoEntrega,
+                $chavesNfe
+            );
+            $parsed = self::parseRetornoEventoCTe($responseSoap);
+
+            return array_merge([
+                'success' => (bool) ($parsed['evento_aceito'] ?? false),
+                'message' => $parsed['xMotivo_evento'] ?: ($parsed['evento_aceito'] ? 'Comprovante registrado.' : 'SEFAZ rejeitou o comprovante.'),
+                'response_xml' => $responseSoap,
+            ], $parsed);
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    public function cancelarComprovanteEntrega(string $chave, string $nProtCte, string $nProtCE, int $nSeqEvento = 1): array
+    {
+        try {
+            $chave = preg_replace('/\D/', '', $chave);
+            if (strlen($chave) !== 44) {
+                return ['success' => false, 'message' => 'Chave inválida.'];
+            }
+            $responseSoap = $this->tools->sefazCancelaCE($chave, $nProtCte, $nProtCE, $nSeqEvento);
+            $parsed = self::parseRetornoEventoCTe($responseSoap);
+
+            return array_merge([
+                'success' => (bool) ($parsed['evento_aceito'] ?? false),
+                'message' => $parsed['xMotivo_evento'] ?: ($parsed['evento_aceito'] ? 'Cancelamento do comprovante homologado.' : 'SEFAZ rejeitou.'),
+                'response_xml' => $responseSoap,
+            ], $parsed);
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /** Inutilização de numeração CT-e (modelo 57) quando suportado pelo pacote. */
+    public function inutilizarNumeracao(int $nSerie, int $nIni, int $nFin, string $xJust, ?int $tpAmb = null, ?string $ano = null): array
+    {
+        try {
+            if (!method_exists($this->tools, 'sefazInutiliza')) {
+                return ['success' => false, 'message' => 'Inutilização não disponível nesta versão do sped-cte.'];
+            }
+            $xmlRet = $this->tools->sefazInutiliza($nSerie, $nIni, $nFin, $xJust, $tpAmb, $ano);
+            $parsed = self::parseRetornoInutilizacaoCTe($xmlRet);
+            return array_merge([
+                'success' => (bool) ($parsed['inutil_aceita'] ?? false),
+                'message' => $parsed['xMotivo'] ?: ($parsed['inutil_aceita'] ? 'Inutilização homologada.' : 'SEFAZ rejeitou a inutilização.'),
+                'response_xml' => $xmlRet,
+            ], $parsed);
+        } catch (Throwable $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /** Consulta status do serviço CT-e na SEFAZ. */
+    public function consultarStatusServico(?string $uf = null): array
+    {
+        try {
+            if (!method_exists($this->tools, 'sefazStatus')) {
+                return ['success' => false, 'message' => 'Consulta de status não disponível.'];
+            }
+            $xmlRet = $this->tools->sefazStatus($uf ?? '', null);
+            libxml_use_internal_errors(true);
+            $sx = @simplexml_load_string($xmlRet);
+            $cStat = null;
+            $xMotivo = null;
+            if ($sx !== false) {
+                $nodes = $sx->xpath('//*[local-name()="cStat"]');
+                if ($nodes && isset($nodes[0])) {
+                    $cStat = (string) $nodes[0];
+                }
+                $nodesM = $sx->xpath('//*[local-name()="xMotivo"]');
+                if ($nodesM && isset($nodesM[0])) {
+                    $xMotivo = (string) $nodesM[0];
+                }
+            }
+            $online = in_array($cStat, ['107', '108'], true);
             return [
                 'success' => true,
-                'response_xml' => $responseSoap,
+                'online' => $online,
+                'cStat' => $cStat,
+                'message' => $xMotivo ?: ($online ? 'Serviço em operação.' : 'Status: ' . ($cStat ?? '?')),
+                'response_xml' => $xmlRet,
             ];
         } catch (Throwable $e) {
             return ['success' => false, 'message' => $e->getMessage()];
         }
+    }
+
+    /**
+     * @return array{cStat_lote:?string,xMotivo_lote:?string,cStat_evento:?string,xMotivo_evento:?string,protocolo_evento:?string,evento_aceito:bool}
+     */
+    public static function parseRetornoEventoCTe(?string $xmlRet): array
+    {
+        $out = [
+            'cStat_lote' => null,
+            'xMotivo_lote' => null,
+            'cStat_evento' => null,
+            'xMotivo_evento' => null,
+            'protocolo_evento' => null,
+            'evento_aceito' => false,
+        ];
+        if ($xmlRet === null || $xmlRet === '') {
+            return $out;
+        }
+        libxml_use_internal_errors(true);
+        $sx = @simplexml_load_string($xmlRet);
+        if ($sx === false) {
+            return $out;
+        }
+        $nodes = $sx->xpath('//*[local-name()="retEnvEvento"]');
+        $ret = ($nodes && isset($nodes[0])) ? $nodes[0] : $sx;
+        $out['cStat_lote'] = isset($ret->cStat) ? (string) $ret->cStat : null;
+        $out['xMotivo_lote'] = isset($ret->xMotivo) ? (string) $ret->xMotivo : null;
+        $infEvNodes = $sx->xpath('//*[local-name()="infEvento"]');
+        if ($infEvNodes && isset($infEvNodes[0])) {
+            $inf = $infEvNodes[0];
+            $out['cStat_evento'] = isset($inf->cStat) ? (string) $inf->cStat : null;
+            $out['xMotivo_evento'] = isset($inf->xMotivo) ? (string) $inf->xMotivo : null;
+            if (isset($inf->nProt)) {
+                $out['protocolo_evento'] = (string) $inf->nProt;
+            }
+        }
+        $cLote = $out['cStat_lote'];
+        $cEv = $out['cStat_evento'];
+        $out['evento_aceito'] = ($cLote === '128' || $cLote === '134') && ($cEv === '135' || $cEv === '136');
+        if (!$out['evento_aceito'] && ($cEv === '135' || $cEv === '136')) {
+            $out['evento_aceito'] = true;
+        }
+        return $out;
+    }
+
+    /** @return array{cStat:?string,xMotivo:?string,inutil_aceita:bool,nProt_inut:?string} */
+    public static function parseRetornoInutilizacaoCTe(?string $xmlRet): array
+    {
+        $out = ['cStat' => null, 'xMotivo' => null, 'inutil_aceita' => false, 'nProt_inut' => null];
+        if ($xmlRet === null || $xmlRet === '') {
+            return $out;
+        }
+        libxml_use_internal_errors(true);
+        $sx = @simplexml_load_string($xmlRet);
+        if ($sx === false) {
+            return $out;
+        }
+        $nodes = $sx->xpath('//*[local-name()="infInut"]');
+        if ($nodes && isset($nodes[0])) {
+            $inf = $nodes[0];
+            $out['cStat'] = isset($inf->cStat) ? (string) $inf->cStat : null;
+            $out['xMotivo'] = isset($inf->xMotivo) ? (string) $inf->xMotivo : null;
+            if (isset($inf->nProt)) {
+                $out['nProt_inut'] = (string) $inf->nProt;
+            }
+        } else {
+            $cNodes = $sx->xpath('//*[local-name()="cStat"]');
+            if ($cNodes && isset($cNodes[0])) {
+                $out['cStat'] = (string) $cNodes[0];
+            }
+            $mNodes = $sx->xpath('//*[local-name()="xMotivo"]');
+            if ($mNodes && isset($mNodes[0])) {
+                $out['xMotivo'] = (string) $mNodes[0];
+            }
+        }
+        $out['inutil_aceita'] = ($out['cStat'] === '102');
+        return $out;
     }
 
     /**

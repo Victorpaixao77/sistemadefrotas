@@ -543,7 +543,7 @@ AND data_rota < DATE_SUB(DATE_SUB(CURDATE(), INTERVAL 5 MONTH), INTERVAL DAY(CUR
 -- Despesas de viagem para rotas do mês atual
 INSERT INTO despesas_viagem (
     empresa_id, rota_id, descarga, pedagios, caixinha, estacionamento,
-    lavagem, borracharia, eletrica_mecanica, adiantamento, total_despviagem,
+    lavagem, borracharia, eletrica_mecanica, adiantamento, outros,
     status, fonte, created_at, updated_at
 )
 SELECT 
@@ -556,7 +556,7 @@ SELECT
     0, -- borracharia
     0, -- elétrica/mecânica
     frete * 0.1, -- adiantamento 10% do frete
-    (distancia_km * 0.5) + (distancia_km * 2.0) + (frete * 0.02) + (distancia_km * 0.3) + (distancia_km * 0.2) + (frete * 0.1),
+    NULL,
     'aprovado', 'gestor', NOW(), NOW()
 FROM rotas
 WHERE empresa_id = 1 
@@ -566,7 +566,7 @@ AND data_rota < DATE_ADD(DATE_SUB(CURDATE(), INTERVAL DAY(CURDATE()) - 1 DAY), I
 -- Despesas de viagem para rotas do mês -1
 INSERT INTO despesas_viagem (
     empresa_id, rota_id, descarga, pedagios, caixinha, estacionamento,
-    lavagem, borracharia, eletrica_mecanica, adiantamento, total_despviagem,
+    lavagem, borracharia, eletrica_mecanica, adiantamento, outros,
     status, fonte, created_at, updated_at
 )
 SELECT 
@@ -578,7 +578,7 @@ SELECT
     distancia_km * 0.22,
     0, 0,
     frete * 0.1,
-    (distancia_km * 0.52) + (distancia_km * 2.1) + (frete * 0.02) + (distancia_km * 0.32) + (distancia_km * 0.22) + (frete * 0.1),
+    NULL,
     'aprovado', 'gestor', NOW(), NOW()
 FROM rotas
 WHERE empresa_id = 1 
@@ -588,7 +588,7 @@ AND data_rota < DATE_SUB(CURDATE(), INTERVAL DAY(CURDATE()) - 1 DAY);
 -- Despesas de viagem para rotas do mês -2
 INSERT INTO despesas_viagem (
     empresa_id, rota_id, descarga, pedagios, caixinha, estacionamento,
-    lavagem, borracharia, eletrica_mecanica, adiantamento, total_despviagem,
+    lavagem, borracharia, eletrica_mecanica, adiantamento, outros,
     status, fonte, created_at, updated_at
 )
 SELECT 
@@ -600,7 +600,7 @@ SELECT
     distancia_km * 0.25,
     0, 0,
     frete * 0.1,
-    (distancia_km * 0.55) + (distancia_km * 2.2) + (frete * 0.02) + (distancia_km * 0.35) + (distancia_km * 0.25) + (frete * 0.1),
+    NULL,
     'aprovado', 'gestor', NOW(), NOW()
 FROM rotas
 WHERE empresa_id = 1 
@@ -610,7 +610,7 @@ AND data_rota < DATE_SUB(DATE_SUB(CURDATE(), INTERVAL 1 MONTH), INTERVAL DAY(CUR
 -- Despesas de viagem para rotas do mês -3 (NEGATIVO - valores mais altos)
 INSERT INTO despesas_viagem (
     empresa_id, rota_id, descarga, pedagios, caixinha, estacionamento,
-    lavagem, borracharia, eletrica_mecanica, adiantamento, total_despviagem,
+    lavagem, borracharia, eletrica_mecanica, adiantamento, outros,
     status, fonte, created_at, updated_at
 )
 SELECT 
@@ -623,7 +623,7 @@ SELECT
     500.00, -- borracharia
     800.00, -- elétrica/mecânica
     frete * 0.2, -- 20% ao invés de 10%
-    (distancia_km * 1.2) + (distancia_km * 4.5) + (frete * 0.05) + (distancia_km * 0.8) + (distancia_km * 0.6) + 500.00 + 800.00 + (frete * 0.2),
+    NULL,
     'aprovado', 'gestor', NOW(), NOW()
 FROM rotas
 WHERE empresa_id = 1 
@@ -633,7 +633,7 @@ AND data_rota < DATE_SUB(DATE_SUB(CURDATE(), INTERVAL 2 MONTH), INTERVAL DAY(CUR
 -- Despesas de viagem para rotas do mês -4
 INSERT INTO despesas_viagem (
     empresa_id, rota_id, descarga, pedagios, caixinha, estacionamento,
-    lavagem, borracharia, eletrica_mecanica, adiantamento, total_despviagem,
+    lavagem, borracharia, eletrica_mecanica, adiantamento, outros,
     status, fonte, created_at, updated_at
 )
 SELECT 
@@ -645,7 +645,7 @@ SELECT
     distancia_km * 0.18,
     0, 0,
     frete * 0.1,
-    (distancia_km * 0.48) + (distancia_km * 1.95) + (frete * 0.02) + (distancia_km * 0.28) + (distancia_km * 0.18) + (frete * 0.1),
+    NULL,
     'aprovado', 'gestor', NOW(), NOW()
 FROM rotas
 WHERE empresa_id = 1 
@@ -655,7 +655,7 @@ AND data_rota < DATE_SUB(DATE_SUB(CURDATE(), INTERVAL 3 MONTH), INTERVAL DAY(CUR
 -- Despesas de viagem para rotas do mês -5
 INSERT INTO despesas_viagem (
     empresa_id, rota_id, descarga, pedagios, caixinha, estacionamento,
-    lavagem, borracharia, eletrica_mecanica, adiantamento, total_despviagem,
+    lavagem, borracharia, eletrica_mecanica, adiantamento, outros,
     status, fonte, created_at, updated_at
 )
 SELECT 
@@ -667,7 +667,7 @@ SELECT
     distancia_km * 0.17,
     0, 0,
     frete * 0.1,
-    (distancia_km * 0.47) + (distancia_km * 1.9) + (frete * 0.02) + (distancia_km * 0.27) + (distancia_km * 0.17) + (frete * 0.1),
+    NULL,
     'aprovado', 'gestor', NOW(), NOW()
 FROM rotas
 WHERE empresa_id = 1 
@@ -677,7 +677,7 @@ AND data_rota < DATE_SUB(DATE_SUB(CURDATE(), INTERVAL 4 MONTH), INTERVAL DAY(CUR
 -- Despesas de viagem para rotas do mês -6
 INSERT INTO despesas_viagem (
     empresa_id, rota_id, descarga, pedagios, caixinha, estacionamento,
-    lavagem, borracharia, eletrica_mecanica, adiantamento, total_despviagem,
+    lavagem, borracharia, eletrica_mecanica, adiantamento, outros,
     status, fonte, created_at, updated_at
 )
 SELECT 
@@ -689,7 +689,7 @@ SELECT
     distancia_km * 0.15,
     0, 0,
     frete * 0.1,
-    (distancia_km * 0.45) + (distancia_km * 1.85) + (frete * 0.02) + (distancia_km * 0.25) + (distancia_km * 0.15) + (frete * 0.1),
+    NULL,
     'aprovado', 'gestor', NOW(), NOW()
 FROM rotas
 WHERE empresa_id = 1 

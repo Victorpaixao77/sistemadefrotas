@@ -273,6 +273,7 @@ error_log('Checklists encontrados: ' . print_r($checklists, true));
                 <div class="dashboard-grid">
                     <div class="dashboard-card" style="grid-column: 1 / -1;">
                         <div class="card-header">
+                            <i class="fas fa-clipboard-check kpi-card-icon" aria-hidden="true"></i>
                             <h3>Novo Checklist</h3>
                         </div>
                         <div class="card-body">

@@ -4,6 +4,7 @@ require_once '../includes/functions.php';
 require_once '../includes/permissions.php';
 require_once '../includes/notifications.php';
 require_once '../includes/competitions.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 
 configure_session();
 session_start();
@@ -11,7 +12,21 @@ session_start();
 // Verificar permissão para acessar configurações do sistema
 require_permission('manage_system_settings');
 
-$page_title = 'Configurações do Sistema';
+// Submenus de configuração (menu lateral). Cada aba mostra só os cards do grupo.
+$config_abas = [
+    'geral' => ['Geral', 'fas fa-sliders'],
+    'seguranca' => ['Segurança', 'fas fa-shield-halved'],
+    'ia' => ['IA & OCR', 'fas fa-robot'],
+    'fiscal' => ['Fiscal & Multas', 'fas fa-file-invoice'],
+    'gps' => ['GPS', 'fas fa-draw-polygon'],
+    'sistema' => ['Sistema', 'fas fa-microchip'],
+    'gamificacao' => ['Gamificação', 'fas fa-trophy'],
+];
+$aba = $_GET['aba'] ?? 'geral';
+if (!isset($config_abas[$aba])) {
+    $aba = 'geral';
+}
+$page_title = 'Configurações · ' . $config_abas[$aba][0];
 $empresa_id = $_SESSION['empresa_id'];
 
 // Busca as configurações atuais
@@ -54,7 +69,14 @@ if ($row && !empty($row['certificado_a1_id'])) {
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="stylesheet" href="../css/fornc-modern-page.css">
-    <link rel="stylesheet" href="../css/configuracoes.css?v=5">
+    <link rel="stylesheet" href="../css/configuracoes.css?v=10">
+    <link rel="stylesheet" href="../css/notif-preferencias.css?v=2">
+    <?php sf_page_help_css('..'); ?>
+    <style>
+        /* Submenus: mostra apenas os cards da aba ativa */
+        .configuracoes-page .config-grid > .dashboard-card[data-aba] { display: none; }
+        .configuracoes-page .config-grid > .dashboard-card[data-aba="<?php echo htmlspecialchars($aba, ENT_QUOTES, 'UTF-8'); ?>"] { display: block; }
+    </style>
     <?php require_once '../includes/sf_api_base.php'; sf_render_api_scripts(); ?>
 </head>
 <body class="configuracoes-modern-page">
@@ -63,10 +85,22 @@ if ($row && !empty($row['certificado_a1_id'])) {
         <div class="main-content">
             <?php include '../includes/header.php'; ?>
             <div class="dashboard-content configuracoes-page fornc-page" id="configuracoes-top">
+                <div class="config-section-head">
+                    <h2><i class="<?php echo htmlspecialchars($config_abas[$aba][1], ENT_QUOTES, 'UTF-8'); ?>"></i> <?php echo htmlspecialchars($config_abas[$aba][0], ENT_QUOTES, 'UTF-8'); ?></h2>
+                    <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                    <nav class="config-section-tabs" aria-label="Seções de configuração">
+                        <?php foreach ($config_abas as $aba_key => $aba_def): ?>
+                            <a href="?aba=<?php echo $aba_key; ?>" class="config-section-tab<?php echo $aba_key === $aba ? ' is-active' : ''; ?>">
+                                <i class="<?php echo htmlspecialchars($aba_def[1], ENT_QUOTES, 'UTF-8'); ?>"></i>
+                                <span><?php echo htmlspecialchars($aba_def[0], ENT_QUOTES, 'UTF-8'); ?></span>
+                            </a>
+                        <?php endforeach; ?>
+                    </nav>
+                </div>
                 <div class="config-grid">
-                    <div class="dashboard-card">
+                    <div data-aba="geral" class="dashboard-card">
                         <div class="card-header">
-                            <h3>Personalização do Menu Lateral</h3>
+                            <h3><i class="fas fa-palette"></i> Identidade visual</h3>
                         </div>
                         <div class="card-body">
                             <form id="configForm">
@@ -77,31 +111,27 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                 <button type="submit" class="btn-primary" id="saveConfigBtn">Salvar</button>
                             </form>
                             <div id="configMsg"></div>
+
+                            <div class="config-subsection">
+                                <h4><i class="fas fa-image"></i> Logo da Empresa</h4>
+                                <form id="logoForm" enctype="multipart/form-data">
+                                    <div class="form-group">
+                                        <label for="logo">Selecione uma imagem (JPG, PNG ou GIF, máx. 5MB)</label>
+                                        <input type="file" id="logo" name="logo" accept="image/jpeg,image/png,image/gif" required>
+                                    </div>
+                                    <div class="logo-preview" id="logoPreview">
+                                        <img src="" alt="Preview do logo">
+                                    </div>
+                                    <button type="submit" class="btn-primary" id="uploadLogoBtn">Enviar Logo</button>
+                                </form>
+                                <div id="logoMsg"></div>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="dashboard-card">
+                    <div data-aba="geral" class="dashboard-card">
                         <div class="card-header">
-                            <h3>Logo da Empresa</h3>
-                        </div>
-                        <div class="card-body">
-                            <form id="logoForm" enctype="multipart/form-data">
-                                <div class="form-group">
-                                    <label for="logo">Selecione uma imagem (JPG, PNG ou GIF, máx. 5MB)</label>
-                                    <input type="file" id="logo" name="logo" accept="image/jpeg,image/png,image/gif" required>
-                                </div>
-                                <div class="logo-preview" id="logoPreview">
-                                    <img src="" alt="Preview do logo">
-                                </div>
-                                <button type="submit" class="btn-primary" id="uploadLogoBtn">Enviar Logo</button>
-                            </form>
-                            <div id="logoMsg"></div>
-                        </div>
-                    </div>
-
-                    <div class="dashboard-card">
-                        <div class="card-header">
-                            <h3>Google Maps</h3>
+                            <h3><i class="fas fa-map-location-dot"></i> Google Maps</h3>
                         </div>
                         <div class="card-body">
                             <form id="googleMapsForm">
@@ -129,7 +159,134 @@ if ($row && !empty($row['certificado_a1_id'])) {
                         </div>
                     </div>
 
-                    <div class="dashboard-card config-card--full config-gps-cercas" id="config-gps-cercas">
+                    <div data-aba="_oculto" class="dashboard-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-robot"></i> OpenAI (OCR de fichas de abastecimento)</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="form-text config-card-lead">A chave fica na tabela <code>empresa_openai_credentials</code> (texto longo, compatível com <code>sk-proj-…</code>). Se existir <code>SF_OPENAI_API_KEY</code> no servidor, ela tem prioridade sobre o banco. O uso estimado do mês alimenta a barra quando há orçamento em USD.</p>
+                            <div id="openaiStatusLine" class="config-openai-status" aria-live="polite"></div>
+                            <div id="openaiUsagePanel" class="config-openai-usage">
+                                <div class="config-openai-usage-row">
+                                    <span>Uso estimado (mês atual)</span>
+                                    <strong id="openaiMonthUsd">—</strong>
+                                </div>
+                                <div class="config-openai-usage-row">
+                                    <span>Tokens (entrada / saída)</span>
+                                    <span id="openaiMonthTok">—</span>
+                                </div>
+                                <div id="openaiBudgetBarWrap" class="config-openai-bar-wrap" style="display:none">
+                                    <div class="config-openai-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+                                        <div id="openaiBudgetFill" class="config-openai-bar-fill"></div>
+                                    </div>
+                                    <div id="openaiPctLabel" class="form-text"></div>
+                                </div>
+                                <p id="openaiBudgetHint" class="form-text" style="display:none">Informe um orçamento mensal (USD) abaixo para ver a % usada em relação ao limite.</p>
+                            </div>
+                            <form id="openAiSettingsForm" autocomplete="off">
+                                <div class="form-group">
+                                    <label for="openai_api_key">Nova chave API (opcional)</label>
+                                    <input type="password" id="openai_api_key" name="openai_api_key" autocomplete="new-password" placeholder="Cole a chave completa (chaves sk-proj- são longas; não use limite manual no campo)">
+                                    <label class="config-openai-check">
+                                        <input type="checkbox" id="openai_clear_key" name="clear_openai_key" value="1">
+                                        Remover chave salva no banco (passa a valer só a chave do servidor, se existir)
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="openai_vision_model">Modelo Vision</label>
+                                    <input type="text" id="openai_vision_model" name="openai_vision_model" maxlength="80" placeholder="Ex.: gpt-4o-mini">
+                                    <small class="form-text">Só usado se não houver <code>SF_OPENAI_VISION_MODEL</code> no servidor.</small>
+                                </div>
+                                <div class="form-group">
+                                    <label for="openai_monthly_budget_usd">Orçamento mensal estimado (USD)</label>
+                                    <input type="number" id="openai_monthly_budget_usd" name="openai_monthly_budget_usd" min="0" step="0.01" placeholder="Ex.: 25">
+                                    <small class="form-text">Base para a % usada (custo estimado a partir dos tokens registrados no OCR).</small>
+                                </div>
+                                <div class="config-actions">
+                                    <button type="button" id="openaiTestBtn" class="btn-secondary">
+                                        <i class="fas fa-plug"></i> Testar API OpenAI
+                                    </button>
+                                    <button type="submit" class="btn-primary">
+                                        <i class="fas fa-save"></i> Salvar
+                                    </button>
+                                </div>
+                            </form>
+                            <div id="openaiSettingsMsg"></div>
+                        </div>
+                    </div>
+
+                    <div data-aba="ia" class="dashboard-card" id="config-vision-ai">
+                        <div class="card-header">
+                            <h3><i class="fas fa-eye"></i> IA de Visão (leitura de fichas)</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="form-text config-card-lead">Provedor de IA usado para ler fotos/PDF de fichas de abastecimento na importação. O <strong>Google Gemini</strong> tem cota gratuita e lê manuscrito bem.</p>
+                            <div id="visionAiStatusLine" class="config-openai-status" aria-live="polite"></div>
+                            <form id="visionAiForm" autocomplete="off">
+                                <div class="form-group">
+                                    <label for="vai_provider">Provedor</label>
+                                    <select id="vai_provider" name="provider">
+                                        <option value="gemini">Google Gemini (gratuito)</option>
+                                        <option value="openai">OpenAI</option>
+                                        <option value="openrouter">OpenRouter</option>
+                                        <option value="custom">Personalizado (compatível com OpenAI)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="vai_api_key">Chave da API</label>
+                                    <input type="password" id="vai_api_key" name="api_key" autocomplete="new-password" placeholder="Cole a chave (em branco mantém a salva)">
+                                    <label class="config-openai-check">
+                                        <input type="checkbox" id="vai_clear_key" name="clear_key" value="1"> Remover chave salva
+                                    </label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="vai_model">Modelo <span id="vai_model_hint" class="form-text" style="text-transform:none;display:inline"></span></label>
+                                    <input type="text" id="vai_model" name="model" placeholder="Padrão do provedor">
+                                </div>
+                                <div class="form-group" id="vai_base_wrap" style="display:none">
+                                    <label for="vai_base_url">Base URL (compatível com OpenAI)</label>
+                                    <input type="text" id="vai_base_url" name="base_url" placeholder="https://...">
+                                </div>
+                                <div class="config-actions">
+                                    <button type="button" id="visionAiTestBtn" class="btn-secondary"><i class="fas fa-plug"></i> Testar</button>
+                                    <button type="submit" class="btn-primary"><i class="fas fa-save"></i> Salvar</button>
+                                </div>
+                            </form>
+                            <div id="visionAiMsg"></div>
+                            <p class="form-text">Como obter a chave do Gemini: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a> (gratuito).</p>
+                        </div>
+                    </div>
+
+                    <div data-aba="_oculto" class="dashboard-card">
+                        <div class="card-header">
+                            <h3><i class="fas fa-file-alt"></i> Google Vision API (OCR de abastecimento)</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="form-text config-card-lead">Configuração por empresa da chave do Google Vision para leitura de fichas de abastecimento. A cota gratuita costuma cobrir operações pequenas.</p>
+                            <div id="googleVisionStatusLine" class="config-openai-status" aria-live="polite"></div>
+                            <form id="googleVisionSettingsForm" autocomplete="off">
+                                <div class="form-group">
+                                    <label for="google_vision_api_key">Chave API</label>
+                                    <input type="password" id="google_vision_api_key" name="google_vision_api_key" autocomplete="new-password" placeholder="Cole a chave do Google Vision">
+                                    <label class="config-openai-check">
+                                        <input type="checkbox" id="google_vision_clear_key" name="clear_google_vision_key" value="1">
+                                        Remover chave salva no banco
+                                    </label>
+                                </div>
+                                <div class="config-actions">
+                                    <button type="button" id="googleVisionTestBtn" class="btn-secondary">
+                                        <i class="fas fa-plug"></i> Testar Google Vision
+                                    </button>
+                                    <button type="submit" class="btn-primary">
+                                        <i class="fas fa-save"></i> Salvar
+                                    </button>
+                                </div>
+                            </form>
+                            <div id="googleVisionSettingsMsg"></div>
+                        </div>
+                    </div>
+
+                    <div data-aba="gps" class="dashboard-card config-card--full config-gps-cercas" id="config-gps-cercas">
                         <div class="card-header">
                             <h3><i class="fas fa-draw-polygon"></i> Cercas GPS (geofence)</h3>
                         </div>
@@ -180,9 +337,9 @@ if ($row && !empty($row['certificado_a1_id'])) {
                         </div>
                     </div>
 
-                    <div class="dashboard-card">
+                    <div data-aba="fiscal" class="dashboard-card">
                         <div class="card-header">
-                            <h3>Certificado Digital A1</h3>
+                            <h3><i class="fas fa-certificate"></i> Certificado Digital A1</h3>
                         </div>
                         <div class="card-body">
                             <?php if (!empty($certificado_atual)): ?>
@@ -240,7 +397,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
                         </div>
                     </div>
 
-                    <div class="dashboard-card config-card--span-2">
+                    <div data-aba="fiscal" class="dashboard-card config-card--span-2">
                         <div class="card-header">
                             <h3><i class="fas fa-search"></i> Consulta de Multas (DETRAN)</h3>
                         </div>
@@ -303,9 +460,9 @@ if ($row && !empty($row['certificado_a1_id'])) {
                         </div>
                     </div>
 
-                    <div class="dashboard-card config-card--full">
+                    <div data-aba="fiscal" class="dashboard-card config-card--full">
                         <div class="card-header">
-                            <h3>Ambiente do Sistema Fiscal</h3>
+                            <h3><i class="fas fa-file-invoice"></i> Ambiente do Sistema Fiscal</h3>
                         </div>
                         <div class="card-body">
                             <form id="ambienteFiscalForm" class="config-form-fiscal">
@@ -391,63 +548,146 @@ if ($row && !empty($row['certificado_a1_id'])) {
                         </div>
                     </div>
 
+                    <div data-aba="fiscal" class="dashboard-card config-card--full">
+                        <div class="card-header">
+                            <h3><i class="fas fa-barcode"></i> CIOT — PEF ANTT</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="form-text config-card-lead">
+                                Pagamento Eletrônico de Frete (PEF v1.1) para geração do CIOT junto à ANTT.
+                                Exige certificado ICP-Brasil em formato PEM e comunicação mTLS (homologação ou produção).
+                                Após configurar, use <strong>Sistema Fiscal → CIOT (PEF ANTT)</strong> para declarar operações.
+                            </p>
+                            <form id="pefCiotConfigForm">
+                                <div class="config-row-2 config-row-2--mb">
+                                    <div class="form-group">
+                                        <label for="pef_ambiente">Ambiente ANTT (PEF)</label>
+                                        <select id="pef_ambiente" name="ambiente">
+                                            <option value="homologacao">Homologação (teste)</option>
+                                            <option value="producao">Produção (real)</option>
+                                        </select>
+                                        <small class="form-text">
+                                            Homologação: <code>appservices-hml.antt.gov.br</code><br>
+                                            Produção: <code>appservices.antt.gov.br</code>
+                                        </small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="pef_cnpj_interessado">CNPJ/CPF do certificado</label>
+                                        <input type="text" id="pef_cnpj_interessado" name="cpf_cnpj_interessado" placeholder="Somente números" maxlength="18">
+                                        <small class="form-text">Titular do certificado digital usado na autenticação mútua.</small>
+                                    </div>
+                                </div>
+                                <div class="config-row-2 config-row-2--mb">
+                                    <div class="form-group">
+                                        <label for="pef_cert_pem">Certificado cliente (PEM)</label>
+                                        <input type="text" id="pef_cert_pem" name="cert_pem_path" placeholder="Ex: uploads/pef/cert.pem">
+                                        <small class="form-text">Caminho absoluto ou relativo à raiz do sistema. Mantenha fora do webroot público.</small>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="pef_cert_key">Chave privada (PEM)</label>
+                                        <input type="text" id="pef_cert_key" name="cert_key_path" placeholder="Ex: uploads/pef/key.pem">
+                                    </div>
+                                </div>
+                                <div class="config-row-2 config-row-2--mb">
+                                    <div class="form-group">
+                                        <label for="pef_cert_pass">Senha da chave privada</label>
+                                        <input type="password" id="pef_cert_pass" name="cert_key_pass" placeholder="Ou variável SF_PEF_CERT_PASS">
+                                    </div>
+                                    <div class="form-group" style="display:flex;align-items:flex-end;">
+                                        <label class="notif-pref-check" style="margin-bottom:.5rem;">
+                                            <input type="checkbox" id="pef_ativo" name="ativo" value="1">
+                                            Integração CIOT/PEF ativa
+                                        </label>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn-primary" id="savePefCiotConfigBtn">
+                                    <i class="fas fa-save"></i> Salvar configuração CIOT/PEF
+                                </button>
+                            </form>
+                            <div id="pefCiotConfigMsg"></div>
+                        </div>
+                    </div>
+
                     <!-- ======================================== -->
                     <!-- CONFIGURAÇÕES DE FUNCIONALIDADES AVANÇADAS -->
                     <!-- ======================================== -->
                     
-                    <div class="dashboard-card config-card--full">
+                    <div data-aba="sistema" class="dashboard-card config-card--full">
                         <div class="card-header">
-                            <h3>⚙️ Configurações de Funcionalidades Avançadas</h3>
+                            <h3><i class="fas fa-sliders"></i> Funcionalidades Avançadas</h3>
                         </div>
                         <div class="card-body">
-                            <!-- Sistema de Notificações -->
+                            <!-- Preferências pessoais de notificações -->
                             <div class="mb-4">
-                                <h5 class="mb-3" style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 5px;">
+                                <h5 class="config-sub">
                                     <i class="fas fa-bell me-2"></i>Sistema de Notificações
                                 </h5>
-                                <form id="configNotificacoesForm">
-                                    <div class="config-row-2 config-row-2--mb-lg">
-                                        <div class="form-group">
-                                            <label>
-                                                <input type="checkbox" id="notificacoes_badges" name="notificacoes_badges" checked> 
-                                                Notificar sobre novos badges conquistados
-                                            </label>
+                                <p class="form-text config-card-lead">Escolha quais alertas <strong>você</strong> deseja receber no sininho (operacionais) e no painel de IA. As preferências são individuais — outros usuários da empresa não são afetados.</p>
+                                <form id="configNotifPrefsForm">
+                                    <div class="notif-prefs-grid">
+                                        <div class="notif-prefs-col">
+                                            <div class="notif-prefs-col-head">
+                                                <h6><i class="fas fa-bell" aria-hidden="true"></i> Operacionais</h6>
+                                                <div class="notif-prefs-actions">
+                                                    <button type="button" class="btn-link-sm" data-prefs-grupo="operacional" data-prefs-acao="all">Marcar todos</button>
+                                                    <span aria-hidden="true">·</span>
+                                                    <button type="button" class="btn-link-sm" data-prefs-grupo="operacional" data-prefs-acao="none">Desmarcar todos</button>
+                                                </div>
+                                            </div>
+                                            <div id="notifPrefsOperacional" class="notif-prefs-tipos" aria-live="polite">
+                                                <p class="notif-prefs-loading">Carregando…</p>
+                                            </div>
                                         </div>
-                                        <div class="form-group">
-                                            <label>
-                                                <input type="checkbox" id="notificacoes_niveis" name="notificacoes_niveis" checked> 
-                                                Notificar sobre subida de nível
-                                            </label>
-                                        </div>
-                                        <div class="form-group">
-                                            <label>
-                                                <input type="checkbox" id="notificacoes_ranking" name="notificacoes_ranking" checked> 
-                                                Notificar sobre mudanças no ranking
-                                            </label>
-                                        </div>
-                                        <div class="form-group">
-                                            <label>
-                                                <input type="checkbox" id="notificacoes_desafios" name="notificacoes_desafios" checked> 
-                                                Notificar sobre desafios completados
-                                            </label>
+                                        <div class="notif-prefs-col">
+                                            <div class="notif-prefs-col-head">
+                                                <h6><i class="fas fa-robot" aria-hidden="true"></i> Inteligência Artificial</h6>
+                                                <div class="notif-prefs-actions">
+                                                    <button type="button" class="btn-link-sm" data-prefs-grupo="ia" data-prefs-acao="all">Marcar todos</button>
+                                                    <span aria-hidden="true">·</span>
+                                                    <button type="button" class="btn-link-sm" data-prefs-grupo="ia" data-prefs-acao="none">Desmarcar todos</button>
+                                                </div>
+                                            </div>
+                                            <div id="notifPrefsIa" class="notif-prefs-tipos" aria-live="polite">
+                                                <p class="notif-prefs-loading">Carregando…</p>
+                                            </div>
                                         </div>
                                     </div>
-                                    
-                                    <div class="form-group">
-                                        <label>
-                                            <input type="checkbox" id="sistema_notificacoes_ativo" name="sistema_notificacoes_ativo" checked> 
-                                            Sistema de Notificações Ativo
+                                    <div class="notif-prefs-digest">
+                                        <label class="notif-pref-check">
+                                            <input type="checkbox" id="notifPrefDigest" name="email_digest">
+                                            Receber resumo diário por e-mail
+                                        </label>
+                                        <label class="notif-pref-time">
+                                            Hora do resumo
+                                            <input type="time" id="notifPrefDigestHora" value="08:00">
                                         </label>
                                     </div>
-                                    
-                                    <button type="submit" class="btn-primary">Salvar Configurações de Notificações</button>
+                                    <button type="submit" class="btn-primary">Salvar minhas preferências</button>
                                 </form>
-                                <div id="configNotificacoesMsg"></div>
+                                <div id="configNotifPrefsMsg" class="config-inline-msg" role="status"></div>
+                            </div>
+
+                            <!-- Ativação do módulo (empresa) -->
+                            <div class="mb-4">
+                                <h5 class="config-sub">
+                                    <i class="fas fa-power-off me-2"></i>Módulo na empresa
+                                </h5>
+                                <form id="configNotificacoesEmpresaForm">
+                                    <div class="form-group">
+                                        <label>
+                                            <input type="checkbox" id="sistema_notificacoes_ativo" name="sistema_notificacoes_ativo" checked>
+                                            Sistema de notificações ativo para toda a empresa
+                                        </label>
+                                        <small class="form-text">Quando desativado, a geração automática de alertas é pausada para todos.</small>
+                                    </div>
+                                    <button type="submit" class="btn-secondary">Salvar configuração da empresa</button>
+                                </form>
+                                <div id="configNotificacoesEmpresaMsg" class="config-inline-msg" role="status"></div>
                             </div>
 
                             <!-- Sistema de Cache -->
                             <div class="mb-4">
-                                <h5 class="mb-3" style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 5px;">
+                                <h5 class="config-sub">
                                     <i class="fas fa-database me-2"></i>Sistema de Cache
                                 </h5>
                                 <form id="configCacheForm">
@@ -502,9 +742,9 @@ if ($row && !empty($row['certificado_a1_id'])) {
                     <!-- CONFIGURAÇÕES DE GAMIFICAÇÃO -->
                     <!-- ======================================== -->
                     
-                    <div class="dashboard-card config-card--full">
+                    <div data-aba="gamificacao" class="dashboard-card config-card--full">
                         <div class="card-header">
-                            <h3>🎮 Configurações de Gamificação</h3>
+                            <h3><i class="fas fa-gamepad"></i> Configurações de Gamificação</h3>
                         </div>
                         <div class="card-body">
                             <!-- Ações Principais -->
@@ -518,9 +758,46 @@ if ($row && !empty($row['certificado_a1_id'])) {
                             </div>
                             <div id="gamificacaoStatus" style="margin-bottom: 20px;"></div>
 
+                            <!-- Alertas de gamificação (empresa) -->
+                            <div class="mb-4">
+                                <h5 class="config-sub">
+                                    <i class="fas fa-bell me-2"></i>Alertas de gamificação
+                                </h5>
+                                <form id="configNotificacoesGamifForm">
+                                    <div class="config-row-2 config-row-2--mb-lg">
+                                        <div class="form-group">
+                                            <label>
+                                                <input type="checkbox" id="notificacoes_badges" name="notificacoes_badges" checked>
+                                                Notificar sobre novos badges conquistados
+                                            </label>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>
+                                                <input type="checkbox" id="notificacoes_niveis" name="notificacoes_niveis" checked>
+                                                Notificar sobre subida de nível
+                                            </label>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>
+                                                <input type="checkbox" id="notificacoes_ranking" name="notificacoes_ranking" checked>
+                                                Notificar sobre mudanças no ranking
+                                            </label>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>
+                                                <input type="checkbox" id="notificacoes_desafios" name="notificacoes_desafios" checked>
+                                                Notificar sobre desafios completados
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn-primary">Salvar alertas de gamificação</button>
+                                </form>
+                                <div id="configNotificacoesGamifMsg" class="config-inline-msg" role="status"></div>
+                            </div>
+
                             <!-- Sistema de Badges e Conquistas -->
                             <div class="mb-4">
-                                <h5 class="mb-3" style="color: #ff6b35; border-bottom: 2px solid #ff6b35; padding-bottom: 5px;">
+                                <h5 class="config-sub">
                                     <i class="fas fa-medal me-2"></i>Sistema de Badges e Conquistas
                                 </h5>
                                 <form id="configBadgesForm">
@@ -561,7 +838,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
 
                             <!-- Sistema de Níveis Avançado -->
                             <div class="mb-4">
-                                <h5 class="mb-3" style="color: #ff6b35; border-bottom: 2px solid #ff6b35; padding-bottom: 5px;">
+                                <h5 class="config-sub">
                                     <i class="fas fa-star me-2"></i>Sistema de Níveis Avançado
                                 </h5>
                                 <form id="configNiveisForm">
@@ -630,7 +907,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
 
                             <!-- Sistema de Desafios -->
                             <div class="mb-4">
-                                <h5 class="mb-3" style="color: #ff6b35; border-bottom: 2px solid #ff6b35; padding-bottom: 5px;">
+                                <h5 class="config-sub">
                                     <i class="fas fa-target me-2"></i>Sistema de Desafios
                                 </h5>
                                 <form id="configDesafiosForm">
@@ -683,9 +960,9 @@ if ($row && !empty($row['certificado_a1_id'])) {
                     <!-- CONFIGURAÇÕES DE RANKING -->
                     <!-- ======================================== -->
                     
-                    <div class="dashboard-card config-card--full">
+                    <div data-aba="gamificacao" class="dashboard-card config-card--full">
                         <div class="card-header">
-                            <h3>🏆 Configurações de Ranking</h3>
+                            <h3><i class="fas fa-trophy"></i> Configurações de Ranking</h3>
                         </div>
                         <div class="card-body">
                             <!-- Ações Principais -->
@@ -701,7 +978,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
 
                             <!-- Configurações de Performance Básicas -->
                             <div class="mb-4">
-                                <h5 class="mb-3" style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 5px;">
+                                <h5 class="config-sub">
                                     <i class="fas fa-cogs me-2"></i>Configurações de Performance Básicas
                                 </h5>
                                 <form id="configPerformanceForm">
@@ -753,7 +1030,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
 
                             <!-- Métricas Avançadas de Avaliação -->
                             <div class="mb-4">
-                                <h5 class="mb-3" style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 5px;">
+                                <h5 class="config-sub">
                                     <i class="fas fa-chart-bar me-2"></i>Métricas Avançadas de Avaliação
                                 </h5>
                                 <form id="configMetricasForm">
@@ -794,7 +1071,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
 
                             <!-- Filtros Dinâmicos de Ranking -->
                             <div class="mb-4">
-                                <h5 class="mb-3" style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 5px;">
+                                <h5 class="config-sub">
                                     <i class="fas fa-filter me-2"></i>Filtros Dinâmicos de Ranking
                                 </h5>
                                 <form id="configFiltrosForm">
@@ -848,6 +1125,126 @@ if ($row && !empty($row['certificado_a1_id'])) {
                             </div>
                         </div>
                     </div>
+                    <!-- ================= SEGURANÇA (dashboards) ================= -->
+                    <!-- Sessão e políticas -->
+                    <div data-aba="seguranca" class="dashboard-card config-seguranca">
+                        <div class="card-header"><h3><i class="fas fa-user-clock"></i> Sessão e políticas</h3></div>
+                        <div class="card-body">
+                            <form class="config-sec-form">
+                                <input type="hidden" name="_fields" value="idle_timeout_min,senha_forte,two_factor_obrigatorio">
+                                <div class="form-group">
+                                    <label for="idle_timeout_min">Logout por inatividade</label>
+                                    <select id="idle_timeout_min" name="idle_timeout_min">
+                                        <option value="0">Desativado</option>
+                                        <option value="15">15 minutos</option>
+                                        <option value="30">30 minutos</option>
+                                        <option value="60">60 minutos</option>
+                                        <option value="120">120 minutos</option>
+                                    </select>
+                                </div>
+                                <div class="config-checks">
+                                    <label class="config-check"><input type="checkbox" name="senha_forte" value="1"> Exigir senha forte</label>
+                                    <label class="config-check"><input type="checkbox" name="two_factor_obrigatorio" value="1"> 2FA obrigatório</label>
+                                </div>
+                                <div class="config-actions"><button type="submit" class="btn-primary"><i class="fas fa-save"></i> Salvar</button></div>
+                            </form>
+                            <div class="config-sec-formmsg" aria-live="polite"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tentativas de login -->
+                    <div data-aba="seguranca" class="dashboard-card config-seguranca">
+                        <div class="card-header"><h3><i class="fas fa-user-lock"></i> Tentativas de login</h3></div>
+                        <div class="card-body">
+                            <form class="config-sec-form">
+                                <input type="hidden" name="_fields" value="login_max_tentativas,login_bloqueio_min">
+                                <div class="form-group">
+                                    <label for="login_max_tentativas">Bloquear após (tentativas)</label>
+                                    <input type="number" id="login_max_tentativas" name="login_max_tentativas" min="3" max="20" value="5">
+                                </div>
+                                <div class="form-group">
+                                    <label for="login_bloqueio_min">Tempo de bloqueio (minutos)</label>
+                                    <input type="number" id="login_bloqueio_min" name="login_bloqueio_min" min="1" max="1440" value="15">
+                                </div>
+                                <div class="config-actions"><button type="submit" class="btn-primary"><i class="fas fa-save"></i> Salvar</button></div>
+                            </form>
+                            <div class="config-sec-formmsg" aria-live="polite"></div>
+                        </div>
+                    </div>
+
+                    <!-- Geo-bloqueio -->
+                    <div data-aba="seguranca" class="dashboard-card config-seguranca">
+                        <div class="card-header"><h3><i class="fas fa-earth-americas"></i> Geo-bloqueio</h3></div>
+                        <div class="card-body">
+                            <form class="config-sec-form">
+                                <input type="hidden" name="_fields" value="geo_block_enabled,geo_paises_permitidos">
+                                <div class="config-checks">
+                                    <label class="config-check"><input type="checkbox" name="geo_block_enabled" value="1"> Bloquear acesso fora dos países permitidos</label>
+                                </div>
+                                <div class="form-group">
+                                    <label for="geo_paises_permitidos">Países permitidos (ISO, ex.: BR,PT)</label>
+                                    <input type="text" id="geo_paises_permitidos" name="geo_paises_permitidos" value="BR" placeholder="BR,PT">
+                                </div>
+                                <div class="config-actions"><button type="submit" class="btn-primary"><i class="fas fa-save"></i> Salvar</button></div>
+                            </form>
+                            <div class="config-sec-formmsg" aria-live="polite"></div>
+                        </div>
+                    </div>
+
+                    <!-- E-mail de novo acesso (SMTP) -->
+                    <div data-aba="seguranca" class="dashboard-card config-card--full config-seguranca">
+                        <div class="card-header"><h3><i class="fas fa-envelope"></i> E-mail de novo acesso (SMTP)</h3></div>
+                        <div class="card-body">
+                            <form class="config-sec-form">
+                                <input type="hidden" name="_fields" value="novo_acesso_email,smtp_host,smtp_port,smtp_secure,smtp_user,smtp_pass,smtp_from">
+                                <div class="config-checks">
+                                    <label class="config-check"><input type="checkbox" name="novo_acesso_email" value="1"> Avisar por e-mail em novo dispositivo/IP</label>
+                                </div>
+                                <div class="config-row-3">
+                                    <div class="form-group"><label for="smtp_host">Servidor SMTP</label><input type="text" id="smtp_host" name="smtp_host" autocomplete="off"></div>
+                                    <div class="form-group"><label for="smtp_port">Porta</label><input type="number" id="smtp_port" name="smtp_port" placeholder="587"></div>
+                                    <div class="form-group">
+                                        <label for="smtp_secure">Segurança</label>
+                                        <select id="smtp_secure" name="smtp_secure">
+                                            <option value="">Nenhuma</option>
+                                            <option value="tls">STARTTLS (587)</option>
+                                            <option value="ssl">SSL/TLS (465)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group"><label for="smtp_user">Usuário SMTP</label><input type="text" id="smtp_user" name="smtp_user" autocomplete="off"></div>
+                                    <div class="form-group"><label for="smtp_pass">Senha SMTP</label><input type="password" id="smtp_pass" name="smtp_pass" autocomplete="new-password" placeholder="••••••••"></div>
+                                    <div class="form-group"><label for="smtp_from">Remetente (From)</label><input type="email" id="smtp_from" name="smtp_from" autocomplete="off"></div>
+                                </div>
+                                <div class="config-actions"><button type="submit" class="btn-primary"><i class="fas fa-save"></i> Salvar</button></div>
+                            </form>
+                            <div class="config-sec-formmsg" aria-live="polite"></div>
+                        </div>
+                    </div>
+
+                    <!-- Whitelist de IP -->
+                    <div data-aba="seguranca" class="dashboard-card config-card--full config-seguranca">
+                        <div class="card-header"><h3><i class="fas fa-network-wired"></i> Whitelist de IP (admin)</h3></div>
+                        <div class="card-body">
+                            <form class="config-sec-form">
+                                <input type="hidden" name="_fields" value="ip_whitelist_enabled">
+                                <div class="config-checks">
+                                    <label class="config-check"><input type="checkbox" id="ip_whitelist_enabled" name="ip_whitelist_enabled" value="1"> Restringir acesso de administradores aos IPs da lista</label>
+                                </div>
+                                <div class="config-actions"><button type="submit" class="btn-primary"><i class="fas fa-save"></i> Salvar</button></div>
+                            </form>
+                            <div class="config-sec-formmsg" aria-live="polite"></div>
+                            <form id="formIpWhitelist" class="config-ip-form" style="margin-top:.75rem">
+                                <div class="form-group"><label for="ipNovo">IP</label><input type="text" id="ipNovo" name="ip" placeholder="200.100.50.10" required></div>
+                                <div class="form-group"><label for="ipDesc">Descrição</label><input type="text" id="ipDesc" name="descricao" placeholder="Matriz"></div>
+                                <button type="submit" class="btn-secondary"><i class="fas fa-plus"></i> Adicionar</button>
+                            </form>
+                            <table class="config-ip-table">
+                                <thead><tr><th>IP</th><th>Descrição</th><th></th></tr></thead>
+                                <tbody id="ipWhitelistBody"></tbody>
+                            </table>
+                            <span class="form-text">Lista vazia = sem restrição (evita auto-bloqueio). Aplica-se a usuários do tipo admin.</span>
+                        </div>
+                    </div>
                 </div>
                 <button type="button" class="config-scroll-top" id="configScrollTopBtn" aria-label="Voltar ao topo" title="Voltar ao topo">
                     <i class="fas fa-arrow-up" aria-hidden="true"></i>
@@ -859,6 +1256,9 @@ if ($row && !empty($row['certificado_a1_id'])) {
     <?php include '../includes/footer.php'; ?>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <script src="../js/seguranca.js?v=4"></script>
+    <script src="../js/vision-ai-config.js?v=3"></script>
+    <script src="../js/notificacoes-preferencias-config.js?v=1"></script>
     <script>
     document.getElementById('configForm').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -1010,6 +1410,20 @@ if ($row && !empty($row['certificado_a1_id'])) {
                     document.getElementById('endereco').value = data.data.endereco || '';
                     document.getElementById('telefone').value = data.data.telefone || '';
                     document.getElementById('email').value = data.data.email || '';
+
+                    if (data.data.pef) {
+                        var pef = data.data.pef;
+                        var pefAmb = document.getElementById('pef_ambiente');
+                        var pefCnpj = document.getElementById('pef_cnpj_interessado');
+                        var pefPem = document.getElementById('pef_cert_pem');
+                        var pefKey = document.getElementById('pef_cert_key');
+                        var pefAtivo = document.getElementById('pef_ativo');
+                        if (pefAmb) pefAmb.value = pef.ambiente || 'homologacao';
+                        if (pefCnpj) pefCnpj.value = pef.cpf_cnpj_interessado || '';
+                        if (pefPem) pefPem.value = pef.cert_pem_path || '';
+                        if (pefKey) pefKey.value = pef.cert_key_path || '';
+                        if (pefAtivo) pefAtivo.checked = !!Number(pef.ativo);
+                    }
                     
                     // Mostrar mensagem informativa
                     const msg = document.getElementById('ambienteFiscalMsg');
@@ -1110,6 +1524,49 @@ if ($row && !empty($row['certificado_a1_id'])) {
             msg.style.color = 'red';
         });
     });
+
+    var pefCiotForm = document.getElementById('pefCiotConfigForm');
+    if (pefCiotForm) {
+        pefCiotForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            var msg = document.getElementById('pefCiotConfigMsg');
+            msg.textContent = '';
+            var dados = {
+                action: 'save_pef_config',
+                ambiente: document.getElementById('pef_ambiente').value,
+                cpf_cnpj_interessado: (document.getElementById('pef_cnpj_interessado').value || '').replace(/\D/g, ''),
+                cert_pem_path: document.getElementById('pef_cert_pem').value.trim(),
+                cert_key_path: document.getElementById('pef_cert_key').value.trim(),
+                cert_key_pass: document.getElementById('pef_cert_pass').value,
+                ativo: document.getElementById('pef_ativo').checked ? 1 : 0
+            };
+            var headers = { 'Content-Type': 'application/json' };
+            if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+                headers['X-CSRF-Token'] = window.__SF_CSRF__;
+            }
+            fetch('../api/configuracoes.php', {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(dados)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (res.success) {
+                    msg.textContent = res.message || 'Configuração CIOT/PEF salva.';
+                    msg.style.color = 'green';
+                    var passEl = document.getElementById('pef_cert_pass');
+                    if (passEl) passEl.value = '';
+                } else {
+                    msg.textContent = res.error || 'Erro ao salvar configuração CIOT/PEF.';
+                    msg.style.color = 'red';
+                }
+            })
+            .catch(function() {
+                msg.textContent = 'Erro ao salvar configuração CIOT/PEF.';
+                msg.style.color = 'red';
+            });
+        });
+    }
 
     // Máscara para CNPJ
     document.getElementById('cnpj_empresa').addEventListener('input', function(e) {
@@ -1356,6 +1813,264 @@ if ($row && !empty($row['certificado_a1_id'])) {
             msgDiv.innerHTML = '';
         }, 5000);
     }
+
+    function showOpenAiMessage(message, type) {
+        const msgDiv = document.getElementById('openaiSettingsMsg');
+        if (!msgDiv) return;
+        const color = type === 'success' ? '#28a745' : '#dc3545';
+        const bgColor = type === 'success' ? '#d4edda' : '#f8d7da';
+        msgDiv.innerHTML = '<div style="color: ' + color + '; background: ' + bgColor + '; padding: 10px; border-radius: 5px; border: 1px solid ' + color + ';">' + message + '</div>';
+        setTimeout(function () { msgDiv.innerHTML = ''; }, 8000);
+    }
+
+    function applyOpenAiPayload(d) {
+        if (!d) return;
+        var statusEl = document.getElementById('openaiStatusLine');
+        var src = '';
+        if (d.key_source_env) {
+            src = 'Chave <strong>em uso</strong>: variável de ambiente <code>SF_OPENAI_API_KEY</code> no servidor.';
+            if (d.key_saved_in_database) {
+                src += ' Existe também chave salva no banco para esta empresa; ela <strong>não é usada</strong> enquanto a variável de ambiente estiver definida.';
+            }
+        } else if (d.has_key) {
+            src = 'Chave <strong>em uso</strong>: cadastro desta empresa (<code>empresa_openai_credentials</code>).';
+        } else if (d.key_saved_in_database) {
+            src = 'Há registro de chave no banco, mas ela não pôde ser lida. Recarregue a página ou salve de novo.';
+        } else {
+            src = 'Nenhuma chave configurada: informe abaixo ou defina <code>SF_OPENAI_API_KEY</code> no servidor.';
+        }
+        var keyLine = d.has_key
+            ? ('Resumo: <code>' + (d.key_masked || '—') + '</code> · modelo efetivo: <code>' + (d.vision_model || '') + '</code>')
+            : '<span class="config-text-muted">Nenhuma chave ativa para chamadas à API (teste e OCR dependem disso).</span>';
+        if (statusEl) statusEl.innerHTML = '<p class="form-text">' + src + '</p><p class="form-text">' + keyLine + '</p>';
+
+        var usd = typeof d.month_estimated_usd === 'number' ? d.month_estimated_usd : 0;
+        var usdEl = document.getElementById('openaiMonthUsd');
+        if (usdEl) {
+            usdEl.textContent = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(usd);
+        }
+        var tokEl = document.getElementById('openaiMonthTok');
+        if (tokEl) {
+            tokEl.textContent = (d.month_prompt_tokens != null ? d.month_prompt_tokens : 0) + ' / ' + (d.month_completion_tokens != null ? d.month_completion_tokens : 0);
+        }
+
+        var barWrap = document.getElementById('openaiBudgetBarWrap');
+        var fill = document.getElementById('openaiBudgetFill');
+        var pctLabel = document.getElementById('openaiPctLabel');
+        var hint = document.getElementById('openaiBudgetHint');
+        var pct = d.pct_used;
+        if (pct != null && barWrap && fill && pctLabel) {
+            barWrap.style.display = '';
+            if (hint) hint.style.display = 'none';
+            var w = Math.min(100, Math.max(0, pct));
+            fill.style.width = w + '%';
+            if (pct >= 90) { fill.classList.add('is-high'); } else { fill.classList.remove('is-high'); }
+            pctLabel.textContent = '≈ ' + pct + '% do orçamento mensal usado neste mês.';
+            barWrap.querySelector('.config-openai-bar').setAttribute('aria-valuenow', String(Math.round(w)));
+        } else {
+            if (barWrap) barWrap.style.display = 'none';
+            if (pctLabel) pctLabel.textContent = '';
+            if (hint) hint.style.display = '';
+        }
+
+        var modelIn = document.getElementById('openai_vision_model');
+        if (modelIn && !modelIn.dataset.userEdited) {
+            modelIn.value = d.vision_model || '';
+        }
+        var budIn = document.getElementById('openai_monthly_budget_usd');
+        if (budIn && !budIn.dataset.userEdited) {
+            budIn.value = d.monthly_budget_usd != null && d.monthly_budget_usd !== '' ? String(d.monthly_budget_usd) : '';
+        }
+    }
+
+    function loadOpenAiSettings() {
+        fetch('../api/configuracoes.php?action=get_openai_settings', { credentials: 'include' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (res.success && res.data) {
+                    applyOpenAiPayload(res.data);
+                }
+            })
+            .catch(function () { /* silencioso */ });
+    }
+
+    document.getElementById('openai_vision_model').addEventListener('input', function () { this.dataset.userEdited = '1'; });
+    document.getElementById('openai_monthly_budget_usd').addEventListener('input', function () { this.dataset.userEdited = '1'; });
+
+    document.getElementById('openaiTestBtn').addEventListener('click', function () {
+        var btn = this;
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testando…';
+        btn.disabled = true;
+        fetch('../api/configuracoes.php', {
+            method: 'POST',
+            headers: sfMutationHeaders({ 'Content-Type': 'application/json' }),
+            credentials: 'include',
+            body: JSON.stringify({ action: 'test_openai' })
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    showOpenAiMessage('✅ ' + (data.message || 'API OK.'), 'success');
+                } else {
+                    showOpenAiMessage('❌ ' + (data.error || data.message || 'Falha no teste.'), 'error');
+                }
+            })
+            .catch(function (err) {
+                showOpenAiMessage('❌ ' + sfSafeErrorMessage(err, 'Erro ao testar.'), 'error');
+            })
+            .finally(function () {
+                btn.innerHTML = orig;
+                btn.disabled = false;
+            });
+    });
+
+    document.getElementById('openAiSettingsForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var keyEl = document.getElementById('openai_api_key');
+        var clearEl = document.getElementById('openai_clear_key');
+        var modelEl = document.getElementById('openai_vision_model');
+        var budEl = document.getElementById('openai_monthly_budget_usd');
+        var payload = {
+            action: 'save_openai_settings',
+            openai_api_key: keyEl ? keyEl.value.trim() : '',
+            clear_openai_key: clearEl && clearEl.checked,
+            openai_vision_model: modelEl ? modelEl.value.trim() : '',
+            openai_monthly_budget_usd: budEl && budEl.value !== '' ? budEl.value : null
+        };
+        var submitBtn = this.querySelector('button[type="submit"]');
+        var origSubmit = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando…';
+            submitBtn.disabled = true;
+        }
+        fetch('../api/configuracoes.php', {
+            method: 'POST',
+            headers: sfMutationHeaders({ 'Content-Type': 'application/json' }),
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    if (keyEl) keyEl.value = '';
+                    if (clearEl) clearEl.checked = false;
+                    if (modelEl) delete modelEl.dataset.userEdited;
+                    if (budEl) delete budEl.dataset.userEdited;
+                    if (data.data) applyOpenAiPayload(data.data);
+                    showOpenAiMessage('✅ ' + (data.message || 'Salvo.'), 'success');
+                } else {
+                    showOpenAiMessage('❌ ' + (data.error || data.message || 'Erro ao salvar.'), 'error');
+                }
+            })
+            .catch(function (err) {
+                showOpenAiMessage('❌ ' + sfSafeErrorMessage(err, 'Erro ao salvar.'), 'error');
+            })
+            .finally(function () {
+                if (submitBtn) {
+                    submitBtn.innerHTML = origSubmit;
+                    submitBtn.disabled = false;
+                }
+            });
+    });
+
+    function showGoogleVisionMessage(message, type) {
+        const msgDiv = document.getElementById('googleVisionSettingsMsg');
+        if (!msgDiv) return;
+        const color = type === 'success' ? '#28a745' : '#dc3545';
+        const bgColor = type === 'success' ? '#d4edda' : '#f8d7da';
+        msgDiv.innerHTML = '<div style="color: ' + color + '; background: ' + bgColor + '; padding: 10px; border-radius: 5px; border: 1px solid ' + color + ';">' + message + '</div>';
+        setTimeout(function () { msgDiv.innerHTML = ''; }, 8000);
+    }
+
+    function applyGoogleVisionPayload(d) {
+        if (!d) return;
+        var statusEl = document.getElementById('googleVisionStatusLine');
+        if (statusEl) {
+            var keyLine = d.has_key
+                ? ('Chave salva: <code>' + (d.key_masked || '****') + '</code>')
+                : '<span class="config-text-muted">Nenhuma chave salva.</span>';
+            statusEl.innerHTML = '<p class="form-text">Motor de OCR atual: <code>Google Vision</code></p><p class="form-text">' + keyLine + '</p>';
+        }
+    }
+
+    function loadGoogleVisionSettings() {
+        fetch('../api/configuracoes.php?action=get_google_vision_settings', { credentials: 'include' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (res.success && res.data) applyGoogleVisionPayload(res.data);
+            })
+            .catch(function () { /* silencioso */ });
+    }
+
+    document.getElementById('googleVisionTestBtn').addEventListener('click', function () {
+        var btn = this;
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testando…';
+        btn.disabled = true;
+        fetch('../api/configuracoes.php', {
+            method: 'POST',
+            headers: sfMutationHeaders({ 'Content-Type': 'application/json' }),
+            credentials: 'include',
+            body: JSON.stringify({ action: 'test_google_vision' })
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    showGoogleVisionMessage('✅ ' + (data.message || 'Google Vision OK.'), 'success');
+                } else {
+                    showGoogleVisionMessage('❌ ' + (data.error || data.message || 'Falha no teste.'), 'error');
+                }
+            })
+            .catch(function (err) {
+                showGoogleVisionMessage('❌ ' + sfSafeErrorMessage(err, 'Erro ao testar Google Vision.'), 'error');
+            })
+            .finally(function () {
+                btn.innerHTML = orig;
+                btn.disabled = false;
+            });
+    });
+
+    document.getElementById('googleVisionSettingsForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var payload = {
+            action: 'save_google_vision_settings',
+            google_vision_api_key: document.getElementById('google_vision_api_key').value.trim(),
+            clear_google_vision_key: document.getElementById('google_vision_clear_key').checked
+        };
+        var submitBtn = this.querySelector('button[type="submit"]');
+        var origSubmit = submitBtn ? submitBtn.innerHTML : '';
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando…';
+            submitBtn.disabled = true;
+        }
+        fetch('../api/configuracoes.php', {
+            method: 'POST',
+            headers: sfMutationHeaders({ 'Content-Type': 'application/json' }),
+            credentials: 'include',
+            body: JSON.stringify(payload)
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    document.getElementById('google_vision_api_key').value = '';
+                    document.getElementById('google_vision_clear_key').checked = false;
+                    loadGoogleVisionSettings();
+                    showGoogleVisionMessage('✅ ' + (data.message || 'Salvo.'), 'success');
+                } else {
+                    showGoogleVisionMessage('❌ ' + (data.error || data.message || 'Erro ao salvar.'), 'error');
+                }
+            })
+            .catch(function (err) {
+                showGoogleVisionMessage('❌ ' + sfSafeErrorMessage(err, 'Erro ao salvar Google Vision.'), 'error');
+            })
+            .finally(function () {
+                if (submitBtn) {
+                    submitBtn.innerHTML = origSubmit;
+                    submitBtn.disabled = false;
+                }
+            });
+    });
 
     // Consulta de Multas (DETRAN) - carregar configuração e info do certificado
     function loadDenatranConfig() {
@@ -1816,6 +2531,8 @@ if ($row && !empty($row['certificado_a1_id'])) {
     document.addEventListener('DOMContentLoaded', function() {
         loadConfiguracoesFiscais();
         loadGoogleMapsConfig();
+        loadOpenAiSettings();
+        loadGoogleVisionSettings();
         
         // Aguardar um pouco para garantir que o DOM esteja totalmente carregado
         setTimeout(() => {
@@ -1824,34 +2541,6 @@ if ($row && !empty($row['certificado_a1_id'])) {
     });
     
     // Event listeners para as configurações de funcionalidades avançadas
-    document.getElementById('configNotificacoesForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(this);
-        formData.append('action', 'save_notifications_config');
-        const msg = document.getElementById('configNotificacoesMsg');
-        msg.textContent = '';
-        
-        fetch('../api/configuracoes.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(res => res.json())
-        .then(res => {
-            if (res.success) {
-                msg.textContent = 'Configurações de notificações salvas com sucesso!';
-                msg.style.color = 'green';
-            } else {
-                msg.textContent = res.error || 'Erro ao salvar configurações de notificações.';
-                msg.style.color = 'red';
-            }
-        })
-        .catch(() => {
-            msg.textContent = 'Erro ao salvar configurações de notificações.';
-            msg.style.color = 'red';
-        });
-    });
-
     document.getElementById('configCacheForm').addEventListener('submit', function(e) {
         e.preventDefault();
         
@@ -2058,5 +2747,10 @@ if ($row && !empty($row['certificado_a1_id'])) {
 
     </script>
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php
+    $sf_help_key = ($aba === 'fiscal') ? 'configuracoes_fiscal' : 'configuracoes';
+    include __DIR__ . '/../includes/sf_page_help_bundle.php';
+    ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

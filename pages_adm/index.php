@@ -60,7 +60,7 @@ try {
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .main-content {
             margin-left: 250px;
@@ -79,12 +79,23 @@ try {
             padding: 20px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .dashboard-card h3 {
-            color: #333;
-            margin: 0 0 10px 0;
+        .dashboard-card .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 10px;
+        }
+        .dashboard-card .card-header .kpi-card-icon {
+            color: #007bff;
             font-size: 1.1rem;
         }
-        .dashboard-card .value {
+        .dashboard-card .card-header h3 {
+            color: #333;
+            margin: 0;
+            font-size: 1.1rem;
+            flex: 1;
+        }
+        .dashboard-card .card-body .value {
             font-size: 2rem;
             font-weight: bold;
             color: #007bff;
@@ -146,20 +157,40 @@ try {
     <div class="main-content">
         <div class="dashboard-grid">
             <div class="dashboard-card">
-                <h3>Empresas Cadastradas</h3>
-                <div class="value"><?php echo $total_empresas; ?></div>
+                <div class="card-header">
+                    <i class="fas fa-building kpi-card-icon" aria-hidden="true"></i>
+                    <h3>Empresas Cadastradas</h3>
+                </div>
+                <div class="card-body">
+                    <div class="value"><?php echo $total_empresas; ?></div>
+                </div>
             </div>
             <div class="dashboard-card">
-                <h3>Usuários Ativos</h3>
-                <div class="value"><?php echo $total_usuarios; ?></div>
+                <div class="card-header">
+                    <i class="fas fa-users kpi-card-icon" aria-hidden="true"></i>
+                    <h3>Usuários Ativos</h3>
+                </div>
+                <div class="card-body">
+                    <div class="value"><?php echo $total_usuarios; ?></div>
+                </div>
             </div>
             <div class="dashboard-card">
-                <h3>Motoristas</h3>
-                <div class="value"><?php echo $total_motoristas; ?></div>
+                <div class="card-header">
+                    <i class="fas fa-id-card kpi-card-icon" aria-hidden="true"></i>
+                    <h3>Motoristas</h3>
+                </div>
+                <div class="card-body">
+                    <div class="value"><?php echo $total_motoristas; ?></div>
+                </div>
             </div>
             <div class="dashboard-card">
-                <h3>Veículos</h3>
-                <div class="value"><?php echo $total_veiculos; ?></div>
+                <div class="card-header">
+                    <i class="fas fa-truck kpi-card-icon" aria-hidden="true"></i>
+                    <h3>Veículos</h3>
+                </div>
+                <div class="card-body">
+                    <div class="value"><?php echo $total_veiculos; ?></div>
+                </div>
             </div>
         </div>
 

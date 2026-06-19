@@ -12,6 +12,71 @@ body.configuracoes-modern-page .dashboard-content.fornc-page.configuracoes-page 
     box-sizing: border-box;
 }
 
+/* Cabeçalho da seção (aba ativa) + abas rápidas */
+.config-section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 1rem;
+    margin: 0 0 0.85rem;
+}
+
+.config-section-head h2 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-primary);
+}
+
+.config-section-head h2 i {
+    color: var(--accent-primary, #3b82f6);
+}
+
+.config-section-head #helpBtn {
+    margin-left: auto;
+}
+
+.config-section-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-left: auto;
+}
+
+.config-section-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: filter 0.15s ease;
+}
+
+.config-section-tab:hover {
+    filter: brightness(1.06);
+}
+
+.config-section-tab.is-active {
+    background: var(--accent-primary, #3b82f6);
+    border-color: var(--accent-primary, #3b82f6);
+    color: #fff;
+}
+
+@media (max-width: 640px) {
+    .config-section-tabs span {
+        display: none;
+    }
+}
+
 /* Grade principal: 3 colunas (telas largas), depois 2, depois 1 */
 .config-grid {
     display: grid;
@@ -189,6 +254,179 @@ body.configuracoes-modern-page .dashboard-content.fornc-page.configuracoes-page 
 }
 .config-gps-cercas .config-gps-cercas-table .btn-gps-cerca-del:hover {
     filter: brightness(0.95);
+}
+
+/* Subtítulo de seção dentro de cards (substitui h5 com cor fixa inline) */
+.configuracoes-page .config-sub {
+    margin: 0 0 0.7rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 2px solid var(--accent-primary, #3b82f6);
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.configuracoes-page .config-sub i {
+    color: var(--accent-primary, #3b82f6);
+}
+
+/* Checkboxes — rótulo inline, legível (sobrepõe o label uppercase padrão) */
+.configuracoes-page .form-group > label:has(> input[type="checkbox"]) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-primary);
+    margin-bottom: 0;
+    cursor: pointer;
+}
+
+.configuracoes-page .form-group > label > input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    accent-color: var(--accent-primary, #3b82f6);
+}
+
+/* Grade de 3 colunas dentro de cards largos */
+.config-row-3 {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.6rem 0.75rem;
+    align-items: start;
+}
+
+@media (max-width: 900px) {
+    .config-row-3 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .config-row-3 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Card Segurança ===== */
+.config-seguranca .config-sec-section {
+    padding: 0.75rem 0 0.85rem;
+    border-top: 1px dashed var(--border-color);
+}
+
+.config-seguranca .config-sec-section:first-of-type {
+    padding-top: 0.15rem;
+    border-top: none;
+}
+
+.config-seguranca .config-sec-section h4 {
+    margin: 0 0 0.6rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.config-seguranca .config-sec-section h4 i {
+    color: var(--accent-primary, #3b82f6);
+    font-size: 0.85em;
+}
+
+/* Linha de checkboxes (toggles) compacta */
+.config-seguranca .config-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.config-seguranca .config-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-primary);
+    margin: 0;
+    cursor: pointer;
+}
+
+.config-seguranca .config-check input {
+    width: auto;
+    margin: 0;
+    accent-color: var(--accent-primary, #3b82f6);
+}
+
+.config-seguranca .config-sec-msg {
+    margin-bottom: 0.6rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
+    border: 1px solid var(--border-color);
+}
+
+/* Form de adicionar IP — em linha */
+.config-seguranca .config-ip-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 0.6rem;
+    align-items: end;
+    margin-bottom: 0.6rem;
+}
+
+@media (max-width: 560px) {
+    .config-seguranca .config-ip-form {
+        grid-template-columns: 1fr;
+    }
+}
+
+.config-seguranca .config-ip-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.config-seguranca .config-ip-table th,
+.config-seguranca .config-ip-table td {
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.config-seguranca .config-ip-table th {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    background: var(--bg-tertiary, rgba(0, 0, 0, 0.04));
+}
+
+.config-seguranca .config-ip-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.config-seguranca .config-ip-table .btn-danger {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    border: none;
+    border-radius: 6px;
+    background: #dc2626;
+    color: #fff;
+    cursor: pointer;
 }
 
 /* Campos — compactos como fornc (labels pequenos uppercase) */
@@ -399,4 +637,67 @@ body.configuracoes-modern-page .dashboard-content.fornc-page.configuracoes-page 
 .config-scroll-top:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35);
+}
+
+/* OpenAI — uso mensal / barra de orçamento */
+.config-openai-status {
+    margin-bottom: 0.75rem;
+}
+
+.config-openai-usage {
+    margin-bottom: 1rem;
+    padding: 0.65rem 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
+}
+
+.config-openai-usage-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    margin-bottom: 0.35rem;
+}
+
+.config-openai-usage-row:last-of-type {
+    margin-bottom: 0.5rem;
+}
+
+.config-openai-bar-wrap {
+    margin-top: 0.5rem;
+}
+
+.config-openai-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--border-color, #e5e7eb);
+    overflow: hidden;
+}
+
+.config-openai-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+    transition: width 0.25s ease;
+}
+
+.config-openai-bar-fill.is-high {
+    background: linear-gradient(90deg, #f59e0b, #ea580c);
+}
+
+.config-openai-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-top: 0.45rem;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    cursor: pointer;
+}
+
+.config-openai-check input {
+    margin-top: 0.15rem;
 }

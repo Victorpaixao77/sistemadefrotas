@@ -175,6 +175,11 @@ $despesa = $stmt->fetch(PDO::FETCH_ASSOC);
                                 </div>
                                 
                                 <div class="form-group">
+                                    <label for="outros">Outros (R$)</label>
+                                    <input type="number" id="outros" name="outros" class="form-control" step="0.01" value="<?php echo $despesa['outros'] ?? '0.00'; ?>" onchange="calcularTotal()">
+                                </div>
+                                
+                                <div class="form-group">
                                     <label for="total">Total (R$)</label>
                                     <input type="number" id="total" name="total" class="form-control" step="0.01" readonly>
                                 </div>
@@ -214,7 +219,8 @@ $despesa = $stmt->fetch(PDO::FETCH_ASSOC);
             'lavagem',
             'borracharia',
             'eletrica_mecanica',
-            'adiantamento'
+            'adiantamento',
+            'outros'
         ];
         
         let total = 0;

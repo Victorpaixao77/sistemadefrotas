@@ -3,6 +3,7 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
+require_once '../includes/cache.php';
 
 // Configure session before starting it
 configure_session();
@@ -28,6 +29,50 @@ $empresa_id = $_SESSION['empresa_id'];
 $items_per_page = 10;
 $current_page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $offset = ($current_page - 1) * $items_per_page;
+// Seção que está sendo paginada (só ela usa $current_page; as demais ficam na pág. 1).
+$active_section = isset($_GET['section']) ? preg_replace('/[^a-z_]/', '', (string) $_GET['section']) : '';
+
+/** Offset da seção: o da página atual se for a seção ativa, senão 0 (primeira página). */
+function sec_offset(string $name): int {
+    global $active_section, $offset;
+    return $active_section === $name ? $offset : 0;
+}
+/** Página a exibir na paginação da seção (1 se não for a seção ativa). */
+function sec_page(string $name): int {
+    global $active_section, $current_page;
+    return $active_section === $name ? $current_page : 1;
+}
+
+// Abas do painel: cada seção pertence a uma aba. Ao paginar uma seção, a aba dela reabre.
+$ia_tab_de_secao = [
+    'alertas' => 'alertas',
+    'recomendacoes' => 'recomendacoes',
+    'insights' => 'recomendacoes',
+    'motoristas' => 'frota',
+    'veiculos' => 'frota',
+    'rotas' => 'frota',
+];
+$ia_tab = $ia_tab_de_secao[$active_section] ?? 'visao';
+
+/** Retorna 'ia-hidden' quando o grupo não pertence à aba ativa. */
+function ia_hidden(string $tab): string {
+    global $ia_tab;
+    return $tab === $ia_tab ? '' : 'ia-hidden';
+}
+
+// Cache das análises pesadas (recomendações, insights, frota). TTL 10 min;
+// ?refresh=1 força o recálculo. Alertas NÃO são cacheados (precisam ficar frescos
+// para refletir "tratado/resolvido/ignorado" imediatamente).
+$ia_cache_ttl = 600;
+$ia_refresh = isset($_GET['refresh']);
+function ia_cache(string $key, callable $callback) {
+    global $empresa_id, $ia_cache_ttl, $ia_refresh;
+    $full = "ia_{$key}_{$empresa_id}";
+    if ($ia_refresh && function_exists('invalidateCache')) {
+        invalidateCache($full);
+    }
+    return getCachedData($full, $callback, $ia_cache_ttl);
+}
 
 // Inicializa arrays vazios para evitar erros
 $dados_consumo = [];
@@ -79,93 +124,77 @@ require_once '../IA/AnaliseAvancada.php';
     $config = new ConfiguracoesIA($empresa_id);
             $analise_avancada = new AnaliseAvancada($conn, $empresa_id);
 
-            // Obtém dados com tratamento individual de erro
-    try {
-        $dados_consumo = $analise->analisarConsumo();
-    } catch (Exception $e) {
-        error_log("Erro ao obter dados de consumo: " . $e->getMessage());
-        $dados_consumo = [];
-    }
-
-    try {
-        $dados_manutencao = $analise->analisarManutencao();
-    } catch (Exception $e) {
-        error_log("Erro ao obter dados de manutenção: " . $e->getMessage());
-        $dados_manutencao = [];
-    }
-
-    try {
-        $dados_rotas = $analise->analisarRotas();
-    } catch (Exception $e) {
-        error_log("Erro ao obter dados de rotas: " . $e->getMessage());
-        $dados_rotas = [];
-    }
+            // Nota: consumo/manutenção/rotas e previsões são carregados por AJAX
+            // (IA/api/ia_metrics.php, ia_charts.php, ia_predictions.php), então NÃO
+            // são computados aqui no load para não pesar a página.
 
     try {
                 $todos_alertas = $alertas->obterTodosAlertas();
                 $todos_alertas = sortByDate($todos_alertas, 'data_criacao');
                 $total_alertas = count($todos_alertas);
-                $alertas_sistema = array_slice($todos_alertas, $offset, $items_per_page);
+                $alertas_sistema = array_slice($todos_alertas, sec_offset('alertas'), $items_per_page);
     } catch (Exception $e) {
         error_log("Erro ao obter alertas: " . $e->getMessage());
         $alertas_sistema = [];
     }
 
     try {
-                $todas_recomendacoes = $recomendacoes->obterTodasRecomendacoes();
+                $todas_recomendacoes = ia_cache('recomendacoes', function () use ($recomendacoes) {
+                    return $recomendacoes->obterTodasRecomendacoes();
+                });
                 $todas_recomendacoes = sortByDate($todas_recomendacoes, 'data_criacao');
                 $total_recomendacoes = count($todas_recomendacoes);
-                $recomendacoes_sistema = array_slice($todas_recomendacoes, $offset, $items_per_page);
+                $recomendacoes_sistema = array_slice($todas_recomendacoes, sec_offset('recomendacoes'), $items_per_page);
     } catch (Exception $e) {
         error_log("Erro ao obter recomendações: " . $e->getMessage());
         $recomendacoes_sistema = [];
     }
 
     try {
-                $todos_insights = $insights->obterTodosInsights();
+                $todos_insights = ia_cache('insights', function () use ($insights) {
+                    return $insights->obterTodosInsights();
+                });
                 $todos_insights = sortByDate($todos_insights, 'data_criacao');
                 $total_insights = count($todos_insights);
-                $insights_sistema = array_slice($todos_insights, $offset, $items_per_page);
+                $insights_sistema = array_slice($todos_insights, sec_offset('insights'), $items_per_page);
     } catch (Exception $e) {
         error_log("Erro ao obter insights: " . $e->getMessage());
         $insights_sistema = [];
     }
 
-    try {
-                $todas_previsoes = $analise_avancada->preverCustosFuturos();
-                $todas_previsoes = sortByDate($todas_previsoes, 'data_analise');
-                $total_previsoes = count($todas_previsoes);
-                $previsoes_custos = array_slice($todas_previsoes, $offset, $items_per_page);
-    } catch (Exception $e) {
-        error_log("Erro ao obter previsões de custos: " . $e->getMessage());
-        $previsoes_custos = [];
-    }
+    // Previsões: carregadas por AJAX (IA/api/ia_predictions.php) — não computar aqui.
 
     try {
-                $todos_motoristas = $analise_avancada->analisarEficienciaMotoristas();
+                $todos_motoristas = ia_cache('motoristas', function () use ($analise_avancada) {
+                    return $analise_avancada->analisarEficienciaMotoristas();
+                });
                 $todos_motoristas = sortByDate($todos_motoristas, 'data_analise');
                 $total_motoristas = count($todos_motoristas);
-                $eficiencia_motoristas = array_slice($todos_motoristas, $offset, $items_per_page);
+                $eficiencia_motoristas = array_slice($todos_motoristas, sec_offset('motoristas'), $items_per_page);
     } catch (Exception $e) {
         error_log("Erro ao obter análise de eficiência dos motoristas: " . $e->getMessage());
         $eficiencia_motoristas = [];
     }
 
     try {
-                $todos_veiculos = $analise_avancada->analisarVidaUtilVeiculos();
+                $todos_veiculos = ia_cache('veiculos', function () use ($analise_avancada) {
+                    return $analise_avancada->analisarVidaUtilVeiculos();
+                });
                 $todos_veiculos = sortByDate($todos_veiculos, 'data_analise');
                 $total_veiculos = count($todos_veiculos);
-                $vida_util_veiculos = array_slice($todos_veiculos, $offset, $items_per_page);
+                $vida_util_veiculos = array_slice($todos_veiculos, sec_offset('veiculos'), $items_per_page);
     } catch (Exception $e) {
         error_log("Erro ao obter análise de vida útil dos veículos: " . $e->getMessage());
         $vida_util_veiculos = [];
     }
 
     try {
-                $todas_rotas = $analise_avancada->analisarOtimizacaoRotas();
+                $todas_rotas = ia_cache('rotas', function () use ($analise_avancada) {
+                    return $analise_avancada->analisarOtimizacaoRotas();
+                });
                 $todas_rotas = sortByDate($todas_rotas, 'data_analise');
                 $total_rotas = count($todas_rotas);
-                $otimizacao_rotas = array_slice($todas_rotas, $offset, $items_per_page);
+                $otimizacao_rotas = array_slice($todas_rotas, sec_offset('rotas'), $items_per_page);
     } catch (Exception $e) {
         error_log("Erro ao obter análise de otimização de rotas: " . $e->getMessage());
         $otimizacao_rotas = [];
@@ -272,6 +301,27 @@ function sortByDate($array, $date_key = 'data') {
     <link rel="stylesheet" href="<?php echo htmlspecialchars(sf_app_url('css/responsive.css')); ?>">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="<?php echo htmlspecialchars(sf_app_url('css/theme.css')); ?>">
+    <style>
+        /* Abas do painel de IA (mostra um grupo por vez — reduz a poluição) */
+        .ia-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 1rem; }
+        .ia-tab {
+            display: inline-flex; align-items: center; gap: 0.45rem;
+            padding: 0.5rem 0.9rem; border-radius: 999px;
+            border: 1px solid var(--border-color, #e2e8f0);
+            background: var(--bg-secondary, rgba(0, 0, 0, 0.03));
+            color: var(--text-secondary, #64748b);
+            font-size: 0.85rem; font-weight: 600; cursor: pointer;
+            transition: filter 0.15s ease;
+        }
+        .ia-tab:hover { filter: brightness(1.06); }
+        .ia-tab.is-active {
+            background: var(--accent-primary, #3b82f6);
+            border-color: var(--accent-primary, #3b82f6);
+            color: #fff;
+        }
+        .ia-hidden { display: none !important; }
+        @media (max-width: 560px) { .ia-tab span { display: none; } }
+    </style>
     
     <style>
         /* Estilos específicos para o Painel IA */
@@ -805,10 +855,6 @@ function sortByDate($array, $date_key = 'data') {
             <?php include '../includes/header.php'; ?>
             
             <div class="dashboard-content">
-                <div class="dashboard-header">
-                    <h1><?php echo $page_title; ?></h1>
-                </div>
-                
                 <?php if ($total_veiculos_empresa == 0): ?>
                 <div class="alert alert-info">
                     <h3><i class="fas fa-info-circle"></i> Nenhum veículo cadastrado</h3>
@@ -817,8 +863,26 @@ function sortByDate($array, $date_key = 'data') {
                 </div>
                 <?php else: ?>
                 
+                <!-- Abas do painel (reduz a poluição: mostra um grupo por vez) -->
+                <nav class="ia-tabs" role="tablist" aria-label="Seções do painel de IA">
+                    <?php
+                    $ia_abas = [
+                        'visao' => ['Visão geral', 'fas fa-gauge-high'],
+                        'alertas' => ['Alertas', 'fas fa-bell'],
+                        'recomendacoes' => ['Recomendações', 'fas fa-lightbulb'],
+                        'previsoes' => ['Previsões', 'fas fa-brain'],
+                        'frota' => ['Frota', 'fas fa-truck'],
+                    ];
+                    foreach ($ia_abas as $k => $def): ?>
+                        <button type="button" class="ia-tab<?php echo $k === $ia_tab ? ' is-active' : ''; ?>" data-tab="<?php echo $k; ?>">
+                            <i class="<?php echo htmlspecialchars($def[1], ENT_QUOTES, 'UTF-8'); ?>"></i>
+                            <span><?php echo htmlspecialchars($def[0], ENT_QUOTES, 'UTF-8'); ?></span>
+                        </button>
+                    <?php endforeach; ?>
+                </nav>
+
                 <!-- Widgets de Métricas em Tempo Real -->
-                <div class="metrics-widgets">
+                <div class="metrics-widgets <?php echo ia_hidden('visao'); ?>" data-ia-tab="visao">
                     <div class="metric-widget">
                         <div class="metric-icon">
                             <i class="fas fa-truck"></i>
@@ -877,14 +941,17 @@ function sortByDate($array, $date_key = 'data') {
                 
                 <div class="dashboard-grid">
                     <!-- Card de Gráficos Interativos -->
-                    <div class="dashboard-card full-width">
+                    <div class="dashboard-card full-width <?php echo ia_hidden('visao'); ?>" data-ia-tab="visao">
                         <div class="card-header">
-                            <h3><i class="fas fa-chart-line"></i> Análise Visual de Dados</h3>
+                            <i class="fas fa-chart-line kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Análise Visual de Dados</h3>
                             <div class="chart-controls">
                                 <select id="chart-period" onchange="handleChartPeriodChange()">
                                     <option value="7">Últimos 7 dias</option>
                                     <option value="30" selected>Últimos 30 dias</option>
                                     <option value="90">Últimos 90 dias</option>
+                                    <option value="180">Últimos 180 dias</option>
+                                    <option value="365">Último ano</option>
                                 </select>
                             </div>
                         </div>
@@ -915,9 +982,10 @@ function sortByDate($array, $date_key = 'data') {
                     </div>
 
                     <!-- Card de Recomendações -->
-                    <div class="dashboard-card">
+                    <div class="dashboard-card <?php echo ia_hidden('recomendacoes'); ?>" data-ia-tab="recomendacoes">
                         <div class="card-header">
-                            <h3><i class="fas fa-lightbulb"></i> Recomendações</h3>
+                            <i class="fas fa-lightbulb kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Recomendações</h3>
                             <?php if ($total_recomendacoes > 0): ?>
                                 <span class="item-count"><?php echo $total_recomendacoes; ?> itens</span>
                             <?php endif; ?>
@@ -926,12 +994,12 @@ function sortByDate($array, $date_key = 'data') {
                             <div class="recommendations-list">
                                 <?php if (!empty($recomendacoes_sistema)): ?>
                                     <?php foreach ($recomendacoes_sistema as $recomendacao): ?>
-                                        <div class="recommendation-item <?php echo $recomendacao['tipo']; ?>">
-                                            <h4><?php echo $recomendacao['mensagem']; ?></h4>
+                                        <div class="recommendation-item <?php echo htmlspecialchars($recomendacao['tipo'], ENT_QUOTES, 'UTF-8'); ?>">
+                                            <h4><?php echo htmlspecialchars($recomendacao['mensagem']); ?></h4>
                                             <?php if (isset($recomendacao['dados'])): ?>
                                                 <p>
                                                     <?php foreach ($recomendacao['dados'] as $key => $value): ?>
-                                                        <strong><?php echo ucfirst($key); ?>:</strong> <?php echo $value; ?><br>
+                                                        <strong><?php echo htmlspecialchars(ucfirst($key)); ?>:</strong> <?php echo htmlspecialchars((string)$value); ?><br>
                                                     <?php endforeach; ?>
                                                 </p>
                                             <?php endif; ?>
@@ -941,14 +1009,15 @@ function sortByDate($array, $date_key = 'data') {
                                     <p>Nenhuma recomendação disponível</p>
                                 <?php endif; ?>
                             </div>
-                            <?php echo generatePagination($total_recomendacoes, $items_per_page, $current_page, 'recomendacoes'); ?>
+                            <?php echo generatePagination($total_recomendacoes, $items_per_page, sec_page('recomendacoes'), 'recomendacoes'); ?>
                         </div>
                     </div>
 
                     <!-- Card de Alertas -->
-                    <div class="dashboard-card">
+                    <div class="dashboard-card <?php echo ia_hidden('alertas'); ?>" data-ia-tab="alertas">
                         <div class="card-header">
-                            <h3><i class="fas fa-bell"></i> Alertas Inteligentes</h3>
+                            <i class="fas fa-bell kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Alertas Inteligentes</h3>
                             <div class="card-actions">
                             <?php if ($total_alertas > 0): ?>
                                 <span class="item-count"><?php echo $total_alertas; ?> itens</span>
@@ -997,7 +1066,7 @@ function sortByDate($array, $date_key = 'data') {
                                                     <small>
                                                         <i class="fas fa-clock"></i> <?php echo date('d/m/Y H:i', strtotime($alerta['data_criacao'])); ?>
                                                         <?php if (isset($alerta['veiculo_placa'])): ?>
-                                                            | <i class="fas fa-truck"></i> <?php echo $alerta['veiculo_placa']; ?>
+                                                            | <i class="fas fa-truck"></i> <?php echo htmlspecialchars($alerta['veiculo_placa']); ?>
                                                         <?php endif; ?>
                                                     </small>
                                                 </div>
@@ -1011,14 +1080,15 @@ function sortByDate($array, $date_key = 'data') {
                                     </div>
                                 <?php endif; ?>
                             </div>
-                            <?php echo generatePagination($total_alertas, $items_per_page, $current_page, 'alertas'); ?>
+                            <?php echo generatePagination($total_alertas, $items_per_page, sec_page('alertas'), 'alertas'); ?>
                         </div>
                     </div>
 
                     <!-- Card de Insights -->
-                    <div class="dashboard-card">
+                    <div class="dashboard-card <?php echo ia_hidden('recomendacoes'); ?>" data-ia-tab="recomendacoes">
                         <div class="card-header">
-                            <h3><i class="fas fa-brain"></i> Insights</h3>
+                            <i class="fas fa-brain kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Insights</h3>
                             <?php if ($total_insights > 0): ?>
                                 <span class="item-count"><?php echo $total_insights; ?> itens</span>
                             <?php endif; ?>
@@ -1027,12 +1097,12 @@ function sortByDate($array, $date_key = 'data') {
                             <div class="insights-container">
                                 <?php if (!empty($insights_sistema)): ?>
                                     <?php foreach ($insights_sistema as $insight): ?>
-                                        <div class="insight-item <?php echo $insight['tipo']; ?>">
-                                            <h4><?php echo $insight['mensagem']; ?></h4>
+                                        <div class="insight-item <?php echo htmlspecialchars($insight['tipo'], ENT_QUOTES, 'UTF-8'); ?>">
+                                            <h4><?php echo htmlspecialchars($insight['mensagem']); ?></h4>
                                             <?php if (isset($insight['dados'])): ?>
                                                 <p>
                                                     <?php foreach ($insight['dados'] as $key => $value): ?>
-                                                        <strong><?php echo ucfirst($key); ?>:</strong> <?php echo $value; ?><br>
+                                                        <strong><?php echo htmlspecialchars(ucfirst($key)); ?>:</strong> <?php echo htmlspecialchars((string)$value); ?><br>
                                                     <?php endforeach; ?>
                                                 </p>
                                             <?php endif; ?>
@@ -1042,15 +1112,16 @@ function sortByDate($array, $date_key = 'data') {
                                     <p>Nenhum insight disponível</p>
                                 <?php endif; ?>
                             </div>
-                            <?php echo generatePagination($total_insights, $items_per_page, $current_page, 'insights'); ?>
+                            <?php echo generatePagination($total_insights, $items_per_page, sec_page('insights'), 'insights'); ?>
                         </div>
                     </div>
 
                     <!-- Após o card de Insights -->
                     <!-- Card de Previsões de IA Avançadas -->
-                    <div class="dashboard-card full-width">
+                    <div class="dashboard-card full-width <?php echo ia_hidden('previsoes'); ?>" data-ia-tab="previsoes">
                         <div class="card-header">
-                            <h3><i class="fas fa-brain"></i> Previsões Inteligentes de IA</h3>
+                            <i class="fas fa-brain kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Previsões Inteligentes de IA</h3>
                             <div class="prediction-controls">
                                 <button class="btn btn-sm" onclick="refreshPredictions()">
                                     <i class="fas fa-sync-alt"></i> Atualizar
@@ -1062,44 +1133,32 @@ function sortByDate($array, $date_key = 'data') {
                                 <div class="prediction-card">
                                     <h4><i class="fas fa-gas-pump"></i> Previsão de Combustível</h4>
                                     <div class="prediction-content">
-                                        <div class="prediction-value" id="fuel-prediction">R$ 0,00</div>
+                                        <div class="prediction-value" id="fuel-prediction">—</div>
                                         <div class="prediction-period">Próximos 30 dias</div>
-                                        <div class="prediction-trend" id="fuel-trend">
-                                            <i class="fas fa-arrow-up"></i> +5.2%
-                                        </div>
-                            </div>
+                                    </div>
                                 </div>
-                                
+
                                 <div class="prediction-card">
                                     <h4><i class="fas fa-wrench"></i> Previsão de Manutenção</h4>
                                     <div class="prediction-content">
-                                        <div class="prediction-value" id="maintenance-prediction">R$ 0,00</div>
+                                        <div class="prediction-value" id="maintenance-prediction">—</div>
                                         <div class="prediction-period">Próximos 30 dias</div>
-                                        <div class="prediction-trend" id="maintenance-trend">
-                                            <i class="fas fa-arrow-down"></i> -2.1%
-                                        </div>
                                     </div>
                                 </div>
-                                
+
                                 <div class="prediction-card">
                                     <h4><i class="fas fa-route"></i> Eficiência de Rotas</h4>
                                     <div class="prediction-content">
-                                        <div class="prediction-value" id="efficiency-prediction">85%</div>
+                                        <div class="prediction-value" id="efficiency-prediction">—</div>
                                         <div class="prediction-period">Próximos 7 dias</div>
-                                        <div class="prediction-trend" id="efficiency-trend">
-                                            <i class="fas fa-arrow-up"></i> +3.5%
-                                        </div>
                                     </div>
                                 </div>
-                                
+
                                 <div class="prediction-card">
                                     <h4><i class="fas fa-exclamation-triangle"></i> Risco de Falhas</h4>
                                     <div class="prediction-content">
-                                        <div class="prediction-value" id="risk-prediction">12%</div>
+                                        <div class="prediction-value" id="risk-prediction">—</div>
                                         <div class="prediction-period">Próximos 14 dias</div>
-                                        <div class="prediction-trend" id="risk-trend">
-                                            <i class="fas fa-arrow-down"></i> -1.8%
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1113,9 +1172,10 @@ function sortByDate($array, $date_key = 'data') {
                     </div>
 
                     <!-- Card de Eficiência dos Motoristas -->
-                    <div class="dashboard-card">
+                    <div class="dashboard-card <?php echo ia_hidden('frota'); ?>" data-ia-tab="frota">
                         <div class="card-header">
-                            <h3><i class="fas fa-user-tie"></i> Eficiência dos Motoristas</h3>
+                            <i class="fas fa-user-tie kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Eficiência dos Motoristas</h3>
                             <?php if ($total_motoristas > 0): ?>
                                 <span class="item-count"><?php echo $total_motoristas; ?> itens</span>
                             <?php endif; ?>
@@ -1125,10 +1185,10 @@ function sortByDate($array, $date_key = 'data') {
                                 <?php if (!empty($eficiencia_motoristas)): ?>
                                     <?php foreach ($eficiencia_motoristas as $motorista): ?>
                                         <div class="driver-item">
-                                            <h4><?php echo $motorista['motorista']; ?></h4>
+                                            <h4><?php echo htmlspecialchars($motorista['motorista']); ?></h4>
                                             <p>
-                                                <strong>Veículo:</strong> <?php echo $motorista['veiculo']; ?><br>
-                                                <strong>Viagens:</strong> <?php echo $motorista['num_viagens']; ?><br>
+                                                <strong>Veículo:</strong> <?php echo htmlspecialchars($motorista['veiculo']); ?><br>
+                                                <strong>Viagens:</strong> <?php echo htmlspecialchars((string)$motorista['num_viagens']); ?><br>
                                                 <strong>Média de Distância:</strong> <?php echo number_format($motorista['media_distancia'], 1, ',', '.'); ?> km<br>
                                                 <strong>Consumo Médio:</strong> <?php echo number_format($motorista['consumo_medio'], 2, ',', '.'); ?> L/km<br>
                                                 <strong>Índice de Eficiência:</strong> <?php echo number_format($motorista['indice_eficiencia'], 2, ',', '.'); ?>
@@ -1139,14 +1199,15 @@ function sortByDate($array, $date_key = 'data') {
                                     <p>Nenhum dado disponível</p>
                                 <?php endif; ?>
                             </div>
-                            <?php echo generatePagination($total_motoristas, $items_per_page, $current_page, 'motoristas'); ?>
+                            <?php echo generatePagination($total_motoristas, $items_per_page, sec_page('motoristas'), 'motoristas'); ?>
                         </div>
                     </div>
 
                     <!-- Card de Vida Útil dos Veículos -->
-                    <div class="dashboard-card">
+                    <div class="dashboard-card <?php echo ia_hidden('frota'); ?>" data-ia-tab="frota">
                         <div class="card-header">
-                            <h3><i class="fas fa-car"></i> Vida Útil dos Veículos</h3>
+                            <i class="fas fa-car kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Vida Útil dos Veículos</h3>
                             <?php if ($total_veiculos > 0): ?>
                                 <span class="item-count"><?php echo $total_veiculos; ?> itens</span>
                             <?php endif; ?>
@@ -1156,13 +1217,13 @@ function sortByDate($array, $date_key = 'data') {
                                 <?php if (!empty($vida_util_veiculos)): ?>
                                     <?php foreach ($vida_util_veiculos as $veiculo): ?>
                                         <div class="vehicle-item">
-                                            <h4><?php echo $veiculo['veiculo']; ?> (<?php echo $veiculo['modelo']; ?>)</h4>
+                                            <h4><?php echo htmlspecialchars($veiculo['veiculo']); ?> (<?php echo htmlspecialchars($veiculo['modelo']); ?>)</h4>
                                             <p>
-                                                <strong>Idade:</strong> <?php echo $veiculo['idade']; ?> anos<br>
+                                                <strong>Idade:</strong> <?php echo htmlspecialchars((string)$veiculo['idade']); ?> anos<br>
                                                 <strong>KM Atual:</strong> <?php echo number_format($veiculo['km_atual'], 0, ',', '.'); ?> km<br>
                                                 <strong>Custo Médio Mensal:</strong> R$ <?php echo number_format($veiculo['custo_medio_mensal'], 2, ',', '.'); ?><br>
                                                 <strong>Custo por KM:</strong> R$ <?php echo number_format($veiculo['custo_por_km'], 2, ',', '.'); ?><br>
-                                                <strong>Recomendação:</strong> <?php echo $veiculo['recomendacao']; ?>
+                                                <strong>Recomendação:</strong> <?php echo htmlspecialchars($veiculo['recomendacao']); ?>
                                             </p>
                                         </div>
                                     <?php endforeach; ?>
@@ -1170,14 +1231,15 @@ function sortByDate($array, $date_key = 'data') {
                                     <p>Nenhum dado disponível</p>
                                 <?php endif; ?>
                             </div>
-                            <?php echo generatePagination($total_veiculos, $items_per_page, $current_page, 'veiculos'); ?>
+                            <?php echo generatePagination($total_veiculos, $items_per_page, sec_page('veiculos'), 'veiculos'); ?>
                         </div>
                     </div>
 
                     <!-- Card de Otimização de Rotas -->
-                    <div class="dashboard-card">
+                    <div class="dashboard-card <?php echo ia_hidden('frota'); ?>" data-ia-tab="frota">
                         <div class="card-header">
-                            <h3><i class="fas fa-route"></i> Otimização de Rotas</h3>
+                            <i class="fas fa-route kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Otimização de Rotas</h3>
                             <?php if ($total_rotas > 0): ?>
                                 <span class="item-count"><?php echo $total_rotas; ?> itens</span>
                             <?php endif; ?>
@@ -1187,7 +1249,7 @@ function sortByDate($array, $date_key = 'data') {
                                 <?php if (!empty($otimizacao_rotas)): ?>
                                     <?php foreach ($otimizacao_rotas as $rota): ?>
                                         <div class="route-item">
-                                            <h4><?php echo $rota['origem']; ?> → <?php echo $rota['destino']; ?></h4>
+                                            <h4><?php echo htmlspecialchars($rota['origem']); ?> → <?php echo htmlspecialchars($rota['destino']); ?></h4>
                                             <p>
                                                 <strong>Distância Atual:</strong> <?php echo number_format($rota['distancia_atual'], 1, ',', '.'); ?> km<br>
                                                 <strong>Distância Otimizada:</strong> <?php echo number_format($rota['distancia_otimizada'], 1, ',', '.'); ?> km<br>
@@ -1200,7 +1262,7 @@ function sortByDate($array, $date_key = 'data') {
                                     <p>Nenhum dado disponível</p>
                                 <?php endif; ?>
                             </div>
-                            <?php echo generatePagination($total_rotas, $items_per_page, $current_page, 'rotas'); ?>
+                            <?php echo generatePagination($total_rotas, $items_per_page, sec_page('rotas'), 'rotas'); ?>
                         </div>
                     </div>
                 </div>
@@ -2060,5 +2122,24 @@ function sortByDate($array, $date_key = 'data') {
         }
     }
     </style>
+    <script>
+    // Troca de abas do painel de IA (mostra um grupo por vez, sem recarregar)
+    (function () {
+        var tabs = document.querySelectorAll('.ia-tab');
+        if (!tabs.length) return;
+        tabs.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var tab = btn.getAttribute('data-tab');
+                tabs.forEach(function (b) { b.classList.toggle('is-active', b === btn); });
+                document.querySelectorAll('[data-ia-tab]').forEach(function (el) {
+                    el.classList.toggle('ia-hidden', el.getAttribute('data-ia-tab') !== tab);
+                });
+                // Gráficos ocultos podem ter renderizado com tamanho 0; força recálculo.
+                window.dispatchEvent(new Event('resize'));
+            });
+        });
+    })();
+    </script>
+    <?php include '../includes/scroll_to_top.php'; ?>
 </body>
 </html> 

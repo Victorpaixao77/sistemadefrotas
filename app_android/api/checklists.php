@@ -69,6 +69,8 @@ try {
             'cintas', 'primeiros_socorros', 'doc_veiculo', 'cnh', 'licenciamento',
             'seguro', 'manifesto_carga', 'doc_empresa', 'carga_amarrada', 'peso_correto',
             'motorista_descansado', 'motorista_sobrio', 'celular_carregado', 'epi',
+            // Itens de carreta/conjunto (Checklist Inteligente)
+            'quinta_roda', 'mangueiras', 'travas', 'lona_carga',
         ];
         $bind = [
             'empresa_id' => $empresa_id,

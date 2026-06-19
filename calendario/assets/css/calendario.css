@@ -1,4 +1,14 @@
 /* Calendar Styles */
+.cal-auto-notice {
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    color: var(--text-primary);
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+}
+
 .calendar-content {
     padding: 20px;
     height: calc(100vh - 120px);
@@ -29,7 +39,15 @@
 
 .calendar-controls {
     display: flex;
-    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+.calendar-controls .btn {
+    min-height: 40px;
+    padding: 10px 18px;
+    white-space: nowrap;
 }
 
 .btn {
@@ -320,120 +338,46 @@
     border-color: #3788d8 !important;
 }
 
-/* Modal Styles */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(5px);
+/* Modal do calendário — usa .modal global de styles.css; só ajustes locais */
+#eventModal .form-group {
+    margin-bottom: 16px;
 }
 
-.modal-content {
-    background-color: var(--bg-secondary);
-    margin: 5% auto;
-    padding: 0;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    width: 90%;
-    max-width: 600px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-    animation: modalSlideIn 0.3s ease;
-}
-
-@keyframes modalSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(-50px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.modal-header {
-    background-color: var(--bg-tertiary);
-    padding: 20px 25px;
-    border-bottom: 1px solid var(--border-color);
-    border-radius: 12px 12px 0 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.modal-header h2 {
-    color: var(--text-primary);
-    margin: 0;
-    font-size: 1.4rem;
-    font-weight: 600;
-}
-
-.close {
-    color: var(--text-secondary);
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-    transition: color 0.3s ease;
-}
-
-.close:hover {
-    color: var(--accent-danger);
-}
-
-.modal-body {
-    padding: 25px;
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
+#eventModal .form-group label {
     display: block;
-    margin-bottom: 8px;
-    font-weight: 600;
+    margin-bottom: 6px;
+    font-weight: 500;
     color: var(--text-primary);
-    font-size: 0.95rem;
+    font-size: 0.875rem;
 }
 
-.form-group input,
-.form-group select,
-.form-group textarea {
+#eventModal .form-group input,
+#eventModal .form-group select,
+#eventModal .form-group textarea {
     width: 100%;
-    padding: 12px 15px;
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
 }
 
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-    outline: none;
-    border-color: var(--accent-primary);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+#eventModal .form-group input[type="color"] {
+    width: 56px;
+    height: 40px;
+    padding: 4px;
+    cursor: pointer;
 }
 
-.form-group textarea {
-    resize: vertical;
-    min-height: 80px;
-}
-
-.form-actions {
+.cal-modal-footer {
     display: flex;
-    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: flex-end;
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border-color);
+    gap: 10px;
+}
+
+.cal-modal-footer .btn {
+    min-width: 108px;
+    min-height: 40px;
+    justify-content: center;
+    margin: 0;
+    box-sizing: border-box;
 }
 
 /* Responsive Design */
@@ -462,20 +406,6 @@
     .calendar-container {
         height: calc(100vh - 350px);
         padding: 15px;
-    }
-    
-    .modal-content {
-        width: 95%;
-        margin: 10% auto;
-    }
-    
-    .form-actions {
-        flex-direction: column;
-    }
-    
-    .btn {
-        width: 100%;
-        justify-content: center;
     }
 }
 

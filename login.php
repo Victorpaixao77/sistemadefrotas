@@ -2,6 +2,69 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/csrf.php';
+require_once 'includes/remember_token.php';
+require_once 'includes/security.php';
+require_once 'includes/notificacoes_helpers.php';
+
+/**
+ * Finaliza um login já autenticado (senha + 2FA OK): regenera a sessão,
+ * grava variáveis, trata "lembrar-me", detecta novo acesso e redireciona.
+ */
+function sf_login_finalize(PDO $conn, array $row, bool $remember, string $username, array $cfg): void
+{
+    // Anti session-fixation
+    session_regenerate_id(true);
+
+    $tem_acesso_global = !empty($row['acesso_todas_empresas']) && $row['acesso_todas_empresas'] == 1;
+    $_SESSION["acesso_todas_empresas"] = $tem_acesso_global;
+    $_SESSION["loggedin"] = true;
+    $_SESSION["id"] = $row["id"];
+    $_SESSION["usuario_id"] = $row["id"];
+    $_SESSION["nome"] = $row["nome"];
+    $_SESSION["email"] = $row["email"];
+    $_SESSION["foto_perfil"] = $row["foto_perfil"];
+    $_SESSION["tipo_usuario"] = $row["tipo_usuario"];
+    $_SESSION["ultima_atividade"] = time();
+
+    // "Lembrar-me" (token seguro)
+    if ($remember) {
+        sf_remember_issue($conn, (int) $row["id"]);
+        setcookie("saved_login", base64_encode(json_encode(['username' => $username])), time() + (30 * 24 * 60 * 60), "/", "", false, true);
+    } else {
+        sf_remember_clear($conn);
+        setcookie("saved_login", "", time() - 3600, "/", "", false, true);
+    }
+
+    // Detecção de novo acesso + e-mail de alerta
+    $ip = sf_client_ip();
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    $geo = !empty($cfg['novo_acesso_email']) ? sf_geo_lookup($ip) : [];
+    $conhecido = sf_acesso_e_conhecido((int) $row['id'], $ip, $ua, $geo);
+    if (!$conhecido) {
+        if (!empty($cfg['novo_acesso_email']) && !empty($row['email'])) {
+            sf_enviar_email_novo_acesso($cfg, $row['email'], (string) $row['nome'], $ip, $geo);
+        }
+        $empresaNotif = (int) ($row['empresa_id'] ?? 0);
+        if ($empresaNotif > 0) {
+            sf_notif_registrar_novo_acesso($conn, $empresaNotif, (int) $row['id'], (string) $row['nome'], $ip, $geo);
+        } elseif ($tem_acesso_global) {
+            sf_notif_guardar_novo_acesso_sessao((string) $row['nome'], $ip, $geo);
+        }
+    }
+
+    if ($tem_acesso_global) {
+        registrarLogAcesso($row["id"], null, 'login', 'sucesso', 'Login realizado - aguardando seleção de empresa');
+        header("location: selecionar_empresa.php");
+        exit;
+    }
+
+    $_SESSION["empresa_id"] = $row["empresa_id"];
+    registrarLogAcesso($row["id"], $row["empresa_id"], 'login', 'sucesso', 'Login realizado com sucesso');
+    $redirect_url = $_SESSION['redirect_url'] ?? 'index.php';
+    unset($_SESSION['redirect_url']);
+    header("location: " . $redirect_url);
+    exit;
+}
 
 // Configure session before starting it
 configure_session();
@@ -15,34 +78,30 @@ if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true && isset($_SE
     exit;
 }
 
-// Check for "Remember Me" cookie (only if not coming from logout)
+// Check for "Remember Me" cookie (only if not coming from logout).
+// Usa token seguro (selector:validator) — ver includes/remember_token.php.
 if (isset($_COOKIE['remember_user']) && !isset($_SESSION['loggedin']) && !isset($_GET['logout'])) {
     try {
-        $cookie_value = base64_decode($_COOKIE['remember_user']);
-        $parts = explode(':', $cookie_value);
-        
-        if (count($parts) == 2) {
-            $user_id = $parts[0];
-            $user_email = $parts[1];
-            
-            $conn = getConnection();
-            $sql = "SELECT u.id, u.nome, u.email, u.empresa_id, u.status as usuario_status, u.foto_perfil, u.tipo_usuario, 
+        $conn = getConnection();
+        $remember_user_id = sf_remember_validate($conn);
+
+        if ($remember_user_id !== null) {
+            $sql = "SELECT u.id, u.nome, u.email, u.empresa_id, u.status as usuario_status, u.foto_perfil, u.tipo_usuario,
                            u.acesso_todas_empresas
-                   FROM usuarios u 
-                   LEFT JOIN empresa_clientes e ON u.empresa_id = e.id 
-                   WHERE u.id = :user_id AND u.email = :user_email AND u.status = 'ativo'";
-            
+                   FROM usuarios u
+                   LEFT JOIN empresa_clientes e ON u.empresa_id = e.id
+                   WHERE u.id = :user_id AND u.status = 'ativo'";
+
             $stmt = $conn->prepare($sql);
-            $stmt->bindParam(":user_id", $user_id, PDO::PARAM_INT);
-            $stmt->bindParam(":user_email", $user_email, PDO::PARAM_STR);
-            
+            $stmt->bindParam(":user_id", $remember_user_id, PDO::PARAM_INT);
+
             if ($stmt->execute() && $stmt->rowCount() == 1) {
                 $row = $stmt->fetch();
-                
+
                 // Verificar se tem acesso a todas as empresas
                 $tem_acesso_global = !empty($row['acesso_todas_empresas']) && $row['acesso_todas_empresas'] == 1;
                 $_SESSION["acesso_todas_empresas"] = $tem_acesso_global;
-                
+
                 // Store data in session variables
                 $_SESSION["loggedin"] = true;
                 $_SESSION["id"] = $row["id"];
@@ -51,7 +110,7 @@ if (isset($_COOKIE['remember_user']) && !isset($_SESSION['loggedin']) && !isset(
                 $_SESSION["email"] = $row["email"];
                 $_SESSION["foto_perfil"] = $row["foto_perfil"];
                 $_SESSION["tipo_usuario"] = $row["tipo_usuario"];
-                
+
                 // Se tem acesso global, redirecionar para seleção de empresa
                 if ($tem_acesso_global) {
                     registrarLogAcesso($row["id"], null, 'login', 'sucesso', 'Login automático via cookie - aguardando seleção de empresa');
@@ -63,14 +122,13 @@ if (isset($_COOKIE['remember_user']) && !isset($_SESSION['loggedin']) && !isset(
                     header("location: index.php");
                 }
                 exit;
-            } else {
-                // Invalid cookie, clear it
-                setcookie("remember_user", "", time() - 3600, "/", "", false, true);
             }
+
+            // Usuário sumiu/inativo — revoga o token.
+            sf_remember_clear($conn);
         }
     } catch (Exception $e) {
-        // Clear invalid cookie
-        setcookie("remember_user", "", time() - 3600, "/", "", false, true);
+        error_log('Remember-me auto-login: ' . $e->getMessage());
     }
 }
 
@@ -91,6 +149,11 @@ if (isset($_GET['logout']) && $_GET['logout'] == '1') {
     $success_message = 'Você foi desconectado com sucesso.';
 }
 
+// Sessão encerrada por inatividade
+if (isset($_GET['timeout']) && $_GET['timeout'] == '1') {
+    $error = 'Sua sessão foi encerrada por inatividade. Faça login novamente.';
+}
+
 // Check for saved login data cookie (sempre, exceto se for login automático)
 if (isset($_COOKIE['saved_login']) && !isset($_SESSION['loggedin'])) {
     try {
@@ -105,477 +168,241 @@ if (isset($_COOKIE['saved_login']) && !isset($_SESSION['loggedin'])) {
     }
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+$client_ip = sf_client_ip();
+
+// ETAPA 2FA: usuário já passou senha e está confirmando o código de 6 dígitos.
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['twofa_code'])) {
+    try {
+        if (!csrf_token_validate($_POST['csrf_token'] ?? null)) {
+            $error = 'Sessão expirada. Recarregue a página e tente novamente.';
+        } elseif (empty($_SESSION['2fa_pending']['usuario_id'])) {
+            $error = 'Sessão de verificação expirada. Faça login novamente.';
+        } else {
+            $conn = getConnection();
+            $pending = $_SESSION['2fa_pending'];
+            $stmt = $conn->prepare("SELECT u.id, u.nome, u.email, u.empresa_id, u.foto_perfil, u.tipo_usuario,
+                                           u.acesso_todas_empresas, u.two_factor_secret
+                                    FROM usuarios u WHERE u.id = :id AND u.status = 'ativo' LIMIT 1");
+            $stmt->execute([':id' => $pending['usuario_id']]);
+            $row = $stmt->fetch();
+
+            if ($row && sf_totp_verify((string) $row['two_factor_secret'], (string) $_POST['twofa_code'])) {
+                $cfg = sf_security_config(!empty($row['empresa_id']) ? (int) $row['empresa_id'] : null);
+                $remember = !empty($pending['remember']);
+                $username = (string) ($pending['username'] ?? '');
+                unset($_SESSION['2fa_pending']);
+                sf_login_attempt_reset((string) $row['email'], $client_ip);
+                sf_login_finalize($conn, $row, $remember, $username, $cfg);
+            } else {
+                registrarLogAcesso($pending['usuario_id'], 0, 'tentativa_login_falha', 'falha', '2FA: código inválido');
+                $error = 'Código de verificação inválido.';
+                $twofa_stage = true;
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('Login 2FA: ' . $e->getMessage());
+        $error = 'Não foi possível validar o código. Tente novamente.';
+        $twofa_stage = true;
+    }
+}
+// ETAPA CREDENCIAIS: e-mail + senha.
+elseif ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = trim($_POST["username"] ?? '');
     $password = trim($_POST["password"] ?? '');
     $remember = isset($_POST["remember"]) ? true : false;
 
-    $now = time();
-    $_SESSION['login_fail_window'] = $_SESSION['login_fail_window'] ?? $now;
-    if (($now - (int) $_SESSION['login_fail_window']) > 900) {
-        $_SESSION['login_fail_count'] = 0;
-        $_SESSION['login_fail_window'] = $now;
-    }
-    if ((int) ($_SESSION['login_fail_count'] ?? 0) >= 12) {
-        $error = 'Muitas tentativas de login. Aguarde alguns minutos e tente novamente.';
+    $_SESSION['login_last_username'] = $username;
+
+    // Bloqueio persistente por e-mail + IP.
+    $attempt = sf_login_attempt_status($username, $client_ip);
+
+    $recaptcha_cfg = sf_login_recaptcha_config();
+    $recaptcha_must = $recaptcha_cfg['active']
+        && $attempt['tentativas'] >= $recaptcha_cfg['threshold'];
+
+    if ($attempt['bloqueado']) {
+        $mins = (int) ceil($attempt['segundos_restantes'] / 60);
+        $error = "Muitas tentativas de login. Tente novamente em {$mins} minuto(s).";
     } elseif (!csrf_token_validate($_POST['csrf_token'] ?? null)) {
         $error = 'Sessão expirada ou token inválido. Recarregue a página e tente novamente.';
+    } elseif ($recaptcha_must && !sf_recaptcha_verify($recaptcha_cfg['secret_key'], (string) ($_POST['g-recaptcha-response'] ?? ''), $client_ip)) {
+        $error = 'Confirme que você não é um robô.';
     } else {
         try {
-        $conn = getConnection();
-        
-        // Prepare a select statement - buscar usuário com ou sem empresa (para acesso_todas_empresas)
-        $sql = "SELECT u.id, u.nome, u.email, u.senha, u.empresa_id, u.status as usuario_status, u.foto_perfil, u.tipo_usuario, 
-                       u.acesso_todas_empresas, u.is_oculto
-               FROM usuarios u 
-               LEFT JOIN empresa_clientes e ON u.empresa_id = e.id 
-               WHERE u.email = :username";
-        
-        if ($stmt = $conn->prepare($sql)) {
+            $conn = getConnection();
+            $sql = "SELECT u.id, u.nome, u.email, u.senha, u.empresa_id, u.status as usuario_status, u.foto_perfil, u.tipo_usuario,
+                           u.acesso_todas_empresas, u.is_oculto, u.two_factor_enabled, u.two_factor_secret, u.two_factor_confirmed_at
+                   FROM usuarios u
+                   LEFT JOIN empresa_clientes e ON u.empresa_id = e.id
+                   WHERE u.email = :username";
+            $stmt = $conn->prepare($sql);
             $stmt->bindParam(":username", $username, PDO::PARAM_STR);
-            
-            if ($stmt->execute()) {
-                if ($stmt->rowCount() == 1) {
-                    $row = $stmt->fetch();
-                    
-                    // Check if user is active
-                    if ($row['usuario_status'] !== 'ativo') {
-                        $error = "Usuário inativo. Entre em contato com o suporte.";
-                    }
-                    // Verify password
-                    else if (password_verify($password, $row['senha'])) {
-                        $_SESSION['login_fail_count'] = 0;
-                        // Verificar se tem acesso a todas as empresas
-                        $tem_acesso_global = !empty($row['acesso_todas_empresas']) && $row['acesso_todas_empresas'] == 1;
-                        $_SESSION["acesso_todas_empresas"] = $tem_acesso_global;
-                        
-                        // Store data in session variables
-                        $_SESSION["loggedin"] = true;
-                        $_SESSION["id"] = $row["id"];
-                        $_SESSION["usuario_id"] = $row["id"];
-                        $_SESSION["nome"] = $row["nome"];
-                        $_SESSION["email"] = $row["email"];
-                        $_SESSION["foto_perfil"] = $row["foto_perfil"];
-                        $_SESSION["tipo_usuario"] = $row["tipo_usuario"];
-                        
-                        // Se tem acesso global, redirecionar para seleção de empresa
-                        if ($tem_acesso_global) {
-                            // Não definir empresa_id ainda, deixar o usuário escolher
-                            // Registrar log de acesso bem-sucedido (sem empresa ainda)
-                            registrarLogAcesso($row["id"], null, 'login', 'sucesso', 'Login realizado - aguardando seleção de empresa');
-                            
-                            // Handle "Remember Me" functionality
-                            if ($remember) {
-                                $cookie_value = base64_encode($row["id"] . ":" . $row["email"]);
-                                setcookie("remember_user", $cookie_value, time() + (30 * 24 * 60 * 60), "/", "", false, true);
-                                
-                                $saved_data = json_encode(['username' => $username]);
-                                $saved_cookie_value = base64_encode($saved_data);
-                                setcookie("saved_login", $saved_cookie_value, time() + (30 * 24 * 60 * 60), "/", "", false, true);
-                            } else {
-                                setcookie("remember_user", "", time() - 3600, "/", "", false, true);
-                                setcookie("saved_login", "", time() - 3600, "/", "", false, true);
-                            }
-                            
-                            // Redirecionar para seleção de empresa
-                            header("location: selecionar_empresa.php");
-                            exit;
-                        } else {
-                            // Usuário normal - definir empresa_id
-                            $empresa_id_login = $row["empresa_id"];
-                            $_SESSION["empresa_id"] = $empresa_id_login;
-                            
-                            // Registrar log de acesso bem-sucedido
-                            registrarLogAcesso($row["id"], $empresa_id_login, 'login', 'sucesso', 'Login realizado com sucesso');
-                            
-                            // Handle "Remember Me" functionality
-                            if ($remember) {
-                                $cookie_value = base64_encode($row["id"] . ":" . $row["email"]);
-                                setcookie("remember_user", $cookie_value, time() + (30 * 24 * 60 * 60), "/", "", false, true);
-                                
-                                $saved_data = json_encode(['username' => $username]);
-                                $saved_cookie_value = base64_encode($saved_data);
-                                setcookie("saved_login", $saved_cookie_value, time() + (30 * 24 * 60 * 60), "/", "", false, true);
-                            } else {
-                                setcookie("remember_user", "", time() - 3600, "/", "", false, true);
-                                setcookie("saved_login", "", time() - 3600, "/", "", false, true);
-                            }
-                        }
-                        
-                        // Redirect user to the original URL or index page
-                        $redirect_url = isset($_SESSION['redirect_url']) ? $_SESSION['redirect_url'] : 'index.php';
-                        unset($_SESSION['redirect_url']); // Limpa a URL de redirecionamento
-                        header("location: " . $redirect_url);
-                        exit;
-                    } else {
-                        $_SESSION['login_fail_count'] = (int) ($_SESSION['login_fail_count'] ?? 0) + 1;
-                        // Registrar tentativa de login falha
-                        registrarLogAcesso($row["id"], $row["empresa_id"], 'tentativa_login_falha', 'falha', 'Senha inválida');
-                        $error = "Senha inválida.";
-                    }
-                } else {
-                    // Tentar registrar tentativa de login com usuário inexistente
-                    // Como não temos o ID do usuário, vamos usar 0
-                    try {
-                        registrarLogAcesso(0, 0, 'tentativa_login_falha', 'falha', 'Usuário não encontrado: ' . $username);
-                    } catch (Exception $e) {
-                        // Ignorar erro de log se a tabela não existir ainda
-                    }
+            $stmt->execute();
+
+            if ($stmt->rowCount() == 1) {
+                $row = $stmt->fetch();
+                $cfg = sf_security_config(!empty($row['empresa_id']) ? (int) $row['empresa_id'] : null);
+
+                if ($row['usuario_status'] !== 'ativo') {
+                    $error = "Usuário inativo. Entre em contato com o suporte.";
+                } elseif (!password_verify($password, $row['senha'])) {
                     $_SESSION['login_fail_count'] = (int) ($_SESSION['login_fail_count'] ?? 0) + 1;
-                    $error = "Usuário não encontrado.";
+                    sf_login_attempt_fail($username, $client_ip, (int) $cfg['login_max_tentativas'], (int) $cfg['login_bloqueio_min']);
+                    registrarLogAcesso($row["id"], $row["empresa_id"], 'tentativa_login_falha', 'falha', 'Senha inválida');
+                    $error = "Senha inválida.";
+                }
+                // Geo-bloqueio
+                elseif (!empty($cfg['geo_block_enabled']) && !sf_geo_allowed($client_ip, (string) $cfg['geo_paises_permitidos'])) {
+                    registrarLogAcesso($row["id"], $row["empresa_id"], 'tentativa_login_falha', 'falha', 'Bloqueio geográfico (IP ' . $client_ip . ')');
+                    $error = "Acesso bloqueado para a sua região.";
+                }
+                // Whitelist de IP para administradores
+                elseif (!empty($cfg['ip_whitelist_enabled']) && in_array($row['tipo_usuario'], ['admin'], true) && !sf_admin_ip_allowed((int) $row['empresa_id'], $client_ip)) {
+                    registrarLogAcesso($row["id"], $row["empresa_id"], 'tentativa_login_falha', 'falha', 'IP não autorizado para admin (' . $client_ip . ')');
+                    $error = "Seu IP não está autorizado a acessar o painel administrativo.";
+                } else {
+                    // Credenciais OK
+                    $_SESSION['login_fail_count'] = 0;
+                    unset($_SESSION['login_last_username']);
+                    sf_login_attempt_reset($username, $client_ip);
+
+                    // 2FA ativo e confirmado → exigir código antes de liberar.
+                    if (!empty($row['two_factor_enabled']) && !empty($row['two_factor_confirmed_at']) && !empty($row['two_factor_secret'])) {
+                        $_SESSION['2fa_pending'] = [
+                            'usuario_id' => (int) $row['id'],
+                            'remember' => $remember,
+                            'username' => $username,
+                        ];
+                        $twofa_stage = true;
+                    } else {
+                        sf_login_finalize($conn, $row, $remember, $username, $cfg);
+                    }
                 }
             } else {
-                $error = "Oops! Algo deu errado. Por favor, tente novamente mais tarde.";
+                registrarLogAcesso(0, 0, 'tentativa_login_falha', 'falha', 'Usuário não encontrado: ' . $username);
+                $_SESSION['login_fail_count'] = (int) ($_SESSION['login_fail_count'] ?? 0) + 1;
+                sf_login_attempt_fail($username, $client_ip, 5, 15);
+                $error = "Usuário ou senha inválidos.";
             }
-        }
-        } catch(PDOException $e) {
-            $error = "Erro: " . $e->getMessage();
+        } catch (PDOException $e) {
+            error_log('Login PDOException: ' . $e->getMessage());
+            $error = "Não foi possível concluir o login. Tente novamente mais tarde.";
         }
     }
 }
+
+// Estado para renderização do formulário.
+$twofa_stage = $twofa_stage ?? !empty($_SESSION['2fa_pending']);
+$login_email_hint = trim((string) ($_SESSION['login_last_username'] ?? ($_POST['username'] ?? '')));
+$recaptcha_cfg = sf_login_recaptcha_config();
+$recaptcha_show = sf_login_recaptcha_should_show($login_email_hint !== '' ? $login_email_hint : null, $client_ip);
+$recaptcha_site_key = $recaptcha_cfg['site_key'];
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Sistema de Gestão de Frotas</title>
-    <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/theme.css">
-    <!-- Favicon -->
+    <title>Entrar — Frotec</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/login-frotec.css?v=<?php echo htmlspecialchars(sf_asset_v(), ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="icon" type="image/png" href="logo.png">
-
-    <style>
-        body {
-            background: #101522;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-        .login-container {
-            width: 100%;
-            max-width: 400px;
-            background: #181f2f;
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-            padding: 40px 32px 32px 32px;
-            margin: 40px 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .login-logo {
-            width: 90px;
-            margin-bottom: 18px;
-        }
-        .login-title {
-            color: #3fa6ff;
-            font-size: 1.7em;
-            font-weight: 700;
-            margin-bottom: 8px;
-            letter-spacing: 1px;
-            text-align: center;
-        }
-        .login-greeting {
-            color: #b0b8c9;
-            font-size: 1.1em;
-            margin-bottom: 28px;
-            text-align: center;
-        }
-        .form-group {
-            width: 100%;
-            margin-bottom: 18px;
-        }
-        .form-group label {
-            color: #b0b8c9;
-            font-size: 1em;
-            margin-bottom: 5px;
-            display: block;
-        }
-        .form-group input[type="email"],
-        .form-group input[type="text"],
-        .form-group input[type="password"] {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #26304a;
-            border-radius: 6px;
-            background: #141a29;
-            color: #eaf1fb;
-            font-size: 1em;
-            outline: none;
-            transition: border 0.2s;
-        }
-        .form-group input:focus {
-            border-color: #3fa6ff;
-        }
-        .form-options {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 18px;
-        }
-        .form-options label {
-            color: #b0b8c9;
-            font-size: 0.97em;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
-        }
-        .form-options a {
-            color: #3fa6ff;
-            text-decoration: none;
-            font-size: 0.97em;
-            transition: color 0.2s;
-        }
-        .form-options a:hover {
-            color: #1e7ecb;
-            text-decoration: underline;
-        }
-        .btn-login {
-            width: 100%;
-            padding: 12px;
-            background: linear-gradient(90deg, #3fa6ff 0%, #1e7ecb 100%);
-            color: #fff;
-            border: none;
-            border-radius: 6px;
-            font-size: 1.1em;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(63,166,255,0.10);
-            transition: background 0.2s, box-shadow 0.2s;
-        }
-        .btn-login:hover {
-            background: linear-gradient(90deg, #1e7ecb 0%, #3fa6ff 100%);
-            box-shadow: 0 4px 16px rgba(63,166,255,0.18);
-        }
-        .error-message {
-            color: #fff;
-            background: #dc3545;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 18px;
-            width: 100%;
-            text-align: center;
-            font-size: 1em;
-        }
-        
-        .success-message {
-            color: #fff;
-            background: #28a745;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 18px;
-            width: 100%;
-            text-align: center;
-            font-size: 1em;
-        }
-        @media (max-width: 500px) {
-            .login-container {
-                padding: 24px 8px 18px 8px;
-            }
-        }
-        .login-background-texts {
-            position: fixed;
-            inset: 0;
-            pointer-events: none;
-            z-index: 0;
-        }
-        .bg-phrase {
-            position: absolute;
-            color: #3fa6ff;
-            opacity: 0.18;
-            font-weight: 700;
-            font-family: 'Segoe UI', Arial, sans-serif;
-            text-shadow: 0 2px 12px #000, 0 1px 0 #fff1;
-            user-select: none;
-            line-height: 1.3;
-            max-width: 320px;
-            transition: opacity 0.3s;
-        }
-        .phrase1 {
-            top: 7%; left: 7%; font-size: 1.3em; color: #3fa6ff; opacity: 0.22;}
-        .phrase2 {
-            top: 18%; right: 8%; font-size: 1.1em; color: #fff; opacity: 0.16;}
-        .phrase3 {
-            bottom: 10%; left: 6%; font-size: 1.05em; color: #3fa6ff; opacity: 0.19;}
-        .phrase4 {
-            top: 38%; left: 2%; font-size: 1.7em; color: #1e7ecb; opacity: 0.13;}
-        .phrase5 {
-            bottom: 18%; right: 7%; font-size: 1.3em; color: #3fa6ff; opacity: 0.18;}
-        .phrase6 {
-            top: 60%; right: 3%; font-size: 1.2em; color: #fff; opacity: 0.15;}
-        .phrase7 {
-            bottom: 5%; left: 40%; font-size: 1.1em; color: #3fa6ff; opacity: 0.16;}
-        .phrase8 {
-            top: 90%; right: 18%; font-size: 1.1em; color: #1e7ecb; opacity: 0.13;}
-        .phrase9 {
-            top: 10%; right: 35%; font-size: 1.05em; color: #fff; opacity: 0.13;}
-        .phrase10 {
-            top: 25%; left: 8%; font-size: 1.2em; color: #3fa6ff; opacity: 0.17;}
-        .phrase11 {
-            top: 45%; right: 5%; font-size: 1.1em; color: #fff; opacity: 0.15;}
-        .phrase12 {
-            bottom: 35%; left: 4%; font-size: 1.15em; color: #1e7ecb; opacity: 0.14;}
-        .phrase13 {
-            top: 70%; left: 12%; font-size: 1.0em; color: #3fa6ff; opacity: 0.16;}
-        .phrase14 {
-            top: 32%; right: 15%; font-size: 1.05em; color: #fff; opacity: 0.13;}
-        .phrase15 {
-            bottom: 25%; right: 20%; font-size: 1.1em; color: #3fa6ff; opacity: 0.18;}
-        .phrase16 {
-            top: 15%; left: 25%; font-size: 1.0em; color: #1e7ecb; opacity: 0.15;}
-        .phrase17 {
-            bottom: 50%; right: 65%; font-size: 1.05em; color: #fff; opacity: 0.14;}
-        .phrase18 {
-            top: 85%; left: 25%; font-size: 1.1em; color: #3fa6ff; opacity: 0.17;}
-        
-        /* Media query para tablets/iPad (768px - 1024px) */
-        @media (min-width: 701px) and (max-width: 1024px) {
-            .bg-phrase { 
-                font-size: 0.8em !important; 
-                max-width: 180px; 
-                opacity: 0.1 !important;
-            }
-            .login-background-texts { 
-                position: fixed; 
-                inset: 0;
-                z-index: 0;
-            }
-            .login-container {
-                position: relative;
-                z-index: 1;
-            }
-            /* Reposicionar frases para não sobrepor o formulário centralizado */
-            /* Esconder frases que ficam na área central (30% - 70% vertical) */
-            .phrase4, .phrase7, .phrase9, .phrase14, .phrase16, .phrase17 {
-                display: none !important;
-            }
-            .phrase1 { top: 5% !important; left: 5% !important; }
-            .phrase2 { top: 10% !important; right: 5% !important; }
-            .phrase3 { bottom: 5% !important; left: 5% !important; }
-            .phrase5 { bottom: 10% !important; right: 5% !important; }
-            .phrase6 { top: 15% !important; right: 3% !important; }
-            .phrase8 { display: none !important; }
-            .phrase10 { top: 8% !important; left: 6% !important; }
-            .phrase11 { top: 20% !important; right: 6% !important; }
-            .phrase12 { bottom: 8% !important; left: 6% !important; }
-            .phrase13 { top: 25% !important; left: 7% !important; }
-            .phrase15 { bottom: 12% !important; right: 8% !important; }
-            .phrase18 { bottom: 8% !important; left: 30% !important; }
-        }
-        
-        @media (max-width: 700px) {
-            .bg-phrase { 
-                font-size: 0.75em !important; 
-                max-width: 140px; 
-                opacity: 0.1 !important;
-            }
-            .login-background-texts { 
-                position: fixed; 
-                inset: 0;
-                z-index: 0;
-            }
-            .login-container {
-                position: relative;
-                z-index: 1;
-            }
-            /* Ajustar posicionamento das frases para não sobrepor o formulário */
-            .phrase1 { top: 2% !important; left: 2% !important; }
-            .phrase2 { top: 5% !important; right: 2% !important; }
-            .phrase3 { bottom: 2% !important; left: 2% !important; }
-            .phrase4 { top: 8% !important; left: 1% !important; font-size: 0.9em !important; }
-            .phrase5 { bottom: 5% !important; right: 2% !important; }
-            .phrase6 { top: 12% !important; right: 1% !important; }
-            .phrase7 { bottom: 8% !important; left: 50% !important; transform: translateX(-50%); }
-            .phrase8 { display: none; }
-            .phrase9 { top: 3% !important; right: 30% !important; }
-            .phrase10 { top: 6% !important; left: 3% !important; }
-            .phrase11 { top: 10% !important; right: 3% !important; }
-            .phrase12 { bottom: 3% !important; left: 3% !important; }
-            .phrase13 { top: 15% !important; left: 4% !important; }
-            .phrase14 { top: 9% !important; right: 8% !important; }
-            .phrase15 { bottom: 6% !important; right: 10% !important; }
-            .phrase16 { top: 4% !important; left: 20% !important; }
-            .phrase17 { display: none; }
-            .phrase18 { bottom: 4% !important; left: 20% !important; }
-        }
-        
-        @media (max-width: 500px) {
-            .bg-phrase { 
-                font-size: 0.65em !important; 
-                max-width: 120px;
-                opacity: 0.08 !important;
-            }
-            /* Esconder mais frases em telas muito pequenas */
-            .phrase4, .phrase6, .phrase9, .phrase10, .phrase11, .phrase13, .phrase14, .phrase15, .phrase16, .phrase18 {
-                display: none;
-            }
-        }
-    </style>
 </head>
-<body>
-    <div class="login-background-texts">
-        <div class="bg-phrase phrase1">Simples para quem dirige.<br>Poderoso para quem gerencia.</div>
-        <div class="bg-phrase phrase2">Chega de planilhas!<br>Gestão de frotas simples, visual e eficiente.</div>
-        <div class="bg-phrase phrase3">Ideal para pequenas e médias empresas.<br>Organize veículos, motoristas, rotas e despesas sem complicações.</div>
-        <div class="bg-phrase phrase4">Mais Segurança</div>
-        <div class="bg-phrase phrase5">Aumente a Eficiência</div>
-        <div class="bg-phrase phrase6">Reduza Custos</div>
-        <div class="bg-phrase phrase7">Tempo economizado</div>
-        <div class="bg-phrase phrase8">Redução de custos</div>
-        <div class="bg-phrase phrase9">Aumento médio de eficiência</div>
-        <!-- Frases adicionais -->
-        <div class="bg-phrase phrase10">Transforme dados em decisões inteligentes.</div>
-        <div class="bg-phrase phrase11">Tenha sua frota sob controle em qualquer lugar.</div>
-        <div class="bg-phrase phrase12">Automatize processos e reduza retrabalho.</div>
-        <div class="bg-phrase phrase13">Mais tempo para focar no crescimento do seu negócio.</div>
-        <div class="bg-phrase phrase14">Relatórios claros e completos em poucos cliques.</div>
-        <div class="bg-phrase phrase15">Do cadastro ao controle financeiro, tudo em um só sistema.</div>
-        <div class="bg-phrase phrase16">Tecnologia feita para simplificar a gestão de frotas.</div>
-        <div class="bg-phrase phrase17">Gestão inteligente que cresce junto com a sua empresa.</div>
-        <div class="bg-phrase phrase18">Monitoramento ágil, decisões rápidas.</div>
+<body class="login-page">
+    <div class="login-page__bg" aria-hidden="true"></div>
+
+    <div class="login-page__quotes" aria-hidden="true">
+        <div class="login-bg-phrase login-bg-phrase--1">Simples para quem dirige.<br>Poderoso para quem gerencia.</div>
+        <div class="login-bg-phrase login-bg-phrase--2">Chega de planilhas!<br>Gestão de frotas simples, visual e eficiente.</div>
+        <div class="login-bg-phrase login-bg-phrase--3">Ideal para pequenas e médias empresas.<br>Organize veículos, motoristas, rotas e despesas sem complicações.</div>
+        <div class="login-bg-phrase login-bg-phrase--4">Mais Segurança</div>
+        <div class="login-bg-phrase login-bg-phrase--5">Aumente a Eficiência</div>
+        <div class="login-bg-phrase login-bg-phrase--6">Reduza Custos</div>
+        <div class="login-bg-phrase login-bg-phrase--7">Tempo economizado</div>
+        <div class="login-bg-phrase login-bg-phrase--8">Redução de custos</div>
+        <div class="login-bg-phrase login-bg-phrase--9">Aumento médio de eficiência</div>
+        <div class="login-bg-phrase login-bg-phrase--10">Transforme dados em decisões inteligentes.</div>
+        <div class="login-bg-phrase login-bg-phrase--11">Tenha sua frota sob controle em qualquer lugar.</div>
+        <div class="login-bg-phrase login-bg-phrase--12">Automatize processos e reduza retrabalho.</div>
+        <div class="login-bg-phrase login-bg-phrase--13">Mais tempo para focar no crescimento do seu negócio.</div>
+        <div class="login-bg-phrase login-bg-phrase--14">Relatórios claros e completos em poucos cliques.</div>
+        <div class="login-bg-phrase login-bg-phrase--15">Do cadastro ao controle financeiro, tudo em um só sistema.</div>
+        <div class="login-bg-phrase login-bg-phrase--16">Tecnologia feita para simplificar a gestão de frotas.</div>
+        <div class="login-bg-phrase login-bg-phrase--17">Gestão inteligente que cresce junto com a sua empresa.</div>
+        <div class="login-bg-phrase login-bg-phrase--18">Monitoramento ágil, decisões rápidas.</div>
     </div>
-    <div class="login-container">
-        <img src="logo.png" alt="Logo" class="login-logo">
-        <div class="login-title">FROTEC</div>
-        <div class="login-greeting">Bem-vindo de volta! Acesse sua conta</div>
+
+    <a href="#login-form" class="login-skip visually-hidden">Ir para o formulário</a>
+
+    <main class="login-page__main">
+        <a href="<?php echo htmlspecialchars(sf_marketing_site_url(), ENT_QUOTES, 'UTF-8'); ?>" class="login-page__back"><i class="fas fa-arrow-left" aria-hidden="true"></i> Voltar ao site</a>
+
+        <div class="login-card">
+            <div class="login-brand">
+                <div class="login-brand__logo-wrap">
+                    <img src="logo.png" alt="" class="login-brand__logo" width="90" height="90" decoding="async">
+                </div>
+                <h1 class="login-brand__name">Frotec</h1>
+                <p class="login-brand__tagline">Área do cliente — entre com seu e-mail corporativo</p>
+            </div>
 
         <?php if (!empty($error)): ?>
-            <div class="error-message"><?php echo $error; ?></div>
+            <div class="login-alert login-alert--error" role="alert"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
         <?php endif; ?>
-        
-        <?php if (!empty($success_message)): ?>
-            <div class="success-message" id="successMessage"><?php echo $success_message; ?></div>
-        <?php endif; ?>
-        
 
-        <form action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post">
+        <?php if (!empty($success_message)): ?>
+            <div class="login-alert login-alert--success" id="successMessage" role="status"><?php echo htmlspecialchars($success_message, ENT_QUOTES, 'UTF-8'); ?></div>
+        <?php endif; ?>
+
+        <?php if (!empty($twofa_stage)): ?>
+        <form id="login-form" class="login-form" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post" autocomplete="off">
             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token_get(), ENT_QUOTES, 'UTF-8'); ?>">
-            <div class="form-group">
-                <label for="username">E-mail</label>
-                <input type="email" id="username" name="username" placeholder="Digite seu e-mail" value="<?php echo $saved_username; ?>" required>
+            <p class="login-brand__tagline" style="margin-bottom:8px">Digite o código de 6 dígitos do seu aplicativo autenticador.</p>
+            <div class="login-field">
+                <label for="twofa_code">Código de verificação</label>
+                <input type="text" id="twofa_code" name="twofa_code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" autofocus required>
             </div>
-            <div class="form-group">
-                <label for="password">Senha</label>
-                <input type="password" id="password" name="password" placeholder="Digite sua senha" required>
+            <button type="submit" class="login-submit">Verificar</button>
+            <div class="login-row" style="justify-content:center;margin-top:10px">
+                <a class="login-forgot" href="login.php?logout=1">Cancelar</a>
             </div>
-            <div class="form-options">
-                <label><input type="checkbox" name="remember" id="remember" <?php echo $remember_checked; ?>> Lembre-me</label>
-                <a href="recuperar_senha.php">Esqueceu a senha?</a>
-            </div>
-            <button type="submit" class="btn-login">Entrar</button>
         </form>
-    </div>
+        <?php else: ?>
+        <form id="login-form" class="login-form" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>" method="post" autocomplete="on">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token_get(), ENT_QUOTES, 'UTF-8'); ?>">
+            <div class="login-field">
+                <label for="username">E-mail</label>
+                <input type="email" id="username" name="username" autocomplete="username" inputmode="email" placeholder="nome@empresa.com.br" value="<?php echo $saved_username; ?>" required>
+            </div>
+            <div class="login-field">
+                <label for="password">Senha</label>
+                <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••" required>
+            </div>
+            <div class="login-row">
+                <label class="login-remember"><input type="checkbox" name="remember" id="remember" <?php echo $remember_checked; ?>> Lembrar-me</label>
+                <a class="login-forgot" href="recuperar_senha.php">Esqueceu a senha?</a>
+            </div>
+            <?php if (!empty($recaptcha_show)): ?>
+            <div class="g-recaptcha" data-sitekey="<?php echo htmlspecialchars($recaptcha_site_key, ENT_QUOTES, 'UTF-8'); ?>" style="margin:8px 0"></div>
+            <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+            <p class="login-fine" style="margin:0.35rem 0 0;font-size:0.75rem;">Proteção anti-robô (reCAPTCHA v2).</p>
+            <?php endif; ?>
+            <button type="submit" class="login-submit">Entrar</button>
+        </form>
+        <?php endif; ?>
+        </div>
+
+        <p class="login-fine">Gestão de frotas em um só lugar. Em caso de dúvida, fale com o suporte da sua empresa.</p>
+    </main>
     <script>
-        // Prevenir múltiplos envios do formulário
-        document.querySelector('form').addEventListener('submit', function(e) {
+        document.querySelector('.login-form')?.addEventListener('submit', function () {
             const submitButton = this.querySelector('button[type="submit"]');
+            if (!submitButton) return;
             submitButton.disabled = true;
-            submitButton.textContent = 'Entrando...';
+            submitButton.textContent = 'Entrando…';
         });
         
         // Fazer mensagem de sucesso desaparecer automaticamente

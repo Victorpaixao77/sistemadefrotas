@@ -33,7 +33,8 @@ try {
                 COALESCE(dv.lavagem, 0) + 
                 COALESCE(dv.borracharia, 0) + 
                 COALESCE(dv.eletrica_mecanica, 0) + 
-                COALESCE(dv.adiantamento, 0)
+                COALESCE(dv.adiantamento, 0) +
+                COALESCE(dv.outros, 0)
             ), 0) as despesas_viagem,
             COALESCE(SUM(a.valor_total), 0) as abastecimentos
         FROM motoristas m

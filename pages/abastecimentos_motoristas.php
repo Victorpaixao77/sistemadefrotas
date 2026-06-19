@@ -7,6 +7,7 @@ date_default_timezone_set('America/Sao_Paulo');
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 
 // Configure session before starting it
 configure_session();
@@ -185,6 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <style>
         body.abastecimentos-motoristas-modern .dashboard-content.fornc-page { overflow-x: auto; }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'abastecimentos-motoristas-modern' : ''; ?>">
     <div class="app-container">
@@ -196,10 +198,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
                 <?php if ($is_modern): ?>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Pendentes</span><span class="val"><?php echo $counts['pendentes']; ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Aprovados</span><span class="val"><?php echo $counts['aprovados']; ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Rejeitados</span><span class="val"><?php echo $counts['rejeitados']; ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Total</span><span class="val"><?php echo $counts['total']; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-clock fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Pendentes</span></div><span class="val"><?php echo $counts['pendentes']; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Aprovados</span></div><span class="val"><?php echo $counts['aprovados']; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-xmark fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Rejeitados</span></div><span class="val"><?php echo $counts['rejeitados']; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-gas-pump fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total</span></div><span class="val"><?php echo $counts['total']; ?></span></div>
                 </div>
                 <div class="fornc-toolbar">
                     <div class="fornc-search-block">
@@ -249,6 +251,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         <button type="button" id="clearRefuelDriverFilters" class="fornc-btn fornc-btn--ghost" title="Limpar filtros">
                             <i class="fas fa-undo"></i>
                         </button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
                     </div>
                 </div>
                 <?php else: ?>
@@ -257,19 +260,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 </div>
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Abastecimentos Pendentes</h3></div>
+                        <div class="card-header">
+                            <i class="fas fa-hourglass-half kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Abastecimentos Pendentes</h3>
+                        </div>
                         <div class="card-body"><div class="metric"><span class="metric-value"><?php echo $counts['pendentes']; ?></span><span class="metric-subtitle">Pendentes</span></div></div>
                     </div>
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Abastecimentos Aprovados</h3></div>
+                        <div class="card-header">
+                            <i class="fas fa-circle-check kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Abastecimentos Aprovados</h3>
+                        </div>
                         <div class="card-body"><div class="metric"><span class="metric-value"><?php echo $counts['aprovados']; ?></span><span class="metric-subtitle">Aprovados</span></div></div>
                     </div>
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Abastecimentos Rejeitados</h3></div>
+                        <div class="card-header">
+                            <i class="fas fa-circle-xmark kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Abastecimentos Rejeitados</h3>
+                        </div>
                         <div class="card-body"><div class="metric"><span class="metric-value"><?php echo $counts['rejeitados']; ?></span><span class="metric-subtitle">Rejeitados</span></div></div>
                     </div>
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Total de Abastecimentos</h3></div>
+                        <div class="card-header">
+                            <i class="fas fa-gas-pump kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Total de Abastecimentos</h3>
+                        </div>
                         <div class="card-body"><div class="metric"><span class="metric-value"><?php echo $counts['total']; ?></span><span class="metric-subtitle">Total</span></div></div>
                     </div>
                 </div>
@@ -310,10 +325,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         <button type="button" class="btn-restore-layout" id="clearRefuelDriverFilters" title="Limpar filtros">
                             <i class="fas fa-undo"></i>
                         </button>
+                        <button type="button" class="btn-help" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
                     </div>
                 </div>
                 <?php endif; ?>
-                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'table-container'; ?>">
+                <?php
+                $ab_mot_modern_empty = !empty($is_modern) && empty($abastecimentos);
+                ?>
+                <?php if (!empty($is_modern)): ?>
+                <div class="fornc-empty-state<?php echo $ab_mot_modern_empty ? ' visible' : ''; ?>" id="abastMotoristasEmptyState" role="status" aria-live="polite">
+                    <p class="fornc-empty-state-title">Nenhum abastecimento encontrado</p>
+                    <p class="fornc-empty-state-hint">Ajuste os filtros ou oriente os motoristas a enviar abastecimentos pelo app.</p>
+                    <a href="abastecimentos.php" class="fornc-btn fornc-btn--primary"><i class="fas fa-gas-pump"></i> Ir para abastecimentos</a>
+                </div>
+                <?php endif; ?>
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'table-container'; ?>" id="abastMotoristasTableWrap"<?php echo $ab_mot_modern_empty ? ' style="display:none"' : ''; ?>>
                     <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>">
                         <thead>
                             <tr>
@@ -371,9 +397,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                 </td>
                             </tr>
                             <?php endforeach; ?>
-                            <?php if (empty($abastecimentos)): ?>
+                            <?php if (empty($abastecimentos) && empty($is_modern)): ?>
                             <tr>
-                                <td colspan="8" class="text-center">Nenhum abastecimento encontrado</td>
+                                <td colspan="12" class="text-center">Nenhum abastecimento encontrado</td>
                             </tr>
                             <?php endif; ?>
                         </tbody>
@@ -963,5 +989,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
     <!-- Scripts -->
     <script src="../js/verificar_pendencias.js"></script>
+    <?php $sf_help_key = 'abastecimentos_motoristas'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

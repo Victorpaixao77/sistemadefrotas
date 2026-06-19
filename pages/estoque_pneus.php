@@ -2,6 +2,7 @@
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 
 // Configure session before starting it
 configure_session();
@@ -11,6 +12,8 @@ session_start();
 
 // Check if user is logged in, if not redirect to login page
 require_authentication();
+require_once '../includes/permissions.php';
+require_permission('access_tire_management');
 
 // Set page title
 $page_title = "Estoque de Pneus";
@@ -140,6 +143,7 @@ $per_page = $resultado['per_page'];
     
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'estoque-pneus-modern' : ''; ?>">
     <div class="app-container">
@@ -162,7 +166,7 @@ $per_page = $resultado['per_page'];
 
                 <?php if ($is_modern): ?>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Total de pneus</span><span class="val"><?php echo (int) $resultado['total']; ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-warehouse fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total de pneus</span></div><span class="val"><?php echo (int) $resultado['total']; ?></span></div>
                 </div>
                 <?php endif; ?>
                 <?php if ($is_modern): ?>
@@ -243,6 +247,7 @@ $per_page = $resultado['per_page'];
                 <div class="dashboard-grid mb-4">
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-warehouse kpi-card-icon" aria-hidden="true"></i>
                             <h3>Total de Pneus</h3>
                         </div>
                         <div class="card-body">
@@ -414,26 +419,7 @@ $per_page = $resultado['per_page'];
     </div>
     
     <!-- Help Modal -->
-    <div id="helpModal" class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Ajuda - Estoque de Pneus</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="help-section">
-                    <h3>Visão Geral</h3>
-                    <p>A página de Estoque de Pneus permite gerenciar todos os pneus disponíveis na sua frota. Aqui você pode:</p>
-                    <ul>
-                        <li>Visualizar todos os pneus em estoque</li>
-                        <li>Filtrar pneus por status e disponibilidade</li>
-                        <li>Ver detalhes de cada pneu</li>
-                        <li>Editar informações dos pneus</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
+    <?php $sf_help_key = 'estoque_pneus'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
     
     <!-- JavaScript -->
     <script src="../js/main.js"></script>
@@ -458,13 +444,23 @@ $per_page = $resultado['per_page'];
         document.querySelector('#filterModal .close-modal').addEventListener('click', function() {
             document.getElementById('filterModal').style.display = 'none';
         });
+
+        document.querySelectorAll('.view-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const id = this.getAttribute('data-id');
+                if (id) window.location.href = 'pneus.php?pneu_id=' + encodeURIComponent(id);
+            });
+        });
+        document.querySelectorAll('.edit-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const id = this.getAttribute('data-id');
+                if (id) window.location.href = 'pneus.php?pneu_id=' + encodeURIComponent(id) + '&edit=1';
+            });
+        });
     </script>
     
-    <!-- JavaScript Files -->
-    <script src="../js/dashboard.js"></script>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
-    <script src="../js/sortable.js"></script>
-    <script src="../js/charts.js"></script>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

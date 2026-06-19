@@ -1,5 +1,6 @@
 <?php
 require_once '../includes/config.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
 require_once '../includes/permissions.php';
 require_once '../includes/sf_api_base.php';
@@ -15,428 +16,17 @@ require_authentication();
 $page_title = "Comissões";
 // Layout moderno (fornc-page); ?classic=1 para o layout anterior
 $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
-$empresa_id = $_SESSION['empresa_id'];
+$empresa_id = (int) $_SESSION['empresa_id'];
 
-/**
- * Ensure commission payments table exists.
- *
- * @param PDO $conn
- * @return void
- */
-function ensureCommissionPaymentsTable(PDO $conn): void
-{
-    $conn->exec("
-        CREATE TABLE IF NOT EXISTS comissoes_pagamentos (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            rota_id INT NOT NULL UNIQUE,
-            status ENUM('pago', 'pendente') NOT NULL DEFAULT 'pendente',
-            valor DECIMAL(10,2) DEFAULT NULL,
-            data_pagamento DATE DEFAULT NULL,
-            observacao TEXT DEFAULT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            CONSTRAINT fk_comissoes_pag_rotas FOREIGN KEY (rota_id) REFERENCES rotas(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    ");
-}
+require_once '../includes/comissoes_helpers.php';
 
-function normalizeSearchValue(string $input): string
-{
-    $input = trim($input);
-    if ($input === '') {
-        return '';
-    }
-
-    if (function_exists('mb_strtolower')) {
-        return mb_strtolower($input, 'UTF-8');
-    }
-
-    return strtolower($input);
-}
-
-function logComissoesDebug(string $context, string $sql, array $params = []): void
-{
-    if (isset($_GET['debug_search'])) {
-        $logDir = __DIR__ . '/../logs';
-        if (!is_dir($logDir)) {
-            @mkdir($logDir, 0775, true);
-        }
-
-        $message = sprintf(
-            "[%s] [comissoes][%s]\nSQL: %s\nParametros: %s\n\n",
-            date('Y-m-d H:i:s'),
-            $context,
-            $sql,
-            json_encode($params, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT)
-        );
-
-        $logFile = $logDir . '/comissoes_debug.log';
-        file_put_contents($logFile, $message, FILE_APPEND);
-    }
-}
-
-function executeWithDebug(PDOStatement $stmt, array $params, string $context, string $sql): void
-{
-    try {
-        foreach ($params as $key => $value) {
-            $stmt->bindValue($key, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
-        }
-
-        logComissoesDebug($context, $sql, $params);
-        $stmt->execute();
-    } catch (PDOException $e) {
-        logComissoesDebug($context . '_erro', $sql, [
-            'mensagem' => $e->getMessage(),
-            'params' => $params
-        ]);
-        throw $e;
-    }
-}
-
-function buildComissoesQueryParts(array $filters, int $empresa_id): array
-{
-    $conditions = [
-        "r.empresa_id = :empresa_id",
-        "r.comissao > 0",
-        "r.status = 'aprovado'"
-    ];
-    $params = [
-        ':empresa_id' => $empresa_id
-    ];
-
-    if (!empty($filters['mes'])) {
-        $conditions[] = "DATE_FORMAT(r.data_rota, '%Y-%m') = :mes";
-        $params[':mes'] = $filters['mes'];
-    }
-
-    if (!empty($filters['motorista'])) {
-        $conditions[] = "r.motorista_id = :motorista_id";
-        $params[':motorista_id'] = (int) $filters['motorista'];
-    }
-
-    if (!empty($filters['veiculo'])) {
-        $conditions[] = "r.veiculo_id = :veiculo_id";
-        $params[':veiculo_id'] = (int) $filters['veiculo'];
-    }
-
-    if (!empty($filters['search'])) {
-        $searchTermRaw = trim($filters['search']);
-        $searchTermLower = normalizeSearchValue($filters['search']);
-        $numericValue = preg_replace('/[^0-9]/', '', $searchTermRaw);
-        $decimalValue = str_replace(',', '.', preg_replace('/[^0-9,]/', '', $searchTermRaw));
-
-        $conditions[] = "(
-            EXISTS (
-                SELECT 1 FROM motoristas m_busca 
-                WHERE m_busca.id = r.motorista_id 
-                AND LOWER(m_busca.nome) LIKE :search_motorista
-            )
-            OR EXISTS (
-                SELECT 1 FROM veiculos v_busca 
-                WHERE v_busca.id = r.veiculo_id 
-                AND (
-                    LOWER(v_busca.placa) LIKE :search_placa
-                    OR LOWER(COALESCE(v_busca.modelo, '')) LIKE :search_modelo
-                    OR LOWER(CONCAT_WS(' ', v_busca.placa, COALESCE(v_busca.modelo, ''))) LIKE :search_veiculo_completo
-                )
-            )
-            OR CAST(r.id AS CHAR) LIKE :search_id
-            OR DATE_FORMAT(r.data_rota, '%d/%m/%Y') LIKE :search_data_completa
-            OR DATE_FORMAT(r.data_rota, '%Y-%m') LIKE :search_data_mes
-            OR CAST(r.frete AS CHAR) LIKE :search_frete
-            OR CAST(r.comissao AS CHAR) LIKE :search_comissao
-        )";
-
-        $searchMotorista = '%' . $searchTermLower . '%';
-        $params[':search_motorista'] = $searchMotorista;
-        $params[':search_placa'] = $searchMotorista;
-        $params[':search_modelo'] = $searchMotorista;
-        $params[':search_veiculo_completo'] = $searchMotorista;
-        $params[':search_id'] = '%' . $searchTermRaw . '%';
-        $params[':search_data_completa'] = '%' . $searchTermRaw . '%';
-        $params[':search_data_mes'] = '%' . $searchTermRaw . '%';
-        $numericSearch = $decimalValue !== '' ? $decimalValue : $numericValue;
-        $numericLike = $numericSearch !== '' ? '%' . $numericSearch . '%' : '%';
-        $params[':search_frete'] = $numericLike;
-        $params[':search_comissao'] = $numericLike;
-    }
-
-    return [$conditions, $params];
-}
-
-function getComissoes(array $filters, int $page, int $empresa_id, PDO $conn, int $per_page = 10, string $sortKey = 'data_rota', string $sortDir = 'DESC'): array
-{
-    $limit = in_array($per_page, [5, 10, 25, 50, 100], true) ? $per_page : 10;
-    $offset = ($page - 1) * $limit;
-
-    [$conditions, $params] = buildComissoesQueryParts($filters, $empresa_id);
-    $whereClause = implode(' AND ', $conditions);
-
-    // Totais e contagem
-    $sqlResumo = "
-        SELECT
-            COUNT(*) AS total_viagens,
-            COALESCE(SUM(r.comissao), 0) AS total_comissao,
-            COALESCE(SUM(r.frete), 0) AS total_frete,
-            COALESCE(SUM(CASE WHEN cp.status = 'pago' THEN r.comissao ELSE 0 END), 0) AS total_pago,
-            COALESCE(SUM(CASE WHEN cp.status = 'pago' THEN 1 ELSE 0 END), 0) AS viagens_pagas
-        FROM rotas r
-        LEFT JOIN comissoes_pagamentos cp ON cp.rota_id = r.id
-        WHERE {$whereClause}";
-
-    $stmtResumo = $conn->prepare($sqlResumo);
-    executeWithDebug($stmtResumo, $params, 'resumo', $sqlResumo);
-    $resumo = $stmtResumo->fetch(PDO::FETCH_ASSOC);
-
-    $sqlCount = "SELECT COUNT(*) FROM rotas r WHERE {$whereClause}";
-    $stmtCount = $conn->prepare($sqlCount);
-    executeWithDebug($stmtCount, $params, 'contagem', $sqlCount);
-    $totalRegistros = (int) $stmtCount->fetchColumn();
-
-    $sql = "
-        SELECT 
-            r.id,
-            r.data_rota,
-            r.data_saida,
-            r.frete,
-            r.comissao,
-            r.no_prazo,
-            r.status,
-            v.placa AS veiculo_placa,
-            v.modelo AS veiculo_modelo,
-            m.nome AS motorista_nome,
-            cp.status AS status_pagamento,
-            cp.data_pagamento,
-            cp.valor AS valor_pago
-        FROM rotas r
-        LEFT JOIN veiculos v ON r.veiculo_id = v.id
-        LEFT JOIN motoristas m ON r.motorista_id = m.id
-        LEFT JOIN comissoes_pagamentos cp ON cp.rota_id = r.id
-        WHERE {$whereClause}";
-
-    $allowedSort = [
-        'data_rota' => 'r.data_rota',
-        'motorista_nome' => 'm.nome',
-        'veiculo_placa' => 'v.placa',
-        'frete' => 'r.frete',
-        'comissao' => 'r.comissao',
-        'pct_comissao' => '(CASE WHEN r.frete > 0 THEN (r.comissao / r.frete) * 100 ELSE 0 END)',
-        'status_pagamento' => 'COALESCE(cp.status, \'pendente\')',
-        'no_prazo' => 'r.no_prazo',
-    ];
-    if (!isset($allowedSort[$sortKey])) {
-        $sortKey = 'data_rota';
-    }
-    $orderCol = $allowedSort[$sortKey];
-    $dir = ($sortDir === 'ASC') ? 'ASC' : 'DESC';
-
-    $sql .= "
-        ORDER BY " . $orderCol . " " . $dir . ", r.id DESC
-        LIMIT :limit OFFSET :offset";
-
-    $stmt = $conn->prepare($sql);
-    executeWithDebug(
-        $stmt,
-        $params + [
-            ':limit' => $limit,
-            ':offset' => $offset
-        ],
-        'listagem',
-        $sql
-    );
-
-    $comissoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $resumo['total_pago'] = $resumo['total_pago'] ?? 0;
-    $resumo['total_pendente'] = ($resumo['total_comissao'] ?? 0) - $resumo['total_pago'];
-    $resumo['viagens_pagas'] = $resumo['viagens_pagas'] ?? 0;
-    $resumo['viagens_pendentes'] = ($resumo['total_viagens'] ?? 0) - $resumo['viagens_pagas'];
-    $resumo['percentual_pago'] = ($resumo['total_comissao'] ?? 0) > 0
-        ? ($resumo['total_pago'] / $resumo['total_comissao']) * 100
-        : 0;
-    $resumo['percentual_medio'] = ($resumo['total_frete'] > 0)
-        ? ($resumo['total_comissao'] / $resumo['total_frete']) * 100
-        : 0;
-
-    $charts = getComissoesChartsData($conditions, $params, $conn);
-
-    return [
-        'comissoes' => $comissoes,
-        'total' => $totalRegistros,
-        'pagina_atual' => $page,
-        'total_paginas' => max(1, (int) ceil($totalRegistros / $limit)),
-        'resumo' => $resumo,
-        'charts' => $charts
-    ];
-}
-
-function getComissoesChartsData(array $conditions, array $params, PDO $conn): array
-{
-    $whereClause = implode(' AND ', $conditions);
-
-    // Status distribution
-    $sqlStatus = "
-        SELECT 
-            COALESCE(cp.status, 'pendente') AS status_pagamento,
-            COUNT(*) AS total_viagens,
-            COALESCE(SUM(r.comissao), 0) AS total_comissao
-        FROM rotas r
-        LEFT JOIN comissoes_pagamentos cp ON cp.rota_id = r.id
-        WHERE {$whereClause}
-        GROUP BY status_pagamento";
-
-    $stmtStatus = $conn->prepare($sqlStatus);
-    executeWithDebug($stmtStatus, $params, 'grafico_status', $sqlStatus);
-    $statusRows = $stmtStatus->fetchAll(PDO::FETCH_ASSOC);
-
-    $statusTotals = [
-        'pago' => ['viagens' => 0, 'valor' => 0],
-        'pendente' => ['viagens' => 0, 'valor' => 0]
-    ];
-
-    foreach ($statusRows as $row) {
-        $status = $row['status_pagamento'] === 'pago' ? 'pago' : 'pendente';
-        $statusTotals[$status]['viagens'] += (int) $row['total_viagens'];
-        $statusTotals[$status]['valor'] += (float) $row['total_comissao'];
-    }
-
-    // Monthly evolution (last 12 months by default)
-    $sqlMonthly = "
-        SELECT 
-            DATE_FORMAT(r.data_rota, '%Y-%m') AS periodo,
-            COALESCE(SUM(r.comissao), 0) AS total_comissao,
-            COALESCE(SUM(CASE WHEN cp.status = 'pago' THEN r.comissao ELSE 0 END), 0) AS total_pago,
-            COALESCE(SUM(CASE WHEN cp.status = 'pendente' OR cp.status IS NULL THEN r.comissao ELSE 0 END), 0) AS total_pendente
-        FROM rotas r
-        LEFT JOIN comissoes_pagamentos cp ON cp.rota_id = r.id
-        WHERE {$whereClause}
-        GROUP BY periodo
-        ORDER BY periodo ASC";
-
-    $stmtMonthly = $conn->prepare($sqlMonthly);
-    executeWithDebug($stmtMonthly, $params, 'grafico_mensal', $sqlMonthly);
-    $monthlyRows = $stmtMonthly->fetchAll(PDO::FETCH_ASSOC);
-
-    $monthlyData = [
-        'labels' => [],
-        'total' => [],
-        'pagas' => [],
-        'pendentes' => []
-    ];
-
-    foreach ($monthlyRows as $row) {
-        $periodo = $row['periodo'] . '-01';
-        $label = date('m/Y', strtotime($periodo));
-        $monthlyData['labels'][] = $label;
-        $monthlyData['total'][] = (float) $row['total_comissao'];
-        $monthlyData['pagas'][] = (float) $row['total_pago'];
-        $monthlyData['pendentes'][] = (float) $row['total_pendente'];
-    }
-
-    // Motorista x Comissão
-    $sqlMotoristas = "
-        SELECT 
-            COALESCE(m.nome, 'Não informado') AS motorista_nome,
-            COALESCE(SUM(r.comissao), 0) AS total_comissao,
-            COALESCE(SUM(CASE WHEN cp.status = 'pago' THEN r.comissao ELSE 0 END), 0) AS total_pago
-        FROM rotas r
-        LEFT JOIN motoristas m ON r.motorista_id = m.id
-        LEFT JOIN comissoes_pagamentos cp ON cp.rota_id = r.id
-        WHERE {$whereClause}
-        GROUP BY m.id, motorista_nome
-        ORDER BY total_comissao DESC
-        LIMIT 8";
-
-    $stmtMotoristas = $conn->prepare($sqlMotoristas);
-    executeWithDebug($stmtMotoristas, $params, 'grafico_motoristas', $sqlMotoristas);
-    $motoristaRows = $stmtMotoristas->fetchAll(PDO::FETCH_ASSOC);
-
-    $motoristaData = [
-        'labels' => [],
-        'totais' => [],
-        'pagas' => [],
-        'pendentes' => [],
-        'top_list' => []
-    ];
-
-    foreach ($motoristaRows as $row) {
-        $total = (float) $row['total_comissao'];
-        $pago = (float) $row['total_pago'];
-        $pendente = $total - $pago;
-        $motoristaData['labels'][] = $row['motorista_nome'];
-        $motoristaData['totais'][] = $total;
-        $motoristaData['pagas'][] = $pago;
-        $motoristaData['pendentes'][] = $pendente;
-        $motoristaData['top_list'][] = [
-            'nome' => $row['motorista_nome'],
-            'total' => $total,
-            'pago' => $pago,
-            'pendente' => $pendente
-        ];
-    }
-
-    return [
-        'status' => [
-            'labels' => ['Pagas', 'Pendentes'],
-            'values' => [
-                round($statusTotals['pago']['valor'], 2),
-                round($statusTotals['pendente']['valor'], 2)
-            ]
-        ],
-        'monthly' => $monthlyData,
-        'motoristas' => $motoristaData
-    ];
+if (!can_view_financial_data()) {
+    http_response_code(403);
+    die('Sem permissão para visualizar dados financeiros.');
 }
 
 $conn = getConnection();
 ensureCommissionPaymentsTable($conn);
-
-/**
- * Obtém dados auxiliares para filtros.
- *
- * @param int $empresa_id
- * @return array
- */
-function getComissoesFilterData(int $empresa_id): array
-{
-    $conn = getConnection();
-
-    $motoristasStmt = $conn->prepare("
-        SELECT id, nome
-        FROM motoristas
-        WHERE empresa_id = :empresa_id
-        ORDER BY nome ASC");
-    $motoristasStmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
-    $motoristasStmt->execute();
-    $motoristas = $motoristasStmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $veiculosStmt = $conn->prepare("
-        SELECT id, placa, modelo
-        FROM veiculos
-        WHERE empresa_id = :empresa_id
-        ORDER BY placa ASC");
-    $veiculosStmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
-    $veiculosStmt->execute();
-    $veiculos = $veiculosStmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $periodosStmt = $conn->prepare("
-        SELECT DISTINCT DATE_FORMAT(data_rota, '%Y-%m') AS periodo
-        FROM rotas
-        WHERE empresa_id = :empresa_id
-          AND comissao > 0
-          AND status = 'aprovado'
-        ORDER BY periodo DESC
-        LIMIT 18");
-    $periodosStmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
-    $periodosStmt->execute();
-    $periodos = $periodosStmt->fetchAll(PDO::FETCH_COLUMN);
-
-    return [
-        'motoristas' => $motoristas,
-        'veiculos' => $veiculos,
-        'periodos' => $periodos
-    ];
-}
 
 $pagina_atual = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
 $per_page = isset($_GET['per_page']) ? (int) $_GET['per_page'] : 10;
@@ -448,7 +38,8 @@ $filters = [
     'mes' => '',
     'motorista' => '',
     'veiculo' => '',
-    'search' => ''
+    'search' => '',
+    'status_pagamento' => '',
 ];
 
 if (!empty($_GET['mes']) && preg_match('/^\d{4}-\d{2}$/', $_GET['mes'])) {
@@ -464,6 +55,10 @@ if (!empty($_GET['veiculo'])) {
 }
 
 $filters['search'] = trim($_GET['search'] ?? '');
+
+if (!empty($_GET['status_pagamento']) && in_array($_GET['status_pagamento'], ['pago', 'pendente'], true)) {
+    $filters['status_pagamento'] = $_GET['status_pagamento'];
+}
 
 $com_sort = isset($_GET['sort']) ? preg_replace('/[^a-z_]/', '', (string) $_GET['sort']) : 'data_rota';
 $com_dir = (isset($_GET['dir']) && strtoupper((string) $_GET['dir']) === 'ASC') ? 'ASC' : 'DESC';
@@ -825,6 +420,7 @@ function formatarDataRota(?string $data): string
         }
 
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'comissoes-modern' : ''; ?>">
     <div class="app-container">
@@ -839,12 +435,14 @@ function formatarDataRota(?string $data): string
                     Comissões de viagens aprovadas. Use <code>?classic=1</code> para o layout anterior.
                 </p>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Total comissões</span><span class="val">R$ <?php echo number_format($resumo['total_comissao'] ?? 0, 2, ',', '.'); ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Pagas</span><span class="val">R$ <?php echo number_format($resumo['total_pago'] ?? 0, 2, ',', '.'); ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Pendentes</span><span class="val">R$ <?php echo number_format($resumo['total_pendente'] ?? 0, 2, ',', '.'); ?></span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">% pago</span><span class="val"><?php echo number_format($resumo['percentual_pago'] ?? 0, 2, ',', '.'); ?>%</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-percent fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total comissões</span></div><span class="val">R$ <?php echo number_format($resumo['total_comissao'] ?? 0, 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Pagas</span></div><span class="val">R$ <?php echo number_format($resumo['total_pago'] ?? 0, 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-hourglass-half fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Pendentes</span></div><span class="val">R$ <?php echo number_format($resumo['total_pendente'] ?? 0, 2, ',', '.'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-chart-pie fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">% pago</span></div><span class="val"><?php echo number_format($resumo['percentual_pago'] ?? 0, 2, ',', '.'); ?>%</span></div>
                 </div>
                 <p class="fornc-kpi-summary"><?php echo (int) ($resumo['total_viagens'] ?? 0); ?> viagens nos filtros atuais.</p>
+
+                <div id="sfComInsights"></div>
 
                 <form method="get" id="comissoesFilterForm" class="comissoes-fornc-filter">
                     <input type="hidden" name="page" id="comissoesFormPage" value="<?php echo $pagina_atual; ?>">
@@ -891,6 +489,14 @@ function formatarDataRota(?string $data): string
                         </select>
                             </div>
                             <div class="fg">
+                                <label for="status_pagamento">Status pagamento</label>
+                                <select id="status_pagamento" name="status_pagamento" title="Status pagamento">
+                                    <option value="">Todos</option>
+                                    <option value="pago" <?php echo $filters['status_pagamento'] === 'pago' ? 'selected' : ''; ?>>Pagas</option>
+                                    <option value="pendente" <?php echo $filters['status_pagamento'] === 'pendente' ? 'selected' : ''; ?>>Pendentes</option>
+                                </select>
+                            </div>
+                            <div class="fg">
                                 <label for="per_page_com">Por página</label>
                                 <select name="per_page" id="per_page_com" class="filter-per-page" onchange="document.getElementById('comissoesFormPage').value=1; this.form.submit();">
                             <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
@@ -931,6 +537,7 @@ function formatarDataRota(?string $data): string
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-hand-holding-dollar kpi-card-icon" aria-hidden="true"></i>
                             <h3>Total de Comissões</h3>
                         </div>
                         <div class="card-body">
@@ -942,6 +549,7 @@ function formatarDataRota(?string $data): string
                     </div>
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-circle-check kpi-card-icon" aria-hidden="true"></i>
                             <h3>Comissões Pagas</h3>
                         </div>
                         <div class="card-body">
@@ -953,6 +561,7 @@ function formatarDataRota(?string $data): string
                     </div>
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-hourglass-half kpi-card-icon" aria-hidden="true"></i>
                             <h3>Comissões Pendentes</h3>
                         </div>
                         <div class="card-body">
@@ -964,6 +573,7 @@ function formatarDataRota(?string $data): string
                     </div>
                     <div class="dashboard-card">
                         <div class="card-header">
+                            <i class="fas fa-chart-pie kpi-card-icon" aria-hidden="true"></i>
                             <h3>Percentual Pago</h3>
                         </div>
                         <div class="card-body">
@@ -1015,6 +625,11 @@ function formatarDataRota(?string $data): string
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <select id="status_pagamento" name="status_pagamento" title="Status pagamento">
+                            <option value="">Todos os status</option>
+                            <option value="pago" <?php echo $filters['status_pagamento'] === 'pago' ? 'selected' : ''; ?>>Pagas</option>
+                            <option value="pendente" <?php echo $filters['status_pagamento'] === 'pendente' ? 'selected' : ''; ?>>Pendentes</option>
+                        </select>
                         <button type="submit" class="btn-restore-layout" title="Aplicar filtros">
                             <i class="fas fa-filter"></i>
                         </button>
@@ -1025,10 +640,31 @@ function formatarDataRota(?string $data): string
                 </form>
                 <?php endif; ?>
 
-                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>">
+                <div class="com-bulk-bar" id="comBulkBar" style="display:none;margin-bottom:0.75rem;">
+                    <span id="comBulkCount">0 selecionada(s)</span>
+                    <button type="button" id="comBulkPaidBtn" class="fornc-btn fornc-btn--accent">
+                        <i class="fas fa-check-double"></i> Marcar selecionadas como pagas
+                    </button>
+                </div>
+
+                <?php
+                $comissoes_modern_empty = !empty($is_modern) && empty($comissoes);
+                ?>
+                <?php if (!empty($is_modern)): ?>
+                <div class="fornc-empty-state<?php echo $comissoes_modern_empty ? ' visible' : ''; ?>" id="comissoesEmptyState" role="status" aria-live="polite">
+                    <p class="fornc-empty-state-title">Nenhuma comissão encontrada</p>
+                    <p class="fornc-empty-state-hint">Ajuste o período, o motorista ou o veículo nos filtros. As comissões vêm dos fretes registrados em rotas.</p>
+                    <a href="routes.php" class="fornc-btn fornc-btn--primary"><i class="fas fa-route"></i> Ir para rotas</a>
+                </div>
+                <?php endif; ?>
+
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'data-table-container'; ?>" id="comissoesTableWrap"<?php echo $comissoes_modern_empty ? ' style="display:none"' : ''; ?>>
                     <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>">
                         <thead>
                             <tr>
+                                <th class="com-check-col" style="width:36px;" title="Selecionar pendentes">
+                                    <input type="checkbox" id="comSelectAll" aria-label="Selecionar todas pendentes">
+                                </th>
                                 <?php if ($is_modern): ?>
                                 <th class="sortable<?php echo $com_sort === 'data_rota' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(comissoes_sort_link_url('data_rota', $com_sort, $com_dir, $per_page, $is_modern, $filters)); ?>" class="th-sort-link">Data <span class="sort-ind"><?php echo htmlspecialchars(comissoes_sort_indicator('data_rota', $com_sort, $com_dir)); ?></span></a></th>
                                 <th class="sortable<?php echo $com_sort === 'motorista_nome' ? ' sorted' : ''; ?>"><a href="<?php echo htmlspecialchars(comissoes_sort_link_url('motorista_nome', $com_sort, $com_dir, $per_page, $is_modern, $filters)); ?>" class="th-sort-link">Motorista <span class="sort-ind"><?php echo htmlspecialchars(comissoes_sort_indicator('motorista_nome', $com_sort, $com_dir)); ?></span></a></th>
@@ -1060,6 +696,11 @@ function formatarDataRota(?string $data): string
                                             : 0;
                                     ?>
                                     <tr>
+                                        <td class="com-check-col">
+                                            <?php if (($comissao['status_pagamento'] ?? 'pendente') !== 'pago'): ?>
+                                                <input type="checkbox" class="com-row-check" data-rota-id="<?php echo (int) $comissao['id']; ?>" aria-label="Selecionar comissão">
+                                            <?php endif; ?>
+                                        </td>
                                         <td><?php echo formatarDataRota($comissao['data_rota'] ?? $comissao['data_saida']); ?></td>
                                         <td><?php echo htmlspecialchars($comissao['motorista_nome'] ?? 'Motorista não informado'); ?></td>
                                         <td><?php echo htmlspecialchars(trim(($comissao['veiculo_placa'] ?? '-') . ' ' . ($comissao['veiculo_modelo'] ?? ''))); ?></td>
@@ -1105,9 +746,9 @@ function formatarDataRota(?string $data): string
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
-                            <?php else: ?>
+                            <?php elseif (empty($is_modern)): ?>
                                 <tr>
-                                    <td colspan="9" class="text-center">Nenhuma comissão encontrada para os filtros selecionados.</td>
+                                    <td colspan="10" class="text-center">Nenhuma comissão encontrada para os filtros selecionados.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
@@ -1184,25 +825,23 @@ function formatarDataRota(?string $data): string
                         </div>
                     </div>
                 </div>
+    <?php $sf_help_key = 'comissoes'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
 
-                <!-- Help Modal -->
-                <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpModal">
-                    <div class="modal-content">
+
+                <!-- Modal data de pagamento -->
+                <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="comPaymentModal" style="display:none;">
+                    <div class="modal-content" style="max-width:420px;">
                         <div class="modal-header">
-                            <h2>Ajuda - Controle de Comissões</h2>
-                            <span class="close-modal" id="closeHelpBtn">&times;</span>
+                            <h2>Confirmar pagamento</h2>
+                            <span class="close-modal" id="comPaymentClose">&times;</span>
                         </div>
                         <div class="modal-body">
-                            <p>Utilize esta página para acompanhar o pagamento das comissões de viagens aprovadas:</p>
-                            <ul>
-                                <li><strong>Filtros:</strong> Defina período, motorista ou veículo para refinar o histórico.</li>
-                                <li><strong>Histórico:</strong> Use os botões de ação para marcar cada comissão como paga ou pendente.</li>
-                                <li><strong>Dashboards:</strong> Analise a distribuição de pagamentos, a evolução mensal e o ranking dos motoristas.</li>
-                                <li><strong>Exportação:</strong> Gere um CSV com os resultados filtrados para controle externo.</li>
-                            </ul>
+                            <label for="comPaymentDate">Data do pagamento</label>
+                            <input type="date" id="comPaymentDate" name="comPaymentDate" value="<?php echo date('Y-m-d'); ?>" class="form-control" style="width:100%;margin-top:0.35rem;">
                         </div>
                         <div class="modal-footer">
-                            <button class="btn-secondary" id="closeHelpFooterBtn">Fechar</button>
+                            <button type="button" class="btn-secondary" id="comPaymentCancel">Cancelar</button>
+                            <button type="button" class="fornc-btn fornc-btn--accent" id="comPaymentConfirm">Confirmar</button>
                         </div>
                     </div>
                 </div>
@@ -1216,307 +855,37 @@ function formatarDataRota(?string $data): string
     <script src="../js/sidebar.js"></script>
     <?php sf_render_api_scripts(); ?>
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const statusData = <?php echo json_encode($chartStatusData); ?>;
-            const monthlyData = <?php echo json_encode($chartMonthlyData); ?>;
-            const motoristaData = <?php echo json_encode($chartMotoristaData); ?>;
-
-            const prevBtn = document.getElementById('prevPageBtn');
-            const nextBtn = document.getElementById('nextPageBtn');
-            const currentPage = <?php echo $pagina_atual; ?>;
-            const totalPages = <?php echo $total_paginas; ?>;
-
-            if (prevBtn && prevBtn.classList.contains('disabled')) {
-                prevBtn.addEventListener('click', function (e) { e.preventDefault(); });
-            }
-            if (nextBtn && nextBtn.classList.contains('disabled')) {
-                nextBtn.addEventListener('click', function (e) { e.preventDefault(); });
-            }
-
-            const exportBtn = document.getElementById('exportCsvBtn');
-            if (exportBtn) {
-                exportBtn.addEventListener('click', function () {
-                    const params = new URLSearchParams(window.location.search);
-                    params.set('export', 'csv');
-                    window.location.href = `comissoes_export.php?${params.toString()}`;
-                });
-            }
-
-            const filterBtn = document.getElementById('filterBtn');
-            const filterSection = document.querySelector('.filter-section') || document.querySelector('.comissoes-fornc-filter');
-            if (filterBtn && filterSection) {
-                filterBtn.addEventListener('click', function () {
-                    filterSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    filterSection.classList.add('highlight-filter');
-                    setTimeout(() => filterSection.classList.remove('highlight-filter'), 1000);
-                });
-            }
-
-            const helpBtn = document.getElementById('helpBtn');
-            const helpModal = document.getElementById('helpModal');
-            const closeHelpBtn = document.getElementById('closeHelpBtn');
-            const closeHelpFooterBtn = document.getElementById('closeHelpFooterBtn');
-
-            const closeHelpModal = () => {
-                if (helpModal) {
-                    helpModal.style.display = 'none';
-                }
-            };
-
-            if (helpBtn && helpModal) {
-                helpBtn.addEventListener('click', function () {
-                    helpModal.style.display = 'block';
-                });
-            }
-
-            if (closeHelpBtn) {
-                closeHelpBtn.addEventListener('click', closeHelpModal);
-            }
-            if (closeHelpFooterBtn) {
-                closeHelpFooterBtn.addEventListener('click', closeHelpModal);
-            }
-
-            window.addEventListener('click', function (event) {
-                if (event.target === helpModal) {
-                    closeHelpModal();
+        window.__COMISSOES_CHARTS__ = <?php echo json_encode([
+            'status' => $chartStatusData,
+            'monthly' => $chartMonthlyData,
+            'motoristas' => $chartMotoristaData,
+        ], JSON_UNESCAPED_UNICODE); ?>;
+    </script>
+    <script src="../js/comissoes.js?v=1"></script>
+    <script src="../js/sf_insights.js?v=1.3"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (window.SFInsights) {
+            SFInsights.init({
+                mountId: 'sfComInsights',
+                insightsUrl: '../api/comissoes_insights.php',
+                resumoUrl: '../api/comissoes_resumo_ia.php',
+                title: 'Insights de comissões',
+                sectionTitle: 'Comissões pendentes prioritárias',
+                emptyOk: 'Nenhuma comissão pendente com alerta relevante.',
+                stats: function (j) {
+                    return [
+                        { label: 'pendentes', value: j.total_pendentes || 0, tone: 'aviso' },
+                        { label: 'em aberto', value: 'R$ ' + Number(j.total_pendente || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }), tone: 'aviso' }
+                    ];
                 }
             });
-
-            function handleCommissionAction(rotaId, action) {
-                const formData = new FormData();
-                formData.append('action', action);
-                formData.append('rota_id', rotaId);
-                if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
-                    formData.append('csrf_token', window.__SF_CSRF__);
-                }
-
-                fetch(sfApiUrl('commissions_actions.php'), {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'include',
-                    headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        window.location.reload();
-                    } else {
-                        alert(data.error || 'Não foi possível atualizar o status da comissão.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao atualizar comissão:', error);
-                    alert('Erro ao atualizar comissão.');
-                });
-            }
-
-            document.querySelectorAll('.mark-paid-btn').forEach(button => {
-                button.addEventListener('click', function () {
-                    const rotaId = this.getAttribute('data-rota-id');
-                    handleCommissionAction(rotaId, 'mark_paid');
-                });
-            });
-
-            document.querySelectorAll('.mark-pending-btn').forEach(button => {
-                button.addEventListener('click', function () {
-                    const rotaId = this.getAttribute('data-rota-id');
-                    handleCommissionAction(rotaId, 'mark_pending');
-                });
-            });
-
-            // Charts
-            let statusChartInstance = null;
-            let monthlyChartInstance = null;
-            let motoristaChartInstance = null;
-
-            function initStatusChart() {
-                const statusCanvas = document.getElementById('statusChart');
-                if (!statusCanvas || !statusData || !(statusData.values || []).some(v => v > 0)) {
-                    return;
-                }
-
-                if (statusChartInstance) {
-                    statusChartInstance.destroy();
-                }
-
-                statusChartInstance = new Chart(statusCanvas, {
-                    type: 'doughnut',
-                    data: {
-                        labels: statusData.labels,
-                        datasets: [{
-                            data: statusData.values,
-                            backgroundColor: ['#2ecc71', '#f39c12'],
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom'
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function (context) {
-                                        const value = context.raw || 0;
-                                        return `${context.label}: R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-
-            function initMonthlyChart() {
-                const monthlyCanvas = document.getElementById('monthlyChart');
-                if (!monthlyCanvas || !monthlyData || !monthlyData.labels || !monthlyData.labels.length) {
-                    return;
-                }
-
-                if (monthlyChartInstance) {
-                    monthlyChartInstance.destroy();
-                }
-
-                monthlyChartInstance = new Chart(monthlyCanvas, {
-                    type: 'line',
-                    data: {
-                        labels: monthlyData.labels,
-                        datasets: [
-                            {
-                                label: 'Total',
-                                data: monthlyData.total,
-                                borderColor: '#3498db',
-                                backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                                fill: false,
-                                tension: 0.3
-                            },
-                            {
-                                label: 'Pagas',
-                                data: monthlyData.pagas,
-                                borderColor: '#2ecc71',
-                                backgroundColor: 'rgba(46, 204, 113, 0.1)',
-                                fill: false,
-                                tension: 0.3
-                            },
-                            {
-                                label: 'Pendentes',
-                                data: monthlyData.pendentes,
-                                borderColor: '#e67e22',
-                                backgroundColor: 'rgba(230, 126, 34, 0.1)',
-                                fill: false,
-                                tension: 0.3
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function (value) {
-                                        return 'R$ ' + value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
-                                    }
-                                }
-                            }
-                        },
-                        plugins: {
-                            tooltip: {
-                                callbacks: {
-                                    label: function (context) {
-                                        const value = context.raw || 0;
-                                        return `${context.dataset.label}: R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-                                    }
-                                }
-                            },
-                            legend: {
-                                position: 'top'
-                            }
-                        }
-                    }
-                });
-            }
-
-            function initMotoristaChart() {
-                const motoristaCanvas = document.getElementById('motoristaChart');
-                if (!motoristaCanvas || !motoristaData || !motoristaData.labels || !motoristaData.labels.length) {
-                    return;
-                }
-
-                if (motoristaChartInstance) {
-                    motoristaChartInstance.destroy();
-                }
-
-                motoristaChartInstance = new Chart(motoristaCanvas, {
-                    type: 'bar',
-                    data: {
-                        labels: motoristaData.labels,
-                        datasets: [
-                            {
-                                label: 'Total',
-                                data: motoristaData.totais,
-                                backgroundColor: 'rgba(52, 152, 219, 0.7)',
-                                borderColor: '#3498db',
-                                borderWidth: 1
-                            },
-                            {
-                                label: 'Pagas',
-                                data: motoristaData.pagas,
-                                backgroundColor: 'rgba(46, 204, 113, 0.7)',
-                                borderColor: '#2ecc71',
-                                borderWidth: 1
-                            },
-                            {
-                                label: 'Pendentes',
-                                data: motoristaData.pendentes,
-                                backgroundColor: 'rgba(230, 126, 34, 0.7)',
-                                borderColor: '#e67e22',
-                                borderWidth: 1
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: {
-                                    callback: function (value) {
-                                        return 'R$ ' + value.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
-                                    }
-                                }
-                            }
-                        },
-                        plugins: {
-                            legend: {
-                                position: 'bottom'
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function (context) {
-                                        const value = context.raw || 0;
-                                        return `${context.dataset.label}: R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-            }
-
-            setTimeout(() => {
-                initStatusChart();
-                initMonthlyChart();
-                initMotoristaChart();
-            }, 0);
-        });
+        }
+    });
     </script>
 
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html>
 

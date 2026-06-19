@@ -123,6 +123,7 @@ $page_title = 'Cadastro de Rotas';
                 <div class="dashboard-grid">
                     <div class="dashboard-card" style="grid-column: 1 / -1;">
                         <div class="card-header">
+                            <i class="fas fa-route kpi-card-icon" aria-hidden="true"></i>
                             <h3>Nova Rota</h3>
                         </div>
                         <div class="card-body">

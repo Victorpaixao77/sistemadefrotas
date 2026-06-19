@@ -6,7 +6,7 @@
 -- 1. TABELA DE CATEGORIAS DO CALENDÁRIO
 CREATE TABLE IF NOT EXISTS categorias_calendario (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(50) NOT NULL UNIQUE,
+    nome VARCHAR(50) NOT NULL,
     descricao TEXT NULL,
     cor_padrao VARCHAR(7) DEFAULT '#3788d8',
     icone VARCHAR(50) DEFAULT 'fas fa-calendar',
@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS categorias_calendario (
     empresa_id INT NOT NULL,
     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_empresa (empresa_id),
-    INDEX idx_nome (nome)
+    INDEX idx_nome (nome),
+    UNIQUE KEY uk_categoria_empresa_nome (empresa_id, nome)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 2. TABELA PRINCIPAL DO CALENDÁRIO

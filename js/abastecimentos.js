@@ -14,13 +14,339 @@
 
 var currentFilter = null;
 var refuelingCurrentPage = 1;
+var consumptionChart = null;
+var efficiencyChart = null;
+var pendingDeleteId = null;
+var refuelPerPageInUrl = false;
+var refuelSortField = 'data_abastecimento';
+var refuelSortDir = 'DESC';
+var _arlaFieldsWired = false;
+var _valorTotalCalcWired = false;
+var _numericInputsWired = false;
+window.refuelSortField = refuelSortField;
+window.refuelSortDir = refuelSortDir;
 
-if (typeof window.refuelSortField === 'undefined') {
-    window.refuelSortField = 'data_abastecimento';
+function showToast(message, type) {
+    type = type || 'info';
+    var container = document.getElementById('toastContainer');
+    if (!container) return;
+    var toast = document.createElement('div');
+    toast.className = 'toast toast-' + type;
+    toast.setAttribute('role', 'alert');
+    var icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle');
+    toast.innerHTML = '<i class="fas ' + icon + '"></i><span></span>';
+    toast.querySelector('span').textContent = message || '';
+    container.appendChild(toast);
+    setTimeout(function () {
+        toast.style.opacity = '0';
+        setTimeout(function () { toast.remove(); }, 300);
+    }, 4000);
 }
-if (typeof window.refuelSortDir === 'undefined') {
-    window.refuelSortDir = 'DESC';
+
+function formatDate(dateString) {
+    if (!dateString) return '-';
+    var date = new Date(String(dateString).replace(' ', 'T'));
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('pt-BR');
 }
+
+function formatNumber(value, decimals) {
+    decimals = decimals == null ? 0 : decimals;
+    if (value == null || value === '') return decimals > 0 ? '0,' + '0'.repeat(decimals) : '0';
+    return Number(value).toLocaleString('pt-BR', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    });
+}
+
+function debounce(func, wait) {
+    var timeout;
+    return function () {
+        var args = arguments;
+        var later = function () {
+            clearTimeout(timeout);
+            func.apply(null, args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+function refuelDefaultSortDir(field) {
+    var textLike = ['veiculo_placa', 'motorista_nome', 'posto', 'forma_pagamento', 'rota'];
+    return textLike.indexOf(field) >= 0 ? 'ASC' : 'DESC';
+}
+
+function syncRefuelSortIndicators() {
+    var table = document.getElementById('refuelingTable');
+    if (!table) return;
+    table.querySelectorAll('thead th.sortable').forEach(function (th) {
+        var field = th.getAttribute('data-sort');
+        var ind = th.querySelector('.sort-ind');
+        if (!ind) return;
+        var on = field === refuelSortField;
+        th.classList.toggle('sorted', on);
+        ind.textContent = on ? (refuelSortDir === 'ASC' ? '▲' : '▼') : '⇅';
+    });
+}
+
+function wireRefuelSortHeaders() {
+    var table = document.getElementById('refuelingTable');
+    if (!table || table.dataset.sortWired === '1') return;
+    table.dataset.sortWired = '1';
+    table.querySelectorAll('thead th.sortable').forEach(function (th) {
+        th.addEventListener('click', function () {
+            var field = th.getAttribute('data-sort');
+            if (!field) return;
+            if (refuelSortField === field) {
+                refuelSortDir = refuelSortDir === 'ASC' ? 'DESC' : 'ASC';
+            } else {
+                refuelSortField = field;
+                refuelSortDir = refuelDefaultSortDir(field);
+            }
+            window.refuelSortField = refuelSortField;
+            window.refuelSortDir = refuelSortDir;
+            syncRefuelSortIndicators();
+            loadRefuelingData(1);
+        });
+    });
+}
+
+function restoreRefuelFiltersFromUrl() {
+    var p = new URLSearchParams(window.location.search);
+    var searchEl = document.getElementById('searchRefueling');
+    if (searchEl && p.has('search')) searchEl.value = p.get('search') || '';
+    var map = [
+        ['veiculo', 'vehicleFilter'],
+        ['motorista', 'driverFilter'],
+        ['combustivel', 'fuelFilter'],
+        ['pagamento', 'paymentFilter']
+    ];
+    map.forEach(function (pair) {
+        if (!p.has(pair[0])) return;
+        var el = document.getElementById(pair[1]);
+        if (el) el.value = p.get(pair[0]) || '';
+    });
+    if (p.has('year') && p.has('month')) {
+        currentFilter = p.get('year') + '-' + p.get('month');
+        var fm = document.getElementById('filterMonth');
+        if (fm) fm.value = currentFilter;
+    } else if (p.has('month')) {
+        currentFilter = p.get('month') || null;
+        var fm2 = document.getElementById('filterMonth');
+        if (fm2 && currentFilter) fm2.value = currentFilter;
+    }
+    if (p.has('per_page')) {
+        refuelPerPageInUrl = true;
+        var pp = parseInt(p.get('per_page'), 10);
+        var sel = document.getElementById('perPageRefuel');
+        if (sel && !Number.isNaN(pp) && [5, 10, 25, 50, 100].indexOf(pp) >= 0) {
+            sel.value = String(pp);
+        }
+    }
+    if (p.has('sort')) refuelSortField = p.get('sort') || refuelSortField;
+    if (p.has('dir')) refuelSortDir = (p.get('dir') || '').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    window.refuelSortField = refuelSortField;
+    window.refuelSortDir = refuelSortDir;
+}
+
+function syncRefuelBrowserUrl(state) {
+    var isModern = document.body.classList.contains('abastecimentos-modern');
+    var hasListFilters = !!(state.search || state.vehicleFilter || state.driverFilter || state.fuelFilter || state.paymentFilter || currentFilter);
+    var sortField = state.sortField;
+    var sortDir = state.sortDir;
+    var hasNonDefaultSort = sortField !== 'data_abastecimento' || sortDir !== 'DESC';
+    var hasNonDefaultPage = state.page !== 1;
+    var hasPerPageInUrl = refuelPerPageInUrl && state.limit !== 10;
+    var params = new URLSearchParams();
+    if (hasNonDefaultPage) params.set('page', String(state.page));
+    if (hasPerPageInUrl) params.set('per_page', String(state.limit));
+    if (state.search) params.set('search', state.search);
+    if (state.vehicleFilter) params.set('veiculo', state.vehicleFilter);
+    if (state.driverFilter) params.set('motorista', state.driverFilter);
+    if (state.fuelFilter) params.set('combustivel', state.fuelFilter);
+    if (state.paymentFilter) params.set('pagamento', state.paymentFilter);
+    if (currentFilter) {
+        var parts = currentFilter.split('-');
+        if (parts.length === 2) {
+            params.set('year', parts[0]);
+            params.set('month', parts[1]);
+        }
+    }
+    if (hasNonDefaultSort) {
+        params.set('sort', sortField);
+        params.set('dir', sortDir);
+    }
+    if (!hasListFilters && !hasNonDefaultSort && !hasNonDefaultPage && !hasPerPageInUrl) {
+        var desiredEmpty = isModern ? '' : '?classic=1';
+        if (window.location.search !== desiredEmpty) {
+            window.history.replaceState({}, '', window.location.pathname + desiredEmpty);
+        }
+        return;
+    }
+    if (!isModern) params.set('classic', '1');
+    var desired = '?' + params.toString();
+    if (window.location.search !== desired) {
+        window.history.replaceState({}, '', window.location.pathname + desired);
+    }
+}
+
+// Escapa texto para inserção segura em HTML (evita XSS via posto, nomes, etc.)
+function escapeHtmlAbast(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// ---- Painel de insights de abastecimentos ----
+var ABAST_INSIGHTS_TITLE = 'Insights de abastecimentos';
+var abastInsightsLoaded = false;
+var abastInsightsLoading = false;
+
+function abastInsightsUrl() {
+    return sfApiUrl('refuel_anomalies.php');
+}
+
+function abastInsightsPlaceholder() {
+    if (window.SFInsights && SFInsights.placeholderHtml) {
+        return SFInsights.placeholderHtml(ABAST_INSIGHTS_TITLE);
+    }
+    return '<i class="fas fa-clipboard-check"></i> ' + ABAST_INSIGHTS_TITLE +
+        ' — <span style="font-weight:500;color:var(--text-muted)">expandir para analisar</span>';
+}
+
+function abastInsightsReadCache() {
+    if (!window.SFInsights || !SFInsights.readCache) return null;
+    return SFInsights.readCache(abastInsightsUrl());
+}
+
+function abastInsightsWriteCache(data) {
+    if (window.SFInsights && SFInsights.writeCache) {
+        SFInsights.writeCache(abastInsightsUrl(), data, SFInsights.CACHE_TTL_MS);
+    }
+}
+
+function initAbastInsightsPanel() {
+    var panel = document.getElementById('abAnomalies');
+    var summary = document.getElementById('abSummary');
+    if (panel) panel.style.display = '';
+    if (summary) summary.innerHTML = abastInsightsPlaceholder();
+}
+
+function setupRefuelAnomalies() {
+    initAbastInsightsPanel();
+    var toggle = document.getElementById('abToggle');
+    var list = document.getElementById('abList');
+    if (toggle && list) {
+        toggle.addEventListener('click', function () {
+            var open = toggle.getAttribute('aria-expanded') === 'true';
+            var willOpen = !open;
+            toggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            list.style.display = willOpen ? '' : 'none';
+            if (willOpen && !abastInsightsLoaded && !abastInsightsLoading) {
+                loadRefuelAnomalies(false);
+            }
+        });
+    }
+    var refresh = document.getElementById('abRefresh');
+    if (refresh) {
+        refresh.addEventListener('click', function (e) {
+            e.stopPropagation();
+            abastInsightsLoaded = false;
+            if (window.SFInsights && SFInsights.removeCache) SFInsights.removeCache(abastInsightsUrl());
+            loadRefuelAnomalies(true);
+        });
+    }
+    if (list) {
+        list.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-ab-edit]');
+            if (!btn) return;
+            var id = btn.getAttribute('data-ab-edit');
+            if (typeof showEditRefuelModal === 'function') showEditRefuelModal(id);
+        });
+    }
+}
+
+function renderRefuelAnomalies(json) {
+    var panel = document.getElementById('abAnomalies');
+    var summary = document.getElementById('abSummary');
+    var list = document.getElementById('abList');
+    if (!panel || !summary || !list) return;
+    abastInsightsLoaded = true;
+    panel.classList.remove('has-erros', 'has-avisos');
+    var erros = json.erros || 0, avisos = json.avisos || 0, total = json.total_inconsistencias || 0;
+    panel.style.display = '';
+
+    if (total === 0) {
+        summary.innerHTML = '<i class="fas fa-clipboard-check" style="color:#16a34a"></i> ' + ABAST_INSIGHTS_TITLE +
+            ' <span class="ab-pill ok">tudo certo</span>';
+        list.innerHTML = '<div class="ab-empty">Nenhuma anomalia encontrada.</div>';
+        list.style.display = '';
+        return;
+    }
+
+    panel.classList.add(erros > 0 ? 'has-erros' : 'has-avisos');
+    var color = erros > 0 ? '#dc2626' : '#f59e0b';
+    summary.innerHTML = '<i class="fas fa-clipboard-check" style="color:' + color + '"></i> ' + ABAST_INSIGHTS_TITLE +
+        '<span class="ab-pill ' + (erros > 0 ? 'erro' : 'aviso') + '">' + total + ' anomalia(s)</span>' +
+        (erros > 0 ? '<span class="ab-pill erro">' + erros + ' erro(s)</span>' : '') +
+        (avisos > 0 ? '<span class="ab-pill aviso">' + avisos + ' aviso(s)</span>' : '');
+
+    list.innerHTML = (json.itens || []).map(function (it) {
+        var dataBr = it.data ? formatDate(it.data) : '';
+        var motivos = (it.motivos || []).map(function (m) { return '<li>' + escapeHtmlAbast(m.msg) + '</li>'; }).join('');
+        var icon = it.severidade === 'erro' ? 'fa-circle-xmark' : 'fa-triangle-exclamation';
+        return '<div class="ab-item">' +
+            '<span class="ab-sev ' + it.severidade + '"><i class="fas ' + icon + '"></i></span>' +
+            '<div class="ab-info">' +
+                '<div class="ab-meta"><strong>' + escapeHtmlAbast(dataBr) + '</strong> · ' +
+                escapeHtmlAbast(it.veiculo) + ' · ' + escapeHtmlAbast(it.motorista) + ' · ' + escapeHtmlAbast(it.posto) + '</div>' +
+                '<ul class="ab-motivos">' + motivos + '</ul>' +
+            '</div>' +
+            '<button type="button" class="btn-icon ab-edit" data-ab-edit="' + it.id + '" title="Abrir abastecimento" aria-label="Abrir abastecimento"><i class="fas fa-edit"></i></button>' +
+            '</div>';
+    }).join('');
+}
+
+function loadRefuelAnomalies(forceRefresh) {
+    if (abastInsightsLoading) return;
+    var panel = document.getElementById('abAnomalies');
+    var summary = document.getElementById('abSummary');
+    var list = document.getElementById('abList');
+    if (!panel) return;
+    panel.style.display = '';
+
+    if (!forceRefresh) {
+        var hit = abastInsightsReadCache();
+        if (hit && hit.success) {
+            renderRefuelAnomalies(hit);
+            return;
+        }
+    }
+
+    abastInsightsLoading = true;
+    if (summary) summary.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analisando abastecimentos…';
+    if (list) list.innerHTML = '<div class="ab-empty">Carregando…</div>';
+    var url = abastInsightsUrl();
+    if (forceRefresh) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'refresh=1&_=' + Date.now();
+    fetch(url, { credentials: 'include' })
+        .then(function (r) { return r.json(); })
+        .then(function (json) {
+            if (json && json.success) {
+                abastInsightsWriteCache(json);
+                renderRefuelAnomalies(json);
+            } else {
+                panel.style.display = 'none';
+            }
+        })
+        .catch(function () { panel.style.display = 'none'; })
+        .then(function () { abastInsightsLoading = false; });
+}
+
 
 document.addEventListener('DOMContentLoaded', function() {
     let filtroData = '';
@@ -55,12 +381,12 @@ document.addEventListener('DOMContentLoaded', function() {
         resetRotas();
         if (filtroData) {
             veiculoSelect.disabled = true;
-            fetch(sfApiUrl(`refuel_data.php?action=get_veiculos_by_data&data=${filtroData}`))
+            fetch(sfApiUrl(`refuel_data.php?action=get_veiculos_by_data&data=${encodeURIComponent(filtroData)}`))
                 .then(r => r.json())
                 .then(res => {
                     if (res.success && res.data.length > 0) {
                         veiculoSelect.innerHTML = '<option value="">Selecione um veículo</option>' +
-                            res.data.map(v => `<option value="${v.id}">${v.placa} - ${v.modelo}</option>`).join('');
+                            res.data.map(v => `<option value="${escapeHtmlAbast(v.id)}">${escapeHtmlAbast(v.placa)} - ${escapeHtmlAbast(v.modelo)}</option>`).join('');
                         veiculoSelect.disabled = false;
                     } else {
                         veiculoSelect.innerHTML = '<option value="">Nenhum veículo encontrado</option>';
@@ -70,19 +396,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 2. Ao selecionar veículo, busca motoristas
+    // 2. Ao selecionar veículo, busca motoristas (sempre ler a data do campo — evita filtro vazio após abrir edição)
     veiculoSelect.addEventListener('change', function() {
         filtroVeiculo = this.value;
         resetMotoristas();
         resetRotas();
-        if (filtroData && filtroVeiculo) {
+        const dataFiltro = dataRotaFiltroInput.value;
+        if (dataFiltro && filtroVeiculo) {
             motoristaSelect.disabled = true;
-            fetch(sfApiUrl(`refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${filtroVeiculo}&data=${filtroData}`))
+            fetch(sfApiUrl(`refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${encodeURIComponent(filtroVeiculo)}&data=${encodeURIComponent(dataFiltro)}`))
                 .then(r => r.json())
                 .then(res => {
                     if (res.success && res.data.length > 0) {
                         motoristaSelect.innerHTML = '<option value="">Selecione um motorista</option>' +
-                            res.data.map(m => `<option value="${m.id}">${m.nome}</option>`).join('');
+                            res.data.map(m => `<option value="${escapeHtmlAbast(m.id)}">${escapeHtmlAbast(m.nome)}</option>`).join('');
                         motoristaSelect.disabled = false;
                     } else {
                         motoristaSelect.innerHTML = '<option value="">Nenhum motorista encontrado</option>';
@@ -96,14 +423,16 @@ document.addEventListener('DOMContentLoaded', function() {
     motoristaSelect.addEventListener('change', function() {
         filtroMotorista = this.value;
         resetRotas();
-        if (filtroData && filtroVeiculo && filtroMotorista) {
+        const dataFiltro = dataRotaFiltroInput.value;
+        const veiculoIdAtual = veiculoSelect.value;
+        if (dataFiltro && veiculoIdAtual && filtroMotorista) {
             rotaSelect.disabled = true;
-            fetch(sfApiUrl(`refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${filtroVeiculo}&motorista_id=${filtroMotorista}&data=${filtroData}`))
+            fetch(sfApiUrl(`refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${encodeURIComponent(veiculoIdAtual)}&motorista_id=${encodeURIComponent(filtroMotorista)}&data=${encodeURIComponent(dataFiltro)}`))
                 .then(r => r.json())
                 .then(res => {
                     if (res.success && res.data.length > 0) {
                         rotaSelect.innerHTML = '<option value="">Selecione a rota</option>' +
-                            res.data.map(r => `<option value="${r.id}">${r.data_rota} - ${r.cidade_origem_nome} → ${r.cidade_destino_nome}</option>`).join('');
+                            res.data.map(r => `<option value="${escapeHtmlAbast(r.id)}">${escapeHtmlAbast(r.data_rota)} - ${escapeHtmlAbast(r.cidade_origem_nome)} → ${escapeHtmlAbast(r.cidade_destino_nome)}</option>`).join('');
                         rotaSelect.disabled = false;
                     } else {
                         rotaSelect.innerHTML = '<option value="">Nenhuma rota encontrada</option>';
@@ -254,151 +583,161 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 
-// Função para preencher selects de edição sem disparar filtro dinâmico
-async function preencherCamposEdicao(refuel) {
-    // Preencher Data da Rota
-    const dataRotaInput = document.getElementById('data_rota_filtro');
-    dataRotaInput.value = refuel.data_rota;
+/** Data Y-m-d a partir de campo da API (DATE ou datetime). */
+function sfRefuelDateToYmd(v) {
+    if (v == null || v === '') {
+        return '';
+    }
+    const s = String(v).trim();
+    const m = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : '';
+}
 
-    // Carregar veículos disponíveis e selecionar o correto
+/**
+ * Preenche data da rota + selects veículo/motorista/rota com listas da API (para poder trocar na edição).
+ * Reabilita os selects (o init do modal deixa motorista/rota disabled).
+ */
+async function preencherCamposEdicao(refuel) {
+    const dataRotaInput = document.getElementById('data_rota_filtro');
     const veiculoSelect = document.getElementById('veiculo_id');
     const motoristaSelect = document.getElementById('motorista_id');
     const rotaSelect = document.getElementById('rota_id');
 
-    // Buscar veículos
-    let res = await fetch(sfApiUrl(`refuel_data.php?action=get_veiculos_by_data&data=${refuel.data_rota}`));
-    let data = await res.json();
-    if (data.success && data.data.length > 0) {
-        veiculoSelect.innerHTML = '<option value="">Selecione um veículo</option>' +
-            data.data.map(v => `<option value="${v.id}">${v.placa} - ${v.modelo}</option>`).join('');
-        veiculoSelect.disabled = false;
-        veiculoSelect.value = refuel.veiculo_id;
+    const dataYmd = sfRefuelDateToYmd(refuel.data_rota) || sfRefuelDateToYmd(refuel.data_abastecimento);
+    if (!dataYmd) {
+        return;
     }
+    dataRotaInput.value = dataYmd;
 
-    // Buscar motoristas
-    res = await fetch(sfApiUrl(`refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${refuel.veiculo_id}&data=${refuel.data_rota}`));
-    data = await res.json();
-    if (data.success && data.data.length > 0) {
-        motoristaSelect.innerHTML = '<option value="">Selecione um motorista</option>' +
-            data.data.map(m => `<option value="${m.id}">${m.nome}</option>`).join('');
-        motoristaSelect.disabled = false;
-        motoristaSelect.value = refuel.motorista_id;
+    const enc = encodeURIComponent(dataYmd);
+    let res = await fetch(sfApiUrl(`refuel_data.php?action=get_veiculos_by_data&data=${enc}`));
+    let json = await res.json();
+    let vehList = (json.success && Array.isArray(json.data)) ? json.data : [];
+    if (vehList.length === 0 && refuel.veiculo_id) {
+        vehList = [{
+            id: refuel.veiculo_id,
+            placa: refuel.veiculo_placa || '',
+            modelo: refuel.veiculo_modelo || '',
+        }];
     }
+    veiculoSelect.innerHTML = '<option value="">Selecione um veículo</option>' +
+        vehList.map(function (v) {
+            return '<option value="' + escapeHtmlAbast(v.id) + '">' + escapeHtmlAbast(v.placa || '') + ' - ' + escapeHtmlAbast(v.modelo || '') + '</option>';
+        }).join('');
+    veiculoSelect.value = String(refuel.veiculo_id || '');
 
-    // Buscar rotas
-    res = await fetch(sfApiUrl(`refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${refuel.veiculo_id}&motorista_id=${refuel.motorista_id}&data=${refuel.data_rota}`));
-    data = await res.json();
-    if (data.success && data.data.length > 0) {
-        rotaSelect.innerHTML = '<option value="">Selecione a rota</option>' +
-            data.data.map(r => `<option value="${r.id}">${r.data_rota} - ${r.cidade_origem_nome} → ${r.cidade_destino_nome}</option>`).join('');
-        rotaSelect.disabled = false;
-        rotaSelect.value = refuel.rota_id;
+    const vid = refuel.veiculo_id;
+    let motList = [];
+    if (vid) {
+        res = await fetch(sfApiUrl(`refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${encodeURIComponent(vid)}&data=${enc}`));
+        json = await res.json();
+        motList = (json.success && Array.isArray(json.data)) ? json.data : [];
     }
+    const mid = refuel.motorista_id;
+    if (mid && !motList.some(function (m) { return String(m.id) === String(mid); })) {
+        motList = motList.concat([{ id: mid, nome: refuel.motorista_nome || ('#' + mid) }]);
+    }
+    motoristaSelect.innerHTML = '<option value="">Selecione um motorista</option>' +
+        motList.map(function (m) {
+            return '<option value="' + escapeHtmlAbast(m.id) + '">' + escapeHtmlAbast(m.nome || '') + '</option>';
+        }).join('');
+    motoristaSelect.value = String(mid || '');
+
+    let rList = [];
+    if (vid && mid) {
+        res = await fetch(sfApiUrl(`refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${encodeURIComponent(vid)}&motorista_id=${encodeURIComponent(mid)}&data=${enc}`));
+        json = await res.json();
+        rList = (json.success && Array.isArray(json.data)) ? json.data : [];
+    }
+    const rid = refuel.rota_id;
+    if (rid && !rList.some(function (r) { return String(r.id) === String(rid); })) {
+        const dr = sfRefuelDateToYmd(refuel.data_rota) || dataYmd;
+        rList = rList.concat([{
+            id: rid,
+            data_rota: dr,
+            cidade_origem_nome: refuel.cidade_origem_nome || 'Origem',
+            cidade_destino_nome: refuel.cidade_destino_nome || 'Destino',
+        }]);
+    }
+    rotaSelect.innerHTML = '<option value="">Selecione a rota</option>' +
+        rList.map(function (r) {
+            return '<option value="' + escapeHtmlAbast(r.id) + '">' + escapeHtmlAbast(r.data_rota) + ' - ' + escapeHtmlAbast(r.cidade_origem_nome || '') + ' → ' + escapeHtmlAbast(r.cidade_destino_nome || '') + '</option>';
+        }).join('');
+    rotaSelect.value = String(rid || '');
+
+    veiculoSelect.disabled = veiculoSelect.querySelectorAll('option').length <= 1;
+    motoristaSelect.disabled = motoristaSelect.querySelectorAll('option').length <= 1;
+    rotaSelect.disabled = rotaSelect.querySelectorAll('option').length <= 1;
 }
 
-// Função para abrir o modal de edição de abastecimento
-window.openEditRefuelModal = function(refuel) {
-    // Preencher campos básicos
+/**
+ * Abre o modal de edição (chamado pelo PHP ou após fetch). Preenche listas para motorista/rota editáveis.
+ */
+window.openEditRefuelModal = async function(refuel) {
     document.getElementById('refuelId').value = refuel.id;
-    document.getElementById('data_abastecimento').value = refuel.data_abastecimento.replace(' ', 'T');
-    document.getElementById('tipo_combustivel').value = refuel.tipo_combustivel;
+    const dab = (refuel.data_abastecimento || '').toString().replace(' ', 'T');
+    document.getElementById('data_abastecimento').value = dab.length >= 16 ? dab.slice(0, 16) : dab;
+    document.getElementById('tipo_combustivel').value = refuel.tipo_combustivel || '';
     document.getElementById('litros').value = Number(refuel.litros).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     document.getElementById('valor_litro').value = Number(refuel.valor_litro).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     document.getElementById('valor_total').value = Number(refuel.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     document.getElementById('km_atual').value = refuel.km_atual;
-    document.getElementById('posto').value = refuel.posto;
-    document.getElementById('forma_pagamento').value = refuel.forma_pagamento;
+    document.getElementById('posto').value = refuel.posto || '';
+    document.getElementById('forma_pagamento').value = refuel.forma_pagamento || '';
     document.getElementById('observacoes').value = refuel.observacoes || '';
 
-    // Preencher select de veículo apenas com o valor do banco
-    const veiculoSelect = document.getElementById('veiculo_id');
-    veiculoSelect.innerHTML = '';
-    if (refuel.veiculo_id) {
-        const option = document.createElement('option');
-        option.value = refuel.veiculo_id;
-        option.textContent = refuel.veiculo_placa ? refuel.veiculo_placa : `Veículo #${refuel.veiculo_id}`;
-        veiculoSelect.appendChild(option);
-        veiculoSelect.value = refuel.veiculo_id;
-    }
+    await preencherCamposEdicao(refuel);
 
-    // Preencher select de motorista apenas com o valor do banco
-    const motoristaSelect = document.getElementById('motorista_id');
-    motoristaSelect.innerHTML = '';
-    if (refuel.motorista_id) {
-        const option = document.createElement('option');
-        option.value = refuel.motorista_id;
-        option.textContent = refuel.motorista_nome ? refuel.motorista_nome : `Motorista #${refuel.motorista_id}`;
-        motoristaSelect.appendChild(option);
-        motoristaSelect.value = refuel.motorista_id;
-    }
-
-    // Preencher select de rota apenas com a rota do banco
-    const rotaSelect = document.getElementById('rota_id');
-    rotaSelect.innerHTML = '';
-    if (refuel.rota_id) {
-        const option = document.createElement('option');
-        option.value = refuel.rota_id;
-        if (refuel.data_rota && refuel.cidade_origem_nome && refuel.cidade_destino_nome) {
-            option.textContent = `${refuel.data_rota.split('T')[0]} - ${refuel.cidade_origem_nome} → ${refuel.cidade_destino_nome}`;
+    const incluiArlaCheckbox = document.getElementById('inclui_arla');
+    const camposArla = document.getElementById('campos_arla');
+    if (incluiArlaCheckbox && camposArla) {
+        if (Number(refuel.inclui_arla) === 1) {
+            incluiArlaCheckbox.checked = true;
+            camposArla.style.display = 'grid';
+            var la = document.getElementById('litros_arla');
+            var vla = document.getElementById('valor_litro_arla');
+            var vta = document.getElementById('valor_total_arla');
+            if (la) {
+                la.value = Number(refuel.litros_arla || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            if (vla) {
+                vla.value = Number(refuel.valor_litro_arla || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            if (vta) {
+                vta.value = Number(refuel.valor_total_arla || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
         } else {
-            option.textContent = 'Rota não encontrada';
+            incluiArlaCheckbox.checked = false;
+            camposArla.style.display = 'none';
         }
-        rotaSelect.appendChild(option);
-        rotaSelect.value = refuel.rota_id;
     }
 
-    // Só buscar opções ao alterar data da rota
-    document.getElementById('data_rota_filtro').addEventListener('change', function() {
-        const data = this.value;
-        if (!data) return;
-        // Buscar veículos disponíveis para a data
-        fetch(sfApiUrl(`refuel_data.php?action=get_veiculos_by_data&data=${data}`))
-            .then(response => response.json())
-            .then(dataV => {
-                veiculoSelect.innerHTML = '';
-                dataV.data.forEach(v => {
-                    const option = document.createElement('option');
-                    option.value = v.id;
-                    option.textContent = v.placa;
-                    veiculoSelect.appendChild(option);
-                });
-            });
-        // Buscar motoristas disponíveis para a data e veículo selecionado
-        setTimeout(() => {
-            const veiculoId = veiculoSelect.value;
-            fetch(sfApiUrl(`refuel_data.php?action=get_motoristas_by_veiculo_data&veiculo_id=${veiculoId}&data=${data}`))
-                .then(response => response.json())
-                .then(dataM => {
-                    motoristaSelect.innerHTML = '';
-                    dataM.data.forEach(m => {
-                        const option = document.createElement('option');
-                        option.value = m.id;
-                        option.textContent = m.nome;
-                        motoristaSelect.appendChild(option);
-                    });
-                });
-        }, 200);
-        // Buscar rotas disponíveis para a data, veículo e motorista selecionados
-        setTimeout(() => {
-            const veiculoId = veiculoSelect.value;
-            const motoristaId = motoristaSelect.value;
-            fetch(sfApiUrl(`refuel_data.php?action=get_rotas_by_veiculo_motorista_data&veiculo_id=${veiculoId}&motorista_id=${motoristaId}&data=${data}`))
-                .then(response => response.json())
-                .then(dataR => {
-                    rotaSelect.innerHTML = '';
-                    dataR.data.forEach(r => {
-                        const option = document.createElement('option');
-                        option.value = r.id;
-                        option.textContent = `${r.data_rota} - ${r.cidade_origem_nome} → ${r.cidade_destino_nome}`;
-                        rotaSelect.appendChild(option);
-                    });
-                });
-        }, 400);
-    });
+    var comprovanteAtual = document.getElementById('comprovante_atual');
+    if (comprovanteAtual) {
+        if (refuel.comprovante) {
+            var compPath = String(refuel.comprovante);
+            var compHref = /^(https?:|\/)/i.test(compPath) ? compPath : '../' + compPath.replace(/^\.\.\//, '');
+            comprovanteAtual.innerHTML =
+                '<div class="current-file"><i class="fas fa-file-alt"></i> ' +
+                '<a href="' + escapeHtmlAbast(compHref) + '" target="_blank" rel="noopener">Ver comprovante atual</a></div>';
+        } else {
+            comprovanteAtual.innerHTML = '';
+        }
+    }
 
-    // Exibe o modal
+    document.getElementById('modalTitle').textContent = 'Editar Abastecimento';
+    if (typeof setupValorTotalCalc === 'function') {
+        setupValorTotalCalc();
+    }
+    if (typeof setupArlaFields === 'function') {
+        setupArlaFields();
+    }
+    if (typeof setupNumericInputs === 'function') {
+        setupNumericInputs();
+    }
+
     document.getElementById('refuelModal').classList.add('active');
-}
+};
 
 /** Percentual ARLA na listagem: sem agrupador de milhares (evita "1.785,7%"). */
 function formatArlaPercentDisplay(percentual) {
@@ -418,6 +757,15 @@ function formatArlaPercentTitle(percentual) {
 }
 
 function loadRefuelingData(page = null) {
+    var emptyElStart = document.getElementById('refuelEmptyState');
+    var wrapStart = document.getElementById('refuelTableContainer');
+    var loadingEl = document.getElementById('refuelTableLoading');
+    if (emptyElStart && wrapStart) {
+        emptyElStart.classList.remove('visible');
+        wrapStart.style.display = '';
+    }
+    if (loadingEl) loadingEl.classList.add('is-visible');
+
     if (page !== null) {
         const parsedPage = parseInt(page, 10);
         refuelingCurrentPage = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
@@ -445,40 +793,21 @@ function loadRefuelingData(page = null) {
     const fuelFilter = fuelSelect ? fuelSelect.value : '';
     const paymentFilter = paymentSelect ? paymentSelect.value : '';
 
-    const isModern = document.body.classList.contains('abastecimentos-modern');
-    const hasListFilters = !!(search || vehicleFilter || driverFilter || fuelFilter || paymentFilter || currentFilter);
-    const sortField = (typeof refuelSortField !== 'undefined' && refuelSortField)
-        ? refuelSortField
-        : 'data_abastecimento';
-    const sortDir = (typeof refuelSortDir !== 'undefined' && String(refuelSortDir).toUpperCase() === 'ASC')
-        ? 'ASC'
-        : 'DESC';
+    const sortField = refuelSortField || 'data_abastecimento';
+    const sortDir = String(refuelSortDir || 'DESC').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-    const urlParams = new URLSearchParams();
-    urlParams.set('page', String(refuelingCurrentPage));
-    urlParams.set('per_page', String(limit));
-    if (!isModern) {
-        urlParams.set('classic', '1');
-    }
-    if (sortField !== 'data_abastecimento' || sortDir !== 'DESC') {
-        urlParams.set('sort', sortField);
-        urlParams.set('dir', sortDir);
-    }
-    const isDefault = refuelingCurrentPage === 1 && limit === 10 && !hasListFilters
-        && sortField === 'data_abastecimento' && sortDir === 'DESC';
-    let desiredSearch;
-    if (isDefault && isModern) {
-        desiredSearch = '';
-    } else if (isDefault && !isModern) {
-        desiredSearch = '?classic=1';
-    } else {
-        desiredSearch = '?' + urlParams.toString();
-    }
-    if (window.location.search !== desiredSearch) {
-        window.history.replaceState({}, '', window.location.pathname + desiredSearch);
-    }
-    
-    // Constrói URL com filtros e paginação (limit = valor do select "Por página")
+    syncRefuelBrowserUrl({
+        page: refuelingCurrentPage,
+        limit: limit,
+        search: search,
+        vehicleFilter: vehicleFilter,
+        driverFilter: driverFilter,
+        fuelFilter: fuelFilter,
+        paymentFilter: paymentFilter,
+        sortField: sortField,
+        sortDir: sortDir
+    });
+
     let url = sfApiUrl(`refuel_data.php?action=list&page=${refuelingCurrentPage}&limit=${limit}`);
     if (search) url += `&search=${encodeURIComponent(search)}`;
     if (currentFilter) {
@@ -491,51 +820,39 @@ function loadRefuelingData(page = null) {
     if (paymentFilter) url += `&pagamento=${encodeURIComponent(paymentFilter)}`;
     url += `&sort=${encodeURIComponent(sortField)}&dir=${encodeURIComponent(sortDir)}`;
 
-    console.log('Carregando dados dos abastecimentos:', url);
-    
-    // Carrega dados dos abastecimentos
     fetch(url, { credentials: 'include' })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
         .then(data => {
-            console.log('Resposta do backend:', data);
+            if (loadingEl) loadingEl.classList.remove('is-visible');
             if (data.success) {
                 updateRefuelingsTable(data.data);
                 if (data.pagination) {
                     refuelingCurrentPage = data.pagination.page || refuelingCurrentPage;
                     updatePagination(data.pagination);
-                    const isModernAb = document.body.classList.contains('abastecimentos-modern');
-                    const hasListFiltersAb = !!(search || vehicleFilter || driverFilter || fuelFilter || paymentFilter || currentFilter);
-                    const updatedParams = new URLSearchParams();
-                    updatedParams.set('page', String(refuelingCurrentPage));
-                    updatedParams.set('per_page', String(limit));
-                    if (!isModernAb) {
-                        updatedParams.set('classic', '1');
-                    }
-                    if (sortField !== 'data_abastecimento' || sortDir !== 'DESC') {
-                        updatedParams.set('sort', sortField);
-                        updatedParams.set('dir', sortDir);
-                    }
-                    const isDefaultAbast = refuelingCurrentPage === 1 && limit === 10 && !hasListFiltersAb
-                        && sortField === 'data_abastecimento' && sortDir === 'DESC';
-                    let desiredSearchAbast;
-                    if (isDefaultAbast && isModernAb) {
-                        desiredSearchAbast = '';
-                    } else if (isDefaultAbast && !isModernAb) {
-                        desiredSearchAbast = '?classic=1';
-                    } else {
-                        desiredSearchAbast = '?' + updatedParams.toString();
-                    }
-                    if (window.location.search !== desiredSearchAbast) {
-                        window.history.replaceState({}, '', window.location.pathname + desiredSearchAbast);
-                    }
+                    syncRefuelBrowserUrl({
+                        page: refuelingCurrentPage,
+                        limit: limit,
+                        search: search,
+                        vehicleFilter: vehicleFilter,
+                        driverFilter: driverFilter,
+                        fuelFilter: fuelFilter,
+                        paymentFilter: paymentFilter,
+                        sortField: sortField,
+                        sortDir: sortDir
+                    });
                 }
             } else {
                 throw new Error(data.error || 'Erro ao carregar dados dos abastecimentos');
             }
         })
         .catch(error => {
-            console.error('Error loading refueling data:', error);
-            alert('Erro ao carregar dados dos abastecimentos: ' + (typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : error.message));
+            if (loadingEl) loadingEl.classList.remove('is-visible');
+            if (window.__SF_DEBUG__) console.error('Erro ao carregar abastecimentos:', error);
+            var msg = typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : (error.message || 'Erro');
+            showToast('Erro ao carregar dados: ' + msg, 'error');
         });
 }
 
@@ -613,92 +930,75 @@ function updatePagination(pagination) {
 }
 
 function updateRefuelingsTable(refuelings) {
-    console.log('Atualizando tabela com:', refuelings);
     const tbody =
         document.getElementById('refuelingTableBody') ||
         document.querySelector('#refuelingTable tbody') ||
         document.querySelector('table.fornc-table tbody') ||
         document.querySelector('table.data-table tbody');
-    if (!tbody) {
-        console.error('updateRefuelingsTable: tbody da lista de abastecimentos não encontrado');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    var refuelModern = document.body.classList.contains('abastecimentos-modern');
+    function dc(name) {
+        return refuelModern ? ' data-col="' + name + '"' : '';
+    }
+    var emptyEl = document.getElementById('refuelEmptyState');
+    var refuelWrap = document.getElementById('refuelTableContainer');
+    var isEmpty = !refuelings || refuelings.length === 0;
+    if (emptyEl && refuelWrap) {
+        emptyEl.classList.toggle('visible', isEmpty);
+        refuelWrap.style.display = isEmpty ? 'none' : '';
+    }
+
+    if (isEmpty) {
+        if (!emptyEl) {
+            tbody.innerHTML = '<tr><td colspan="12" class="text-center">Nenhum abastecimento encontrado</td></tr>';
+        }
         return;
     }
-    tbody.innerHTML = '';
-    
-    if (refuelings && refuelings.length > 0) {
-        refuelings.forEach(refuel => {
-            console.log('Dados da rota para abastecimento:', {
-                id: refuel.id,
-                origem: refuel.cidade_origem_nome,
-                destino: refuel.cidade_destino_nome,
-                rota_id: refuel.rota_id
-            });
-            
-            const row = document.createElement('tr');
-            const valorTotalAbastecimento = (() => {
-                const valorBase = parseFloat(refuel.valor_total || 0);
-                if (refuel.inclui_arla == 1) {
-                    const valorArla = parseFloat(refuel.valor_total_arla || 0);
-                    return valorBase + valorArla;
+
+    refuelings.forEach(refuel => {
+        const row = document.createElement('tr');
+        const valorTotalAbastecimento = (() => {
+            const valorBase = parseFloat(refuel.valor_total || 0);
+            if (refuel.inclui_arla == 1) {
+                return valorBase + parseFloat(refuel.valor_total_arla || 0);
+            }
+            return valorBase;
+        })();
+        const rotaInfo = (refuel.cidade_origem_nome && refuel.cidade_destino_nome)
+            ? escapeHtmlAbast(refuel.cidade_origem_nome) + ' → ' + escapeHtmlAbast(refuel.cidade_destino_nome)
+            : '-';
+
+        row.innerHTML = `
+            <td${dc('data')}>${formatDate(refuel.data_abastecimento)}</td>
+            <td${dc('veiculo')}>${escapeHtmlAbast(refuel.veiculo_placa) || '-'}</td>
+            <td${dc('motorista')}>${escapeHtmlAbast(refuel.motorista_nome) || '-'}</td>
+            <td${dc('posto')}>${escapeHtmlAbast(refuel.posto) || '-'}</td>
+            <td${dc('litros')}>${formatNumber(refuel.litros, 3)} L</td>
+            <td${dc('valor_litro')}>R$ ${formatNumber(refuel.valor_litro, 2)}</td>
+            <td${dc('valor_total')}>R$ ${formatNumber(valorTotalAbastecimento, 2)}</td>
+            <td class="col-arla"${dc('arla')}>
+                ${refuel.inclui_arla == 1 ?
+                    (() => {
+                        const percentual = refuel.litros > 0 ? (refuel.litros_arla / refuel.litros) * 100 : 0;
+                        let classePercentual = percentual >= 3 && percentual <= 5 ? 'percentual-ok' : (percentual > 5 ? 'percentual-alto' : 'percentual-baixo');
+                        const titleAttr = formatArlaPercentTitle(percentual).replace(/"/g, '&quot;');
+                        return '<span class="percentual-arla ' + classePercentual + '" title="' + titleAttr + '">' + formatArlaPercentDisplay(percentual) + '</span>';
+                    })() :
+                    '<span class="text-muted">-</span>'
                 }
-                return valorBase;
-            })();
-            const rotaInfo = (refuel.cidade_origem_nome && refuel.cidade_destino_nome) 
-                ? `${refuel.cidade_origem_nome} → ${refuel.cidade_destino_nome}`
-                : '-';
-                
-            row.innerHTML = `
-                <td>${formatDate(refuel.data_abastecimento)}</td>
-                <td>${refuel.veiculo_placa || '-'}</td>
-                <td>${refuel.motorista_nome || '-'}</td>
-                <td>${refuel.posto || '-'}</td>
-                <td>${formatNumber(refuel.litros, 3)} L</td>
-                <td>R$ ${formatNumber(refuel.valor_litro, 2)}</td>
-                <td>R$ ${formatNumber(valorTotalAbastecimento, 2)}</td>
-                <td class="col-arla">
-                    ${refuel.inclui_arla == 1 ? 
-                        (() => {
-                            const percentual = refuel.litros > 0 ? (refuel.litros_arla / refuel.litros) * 100 : 0;
-                            let classePercentual = '';
-                            if (percentual >= 3 && percentual <= 5) {
-                                classePercentual = 'percentual-ok';
-                            } else if (percentual > 5) {
-                                classePercentual = 'percentual-alto';
-                            } else {
-                                classePercentual = 'percentual-baixo';
-                            }
-                            const titleAttr = formatArlaPercentTitle(percentual).replace(/"/g, '&quot;');
-                            return `<span class="percentual-arla ${classePercentual}" title="${titleAttr}">${formatArlaPercentDisplay(percentual)}</span>`;
-                        })() : 
-                        '<span class="text-muted">-</span>'
-                    }
-                </td>
-                <td>${formatNumber(refuel.km_atual, 0)}</td>
-                <td>${refuel.forma_pagamento || '-'}</td>
-                <td>${rotaInfo}</td>
-                <td class="actions">
-                    <button class="btn-icon edit-btn" data-id="${refuel.id}" title="Editar">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    ${refuel.comprovante ? `
-                        <button class="btn-icon view-comprovante-btn" data-comprovante="${refuel.comprovante}" title="Ver Comprovante">
-                            <i class="fas fa-file-alt"></i>
-                        </button>
-                    ` : ''}
-                    <button class="btn-icon delete-btn" data-id="${refuel.id}" title="Excluir">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            `;
-            tbody.appendChild(row);
-        });
-        
-        // Configura eventos dos botões
-        setupTableButtons();
-    } else {
-        tbody.innerHTML = '<tr><td colspan="12" class="text-center">Nenhum abastecimento encontrado</td></tr>';
-    }
-    console.log('Tabela atualizada!');
+            </td>
+            <td${dc('km')}>${formatNumber(refuel.km_atual, 0)}</td>
+            <td${dc('pagamento')}>${escapeHtmlAbast(refuel.forma_pagamento) || '-'}</td>
+            <td${dc('rota')}>${rotaInfo}</td>
+            <td class="actions">
+                <button class="btn-icon edit-btn" data-id="${refuel.id}" title="Editar"><i class="fas fa-edit"></i></button>
+                ${refuel.comprovante ? '<button class="btn-icon view-comprovante-btn" data-comprovante="' + escapeHtmlAbast(refuel.comprovante) + '" title="Ver Comprovante"><i class="fas fa-file-alt"></i></button>' : ''}
+                <button class="btn-icon delete-btn" data-id="${refuel.id}" title="Excluir"><i class="fas fa-trash"></i></button>
+            </td>`;
+        tbody.appendChild(row);
+    });
 }
 
 function setupArlaFields() {
@@ -709,8 +1009,8 @@ function setupArlaFields() {
     const valorTotalArlaInput = document.getElementById('valor_total_arla');
     
     if (!incluiArlaCheckbox || !camposArla) return;
-    
-    // Controla a exibição dos campos ARLA
+    if (_arlaFieldsWired) return;
+    _arlaFieldsWired = true;
     incluiArlaCheckbox.addEventListener('change', function() {
         if (this.checked) {
             camposArla.style.display = 'grid';
@@ -794,12 +1094,14 @@ function setupArlaFields() {
 }
 
 function setupValorTotalCalc() {
+    if (_valorTotalCalcWired) return;
     const litrosInput = document.getElementById('litros');
     const valorLitroInput = document.getElementById('valor_litro');
     const valorTotalInput = document.getElementById('valor_total');
+    if (!litrosInput || !valorLitroInput || !valorTotalInput) return;
+    _valorTotalCalcWired = true;
 
     function formatarNumero(valor) {
-        // Remove pontos e troca vírgula por ponto para cálculo
         return parseFloat(valor.toString().replace(/\./g, '').replace(',', '.')) || 0;
     }
 
@@ -869,134 +1171,23 @@ function setupValorTotalCalc() {
 }
 
 function showEditRefuelModal(id) {
-    // Limpa o formulário
     document.getElementById('refuelForm').reset();
-    
-    // Busca os dados do abastecimento
-    fetch(sfApiUrl(`refuel_data.php?action=get&id=${id}`))
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                const refuel = data.data;
-                
-                // Preenche o formulário
-                document.getElementById('refuelId').value = refuel.id;
-                document.getElementById('data_rota_filtro').value = refuel.data_rota ? refuel.data_rota.split('T')[0] : '';
-                document.getElementById('data_abastecimento').value = refuel.data_abastecimento.replace(' ', 'T');
-                
-                // Preencher select de veículo apenas com o valor do banco
-                const veiculoSelect = document.getElementById('veiculo_id');
-                veiculoSelect.innerHTML = '<option value="">Selecione um veículo</option>';
-                if (refuel.veiculo_id) {
-                    const option = document.createElement('option');
-                    option.value = refuel.veiculo_id;
-                    option.textContent = refuel.veiculo_placa ? `${refuel.veiculo_placa} - ${refuel.veiculo_modelo || ''}` : `Veículo #${refuel.veiculo_id}`;
-                    veiculoSelect.appendChild(option);
-                    veiculoSelect.value = refuel.veiculo_id;
-                }
-
-                // Preencher select de motorista apenas com o valor do banco
-                const motoristaSelect = document.getElementById('motorista_id');
-                motoristaSelect.innerHTML = '<option value="">Selecione um motorista</option>';
-                if (refuel.motorista_id) {
-                    const option = document.createElement('option');
-                    option.value = refuel.motorista_id;
-                    option.textContent = refuel.motorista_nome || `Motorista #${refuel.motorista_id}`;
-                    motoristaSelect.appendChild(option);
-                    motoristaSelect.value = refuel.motorista_id;
-                }
-
-                // Preencher select de rota apenas com o valor do banco
-                const rotaSelect = document.getElementById('rota_id');
-                rotaSelect.innerHTML = '<option value="">Selecione a rota</option>';
-                if (refuel.rota_id) {
-                    const option = document.createElement('option');
-                    option.value = refuel.rota_id;
-                    option.textContent = refuel.cidade_origem_nome && refuel.cidade_destino_nome ? 
-                        `${refuel.cidade_origem_nome} → ${refuel.cidade_destino_nome}` : 
-                        `Rota #${refuel.rota_id}`;
-                    rotaSelect.appendChild(option);
-                    rotaSelect.value = refuel.rota_id;
-                }
-                
-                document.getElementById('tipo_combustivel').value = refuel.tipo_combustivel;
-                
-                // Formata os valores numéricos corretamente
-                document.getElementById('litros').value = Number(refuel.litros).toLocaleString('pt-BR', {
-                    minimumFractionDigits: 3,
-                    maximumFractionDigits: 3
-                });
-                document.getElementById('valor_litro').value = Number(refuel.valor_litro).toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-                document.getElementById('valor_total').value = Number(refuel.valor_total).toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-                
-                document.getElementById('km_atual').value = refuel.km_atual;
-                document.getElementById('posto').value = refuel.posto;
-                document.getElementById('forma_pagamento').value = refuel.forma_pagamento;
-                document.getElementById('observacoes').value = refuel.observacoes || '';
-                
-                // Preencher campos ARLA
-                const incluiArlaCheckbox = document.getElementById('inclui_arla');
-                const camposArla = document.getElementById('campos_arla');
-                
-                if (refuel.inclui_arla == 1) {
-                    incluiArlaCheckbox.checked = true;
-                    camposArla.style.display = 'grid';
-                    
-                    // Formata os valores ARLA
-                    document.getElementById('litros_arla').value = Number(refuel.litros_arla || 0).toLocaleString('pt-BR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    });
-                    document.getElementById('valor_litro_arla').value = Number(refuel.valor_litro_arla || 0).toLocaleString('pt-BR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    });
-                    document.getElementById('valor_total_arla').value = Number(refuel.valor_total_arla || 0).toLocaleString('pt-BR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2
-                    });
-                } else {
-                    incluiArlaCheckbox.checked = false;
-                    camposArla.style.display = 'none';
-                }
-                
-                // Exibe o comprovante atual se existir
-                const comprovanteAtual = document.getElementById('comprovante_atual');
-                if (refuel.comprovante) {
-                    comprovanteAtual.innerHTML = `
-                        <div class="current-file">
-                            <i class="fas fa-file-alt"></i>
-                            <a href="../${refuel.comprovante}" target="_blank">Ver comprovante atual</a>
-                        </div>
-                    `;
-                } else {
-                    comprovanteAtual.innerHTML = '';
-                }
-                
-                // Atualiza o título do modal
-                document.getElementById('modalTitle').textContent = 'Editar Abastecimento';
-                
-                // Configura os cálculos automáticos
-                setupValorTotalCalc();
-                
-                // Configura campos ARLA
-                setupArlaFields();
-                
-                // Exibe o modal
-                document.getElementById('refuelModal').classList.add('active');
-            } else {
-                showError(data.error || 'Erro ao carregar dados do abastecimento');
+    fetch(sfApiUrl(`refuel_data.php?action=get&id=${encodeURIComponent(id)}`))
+        .then(function (response) { return response.json(); })
+        .then(async function (data) {
+            if (!data.success) {
+                throw new Error(data.error || 'Erro ao carregar dados do abastecimento');
             }
+            await window.openEditRefuelModal(data.data);
         })
-        .catch(error => {
+        .catch(function (error) {
             console.error('Erro:', error);
-            showError('Erro ao carregar dados do abastecimento');
+            var msg = error && error.message ? error.message : String(error);
+            if (typeof showToast === 'function') {
+                showToast(msg, 'error');
+            } else if (typeof showError === 'function') {
+                showError(msg);
+            }
         });
 }
 
@@ -1052,22 +1243,22 @@ function updateRefuelTable(refuels) {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${formatDate(refuel.data_abastecimento)}</td>
-            <td>${refuel.veiculo_placa || '-'}</td>
-            <td>${refuel.motorista_nome || '-'}</td>
-            <td>${refuel.posto || '-'}</td>
-            <td>${refuel.tipo_combustivel || '-'}</td>
+            <td>${escapeHtmlAbast(refuel.veiculo_placa) || '-'}</td>
+            <td>${escapeHtmlAbast(refuel.motorista_nome) || '-'}</td>
+            <td>${escapeHtmlAbast(refuel.posto) || '-'}</td>
+            <td>${escapeHtmlAbast(refuel.tipo_combustivel) || '-'}</td>
             <td>${formatNumber(refuel.litros)}</td>
             <td>R$ ${formatCurrency(refuel.valor_litro)}</td>
             <td>R$ ${formatCurrency(refuel.valor_total)}</td>
             <td>${formatNumber(refuel.km_atual)}</td>
-            <td>${refuel.forma_pagamento || '-'}</td>
-            <td>${refuel.rota_id || '-'}</td>
+            <td>${escapeHtmlAbast(refuel.forma_pagamento) || '-'}</td>
+            <td>${escapeHtmlAbast(refuel.rota_id) || '-'}</td>
             <td class="actions">
                 <button class="btn-icon edit-btn" data-id="${refuel.id}" title="Editar">
                     <i class="fas fa-edit"></i>
                 </button>
                 ${refuel.comprovante ? `
-                    <button class="btn-icon view-comprovante-btn" data-comprovante="${refuel.comprovante}" title="Ver Comprovante">
+                    <button class="btn-icon view-comprovante-btn" data-comprovante="${escapeHtmlAbast(refuel.comprovante)}" title="Ver Comprovante">
                         <i class="fas fa-file-alt"></i>
                     </button>
                 ` : ''}
@@ -1083,31 +1274,34 @@ function updateRefuelTable(refuels) {
     setupTableButtons();
 }
 
-function setupTableButtons() {
-    // Setup edit buttons
-    document.querySelectorAll('.btn-icon.edit-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const id = this.getAttribute('data-id');
-            showEditRefuelModal(id);
-        });
-    });
-    
-    // Setup delete buttons
-    document.querySelectorAll('.btn-icon.delete-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const id = this.getAttribute('data-id');
-            showDeleteConfirmation(id);
-        });
-    });
+let _abastTableButtonsWired = false;
 
-    // Setup view comprovante buttons
-    document.querySelectorAll('.btn-icon.view-comprovante-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const comprovante = this.getAttribute('data-comprovante');
-            if (comprovante) {
-                window.open('../' + comprovante, '_blank');
+function setupTableButtons() {
+    const table = document.getElementById('refuelingTable');
+    if (!table || _abastTableButtonsWired) return;
+    _abastTableButtonsWired = true;
+    table.addEventListener('click', function (e) {
+        const editBtn = e.target.closest('.edit-btn');
+        if (editBtn) {
+            e.preventDefault();
+            showEditRefuelModal(editBtn.getAttribute('data-id'));
+            return;
+        }
+        const delBtn = e.target.closest('.delete-btn');
+        if (delBtn) {
+            e.preventDefault();
+            showDeleteConfirmation(delBtn.getAttribute('data-id'));
+            return;
+        }
+        const compBtn = e.target.closest('.view-comprovante-btn');
+        if (compBtn) {
+            e.preventDefault();
+            const comprovante = compBtn.getAttribute('data-comprovante') || '';
+            if (comprovante && !/^\s*javascript:/i.test(comprovante)) {
+                const href = /^(https?:|\/)/i.test(comprovante) ? comprovante : '../' + comprovante.replace(/^\.\.\//, '');
+                window.open(href, '_blank', 'noopener');
             }
-        });
+        }
     });
 }
 
@@ -1304,11 +1498,16 @@ function loadAnomaliesChart() {
                 throw new Error(data.error || 'Erro ao carregar dados do gráfico de anomalias');
             }
 
+            if (!data.data || !data.data.length) {
+                return;
+            }
+
             const ctx = document.getElementById('anomaliesChart').getContext('2d');
             
-            // Calcula a média de valor por litro
-            const valores = data.data.map(item => parseFloat(item.valor_litro));
+            const valores = data.data.map(item => parseFloat(item.valor_litro)).filter(v => !Number.isNaN(v));
+            if (!valores.length) return;
             const mediaValor = valores.reduce((a, b) => a + b, 0) / valores.length;
+            const maxLitros = Math.max.apply(null, data.data.map(item => parseFloat(item.litros) || 0));
             
             // Calcula o desvio padrão
             const desvioPadrao = Math.sqrt(
@@ -1335,7 +1534,7 @@ function loadAnomaliesChart() {
                             label: 'Média',
                             data: [
                                 { x: 0, y: mediaValor },
-                                { x: Math.max(...data.data.map(item => parseFloat(item.litros))), y: mediaValor }
+                                { x: Math.max(maxLitros, 1), y: mediaValor }
                             ],
                             type: 'line',
                             borderColor: 'rgba(255, 99, 132, 1)',
@@ -1347,7 +1546,7 @@ function loadAnomaliesChart() {
                             label: 'Limite Superior',
                             data: [
                                 { x: 0, y: mediaValor + desvioPadrao },
-                                { x: Math.max(...data.data.map(item => parseFloat(item.litros))), y: mediaValor + desvioPadrao }
+                                { x: Math.max(maxLitros, 1), y: mediaValor + desvioPadrao }
                             ],
                             type: 'line',
                             borderColor: 'rgba(255, 99, 132, 0.5)',
@@ -1360,7 +1559,7 @@ function loadAnomaliesChart() {
                             label: 'Limite Inferior',
                             data: [
                                 { x: 0, y: mediaValor - desvioPadrao },
-                                { x: Math.max(...data.data.map(item => parseFloat(item.litros))), y: mediaValor - desvioPadrao }
+                                { x: Math.max(maxLitros, 1), y: mediaValor - desvioPadrao }
                             ],
                             type: 'line',
                             borderColor: 'rgba(255, 99, 132, 0.5)',
@@ -1709,10 +1908,11 @@ function loadMonthlyCostChart() {
 
 function setupFilters() {
     const filterMonthInput = document.getElementById('filterMonth');
-    if (filterMonthInput) {
+    if (filterMonthInput && !currentFilter) {
         filterMonthInput.value = '';
+    } else if (filterMonthInput && currentFilter) {
+        filterMonthInput.value = currentFilter;
     }
-    currentFilter = null;
     updateFilterButtonState();
 
     // Setup filter modal buttons
@@ -1763,29 +1963,17 @@ function setupFilters() {
     });
 }
 
-// Atualiza a função initializePage para garantir que os gráficos sejam carregados corretamente
 function initializePage() {
-    const upInit = new URLSearchParams(window.location.search);
-    if (upInit.has('sort')) {
-        refuelSortField = upInit.get('sort') || refuelSortField;
-    }
-    if (upInit.has('dir')) {
-        refuelSortDir = (upInit.get('dir') || '').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-    }
-    if (typeof syncRefuelSortIndicators === 'function') {
-        syncRefuelSortIndicators();
-    }
+    restoreRefuelFiltersFromUrl();
+    syncRefuelSortIndicators();
+    wireRefuelSortHeaders();
 
-    // Load refuel data from API
     loadRefuelingData();
-    
-    // Load summary data
     loadRefuelingSummary();
-
-    // Load filter options
     loadFilterOptions();
-    
-    // Load all charts
+
+    setupRefuelAnomalies();
+
     Promise.all([
         loadConsumptionChart(),
         loadEfficiencyChart(),
@@ -1793,23 +1981,21 @@ function initializePage() {
         loadDriverConsumptionChart(),
         loadVehicleEfficiencyChart(),
         loadMonthlyCostChart()
-    ]).catch(error => {
-        console.error('Erro ao carregar gráficos iniciais:', error);
+    ]).catch(function (error) {
+        if (window.__SF_DEBUG__) console.error('Erro ao carregar gráficos iniciais:', error);
     });
-    
-    // Setup button events
-    document.getElementById('addRefuelBtn').addEventListener('click', showAddRefuelModal);
-    document.getElementById('filterBtn').addEventListener('click', showFilterModal);
-    document.getElementById('helpBtn').addEventListener('click', showHelpModal);
-    
-    // Setup search
+
+    var addBtn = document.getElementById('addRefuelBtn');
+    if (addBtn) addBtn.addEventListener('click', showAddRefuelModal);
+    var emptyCreate = document.getElementById('refuelEmptyCreateBtn');
+    if (emptyCreate) emptyCreate.addEventListener('click', showAddRefuelModal);
+    var filterBtn = document.getElementById('filterBtn');
+    if (filterBtn) filterBtn.addEventListener('click', showFilterModal);
+
     const searchInput = document.getElementById('searchRefueling');
     if (searchInput) {
-    searchInput.addEventListener('input', debounce(() => {
-            loadRefuelingData(1);
-    }, 300));
-
-        searchInput.addEventListener('keydown', event => {
+        searchInput.addEventListener('input', debounce(function () { loadRefuelingData(1); }, 300));
+        searchInput.addEventListener('keydown', function (event) {
             if (event.key === 'Enter') {
                 event.preventDefault();
                 loadRefuelingData(1);
@@ -1819,90 +2005,97 @@ function initializePage() {
 
     const applyFiltersBtn = document.getElementById('applyRefuelFilters');
     if (applyFiltersBtn) {
-        applyFiltersBtn.addEventListener('click', () => {
-            loadRefuelingData(1);
-        });
+        applyFiltersBtn.addEventListener('click', function () { loadRefuelingData(1); });
     }
 
     const clearFiltersBtn = document.getElementById('clearRefuelFilters');
     if (clearFiltersBtn) {
-        clearFiltersBtn.addEventListener('click', () => {
+        clearFiltersBtn.addEventListener('click', function () {
             if (searchInput) searchInput.value = '';
-            const vehicleFilter = document.getElementById('vehicleFilter');
-            const driverFilter = document.getElementById('driverFilter');
-            const fuelFilter = document.getElementById('fuelFilter');
-            const paymentFilter = document.getElementById('paymentFilter');
-            const filterMonthInput = document.getElementById('filterMonth');
-
-            if (vehicleFilter) vehicleFilter.value = '';
-            if (driverFilter) driverFilter.value = '';
-            if (fuelFilter) fuelFilter.value = '';
-            if (paymentFilter) paymentFilter.value = '';
+            ['vehicleFilter', 'driverFilter', 'fuelFilter', 'paymentFilter'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            var filterMonthInput = document.getElementById('filterMonth');
             if (filterMonthInput) filterMonthInput.value = '';
-
             currentFilter = null;
             refuelingCurrentPage = 1;
             updateFilterButtonState();
-
             loadRefuelingData(1);
         });
     }
 
     const perPageRefuelEl = document.getElementById('perPageRefuel');
-    if (perPageRefuelEl && document.body.classList.contains('abastecimentos-modern')) {
-        perPageRefuelEl.addEventListener('change', () => loadRefuelingData(1));
+    if (perPageRefuelEl) {
+        perPageRefuelEl.addEventListener('change', function () {
+            refuelPerPageInUrl = true;
+            loadRefuelingData(1);
+        });
     }
-    
-    // Setup table buttons
+
     setupTableButtons();
 }
 
 function loadFilterOptions() {
+    var cacheKey = 'abastecimentos_filter_options';
+    var cacheTtl = 5 * 60 * 1000;
+    try {
+        var cached = sessionStorage.getItem(cacheKey);
+        if (cached) {
+            var parsed = JSON.parse(cached);
+            if (parsed && parsed.ts && (Date.now() - parsed.ts < cacheTtl) && parsed.data) {
+                applyFilterOptionsData({ success: true, data: parsed.data });
+                return;
+            }
+        }
+    } catch (e) { /* ignore */ }
     fetch(sfApiUrl('refuel_data.php?action=filter_options'), { credentials: 'include' })
         .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
+            if (!response.ok) throw new Error('HTTP ' + response.status);
             return response.json();
         })
         .then(data => {
-            if (!data.success || !data.data) return;
-
-            const { vehicles = [], drivers = [] } = data.data;
-
-            const vehicleFilter = document.getElementById('vehicleFilter');
-            if (vehicleFilter) {
-                const currentValue = vehicleFilter.value;
-                vehicleFilter.innerHTML = '<option value="">Todos os veículos</option>';
-                vehicles.forEach(vehicle => {
-                    const option = document.createElement('option');
-                    option.value = vehicle.id;
-                    option.textContent = vehicle.placa + (vehicle.modelo ? ` - ${vehicle.modelo}` : '');
-                    vehicleFilter.appendChild(option);
-                });
-                if (currentValue) {
-                    vehicleFilter.value = currentValue;
-                }
-            }
-
-            const driverFilter = document.getElementById('driverFilter');
-            if (driverFilter) {
-                const currentValue = driverFilter.value;
-                driverFilter.innerHTML = '<option value="">Todos os motoristas</option>';
-                drivers.forEach(driver => {
-                    const option = document.createElement('option');
-                    option.value = driver.id;
-                    option.textContent = driver.nome;
-                    driverFilter.appendChild(option);
-                });
-                if (currentValue) {
-                    driverFilter.value = currentValue;
-                }
+            if (data.success && data.data) {
+                try {
+                    sessionStorage.setItem(cacheKey, JSON.stringify({ data: data.data, ts: Date.now() }));
+                } catch (e) { /* ignore */ }
+                applyFilterOptionsData(data);
             }
         })
         .catch(error => {
-            console.error('Erro ao carregar opções de filtro:', error);
+            if (window.__SF_DEBUG__) console.error('Erro ao carregar opções de filtro:', error);
         });
+}
+
+function applyFilterOptionsData(data) {
+    if (!data.success || !data.data) return;
+    const { vehicles = [], drivers = [] } = data.data;
+
+    const vehicleFilter = document.getElementById('vehicleFilter');
+    if (vehicleFilter) {
+        const currentValue = vehicleFilter.value;
+        vehicleFilter.innerHTML = '<option value="">Todos os veículos</option>';
+        vehicles.forEach(vehicle => {
+            const option = document.createElement('option');
+            option.value = vehicle.id;
+            option.textContent = vehicle.placa + (vehicle.modelo ? ' - ' + vehicle.modelo : '');
+            vehicleFilter.appendChild(option);
+        });
+        if (currentValue) vehicleFilter.value = currentValue;
+    }
+
+    const driverFilter = document.getElementById('driverFilter');
+    if (driverFilter) {
+        const currentValue = driverFilter.value;
+        driverFilter.innerHTML = '<option value="">Todos os motoristas</option>';
+        drivers.forEach(driver => {
+            const option = document.createElement('option');
+            option.value = driver.id;
+            option.textContent = driver.nome;
+            driverFilter.appendChild(option);
+        });
+        if (currentValue) driverFilter.value = currentValue;
+    }
 }
 
 function carregarMotoristas(veiculoId, data) {
@@ -1943,4 +2136,313 @@ function carregarRotasPorAbastecimento(refuel) {
                 throw new Error(data.error || 'Erro ao carregar rotas');
             }
         });
-} 
+}
+
+function loadRefuelingSummary() {
+    let url = sfApiUrl('refuel_data.php?action=summary');
+    if (currentFilter) {
+        const parts = currentFilter.split('-');
+        url += '&year=' + parts[0] + '&month=' + parts[1];
+    }
+    return fetch(url, { credentials: 'include' })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) throw new Error(data.error || 'Erro ao carregar resumo');
+            updateMetricCards(data.data);
+        })
+        .catch(function (error) {
+            if (window.__SF_DEBUG__) console.error('Error loading refueling summary:', error);
+        });
+}
+
+function updateMetricCards(data) {
+    function setText(id, text) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+    if (!data) return;
+    setText('refuelKpiAbastecimentos', formatNumber(data.total_abastecimentos, 0));
+    setText('refuelKpiLitros', formatNumber(data.total_litros, 2) + ' L');
+    setText('refuelKpiValor', 'R$ ' + formatNumber(data.total_gasto, 2));
+    setText('refuelKpiMediaLitro', 'R$ ' + formatNumber(data.media_valor_litro, 2) + '/L');
+}
+
+function showDeleteConfirmation(refuelId) {
+    fetch(sfApiUrl('refuel_data.php?action=get&id=' + encodeURIComponent(refuelId)), { credentials: 'include' })
+        .then(function (response) {
+            if (!response.ok) {
+                return response.json().then(function (data) {
+                    throw new Error(data.error || 'Erro ao carregar dados');
+                });
+            }
+            return response.json();
+        })
+        .then(function (data) {
+            if (!data.success) throw new Error(data.error || 'Erro ao carregar dados');
+            var refuel = data.data;
+            var msgEl = document.getElementById('deleteConfirmMessage');
+            if (msgEl) {
+                msgEl.textContent = 'Deseja realmente excluir o abastecimento do veículo ' + (refuel.veiculo_placa || '') + ' realizado em ' + formatDate(refuel.data_abastecimento) + '?';
+            }
+            pendingDeleteId = refuelId;
+            var modal = document.getElementById('deleteConfirmModal');
+            if (modal) modal.classList.add('active');
+        })
+        .catch(function (error) {
+            showToast('Erro ao carregar dados: ' + (error.message || 'Erro'), 'error');
+        });
+}
+
+function deleteRefuel(refuelId) {
+    const fd = new FormData();
+    fd.append('action', 'delete');
+    fd.append('id', refuelId);
+    if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__) {
+        fd.append('csrf_token', window.__SF_CSRF__);
+    }
+    fetch(sfApiUrl('refuel_actions.php'), {
+        method: 'POST',
+        body: fd,
+        credentials: 'include',
+        headers: typeof sfMutationHeaders === 'function' ? sfMutationHeaders() : {}
+    })
+        .then(function (response) {
+            if (!response.ok) {
+                return response.json().then(function (data) { throw new Error(data.error || 'Erro ao excluir'); });
+            }
+            return response.json();
+        })
+        .then(function (data) {
+            if (!data.success) throw new Error(data.error || 'Erro ao excluir');
+            showToast(data.message || 'Abastecimento excluído.', 'success');
+            loadRefuelingData();
+            loadRefuelingSummary();
+            loadConsumptionChart();
+            loadEfficiencyChart();
+            loadAnomaliesChart();
+            loadDriverConsumptionChart();
+            loadVehicleEfficiencyChart();
+            loadMonthlyCostChart();
+        })
+        .catch(function (error) {
+            showToast('Erro ao excluir: ' + (error.message || 'Erro'), 'error');
+        });
+}
+
+function closeAllModals() {
+    document.querySelectorAll('.modal').forEach(function (modal) { modal.classList.remove('active'); });
+}
+
+function setupModals() {
+    document.querySelectorAll('.close-modal').forEach(function (button) {
+        button.addEventListener('click', closeAllModals);
+    });
+    var cancelBtn = document.getElementById('cancelRefuelBtn');
+    if (cancelBtn) cancelBtn.addEventListener('click', closeAllModals);
+    document.querySelectorAll('.modal').forEach(function (modal) {
+        modal.addEventListener('click', function (e) {
+            if (e.target === modal) closeAllModals();
+        });
+    });
+}
+
+function showAddRefuelModal() {
+    document.getElementById('refuelForm').reset();
+    document.getElementById('refuelId').value = '';
+    document.getElementById('modalTitle').textContent = 'Adicionar Abastecimento';
+    document.getElementById('refuelModal').classList.add('active');
+    var now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    document.getElementById('data_abastecimento').value = now.toISOString().slice(0, 16);
+    var veiculo = document.getElementById('veiculo_id');
+    var motorista = document.getElementById('motorista_id');
+    var rota = document.getElementById('rota_id');
+    if (veiculo) { veiculo.innerHTML = '<option value="">Selecione um veículo</option>'; veiculo.disabled = true; }
+    if (motorista) { motorista.innerHTML = '<option value="">Selecione um motorista</option>'; motorista.disabled = true; }
+    if (rota) { rota.innerHTML = '<option value="">Selecione a rota</option>'; rota.disabled = true; }
+    setupValorTotalCalc();
+    setupArlaFields();
+    setupNumericInputs();
+}
+
+function setupNumericInputs() {
+    if (_numericInputsWired) return;
+    _numericInputsWired = true;
+    document.querySelectorAll('.numeric-input').forEach(function (input) {
+        if (input.value) {
+            var numericValue = parseFloat(input.value.replace(',', '.'));
+            if (!isNaN(numericValue)) {
+                input.value = numericValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+        }
+        input.addEventListener('input', function (e) {
+            var value = e.target.value.replace(/[^\d,.]/g, '').replace(/\./g, '');
+            var parts = value.split(',');
+            if (parts.length > 2) value = parts[0] + ',' + parts.slice(1).join('');
+            e.target.value = value;
+        });
+    });
+}
+
+function showFilterModal() {
+    var m = document.getElementById('filterModal');
+    if (m) m.classList.add('active');
+}
+
+function formatMonthYear(dateString) {
+    var parts = dateString.split('-');
+    var date = new Date(parts[0], parts[1] - 1);
+    return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+}
+
+function updateFilterButtonState() {
+    var filterBtn = document.getElementById('filterBtn');
+    if (!filterBtn) return;
+    if (currentFilter) {
+        filterBtn.classList.add('active');
+        filterBtn.title = 'Filtro: ' + formatMonthYear(currentFilter);
+    } else {
+        filterBtn.classList.remove('active');
+        filterBtn.title = 'Filtros';
+    }
+}
+
+function showFilterModal() {
+    var m = document.getElementById('filterModal');
+    if (m) m.classList.add('active');
+}
+
+async function validarKmAbastecimento(rotaId, kmAbastecimento) {
+    if (!rotaId || !kmAbastecimento) return { valido: false, mensagem: 'Dados insuficientes para validação' };
+    try {
+        var formData = new FormData();
+        formData.append('action', 'validar_km_abastecimento');
+        formData.append('rota_id', rotaId);
+        formData.append('km_abastecimento', kmAbastecimento);
+        var response = await fetch(sfApiUrl('validar_quilometragem.php'), { method: 'POST', body: formData });
+        return await response.json();
+    } catch (e) {
+        return { valido: false, mensagem: 'Erro na validação' };
+    }
+}
+
+async function obterAbastecimentosRota(rotaId) {
+    if (!rotaId) return null;
+    try {
+        var response = await fetch(sfApiUrl('validar_quilometragem.php?action=obter_abastecimentos_rota&rota_id=' + encodeURIComponent(rotaId)));
+        var data = await response.json();
+        return data.success ? data : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function configurarValidacaoKmAbastecimento() {
+    var rotaSelect = document.getElementById('rota_id');
+    var kmAtualInput = document.getElementById('km_atual');
+    var kmAtualHelp = document.getElementById('km_atual_help');
+    var kmAtualValidation = document.getElementById('km_atual_validation');
+    if (!rotaSelect || !kmAtualInput || rotaSelect.dataset.kmValWired === '1') return;
+    rotaSelect.dataset.kmValWired = '1';
+
+    rotaSelect.addEventListener('change', async function () {
+        var rotaId = this.value;
+        if (rotaId && kmAtualHelp) {
+            var dadosRota = await obterAbastecimentosRota(rotaId);
+            if (dadosRota) {
+                var minValue = dadosRota.total_abastecimentos > 0 ? dadosRota.km_ultimo_abastecimento + 1 : dadosRota.km_saida_rota + 1;
+                kmAtualHelp.textContent = 'KM saída: ' + dadosRota.km_saida_rota.toLocaleString('pt-BR') + ' km. Mínimo: ' + minValue.toLocaleString('pt-BR') + ' km';
+                kmAtualInput.placeholder = 'Mín: ' + minValue.toLocaleString('pt-BR');
+                kmAtualInput.min = minValue;
+            }
+        } else if (kmAtualHelp) {
+            kmAtualHelp.textContent = 'Selecione uma rota para validar a quilometragem';
+            kmAtualInput.placeholder = 'Ex: 150000';
+            kmAtualInput.min = '';
+        }
+        if (kmAtualValidation) kmAtualValidation.textContent = '';
+    });
+
+    kmAtualInput.addEventListener('blur', async function () {
+        var rotaId = rotaSelect.value;
+        var kmAbastecimento = this.value;
+        if (!kmAtualValidation) return;
+        if (rotaId && kmAbastecimento) {
+            var validacao = await validarKmAbastecimento(rotaId, kmAbastecimento);
+            var msg = validacao.mensagem || '';
+            if (validacao.valido) {
+                kmAtualValidation.textContent = msg;
+                kmAtualValidation.style.color = '#28a745';
+                kmAtualInput.style.borderColor = '#28a745';
+            } else {
+                kmAtualValidation.textContent = msg;
+                kmAtualValidation.style.color = '#dc3545';
+                kmAtualInput.style.borderColor = '#dc3545';
+            }
+        } else {
+            kmAtualValidation.textContent = '';
+            kmAtualInput.style.borderColor = '';
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.__abastPageInitDone) return;
+    window.__abastPageInitDone = true;
+
+    var exportBtn = document.getElementById('exportBtn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', function () {
+            var params = new URLSearchParams();
+            var search = document.getElementById('searchRefueling');
+            if (search && search.value.trim()) params.set('search', search.value.trim());
+            var v = document.getElementById('vehicleFilter'); if (v && v.value) params.set('veiculo', v.value);
+            var d = document.getElementById('driverFilter'); if (d && d.value) params.set('motorista', d.value);
+            var f = document.getElementById('fuelFilter'); if (f && f.value) params.set('combustivel', f.value);
+            var p = document.getElementById('paymentFilter'); if (p && p.value) params.set('pagamento', p.value);
+            if (currentFilter) {
+                var parts = currentFilter.split('-');
+                if (parts.length === 2) { params.set('year', parts[0]); params.set('month', parts[1]); }
+            }
+            window.open(sfApiUrl('refuel_export.php?' + params.toString()), '_blank');
+            showToast('Exportação iniciada.', 'info');
+        });
+    }
+
+    var deleteModal = document.getElementById('deleteConfirmModal');
+    function closeDeleteModal() {
+        if (deleteModal) deleteModal.classList.remove('active');
+        pendingDeleteId = null;
+    }
+    var closeDel = document.getElementById('closeDeleteModal');
+    var cancelDel = document.getElementById('cancelDeleteBtn');
+    var confirmDel = document.getElementById('confirmDeleteBtn');
+    if (closeDel) closeDel.addEventListener('click', closeDeleteModal);
+    if (cancelDel) cancelDel.addEventListener('click', closeDeleteModal);
+    if (confirmDel) {
+        confirmDel.addEventListener('click', function () {
+            if (pendingDeleteId) {
+                deleteRefuel(pendingDeleteId);
+                closeDeleteModal();
+            }
+        });
+    }
+
+    if (document.body.classList.contains('abastecimentos-modern') && typeof window.initForncTableColumns === 'function') {
+        window.initForncTableColumns({
+            tableSelector: '#refuelingTable',
+            toggleListSelector: '#refuelColumnsToggleList',
+            storageKey: 'sf_abastecimentos_table_cols_v1',
+            columnsBtnId: 'refuelColumnsBtn',
+            modalId: 'refuelColumnsModal',
+            saveBtnId: 'refuelColumnsSaveBtn'
+        });
+    }
+
+    initializePage();
+    setupModals();
+    setupFilters();
+    requestAnimationFrame(function () {
+        requestAnimationFrame(configurarValidacaoKmAbastecimento);
+    });
+}); 

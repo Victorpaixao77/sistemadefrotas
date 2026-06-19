@@ -23,6 +23,7 @@ if (!isset($ufs) || !is_array($ufs)) {
                         <button type="button" class="route-tab-btn" data-route-tab="4">Seguros</button>
                         <button type="button" class="route-tab-btn" data-route-tab="5">Produto predominante</button>
                         <button type="button" class="route-tab-btn" data-route-tab="6">Totalizadores</button>
+                        <button type="button" class="route-tab-btn" data-route-tab="7">Conformidade</button>
                     </div>
 
                     <form id="novoMDFEWizardForm">
@@ -49,6 +50,19 @@ if (!isset($ufs) || !is_array($ufs)) {
                                             <option value="1">1 - ETC (Empresa de Transporte de Cargas)</option>
                                             <option value="2">2 - TAC (Transportador Autônomo de Cargas)</option>
                                             <option value="3">3 - CTC (Cooperativa de Transporte de Cargas)</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <label for="wizard_veiculo_id" class="form-label">Veículo (frota)</label>
+                                        <select class="form-select" id="wizard_veiculo_id" name="veiculo_id">
+                                            <option value="">Selecione ou informe placa na aba Rodoviário</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="wizard_motorista_id" class="form-label">Motorista principal (frota)</label>
+                                        <select class="form-select" id="wizard_motorista_id" name="motorista_id">
+                                            <option value="">Selecione ou cadastre condutor na aba Rodoviário</option>
                                         </select>
                                     </div>
 
@@ -305,9 +319,14 @@ if (!isset($ufs) || !is_array($ufs)) {
                                 <div class="mdfe-subtab-pane" data-mdfe-rodo-tab="2">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <h6 class="mb-0">CIOT</h6>
-                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="mostrarFormCiotNovoMDFE()">
-                                            <i class="fas fa-plus"></i> Adicionar CIOT
-                                        </button>
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="abrirModalImportarCiotPef()">
+                                                <i class="fas fa-link"></i> Importar do PEF
+                                            </button>
+                                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="mostrarFormCiotNovoMDFE()">
+                                                <i class="fas fa-plus"></i> Adicionar CIOT
+                                            </button>
+                                        </div>
                                     </div>
                                     <div id="rodCiotFormWrap" class="mdfe-inline-form is-hidden">
                                         <div class="row g-3">
@@ -352,7 +371,86 @@ if (!isset($ufs) || !is_array($ufs)) {
                                     </div>
                                 </div>
                                 <div class="mdfe-subtab-pane" data-mdfe-rodo-tab="3">
-                                    <div class="alert alert-info mb-0">Submenu "Reboque" será implementado na próxima fase.</div>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h6 class="mb-0">Reboques</h6>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="mostrarFormReboqueNovoMDFE()">
+                                            <i class="fas fa-plus"></i> Adicionar reboque
+                                        </button>
+                                    </div>
+                                    <div id="rodReboqueFormWrap" class="mdfe-inline-form is-hidden">
+                                        <div class="row g-3">
+                                            <div class="col-md-3">
+                                                <label for="rod_reb_placa" class="form-label">Placa *</label>
+                                                <input type="text" class="form-control" id="rod_reb_placa" maxlength="10">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label for="rod_reb_renavam" class="form-label">RENAVAM</label>
+                                                <input type="text" class="form-control" id="rod_reb_renavam" maxlength="20">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label for="rod_reb_tara" class="form-label">Tara (kg)</label>
+                                                <input type="number" class="form-control" id="rod_reb_tara" min="0" step="1">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label for="rod_reb_cap_kg" class="form-label">Cap. (kg)</label>
+                                                <input type="number" class="form-control" id="rod_reb_cap_kg" min="0" step="1">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label for="rod_reb_uf" class="form-label">UF</label>
+                                                <select class="form-select" id="rod_reb_uf">
+                                                    <option value="">UF</option>
+                                                    <?php foreach ($ufs as $uf) { echo "<option value=\"$uf\">$uf</option>"; } ?>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label for="rod_reb_tp_rod" class="form-label">Tipo rodado</label>
+                                                <select class="form-select" id="rod_reb_tp_rod">
+                                                    <option value="01">01 - Truck</option>
+                                                    <option value="02">02 - Toco</option>
+                                                    <option value="03">03 - Cavalo mecânico</option>
+                                                    <option value="04">04 - VAN</option>
+                                                    <option value="05">05 - Utilitário</option>
+                                                    <option value="06">06 - Outros</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label for="rod_reb_tp_car" class="form-label">Tipo carroceria</label>
+                                                <select class="form-select" id="rod_reb_tp_car">
+                                                    <option value="00">00 - Não aplicável</option>
+                                                    <option value="01">01 - Aberta</option>
+                                                    <option value="02">02 - Fechada/Baú</option>
+                                                    <option value="03">03 - Granelera</option>
+                                                    <option value="04">04 - Porta container</option>
+                                                    <option value="05">05 - Sider</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label for="rod_reb_cod_interno" class="form-label">Código interno</label>
+                                                <input type="text" class="form-control" id="rod_reb_cod_interno" maxlength="30">
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-end gap-2 mt-3">
+                                            <button type="button" class="btn btn-secondary btn-sm" onclick="cancelarReboqueNovoMDFE()">Cancelar</button>
+                                            <button type="button" class="btn btn-primary btn-sm" onclick="gravarReboqueNovoMDFE()">Gravar</button>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="rod_reboques_json" name="rod_reboques_json" value="[]">
+                                    <div class="table-responsive mt-3">
+                                        <table class="mdfe-simple-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Placa</th>
+                                                    <th>Tara</th>
+                                                    <th>Cap. kg</th>
+                                                    <th>UF</th>
+                                                    <th style="width: 92px;">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="rodReboquesTabelaBody">
+                                                <tr><td colspan="5" class="text-muted">Nenhum reboque adicionado.</td></tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                                 <div class="mdfe-subtab-pane" data-mdfe-rodo-tab="4">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
@@ -679,6 +777,12 @@ if (!isset($ufs) || !is_array($ufs)) {
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <h6 class="mb-0">Documentos (NF-e / CT-e)</h6>
                                     <div class="d-flex gap-2 flex-wrap">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="abrirModalSelecionarCTEParaWizard()">
+                                            <i class="fas fa-link"></i> Vincular CT-e do sistema
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="abrirModalSelecionarNFEParaMDFE()">
+                                            <i class="fas fa-link"></i> Vincular NF-e do sistema
+                                        </button>
                                         <button type="button" class="btn btn-outline-primary btn-sm" onclick="mostrarFormDocumentoNovoMDFE('adicionar')">
                                             <i class="fas fa-plus"></i> Adicionar nova NF-e
                                         </button>
@@ -690,8 +794,72 @@ if (!isset($ufs) || !is_array($ufs)) {
                                         </button>
                                     </div>
                                 </div>
-                                <div id="docFormWrapNovoMDFE" class="mdfe-inline-form is-hidden">
-                                    <h6 class="mb-2">Incluir documento fiscal</h6>
+
+                                <div id="docPainelVincularCte" class="mdfe-doc-painel is-hidden" aria-label="Vincular CT-e do sistema">
+                                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                        <h6 class="mb-0"><i class="fas fa-receipt text-primary"></i> Vincular CT-e do sistema</h6>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="fecharPaineisDocumentosWizard()">
+                                            <i class="fas fa-times"></i> Fechar
+                                        </button>
+                                    </div>
+                                    <p class="text-muted small mb-2">Marque os CT-e autorizados para adicionar à lista de documentos deste manifesto.</p>
+                                    <div id="cteSelectorWizardMdfeInline" class="cte-selector">Carregando CT-e...</div>
+                                    <div class="row g-2 mt-2">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Qtd selecionados</label>
+                                            <input type="number" class="form-control" id="totalCteWizardSelecionadosInline" readonly>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Peso total (kg)</label>
+                                            <input type="number" class="form-control" id="totalPesoCteWizardSelecionadosInline" step="0.001" readonly>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Valor total</label>
+                                            <input type="number" class="form-control" id="totalValorCteWizardSelecionadosInline" step="0.01" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-end gap-2 mt-3">
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="fecharPaineisDocumentosWizard()">Cancelar</button>
+                                        <button type="button" class="btn btn-primary btn-sm" onclick="importarCteSelecionadosParaWizardMDFE()">
+                                            <i class="fas fa-check"></i> Vincular selecionados
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="docPainelVincularNfe" class="mdfe-doc-painel is-hidden" aria-label="Vincular NF-e do sistema">
+                                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                        <h6 class="mb-0"><i class="fas fa-file-invoice text-primary"></i> Vincular NF-e do sistema</h6>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="fecharPaineisDocumentosWizard()">
+                                            <i class="fas fa-times"></i> Fechar
+                                        </button>
+                                    </div>
+                                    <p class="text-muted small mb-2">Marque as NF-e recebidas/em transporte para incluir no manifesto.</p>
+                                    <div id="nfeSelectorMdfeInline" class="cte-selector">Carregando NF-e...</div>
+                                    <div class="row g-2 mt-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Qtd selecionadas</label>
+                                            <input type="number" class="form-control" id="totalNfeSelecionadasMdfeInline" readonly>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Valor total</label>
+                                            <input type="number" class="form-control" id="totalValorNfeSelecionadasMdfeInline" step="0.01" readonly>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-end gap-2 mt-3">
+                                        <button type="button" class="btn btn-secondary btn-sm" onclick="fecharPaineisDocumentosWizard()">Cancelar</button>
+                                        <button type="button" class="btn btn-primary btn-sm" onclick="importarNfeSelecionadasParaMDFE()">
+                                            <i class="fas fa-check"></i> Vincular selecionadas
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div id="docFormWrapNovoMDFE" class="mdfe-doc-painel mdfe-inline-form is-hidden">
+                                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                                        <h6 class="mb-0" id="docFormTituloNovoMDFE"><i class="fas fa-file-alt text-primary"></i> Incluir documento fiscal</h6>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="cancelarDocumentoNovoMDFE()">
+                                            <i class="fas fa-times"></i> Fechar
+                                        </button>
+                                    </div>
                                     <div class="row g-3">
                                         <div class="col-md-4">
                                             <label for="doc_municipio_descarregamento" class="form-label">Município de descarregamento</label>
@@ -1027,12 +1195,32 @@ if (!isset($ufs) || !is_array($ufs)) {
                                 <input type="hidden" id="origem_cte_ids" name="origem_cte_ids" value="[]">
                                 <input type="hidden" id="origem_nfe_ids" name="origem_nfe_ids" value="[]">
                             </div>
+
+                            <div class="route-modal-tab-pane" data-route-tab="7">
+                                <div class="mdfe-conformidade-panel" id="mdfeConformidadePanel">
+                                    <p class="text-muted small mb-3">
+                                        Verificação antes de salvar ou enviar o MDF-e. Itens em vermelho impedem o salvamento.
+                                    </p>
+                                    <div id="mdfeChecklistStatus" class="alert alert-secondary mb-3" role="status">
+                                        <i class="fas fa-spinner fa-spin"></i> Aguardando dados do wizard…
+                                    </div>
+                                    <ul id="mdfeChecklistItens" class="list-group list-group-flush mdfe-checklist-list"></ul>
+                                    <div class="mt-3">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="atualizarChecklistConformidadeMdfe(true)">
+                                            <i class="fas fa-sync-alt"></i> Atualizar checklist
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                    <button type="button" class="btn btn-primary" onclick="avancarNovoMdfeWizard()">
+                    <button type="button" class="btn btn-success" id="btnSalvarNovoMdfeWizard" onclick="salvarNovoMdfeWizard()">
+                        <i class="fas fa-save"></i> Salvar MDF-e
+                    </button>
+                    <button type="button" class="btn btn-primary" id="btnAvancarNovoMdfeWizard" onclick="avancarNovoMdfeWizard()">
                         <i class="fas fa-arrow-right"></i> Próxima etapa
                     </button>
                 </div>

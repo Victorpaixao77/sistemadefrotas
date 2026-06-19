@@ -9,7 +9,25 @@ if (!function_exists('dashboard_home_normalize_period')) {
     {
         $p = strtolower((string) $p);
         $ok = ['all', 'month', 'quarter', 'year'];
-        return in_array($p, $ok, true) ? $p : 'all';
+        return in_array($p, $ok, true) ? $p : 'year';
+    }
+
+    function dashboard_home_cache_file(int $empresa_id, string $period, string $finFlag): string
+    {
+        $cacheKey = 'dh_' . $empresa_id . '_' . $period . '_' . $finFlag;
+        return sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'sf_dash_' . md5($cacheKey) . '.json';
+    }
+
+    function dashboard_home_cache_clear_empresa(int $empresa_id): void
+    {
+        foreach (['all', 'month', 'quarter', 'year'] as $period) {
+            foreach (['0', '1'] as $finFlag) {
+                $file = dashboard_home_cache_file($empresa_id, $period, $finFlag);
+                if (is_file($file)) {
+                    @unlink($file);
+                }
+            }
+        }
     }
 
     /**
@@ -327,6 +345,11 @@ if (!function_exists('dashboard_home_normalize_period')) {
 
         $gps_veiculos_sinal_recente = 0;
         $gps_pontos_hoje = 0;
+        $despesas_pendentes_count = 0;
+        $checklists_problema_count = 0;
+        $notif_nao_lidas_operacional = 0;
+        $notif_nao_lidas_ia = 0;
+
         try {
             $stG = $conn->prepare('
                 SELECT COUNT(*) FROM gps_ultima_posicao g
@@ -359,6 +382,42 @@ if (!function_exists('dashboard_home_normalize_period')) {
             $gps_pontos_hoje = 0;
         }
 
+        try {
+            $st = $conn->prepare("SELECT COUNT(*) FROM despesas_viagem WHERE empresa_id = :e AND status = 'pendente'");
+            $st->execute([':e' => $empresa_id]);
+            $despesas_pendentes_count = (int) $st->fetchColumn();
+        } catch (Exception $e) {
+            $despesas_pendentes_count = 0;
+        }
+
+        try {
+            $st = $conn->prepare("
+                SELECT COUNT(*) FROM checklist_viagem c
+                WHERE c.empresa_id = :e
+                AND c.data_checklist >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                AND (c.freios = 0 OR c.pneus = 0 OR c.extintor = 0 OR c.cnh = 0 OR c.luzes = 0
+                     OR c.doc_veiculo = 0 OR c.motorista_sobrio = 0 OR c.vazamentos = 0 OR c.triangulo = 0)
+            ");
+            $st->execute([':e' => $empresa_id]);
+            $checklists_problema_count = (int) $st->fetchColumn();
+        } catch (Exception $e) {
+            $checklists_problema_count = 0;
+        }
+
+        if (!function_exists('sf_notif_contar_nao_lidas_usuario')) {
+            require_once __DIR__ . '/notificacoes_helpers.php';
+        }
+        $uid = function_exists('sf_notif_usuario_id') ? sf_notif_usuario_id() : (int) ($_SESSION['user_id'] ?? $_SESSION['usuario_id'] ?? 0);
+        if ($uid > 0) {
+            try {
+                $notif_nao_lidas_operacional = sf_notif_contar_nao_lidas_usuario($conn, $empresa_id, $uid, 'operacional');
+                $notif_nao_lidas_ia = sf_notif_contar_nao_lidas_usuario($conn, $empresa_id, $uid, 'ia');
+            } catch (Exception $e) {
+                $notif_nao_lidas_operacional = 0;
+                $notif_nao_lidas_ia = 0;
+            }
+        }
+
         return [
             'rotas_pendentes_count' => $rotas_pendentes_count,
             'contas_vencidas_count' => $contas_vencidas_count,
@@ -366,6 +425,10 @@ if (!function_exists('dashboard_home_normalize_period')) {
             'proximas_rotas' => $proximas_rotas,
             'gps_veiculos_sinal_recente' => $gps_veiculos_sinal_recente,
             'gps_pontos_hoje' => $gps_pontos_hoje,
+            'despesas_pendentes_count' => $despesas_pendentes_count,
+            'checklists_problema_count' => $checklists_problema_count,
+            'notif_nao_lidas_operacional' => $notif_nao_lidas_operacional,
+            'notif_nao_lidas_ia' => $notif_nao_lidas_ia,
         ];
     }
 
@@ -376,10 +439,10 @@ if (!function_exists('dashboard_home_normalize_period')) {
     {
         $period = dashboard_home_normalize_period($period_key);
         $finFlag = $can_view_financial_data ? '1' : '0';
-        $cacheKey = 'dh_' . $empresa_id . '_' . $period . '_' . $finFlag;
-        $cacheFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'sf_dash_' . md5($cacheKey) . '.json';
+        $cacheFile = dashboard_home_cache_file($empresa_id, $period, $finFlag);
         $cacheTtl = 90;
-        if (is_readable($cacheFile) && (time() - (int) @filemtime($cacheFile)) < $cacheTtl) {
+        $skipCache = !empty($_GET['refresh']) || !empty($GLOBALS['sf_dashboard_skip_cache']);
+        if (!$skipCache && is_readable($cacheFile) && (time() - (int) @filemtime($cacheFile)) < $cacheTtl) {
             $raw = @file_get_contents($cacheFile);
             if ($raw !== false && $raw !== '') {
                 $cached = json_decode($raw, true);
@@ -421,6 +484,10 @@ if (!function_exists('dashboard_home_normalize_period')) {
             'proximas_rotas' => [],
             'gps_veiculos_sinal_recente' => 0,
             'gps_pontos_hoje' => 0,
+            'despesas_pendentes_count' => 0,
+            'checklists_problema_count' => 0,
+            'notif_nao_lidas_operacional' => 0,
+            'notif_nao_lidas_ia' => 0,
         ];
 
         try {

@@ -376,7 +376,7 @@ try {
             '(COALESCE(dv.pedagios,0) + 0) > 0',
             '(COALESCE(dv.caixinha,0) + 0) > 0',
             '((COALESCE(dv.estacionamento,0) + COALESCE(dv.lavagem,0)) + 0) > 0',
-            '((COALESCE(dv.descarga,0) + COALESCE(dv.borracharia,0) + COALESCE(dv.eletrica_mecanica,0) + COALESCE(dv.adiantamento,0)) + 0) > 0',
+            '((COALESCE(dv.descarga,0) + COALESCE(dv.borracharia,0) + COALESCE(dv.eletrica_mecanica,0) + COALESCE(dv.adiantamento,0) + COALESCE(dv.outros,0)) + 0) > 0',
         ];
         $whereExtra = $conds[$slice];
         $columns = [

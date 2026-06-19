@@ -13,6 +13,14 @@ if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_
     exit;
 }
 
+require_once __DIR__ . '/permissions.php';
+require_once __DIR__ . '/pneus_helpers.php';
+if (!can_access_tire_management()) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Sem permissão para gestão de pneus']);
+    exit;
+}
+
 try {
     $pdo = getConnection();
     $empresa_id = $_SESSION['empresa_id'];
@@ -265,5 +273,5 @@ try {
 } catch (Exception $e) {
     error_log('Erro em get_tires.php: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Erro ao buscar pneus']);
 } 

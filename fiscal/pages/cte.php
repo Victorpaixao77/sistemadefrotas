@@ -1,8 +1,4 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 // Include configuration and functions first
 require_once '../../includes/config.php';
 require_once '../../includes/functions.php';
@@ -19,7 +15,7 @@ require_once __DIR__ . '/../../includes/csrf.php';
 
 // Set page title
 $page_title = "Gestão de CT-e";
-$empresa_id = (int)($_SESSION['empresa_id'] ?? 1);
+$empresa_id = (int)($_SESSION['empresa_id'] ?? 0);
 $is_modern = true;
 
 // Layout moderno é padrão: remove ?classic= da URL para manter consistência.
@@ -143,6 +139,12 @@ if (array_key_exists('classic', $_GET)) {
                         </div>
                     </div>
                     <div class="fornc-btn-row">
+                        <button type="button" class="fornc-btn fornc-btn--primary" onclick="abrirModalCteWizard()">
+                            <i class="fas fa-plus"></i> Novo CT-e
+                        </button>
+                        <button type="button" class="fornc-btn fornc-btn--muted" onclick="abrirModalCteInutilizar()" title="Inutilizar faixa de numeração">
+                            <i class="fas fa-ban"></i> Inutilizar
+                        </button>
                         <button id="consultarCTeBtn" class="fornc-btn fornc-btn--primary" onclick="abrirModalConsultarCTe()">
                             <i class="fas fa-search"></i> Consultar CT-e
                         </button>
@@ -264,6 +266,9 @@ if (array_key_exists('classic', $_GET)) {
         </div>
     </div>
     
+    <?php include __DIR__ . '/partials/cte_wizard_modal.php'; ?>
+    <?php include __DIR__ . '/partials/cte_event_modals.php'; ?>
+    
     <!-- JavaScript Files -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
@@ -272,9 +277,12 @@ if (array_key_exists('classic', $_GET)) {
     <script src="../../js/theme.js"></script>
     <script>window.FISCAL_CSRF_TOKEN = <?php echo json_encode(csrf_token_get()); ?>;</script>
     <script src="js/fiscal_api_fetch.js?v=<?php echo file_exists(__DIR__ . '/js/fiscal_api_fetch.js') ? (int)filemtime(__DIR__ . '/js/fiscal_api_fetch.js') : 1; ?>"></script>
+    <script src="js/cte-wizard.js?v=<?php echo file_exists(__DIR__ . '/js/cte-wizard.js') ? (int)filemtime(__DIR__ . '/js/cte-wizard.js') : 1; ?>"></script>
+    <script src="js/cte-events.js?v=<?php echo file_exists(__DIR__ . '/js/cte-events.js') ? (int)filemtime(__DIR__ . '/js/cte-events.js') : 1; ?>"></script>
 
     <script>
         var cteDocsCache = [];
+        var cteListTruncationHtml = '';
         var ctePaginaAtual = 1;
         var ctePerPage = 10;
 
@@ -427,7 +435,7 @@ if (array_key_exists('classic', $_GET)) {
         function carregarCTE() {
             var msg = document.getElementById('cteList');
             msg.innerHTML = '<div style="color: #17a2b8; background: #d1ecf1; padding: 15px; border-radius: 5px;"><strong>Carregando CT-e...</strong></div>';
-            fiscalApiFetch('../api/documentos_fiscais_v2.php?action=list&tipo=cte&limit=100')
+            fiscalApiFetch('../api/documentos_fiscais_v2.php?action=list&tipo=cte&limit=500')
                 .then(function(res) {
                     var data = res.data || {};
                     if (res.status === 429 || (data && String(data.code || '') === 'rate_limited')) {
@@ -437,9 +445,13 @@ if (array_key_exists('classic', $_GET)) {
                         return;
                     }
                     if (data.success && data.documentos && data.documentos.length > 0) {
+                        cteListTruncationHtml = (typeof fiscalListTruncationBanner === 'function')
+                            ? fiscalListTruncationBanner(data.totais, data.documentos, 500)
+                            : '';
                         cteDocsCache = data.documentos || [];
                         aplicarFiltrosCTE();
                     } else {
+                        cteListTruncationHtml = '';
                         cteDocsCache = [];
                         msg.innerHTML = '<div style="color: #6c757d; background: #f8f9fa; padding: 15px; border-radius: 5px;"><strong>Nenhum CT-e</strong><br>Clique em "Consultar CT-e" para registrar pela chave de acesso.</div>';
                         atualizarPaginacaoCte(0);
@@ -522,13 +534,16 @@ if (array_key_exists('classic', $_GET)) {
                 }
                 if (status === 'autorizado') {
                     html += ' <a class="btn-icon" href="#" onclick="cancelarCTe(' + doc.id + '); return false;" title="Cancelar CT-e"><i class="fas fa-times-circle"></i></a>';
+                    html += ' <a class="btn-icon" href="#" onclick="abrirModalCteCce(' + doc.id + '); return false;" title="CC-e"><i class="fas fa-edit"></i></a>';
+                    html += ' <a class="btn-icon" href="#" onclick="abrirModalCteComprovante(' + doc.id + '); return false;" title="Comprovante entrega"><i class="fas fa-clipboard-check"></i></a>';
+                    html += ' <a class="btn-icon" href="#" onclick="abrirModalCteDesacordo(' + doc.id + '); return false;" title="Desacordo tomador"><i class="fas fa-exclamation-triangle"></i></a>';
                 }
                 html += ' <a class="btn-icon" href="#" onclick="downloadCteXml(' + doc.id + '); return false;" title="Gerar / Download XML"><i class="fas fa-file-code"></i></a>';
                 html += ' <a class="btn-icon" href="#" onclick="downloadCtePdf(' + doc.id + '); return false;" title="Gerar / Download PDF"><i class="fas fa-file-pdf"></i></a>';
                 html += '</td></tr>';
             });
             html += '</tbody></table>';
-            msg.innerHTML = html;
+            msg.innerHTML = cteListTruncationHtml + html;
             atualizarPaginacaoCte(docsFiltrados.length);
         }
 
@@ -594,7 +609,23 @@ if (array_key_exists('classic', $_GET)) {
                     var origem = d.origem || d.origem_cidade || '-';
                     var destino = d.destino || d.destino_cidade || '-';
                     var situacao = (d.status === 'autorizado' ? 'Autorizado' : d.status === 'pendente' ? 'Pendente' : d.status === 'cancelado' ? 'Cancelado' : d.status === 'denegado' ? 'Denegado' : d.status || '-');
-                    title.innerHTML = '<i class="fas fa-file-alt"></i> CT-e ' + (d.numero_cte || id);
+                    title.innerHTML = '<i class="fas fa-file-alt"></i> CT-e ' + escapeHtml(String(d.numero_cte || id));
+                    var nfesHtml = '';
+                    if (Array.isArray(d.nfes_vinculadas) && d.nfes_vinculadas.length) {
+                        nfesHtml = '<dt class="col-sm-4">NF-e vinculadas</dt><dd class="col-sm-8"><ul class="mb-0 ps-3">';
+                        d.nfes_vinculadas.forEach(function (n) {
+                            nfesHtml += '<li>NF-e ' + escapeHtml(n.numero_nfe || n.id) + ' — R$ ' + parseFloat(n.valor_total || 0).toFixed(2) + '</li>';
+                        });
+                        nfesHtml += '</ul></dd>';
+                    }
+                    var evHtml = '';
+                    if (Array.isArray(d.eventos) && d.eventos.length) {
+                        evHtml = '<dt class="col-sm-4">Eventos recentes</dt><dd class="col-sm-8"><ul class="mb-0 ps-3 small">';
+                        d.eventos.forEach(function (ev) {
+                            evHtml += '<li>' + escapeHtml(ev.tp_evento) + ' seq ' + escapeHtml(String(ev.n_seq_evento)) + ' — ' + escapeHtml(ev.status) + '</li>';
+                        });
+                        evHtml += '</ul></dd>';
+                    }
                     body.innerHTML = '<dl class="row mb-0">' +
                         '<dt class="col-sm-4">Número</dt><dd class="col-sm-8">' + escapeHtml(d.numero_cte || '-') + '</dd>' +
                         '<dt class="col-sm-4">Série</dt><dd class="col-sm-8">' + escapeHtml(d.serie_cte || '-') + '</dd>' +
@@ -604,6 +635,7 @@ if (array_key_exists('classic', $_GET)) {
                         '<dt class="col-sm-4">Destino</dt><dd class="col-sm-8">' + escapeHtml(destino) + '</dd>' +
                         '<dt class="col-sm-4">Valor do frete</dt><dd class="col-sm-8">R$ ' + vlr + '</dd>' +
                         '<dt class="col-sm-4">Status</dt><dd class="col-sm-8">' + escapeHtml(situacao) + '</dd>' +
+                        nfesHtml + evHtml +
                         '</dl>';
                 })
                 .catch(function() {
@@ -687,26 +719,23 @@ if (array_key_exists('classic', $_GET)) {
             ).then(function(justificativa) {
                 if (justificativa == null || justificativa === '') return;
 
-                fetch('../api/fiscal_events.php', {
+                fiscalApiFetch('../api/fiscal_events.php', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         action: 'cancelar',
-                        empresa_id: EMPRESA_ID,
                         documento_tipo: 'cte',
                         documento_id: id,
                         justificativa: justificativa
                     })
                 })
-                    .then(function(r) { return r.json(); })
-                    .then(function(data) {
+                    .then(function(res) {
+                        var data = res.data || {};
                         if (data && data.success) {
                             fiscalToast('Cancelamento solicitado/processado. Status do evento: ' + (data.data && data.data.status ? data.data.status : 'pendente'), 'success');
                             carregarCTE();
                         } else {
-                            fiscalToast('Erro: ' + (data.error || data.message || 'Erro desconhecido'), 'danger');
+                            fiscalToast(fiscalApiErrorMessage(data, res.status), 'danger');
                         }
                     })
                     .catch(function() {

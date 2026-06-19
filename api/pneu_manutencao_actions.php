@@ -1,34 +1,13 @@
 <?php
-require_once '../includes/config.php';
-require_once '../includes/db_connect.php';
+require_once '../includes/pneus_api_base.php';
 require_once __DIR__ . '/../includes/pneu_movimentacoes_helper.php';
-require_once __DIR__ . '/../includes/csrf.php';
-require_once __DIR__ . '/../includes/api_json.php';
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
-// Verificar se o usuário está autenticado
-if (!is_logged_in()) {
-    echo json_encode(['success' => false, 'error' => 'Usuário não autenticado']);
-    exit;
-}
-
-// Obter conexão com o banco de dados
 $conn = getConnection();
-
-// Verificar se a empresa existe
-$sql = "SELECT id FROM empresa_clientes WHERE id = :empresa_id";
-$empresa = fetchOne($conn, $sql, [':empresa_id' => $_SESSION['empresa_id']]);
-
-if (!$empresa) {
-    echo json_encode(['success' => false, 'error' => 'Empresa não encontrada']);
-    exit;
-}
-
-// Obter a ação solicitada
+$empresa_id = pneus_empresa_id();
 $action = $_GET['action'] ?? '';
 
-// Protege mutações com CSRF (add/update/delete) e retorno JSON padronizado.
 if (in_array($action, ['add', 'update', 'delete', 'create', 'edit'], true)) {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
         api_json_method_not_allowed('Use POST para alterar dados.');
@@ -36,7 +15,19 @@ if (in_array($action, ['add', 'update', 'delete', 'create', 'edit'], true)) {
     api_require_csrf_json();
 }
 
-// Processar a ação
+function pneu_manut_validar_fks(PDO $conn, int $empresa_id, array $data): ?string
+{
+    $pneu_id = (int) ($data['pneu_id'] ?? 0);
+    if (!pneus_validar_pneu_empresa($conn, $pneu_id, $empresa_id)) {
+        return 'Pneu inválido para esta empresa';
+    }
+    $veiculo_id = isset($data['veiculo_id']) && $data['veiculo_id'] !== '' ? (int) $data['veiculo_id'] : null;
+    if (!pneus_validar_veiculo_empresa($conn, $veiculo_id, $empresa_id)) {
+        return 'Veículo inválido para esta empresa';
+    }
+    return null;
+}
+
 switch ($action) {
     case 'add':
         // Receber dados do POST
@@ -47,6 +38,11 @@ switch ($action) {
             empty($data['tipo_manutencao_id']) || empty($data['km_veiculo']) || 
             empty($data['custo'])) {
             echo json_encode(['success' => false, 'error' => 'Dados obrigatórios não fornecidos']);
+            exit;
+        }
+        $fkErr = pneu_manut_validar_fks($conn, $empresa_id, $data);
+        if ($fkErr) {
+            echo json_encode(['success' => false, 'error' => $fkErr]);
             exit;
         }
         
@@ -60,7 +56,7 @@ switch ($action) {
                 )";
         
         $params = [
-            ':empresa_id' => $_SESSION['empresa_id'],
+            ':empresa_id' => $empresa_id,
             ':pneu_id' => $data['pneu_id'],
             ':veiculo_id' => $data['veiculo_id'] ?: null,
             ':data_manutencao' => $data['data_manutencao'],
@@ -83,7 +79,7 @@ switch ($action) {
             } catch (Exception $e) {}
             $tipo_mov = (strtolower($tipo_nome ?? '') === 'recapagem') ? 'recapagem' : 'manutencao';
             pneu_movimentacao_inserir($conn, [
-                'empresa_id' => $_SESSION['empresa_id'],
+                'empresa_id' => $empresa_id,
                 'pneu_id'    => (int) $data['pneu_id'],
                 'tipo'       => $tipo_mov,
                 'veiculo_id' => !empty($data['veiculo_id']) ? (int) $data['veiculo_id'] : null,
@@ -92,7 +88,7 @@ switch ($action) {
             ]);
             echo json_encode(['success' => true]);
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'error' => 'Erro ao adicionar manutenção: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'error' => 'Erro ao adicionar manutenção']);
         }
         break;
         
@@ -106,6 +102,11 @@ switch ($action) {
             empty($data['tipo_manutencao_id']) || empty($data['km_veiculo']) || 
             empty($data['custo'])) {
             echo json_encode(['success' => false, 'error' => 'Dados obrigatórios não fornecidos']);
+            exit;
+        }
+        $fkErr = pneu_manut_validar_fks($conn, $empresa_id, $data);
+        if ($fkErr) {
+            echo json_encode(['success' => false, 'error' => $fkErr]);
             exit;
         }
         
@@ -122,7 +123,7 @@ switch ($action) {
         
         $params = [
             ':id' => $id,
-            ':empresa_id' => $_SESSION['empresa_id'],
+            ':empresa_id' => $empresa_id,
             ':pneu_id' => $data['pneu_id'],
             ':veiculo_id' => $data['veiculo_id'] ?: null,
             ':data_manutencao' => $data['data_manutencao'],
@@ -136,7 +137,7 @@ switch ($action) {
             executeNonQuery($conn, $sql, $params);
             echo json_encode(['success' => true]);
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'error' => 'Erro ao atualizar manutenção: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'error' => 'Erro ao atualizar manutenção']);
         }
         break;
         
@@ -158,7 +159,7 @@ switch ($action) {
             ]);
             echo json_encode(['success' => true]);
         } catch (Exception $e) {
-            echo json_encode(['success' => false, 'error' => 'Erro ao excluir manutenção: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'error' => 'Erro ao excluir manutenção']);
         }
         break;
         

@@ -161,7 +161,8 @@ try {
                         lavagem = :lavagem, 
                         borracharia = :borracharia, 
                         eletrica_mecanica = :eletrica_mecanica, 
-                        adiantamento = :adiantamento
+                        adiantamento = :adiantamento,
+                        outros = :outros
                         WHERE rota_id = :rota_id AND empresa_id = :empresa_id";
                         
                     $stmt = $conn->prepare($sql);
@@ -171,11 +172,11 @@ try {
                     $sql = "INSERT INTO despesas_viagem (
                         rota_id, empresa_id, descarga, pedagios, caixinha, 
                         estacionamento, lavagem, borracharia, 
-                        eletrica_mecanica, adiantamento
+                        eletrica_mecanica, adiantamento, outros
                     ) VALUES (
                         :rota_id, :empresa_id, :descarga, :pedagios, :caixinha, 
                         :estacionamento, :lavagem, :borracharia, 
-                        :eletrica_mecanica, :adiantamento
+                        :eletrica_mecanica, :adiantamento, :outros
                     )";
                         
                     $stmt = $conn->prepare($sql);
@@ -183,6 +184,7 @@ try {
                 }
                 
                 $stmt->bindParam(':rota_id', $rota_id, PDO::PARAM_INT);
+                $data['outros'] = $data['outros'] ?? null;
                 $stmt->bindParam(':descarga', $data['descarga'], PDO::PARAM_STR);
                 $stmt->bindParam(':pedagios', $data['pedagios'], PDO::PARAM_STR);
                 $stmt->bindParam(':caixinha', $data['caixinha'], PDO::PARAM_STR);
@@ -191,6 +193,7 @@ try {
                 $stmt->bindParam(':borracharia', $data['borracharia'], PDO::PARAM_STR);
                 $stmt->bindParam(':eletrica_mecanica', $data['eletrica_mecanica'], PDO::PARAM_STR);
                 $stmt->bindParam(':adiantamento', $data['adiantamento'], PDO::PARAM_STR);
+                $stmt->bindParam(':outros', $data['outros'], PDO::PARAM_STR);
                 
                 if ($stmt->execute()) {
                     bi_cache_invalidate_empresa($conn, (int) $empresa_id);
@@ -536,7 +539,15 @@ function getVeiculos() {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
         
-        $sql = "SELECT id, placa, modelo FROM veiculos WHERE empresa_id = :empresa_id ORDER BY placa";
+        $sql = "SELECT v.id, v.placa, v.modelo, v.id_carreta, tc.nome AS tipo_combustivel_nome,
+                       cr.nome AS carreta_nome,
+                       COALESCE(NULLIF(v.numero_eixos, 0), NULLIF(cv.eixos, 0), 6) AS eixos_conjunto
+                FROM veiculos v
+                LEFT JOIN tipos_combustivel tc ON v.tipo_combustivel_id = tc.id
+                LEFT JOIN tipos_carretas cr ON v.id_carreta = cr.id
+                LEFT JOIN tipos_cavalos cv ON v.id_cavalo = cv.id
+                WHERE v.empresa_id = :empresa_id
+                ORDER BY v.placa";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
         $stmt->execute();

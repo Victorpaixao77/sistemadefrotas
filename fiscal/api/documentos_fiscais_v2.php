@@ -31,35 +31,30 @@ require_once __DIR__ . '/../includes/CTeService.php';
 require_once __DIR__ . '/../includes/MdfeService.php';
 require_once __DIR__ . '/../includes/FiscalQueueService.php';
 require_once __DIR__ . '/../includes/CteDebug.php';
+require_once __DIR__ . '/../../includes/pef_ciot_helpers.php';
+require_once __DIR__ . '/../includes/mdfe_wizard_helpers.php';
+require_once __DIR__ . '/../includes/cte_wizard_helpers.php';
+require_once __DIR__ . '/../includes/CteContextLoader.php';
+require_once __DIR__ . '/../includes/CteXmlBuilder.php';
+require_once __DIR__ . '/../includes/cte_event_helpers.php';
+require_once __DIR__ . '/../includes/CteDacteSped.php';
 
-// Configurar sessão
+require_once __DIR__ . '/../../includes/csrf.php';
+require_once __DIR__ . '/../../includes/api_json.php';
+
 configure_session();
 session_start();
+require_authentication();
 
-// CSRF: se o cliente enviar X-CSRF-Token ou POST csrf_token, valida em mutações (NF-e / CT-e / MDF-e).
-$csrfTok = null;
-if (!empty($_SERVER['HTTP_X_CSRF_TOKEN']) && is_string($_SERVER['HTTP_X_CSRF_TOKEN'])) {
-    $csrfTok = $_SERVER['HTTP_X_CSRF_TOKEN'];
-} elseif (!empty($_POST['csrf_token']) && is_string($_POST['csrf_token'])) {
-    $csrfTok = $_POST['csrf_token'];
-}
-if ($csrfTok !== null && $csrfTok !== '') {
-    require_once __DIR__ . '/../../includes/csrf.php';
-    require_once __DIR__ . '/../../includes/api_json.php';
-    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-    if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true) && !csrf_token_validate($csrfTok)) {
-        api_json_error('Token CSRF inválido. Recarregue a página.', 403, 'csrf_invalid');
-    }
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+    api_require_csrf_json();
 }
 
-// Verificar autenticação
-if (!isset($_SESSION['empresa_id'])) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'error' => 'Não autorizado']);
-    exit;
+$empresa_id = (int)$_SESSION['empresa_id'];
+if ($empresa_id < 1) {
+    api_json_error('Não autorizado.', 401);
 }
-
-$empresa_id = $_SESSION['empresa_id'];
 $conn = getConnection();
 
 require_once __DIR__ . '/../../includes/rate_limit.php';
@@ -1700,6 +1695,7 @@ function persistMdfeWizardEstruturado(PDO $conn, int $empresaId, int $mdfeId, ar
 {
     if ($mdfeId <= 0) return;
     ensureMdfeWizardPersistenceSchema($conn);
+    sf_pef_ensure_mdfe_link_schema($conn);
 
     $ciots = is_array($payload['ciots'] ?? null) ? $payload['ciots'] : [];
     $vales = is_array($payload['vales_pedagio'] ?? null) ? $payload['vales_pedagio'] : [];
@@ -1723,19 +1719,24 @@ function persistMdfeWizardEstruturado(PDO $conn, int $empresaId, int $mdfeId, ar
     $conn->prepare("DELETE FROM fiscal_mdfe_autorizados_download WHERE mdfe_id = ?")->execute([$mdfeId]);
 
     $stCiot = $conn->prepare("
-        INSERT INTO fiscal_mdfe_ciot (mdfe_id, empresa_id, numero_ciot, valor_frete, cpf_cnpj_tac, ipef, payload_json)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO fiscal_mdfe_ciot (mdfe_id, empresa_id, numero_ciot, valor_frete, cpf_cnpj_tac, ipef, pef_operacao_id, payload_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ");
     foreach ($ciots as $item) {
         if (!is_array($item)) continue;
+        $pefId = (int) ($item['pefOperacaoId'] ?? $item['pef_operacao_id'] ?? 0);
         $stCiot->execute([
             $mdfeId, $empresaId,
             (string)($item['numeroCiot'] ?? $item['numero_ciot'] ?? ''),
             (float)($item['valorFrete'] ?? $item['valor_frete'] ?? 0),
             (string)($item['cpfCnpjTac'] ?? $item['cpf_cnpj_tac'] ?? ''),
             (string)($item['ipef'] ?? ''),
+            $pefId > 0 ? $pefId : null,
             json_encode($item, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         ]);
+        if ($pefId > 0) {
+            sf_pef_vincular_operacao_mdfe($empresaId, $pefId, $mdfeId);
+        }
     }
 
     $stVale = $conn->prepare("
@@ -1890,6 +1891,134 @@ function persistMdfeWizardEstruturado(PDO $conn, int $empresaId, int $mdfeId, ar
     }
 }
 
+function ensureMdfeMetaSchema(PDO $conn): void
+{
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    $done = true;
+    $sqlFile = __DIR__ . '/../../sql/fiscal_mdfe_meta_v1.sql';
+    if (!is_readable($sqlFile)) {
+        return;
+    }
+    try {
+        $sql = (string) file_get_contents($sqlFile);
+        foreach (array_filter(array_map('trim', explode(';', $sql))) as $stmt) {
+            if ($stmt === '' || stripos($stmt, '--') === 0) {
+                continue;
+            }
+            if (stripos($stmt, 'CREATE') === false && stripos($stmt, 'ALTER') === false) {
+                continue;
+            }
+            try {
+                $conn->exec($stmt);
+            } catch (Throwable $e) {
+                error_log('ensureMdfeMetaSchema: ' . $e->getMessage());
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('ensureMdfeMetaSchema read: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Persiste metadados do wizard na tabela fiscal_mdfe.
+ *
+ * @param array<string,mixed> $meta
+ */
+function persistMdfeMeta(PDO $conn, int $empresaId, int $mdfeId, array $meta): void
+{
+    if ($mdfeId <= 0) {
+        return;
+    }
+    ensureMdfeMetaSchema($conn);
+
+    $tipoEmitente = trim((string) ($meta['tipo_emitente'] ?? ''));
+    $tipoTransportador = trim((string) ($meta['tipo_transportador'] ?? ''));
+    $rodoviario = is_array($meta['rodoviario'] ?? null) ? $meta['rodoviario'] : [];
+    $munCarreg = trim((string) ($meta['municipio_carregamento'] ?? ''));
+    $munDesc = trim((string) ($meta['municipio_descarregamento'] ?? ''));
+    $ufIni = strtoupper(trim((string) ($meta['uf_inicio'] ?? '')));
+    $ufFim = strtoupper(trim((string) ($meta['uf_fim'] ?? '')));
+    $cMunCarreg = trim((string) ($meta['cod_mun_carreg_ibge'] ?? ''));
+    $cMunDesc = trim((string) ($meta['cod_mun_desc_ibge'] ?? ''));
+
+    if ($cMunCarreg === '' && $munCarreg !== '' && $ufIni !== '') {
+        $cMunCarreg = mdfeResolverIbgeMunicipio($conn, $munCarreg, $ufIni);
+    }
+    if ($cMunDesc === '' && $munDesc !== '' && $ufFim !== '') {
+        $cMunDesc = mdfeResolverIbgeMunicipio($conn, $munDesc, $ufFim);
+    }
+
+    $stmt = $conn->prepare('
+        UPDATE fiscal_mdfe SET
+            tipo_emitente = ?,
+            tipo_transportador = ?,
+            rod_rntrc = ?,
+            rod_placa = ?,
+            rod_tipo_rodado = ?,
+            rod_tipo_carroceria = ?,
+            cod_mun_carreg_ibge = ?,
+            cod_mun_desc_ibge = ?,
+            updated_at = ?
+        WHERE id = ? AND empresa_id = ?
+    ');
+    $stmt->execute([
+        $tipoEmitente !== '' ? $tipoEmitente : null,
+        $tipoTransportador !== '' ? $tipoTransportador : null,
+        trim((string) ($rodoviario['rntrc'] ?? '')) ?: null,
+        trim((string) ($rodoviario['placa'] ?? '')) ?: null,
+        trim((string) ($rodoviario['tipo_rodado'] ?? '')) ?: null,
+        trim((string) ($rodoviario['tipo_carroceria'] ?? '')) ?: null,
+        $cMunCarreg !== '' ? $cMunCarreg : null,
+        $cMunDesc !== '' ? $cMunDesc : null,
+        date('Y-m-d H:i:s'),
+        $mdfeId,
+        $empresaId,
+    ]);
+}
+
+function mdfeResolverIbgeMunicipio(PDO $conn, string $nome, string $uf): string
+{
+    $nome = trim($nome);
+    $uf = strtoupper(trim($uf));
+    if ($nome === '' || $uf === '') {
+        return '';
+    }
+    try {
+        $st = $conn->prepare('SELECT codigo_ibge FROM cidades WHERE UPPER(uf) = :uf AND UPPER(nome) = :nome LIMIT 1');
+        $st->execute([
+            ':uf' => $uf,
+            ':nome' => function_exists('mb_strtoupper') ? mb_strtoupper($nome, 'UTF-8') : strtoupper($nome),
+        ]);
+        $ibge = preg_replace('/\D/', '', (string) $st->fetchColumn());
+        return strlen($ibge) === 7 ? $ibge : '';
+    } catch (Throwable $e) {
+        return '';
+    }
+}
+
+/**
+ * @param array<int,array<string,mixed>> $documentos
+ */
+function persistMdfeDocumentos(PDO $conn, int $empresaId, int $mdfeId, array $documentos): void
+{
+    mdfe_persist_documentos_extended($conn, $empresaId, $mdfeId, $documentos);
+}
+
+function mdfeUfParaCodigoIbge(string $uf): string
+{
+    $mapa = [
+        'RO' => '11', 'AC' => '12', 'AM' => '13', 'RR' => '14', 'PA' => '15', 'AP' => '16', 'TO' => '17',
+        'MA' => '21', 'PI' => '22', 'CE' => '23', 'RN' => '24', 'PB' => '25', 'PE' => '26', 'AL' => '27',
+        'SE' => '28', 'BA' => '29', 'MG' => '31', 'ES' => '32', 'RJ' => '33', 'SP' => '35', 'PR' => '41',
+        'SC' => '42', 'RS' => '43', 'MS' => '50', 'MT' => '51', 'GO' => '52', 'DF' => '53',
+    ];
+    $uf = strtoupper(trim($uf));
+    return $mapa[$uf] ?? '41';
+}
+
 // Processar requisição
 $action = $_GET['action'] ?? $_POST['action'] ?? 'list';
 
@@ -1899,7 +2028,7 @@ try {
             // Listar documentos
             $tipo = $_GET['tipo'] ?? 'cte';
             $status = $_GET['status'] ?? null;
-            $limit = $_GET['limit'] ?? 50;
+            $limit = min(500, max(1, (int)($_GET['limit'] ?? 50)));
             
             // Mapear tipo para tabela
             $tabela = '';
@@ -2002,12 +2131,19 @@ try {
             }
             $stmt->execute([$empresa_id]);
             $totais = $stmt->fetch(PDO::FETCH_ASSOC);
-            
+            $totalCount = (int)($totais['total'] ?? 0);
+
             echo json_encode([
                 'success' => true,
                 'documentos' => $documentos,
                 'totais' => $totais,
-                'tipo' => $tipo
+                'tipo' => $tipo,
+                'meta' => [
+                    'limit' => $limit,
+                    'returned' => count($documentos),
+                    'total' => $totalCount,
+                    'truncated' => $totalCount > count($documentos),
+                ],
             ]);
             
             logOperacao('listar', "Listou documentos $tipo", 'sucesso');
@@ -2581,6 +2717,7 @@ try {
             
         case 'criar_cte':
             fiscal_api_rate_limit_or_json_429('fiscal_criar_cte', 20, 300);
+            cte_ensure_extended_schema($conn);
             // CRIAR CT-e (Conhecimento de Transporte Eletrônico)
             $nfe_ids_raw = $_POST['nfe_ids'] ?? [];
             if (is_string($nfe_ids_raw)) {
@@ -2605,7 +2742,9 @@ try {
             if (!empty($nfe_ids)) {
                 $phNfe = str_repeat('?,', count($nfe_ids) - 1) . '?';
                 $stmt = $conn->prepare("
-                    SELECT id, status, cliente_cnpj, cliente_razao_social
+                    SELECT id, status, cliente_cnpj, cliente_razao_social,
+                           cliente_remetente, cnpj_remetente, cliente_destinatario, cnpj_destinatario,
+                           chave_acesso, valor_total, peso_carga, xml_nfe
                     FROM fiscal_nfe_clientes
                     WHERE id IN ($phNfe) AND empresa_id = ?
                 ");
@@ -2652,18 +2791,41 @@ try {
                 $numero_cte = getProximoNumero('CTE', '1');
                 $chave_acesso = gerarChaveAcesso('CTE', $numero_cte, '1');
 
+                $origemCidade = '';
+                $origemEstado = '';
+                $destinoCidade = '';
+                $destinoEstado = '';
+                if (!empty($nfes)) {
+                    $p0 = cte_parties_from_nfe_row($conn, $nfes[0]);
+                    $origemCidade = $p0['rem']['mun'] ?: cte_parse_origem_destino_texto($origem)['cidade'];
+                    $origemEstado = $p0['rem']['uf'] ?: cte_parse_origem_destino_texto($origem)['uf'];
+                    $destinoCidade = $p0['dest']['mun'] ?: cte_parse_origem_destino_texto($destino)['cidade'];
+                    $destinoEstado = $p0['dest']['uf'] ?: cte_parse_origem_destino_texto($destino)['uf'];
+                } else {
+                    $po = cte_parse_origem_destino_texto($origem);
+                    $pd = cte_parse_origem_destino_texto($destino);
+                    $origemCidade = $po['cidade'];
+                    $origemEstado = $po['uf'];
+                    $destinoCidade = $pd['cidade'];
+                    $destinoEstado = $pd['uf'];
+                }
+
+                $nfeIdsJson = json_encode($nfe_ids, JSON_UNESCAPED_UNICODE);
+
                 $stmt = $conn->prepare("
                     INSERT INTO fiscal_cte (
                         empresa_id, numero_cte, serie_cte, chave_acesso, data_emissao,
                         natureza_operacao, valor_total, peso_carga, volumes_carga,
-                        origem, destino, veiculo_id, motorista_id, status,
+                        origem, destino, origem_cidade, origem_estado, destino_cidade, destino_estado,
+                        veiculo_id, motorista_id, nfe_ids, status,
                         created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
                     $empresa_id, $numero_cte, '1', $chave_acesso, date('Y-m-d'),
                     'Transporte de mercadorias', $valor_frete, $peso_total, $volumes_total,
-                    $origem, $destino, $veiculo_id, $motorista_id, 'rascunho',
+                    $origem, $destino, $origemCidade, $origemEstado, $destinoCidade, $destinoEstado,
+                    $veiculo_id, $motorista_id, $nfeIdsJson, 'rascunho',
                     date('Y-m-d H:i:s'), date('Y-m-d H:i:s'),
                 ]);
                 $cte_id = (int)$conn->lastInsertId();
@@ -2773,6 +2935,8 @@ try {
                         $inf_complementar !== '' ? $inf_complementar : null,
                     ]);
                 }
+
+                cte_persistir_parties_itens($conn, $cte_id, $nfes);
 
                 $conn->commit();
             } catch (Throwable $e) {
@@ -2918,6 +3082,7 @@ try {
 
         case 'emitir_cte_sefaz':
             fiscal_api_rate_limit_or_json_429('fiscal_emitir_cte_sefaz', 15, 300);
+            cte_ensure_extended_schema($conn);
             // AUTORIZAR CT-e via SEFAZ (modelo 57) usando sped-cte
             $cte_id = (int)($_POST['cte_id'] ?? $_POST['id'] ?? 0);
             if ($cte_id <= 0) {
@@ -3001,19 +3166,24 @@ try {
                 break;
             }
 
-            // Carregar dados da empresa (para montar XML)
-            $stmtEmp = $conn->prepare("SELECT * FROM empresa_clientes WHERE id = ? LIMIT 1");
-            $stmtEmp->execute([$empresa_id]);
-            $empresa = $stmtEmp->fetch(PDO::FETCH_ASSOC);
-            if (!$empresa) {
-                $empresa = ['cnpj' => '', 'razao_social' => 'Transportadora', 'nome_fantasia' => '', 'inscricao_estadual' => '', 'endereco' => '', 'cep' => '', 'cidade' => '', 'estado' => 'PR'];
-            }
-
-            // Montar cteProc XML
+            // Montar XML CT-e layout 4.00
             require_once __DIR__ . '/../includes/CteXmlHelper.php';
-            $xml_proc = montarCteProcXml($conn, $cte, $empresa);
+            try {
+                $loader = new CteContextLoader((int) $empresa_id, $conn);
+                $ctxEmit = $loader->loadById($cte_id);
+                $xml_proc = CteXmlBuilder::build($ctxEmit);
+            } catch (Throwable $eBuild) {
+                error_log('emitir_cte_sefaz builder: ' . $eBuild->getMessage());
+                $stmtEmp = $conn->prepare("SELECT * FROM empresa_clientes WHERE id = ? LIMIT 1");
+                $stmtEmp->execute([$empresa_id]);
+                $empresa = $stmtEmp->fetch(PDO::FETCH_ASSOC);
+                if (!$empresa) {
+                    $empresa = ['cnpj' => '', 'razao_social' => 'Transportadora', 'nome_fantasia' => '', 'inscricao_estadual' => '', 'endereco' => '', 'cep' => '', 'cidade' => '', 'estado' => 'PR'];
+                }
+                $xml_proc = montarCteProcXml($conn, $cte, $empresa);
+            }
             if (empty($xml_proc)) {
-                throw new Exception('Erro ao gerar XML (cteProc) do CT-e.');
+                throw new Exception('Erro ao gerar XML do CT-e.');
             }
 
             $cteService = new CTeService((int)$empresa_id);
@@ -3021,7 +3191,11 @@ try {
             // Enviar autorização
             $envio = $cteService->emitirCTe($xml_proc);
             if (empty($envio['success'])) {
-                throw new Exception('Falha ao enviar CT-e para SEFAZ: ' . ($envio['message'] ?? 'erro desconhecido'));
+                $msgEnv = $envio['message'] ?? 'erro desconhecido';
+                if (!empty($envio['cStat']) || !empty($envio['cStat_prot'])) {
+                    $msgEnv .= ' (cStat: ' . ($envio['cStat_prot'] ?? $envio['cStat']) . ')';
+                }
+                throw new Exception('Falha ao enviar CT-e para SEFAZ: ' . $msgEnv);
             }
 
             // Salvar XML assinado para auditoria
@@ -3032,25 +3206,29 @@ try {
                 }
             } catch (Throwable $e) {}
 
-            // Consultar para obter cStat/protocolo após o envio
-            $consulta = $cteService->consultarPorChave($chave);
-            if (!$consulta['success']) {
-                // Envio pode ter sido aceito na recepção, mas a autorização pode não estar disponível ainda.
-                echo json_encode([
-                    'success' => true,
-                    'message' => 'CT-e enviado. Autorização ainda não consultável no momento.',
-                    'status' => 'pendente',
-                    'cte_id' => $cte_id,
-                    'chave_acesso' => $chave,
-                    'consulta' => $consulta,
-                ]);
-                logOperacao('emitir_cte_sefaz', "Enviou CT-e #{$cte['numero_cte']} mas consulta falhou/pendente", 'info', $cte_id, $_POST, ['consulta' => $consulta]);
-                break;
+            // Consultar para obter cStat/protocolo após o envio (ou usar retorno imediato)
+            $protocolo = $envio['protocolo'] ?? null;
+            $cStat = (string) ($envio['cStat_prot'] ?? $envio['cStat'] ?? '');
+            if ($protocolo === null || $cStat === '' || !in_array($cStat, ['100', '150'], true)) {
+                $consulta = $cteService->consultarPorChave($chave);
+                if ($consulta['success']) {
+                    $dados = $consulta['data'] ?? [];
+                    $protocolo = $dados['protocolo'] ?? $protocolo;
+                    $cStat = (string) ($dados['cStat'] ?? $cStat);
+                } elseif ($protocolo === null) {
+                    echo json_encode([
+                        'success' => true,
+                        'message' => 'CT-e enviado. Autorização ainda não consultável no momento.',
+                        'status' => 'pendente',
+                        'cte_id' => $cte_id,
+                        'chave_acesso' => $chave,
+                        'consulta' => $consulta,
+                    ], JSON_UNESCAPED_UNICODE);
+                    logOperacao('emitir_cte_sefaz', "Enviou CT-e #{$cte['numero_cte']} mas consulta falhou/pendente", 'info', $cte_id, $_POST, ['consulta' => $consulta]);
+                    break;
+                }
             }
 
-            $dados = $consulta['data'] ?? [];
-            $protocolo = $dados['protocolo'] ?? null;
-            $cStat = (string)($dados['cStat'] ?? '');
             $status = ($cStat === '100' || $cStat === '150') ? 'autorizado' : 'pendente';
 
             try {
@@ -3327,7 +3505,8 @@ try {
             
         case 'criar_mdfe':
             fiscal_api_rate_limit_or_json_429('fiscal_criar_mdfe', 25, 300);
-            // CRIAR MDF-e (Manifesto Eletrônico de Documentos Fiscais)
+            mdfe_normalize_wizard_post($_POST);
+
             $cte_ids = $_POST['cte_ids'] ?? [];
             if (!is_array($cte_ids)) {
                 $cte_ids = $cte_ids !== '' && $cte_ids !== null ? [intval($cte_ids)] : [];
@@ -3335,6 +3514,12 @@ try {
                 $cte_ids = array_values(array_filter(array_map('intval', $cte_ids), function($v) { return $v > 0; }));
             }
             $cte_ids = array_values(array_unique($cte_ids));
+            if (empty($cte_ids)) {
+                $fromOrigem = mdfe_parse_json_any($_POST['origem_cte_ids'] ?? '', []);
+                $cte_ids = array_values(array_unique(array_filter(array_map('intval', $fromOrigem), function ($v) {
+                    return $v > 0;
+                })));
+            }
             $origem_mdfe = trim((string)($_POST['origem_mdfe'] ?? ''));
             $origem_nfe_ids_raw = $_POST['origem_nfe_ids'] ?? [];
             if (is_string($origem_nfe_ids_raw)) {
@@ -3351,13 +3536,18 @@ try {
             $motorista_id = $_POST['motorista_id'] ?? null;
             $rota_id = $_POST['rota_id'] ?? null;
             $data_viagem = $_POST['data_viagem'] ?? date('Y-m-d');
-            
-            if (empty($cte_ids) && empty($origem_nfe_ids)) {
-                throw new Exception('É necessário selecionar pelo menos um CT-e ou NF-e para o manifesto');
+
+            $documentos_mdfe = mdfeParseJsonAny($_POST['doc_documentos_json'] ?? '', []);
+            [$cte_ids, $origem_nfe_ids] = mdfe_resolver_ids_documentos($conn, (int) $empresa_id, $cte_ids, $origem_nfe_ids, $documentos_mdfe);
+            [$veiculo_id, $motorista_id] = mdfe_resolver_veiculo_motorista($conn, (int) $empresa_id, $_POST, $veiculo_id, $motorista_id);
+
+            $chavesDoc = mdfe_documentos_tem_chaves($documentos_mdfe);
+            if (empty($cte_ids) && empty($origem_nfe_ids) && ($chavesDoc['cte'] + $chavesDoc['nfe']) === 0) {
+                throw new Exception('É necessário vincular ao menos um CT-e ou NF-e (sistema ou chave no wizard de documentos)');
             }
             
             if (!$veiculo_id || !$motorista_id) {
-                throw new Exception('Veículo e motorista são obrigatórios');
+                throw new Exception('Veículo e motorista são obrigatórios (selecione na frota ou informe placa + condutor com CPF)');
             }
             
             // Capturar campos adicionais
@@ -3372,7 +3562,8 @@ try {
             $modo_validacao = trim((string)($_POST['modo'] ?? 'emissao'));
             $rota_tem_pedagio = !empty($_POST['rota_tem_pedagio']) && (string)$_POST['rota_tem_pedagio'] !== '0';
 
-            $documentos_mdfe = mdfeParseJsonAny($_POST['doc_documentos_json'] ?? '', []);
+            $condutores_mdfe = mdfe_parse_json_any($_POST['rod_condutores_json'] ?? '', []);
+            $reboques_mdfe = mdfe_parse_json_any($_POST['rod_reboques_json'] ?? '', []);
             $pagamentos_mdfe = mdfeParseJsonAny($_POST['rod_pagamentos_frete_json'] ?? '', []);
             $contratantes_mdfe = mdfeParseJsonAny($_POST['rod_contratantes_json'] ?? '', []);
             $ciot_mdfe = mdfeParseJsonAny($_POST['rod_ciot_json'] ?? '', []);
@@ -3386,6 +3577,16 @@ try {
                 'tipo_rodado' => trim((string)($_POST['rod_tipo_rodado'] ?? '')),
                 'tipo_carroceria' => trim((string)($_POST['rod_tipo_carroceria'] ?? '')),
             ];
+
+            $rota_id_int = (int) ($rota_id ?? 0);
+            $ciot_auto_pef = false;
+            if (empty($ciot_mdfe) && $rota_id_int > 0) {
+                $autoCiot = sf_pef_ciot_auto_por_rota((int) $empresa_id, $rota_id_int);
+                if ($autoCiot) {
+                    $ciot_mdfe = [$autoCiot];
+                    $ciot_auto_pef = true;
+                }
+            }
             
             if (!$uf_inicio || !$uf_fim) {
                 throw new Exception('UF de início e fim são obrigatórias');
@@ -3568,7 +3769,7 @@ try {
             foreach ($wizardKeys as $wk) {
                 if (array_key_exists($wk, $_POST)) { $persistirWizard = true; break; }
             }
-            if ($persistirWizard) {
+            if ($persistirWizard || $ciot_auto_pef) {
                 persistMdfeWizardEstruturado($conn, (int)$empresa_id, (int)$mdfe_id, [
                     'ciots' => $ciot_mdfe,
                     'vales_pedagio' => $vales_mdfe,
@@ -3579,6 +3780,22 @@ try {
                     'totais' => is_array($totais_mdfe) ? $totais_mdfe : [],
                 ]);
             }
+
+            persistMdfeMeta($conn, (int)$empresa_id, (int)$mdfe_id, [
+                'tipo_emitente' => $tipo_emitente,
+                'tipo_transportador' => $tipo_transportador,
+                'rodoviario' => $rodoviario_mdfe,
+                'municipio_carregamento' => $municipio_carregamento,
+                'municipio_descarregamento' => $municipio_descarregamento,
+                'uf_inicio' => $uf_inicio,
+                'uf_fim' => $uf_fim,
+            ]);
+            if (!empty($documentos_mdfe)) {
+                mdfe_persist_documentos_extended($conn, (int)$empresa_id, (int)$mdfe_id, $documentos_mdfe);
+            }
+            mdfe_persist_percurso($conn, (int)$empresa_id, (int)$mdfe_id, $_POST['ufs_percurso'] ?? '');
+            mdfe_persist_condutores($conn, (int)$empresa_id, (int)$mdfe_id, is_array($condutores_mdfe) ? $condutores_mdfe : []);
+            mdfe_persist_reboques($conn, (int)$empresa_id, (int)$mdfe_id, is_array($reboques_mdfe) ? $reboques_mdfe : []);
             
             // Atualizar mdfe_id no fiscal_cte (se a coluna existir)
             try {
@@ -3616,6 +3833,7 @@ try {
                 'nfe_ids' => $origem_nfe_ids,
                 'validation_version' => $resultadoValidacao['versao_regra'] ?? null,
                 'warnings' => $resultadoValidacao['warnings'] ?? [],
+                'ciot_auto_pef' => $ciot_auto_pef,
             ]);
             
             logOperacao('criacao_mdfe', "Criou MDF-e #$numero_mdfe com " . count($cte_ids) . " CT-e", 'sucesso', $mdfe_id, $_POST);
@@ -3698,6 +3916,40 @@ try {
                     }
                 } catch (Throwable $e) {
                     $documento['wizard_estruturado'] = [];
+                }
+            }
+
+            if ($tipo === 'cte') {
+                cte_ensure_extended_schema($conn);
+                cte_ensure_eventos_schema($conn);
+                try {
+                    $stIt = $conn->prepare('SELECT * FROM fiscal_cte_itens WHERE cte_id = ? LIMIT 1');
+                    $stIt->execute([$id]);
+                    $documento['itens'] = $stIt->fetch(PDO::FETCH_ASSOC) ?: [];
+                } catch (Throwable $e) {
+                    $documento['itens'] = [];
+                }
+                try {
+                    $stN = $conn->prepare('
+                        SELECT id, numero_nfe, chave_acesso, valor_total, peso_carga, status,
+                               cliente_remetente, cliente_destinatario
+                        FROM fiscal_nfe_clientes WHERE cte_id = ? AND empresa_id = ?
+                    ');
+                    $stN->execute([$id, $empresa_id]);
+                    $documento['nfes_vinculadas'] = $stN->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                } catch (Throwable $e) {
+                    $documento['nfes_vinculadas'] = [];
+                }
+                try {
+                    $stEv = $conn->prepare('
+                        SELECT id, tp_evento, n_seq_evento, protocolo_evento, status, criado_em
+                        FROM fiscal_cte_eventos WHERE cte_id = ? AND empresa_id = ?
+                        ORDER BY id DESC LIMIT 20
+                    ');
+                    $stEv->execute([$id, $empresa_id]);
+                    $documento['eventos'] = $stEv->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                } catch (Throwable $e) {
+                    $documento['eventos'] = [];
                 }
             }
             
@@ -3948,6 +4200,30 @@ try {
 
             if ($tipo === 'mdfe' && $persistirWizardEstruturado && is_array($wizardPayloadEstruturado)) {
                 persistMdfeWizardEstruturado($conn, (int)$empresa_id, (int)$id, $wizardPayloadEstruturado);
+            }
+
+            if ($tipo === 'mdfe') {
+                $tipo_emitente_upd = trim((string)($_POST['tipo_emitente'] ?? ''));
+                if ($tipo_emitente_upd !== '' || array_key_exists('rod_rntrc', $_POST) || array_key_exists('doc_documentos_json', $_POST)) {
+                    persistMdfeMeta($conn, (int)$empresa_id, (int)$id, [
+                        'tipo_emitente' => $tipo_emitente_upd,
+                        'tipo_transportador' => trim((string)($_POST['tipo_transportador'] ?? '')),
+                        'rodoviario' => [
+                            'rntrc' => trim((string)($_POST['rod_rntrc'] ?? '')),
+                            'placa' => trim((string)($_POST['rod_placa'] ?? '')),
+                            'tipo_rodado' => trim((string)($_POST['rod_tipo_rodado'] ?? '')),
+                            'tipo_carroceria' => trim((string)($_POST['rod_tipo_carroceria'] ?? '')),
+                        ],
+                        'municipio_carregamento' => $_POST['municipio_carregamento'] ?? null,
+                        'municipio_descarregamento' => $_POST['municipio_descarregamento'] ?? null,
+                        'uf_inicio' => $_POST['uf_inicio'] ?? null,
+                        'uf_fim' => $_POST['uf_fim'] ?? null,
+                    ]);
+                }
+                if (array_key_exists('doc_documentos_json', $_POST)) {
+                    $docsUpd = mdfeParseJsonAny($_POST['doc_documentos_json'] ?? '', []);
+                    persistMdfeDocumentos($conn, (int)$empresa_id, (int)$id, is_array($docsUpd) ? $docsUpd : []);
+                }
             }
 
                 if ($useTxnMdfeUpdate) {
@@ -4342,15 +4618,144 @@ try {
             }
             break;
             
+        case 'consultar_status_cte_sefaz':
+            fiscal_api_rate_limit_or_json_429('fiscal_status_cte', 30, 300);
+            if (!CTeService::disponivel()) {
+                throw new Exception('Pacote sped-cte não instalado.');
+            }
+            $svc = new CTeService((int) $empresa_id);
+            $uf = trim((string) ($_GET['uf'] ?? $_POST['uf'] ?? ''));
+            $res = $svc->consultarStatusServico($uf !== '' ? $uf : null);
+            echo json_encode($res, JSON_UNESCAPED_UNICODE);
+            break;
+
+        case 'cte_cce':
+            fiscal_api_rate_limit_or_json_429('fiscal_cte_cce', 15, 300);
+            cte_ensure_eventos_schema($conn);
+            $cte_id = (int) ($_POST['cte_id'] ?? 0);
+            $texto = trim((string) ($_POST['correcao'] ?? $_POST['texto_correcao'] ?? ''));
+            $grupo = trim((string) ($_POST['grupo_alterado'] ?? 'infAdic'));
+            $campo = trim((string) ($_POST['campo_alterado'] ?? 'infCpl'));
+            if ($cte_id <= 0) {
+                throw new Exception('cte_id é obrigatório.');
+            }
+            if ($texto === '') {
+                throw new Exception('Texto da correção é obrigatório.');
+            }
+            $inf = cte_build_inf_correcao($grupo, $campo, $texto);
+            $res = cte_processar_cce($conn, (int) $empresa_id, $cte_id, $inf);
+            echo json_encode($res, JSON_UNESCAPED_UNICODE);
+            logOperacao('cte_cce', 'CC-e CT-e #' . $cte_id, !empty($res['success']) ? 'sucesso' : 'erro', $cte_id);
+            break;
+
+        case 'cte_desacordo':
+            fiscal_api_rate_limit_or_json_429('fiscal_cte_desacordo', 10, 300);
+            cte_ensure_eventos_schema($conn);
+            $cte_id = (int) ($_POST['cte_id'] ?? 0);
+            $xObs = trim((string) ($_POST['observacao'] ?? $_POST['justificativa'] ?? ''));
+            $ufEv = trim((string) ($_POST['uf_evento'] ?? 'RS'));
+            if ($cte_id <= 0) {
+                throw new Exception('cte_id é obrigatório.');
+            }
+            $res = cte_processar_desacordo($conn, (int) $empresa_id, $cte_id, $xObs, $ufEv);
+            echo json_encode($res, JSON_UNESCAPED_UNICODE);
+            logOperacao('cte_desacordo', 'Desacordo tomador CT-e #' . $cte_id, !empty($res['success']) ? 'sucesso' : 'erro', $cte_id);
+            break;
+
+        case 'cte_comprovante_entrega':
+            fiscal_api_rate_limit_or_json_429('fiscal_cte_ce', 15, 300);
+            cte_ensure_eventos_schema($conn);
+            $cte_id = (int) ($_POST['cte_id'] ?? 0);
+            if ($cte_id <= 0) {
+                throw new Exception('cte_id é obrigatório.');
+            }
+            $dados = [
+                'x_nome' => $_POST['nome_recebedor'] ?? '',
+                'n_doc' => $_POST['doc_recebedor'] ?? '',
+                'dh_entrega' => $_POST['dh_entrega'] ?? '',
+                'latitude' => $_POST['latitude'] ?? '',
+                'longitude' => $_POST['longitude'] ?? '',
+                'assinatura_base64' => $_POST['assinatura_base64'] ?? '',
+            ];
+            $res = cte_processar_comprovante_entrega($conn, (int) $empresa_id, $cte_id, $dados);
+            echo json_encode($res, JSON_UNESCAPED_UNICODE);
+            logOperacao('cte_comprovante', 'Comprovante entrega CT-e #' . $cte_id, !empty($res['success']) ? 'sucesso' : 'erro', $cte_id);
+            break;
+
+        case 'cte_cancelar_comprovante':
+            fiscal_api_rate_limit_or_json_429('fiscal_cte_cancel_ce', 10, 300);
+            cte_ensure_eventos_schema($conn);
+            $cte_id = (int) ($_POST['cte_id'] ?? 0);
+            $nProtCE = trim((string) ($_POST['protocolo_ce'] ?? ''));
+            if ($cte_id <= 0) {
+                throw new Exception('cte_id é obrigatório.');
+            }
+            $cte = cte_carregar_para_evento($conn, $cte_id, (int) $empresa_id);
+            if (!$cte) {
+                throw new Exception('CT-e não encontrado.');
+            }
+            if ($nProtCE === '') {
+                $st = $conn->prepare('SELECT ult_protocolo_ce FROM fiscal_cte_itens WHERE cte_id = ? LIMIT 1');
+                $st->execute([$cte_id]);
+                $nProtCE = trim((string) ($st->fetchColumn() ?: ''));
+            }
+            if ($nProtCE === '') {
+                throw new Exception('Protocolo do comprovante não informado.');
+            }
+            $chave = preg_replace('/\D/', '', (string) ($cte['chave_acesso'] ?? ''));
+            $nProt = trim((string) ($cte['protocolo_autorizacao'] ?? ''));
+            $svc = new CTeService((int) $empresa_id);
+            $res = $svc->cancelarComprovanteEntrega($chave, $nProt, $nProtCE);
+            echo json_encode($res, JSON_UNESCAPED_UNICODE);
+            break;
+
+        case 'cte_inutilizar':
+            fiscal_api_rate_limit_or_json_429('fiscal_cte_inutil', 10, 300);
+            $serie = (int) ($_POST['serie'] ?? 1);
+            $nIni = (int) ($_POST['numero_inicio'] ?? 0);
+            $nFin = (int) ($_POST['numero_fim'] ?? 0);
+            $just = trim((string) ($_POST['justificativa'] ?? ''));
+            $res = cte_processar_inutilizacao($conn, (int) $empresa_id, $serie, $nIni, $nFin, $just);
+            echo json_encode($res, JSON_UNESCAPED_UNICODE);
+            break;
+
+        case 'documentos_para_cte':
+            fiscal_api_rate_limit_or_json_429('fiscal_docs_cte', 60, 300);
+            cte_ensure_extended_schema($conn);
+            $lim = isset($_GET['limit']) ? (int) $_GET['limit'] : 100;
+            $dados = cte_listar_dados_wizard($conn, (int) $empresa_id, $lim);
+            echo json_encode([
+                'success' => true,
+                'nfes' => $dados['nfes'],
+                'veiculos' => $dados['veiculos'],
+                'motoristas' => $dados['motoristas'],
+            ], JSON_UNESCAPED_UNICODE);
+            break;
+
+        case 'documentos_para_mdfe':
+            fiscal_api_rate_limit_or_json_429('fiscal_docs_mdfe', 60, 300);
+            mdfe_ensure_extended_schema($conn);
+            $lim = isset($_GET['limit']) ? (int) $_GET['limit'] : 100;
+            $docs = mdfe_listar_documentos_disponiveis($conn, (int) $empresa_id, $lim);
+            echo json_encode([
+                'success' => true,
+                'ctes' => $docs['ctes'],
+                'nfes' => $docs['nfes'],
+            ]);
+            break;
+
         case 'cancelar_mdfe':
             fiscal_api_rate_limit_or_json_429('fiscal_cancelar_mdfe', 20, 300);
-            // Cancelar MDF-e: só se AUTORIZADO, não encerrado e dentro de 24h da autorização
             $id = $_POST['id'] ?? $_GET['id'] ?? null;
+            $justificativa = trim((string)($_POST['justificativa'] ?? ''));
             if (!$id) {
                 throw new Exception('ID do MDF-e é obrigatório');
             }
+            if (strlen($justificativa) < 15) {
+                throw new Exception('Justificativa do cancelamento é obrigatória (mínimo 15 caracteres).');
+            }
             $stmt = $conn->prepare("
-                SELECT id, status, chave_acesso, data_autorizacao, data_emissao, data_encerramento
+                SELECT id, status, chave_acesso, protocolo_autorizacao, data_autorizacao, data_emissao, data_encerramento
                 FROM fiscal_mdfe
                 WHERE id = ? AND empresa_id = ?
                 LIMIT 1
@@ -4367,10 +4772,13 @@ try {
                 throw new Exception('MDF-e já encerrado. Não é possível cancelar.');
             }
 
-            // Regra crítica: validar com SEFAZ antes de cancelar (bloqueia se já houver encerramento)
             $chaveAc = preg_replace('/\D/', '', (string)($mdfe['chave_acesso'] ?? ''));
             if (empty($chaveAc) || strlen($chaveAc) < 44) {
                 throw new Exception('MDF-e sem chave_acesso válida. Faça emissão/autorização antes de cancelar.');
+            }
+            $nProt = trim((string)($mdfe['protocolo_autorizacao'] ?? ''));
+            if ($nProt === '') {
+                throw new Exception('MDF-e sem protocolo de autorização. Consulte o status na SEFAZ antes de cancelar.');
             }
 
             $mdfeService = new MdfeService((int)$empresa_id);
@@ -4378,7 +4786,6 @@ try {
             $tpEventos = $consulta['tpEventos'] ?? [];
             $cStat = (string)($consulta['cStat'] ?? '');
 
-            // 110112 = encerramento; 110111 = cancelamento (conforme tpEvento do MDF-e)
             if (in_array('110112', $tpEventos, true) || $cStat === '132') {
                 throw new Exception('MDF-e já encerrado na SEFAZ. Não é permitido cancelar.');
             }
@@ -4391,21 +4798,34 @@ try {
             if ($dataRef < $limite24h) {
                 throw new Exception('Prazo para cancelamento expirado (24 horas após autorização). Use Encerrar MDF-e.');
             }
+
+            $evento = $mdfeService->cancelarMdfe($chaveAc, $nProt, $justificativa);
+            if (empty($evento['sucesso'])) {
+                throw new Exception($evento['erro'] ?? 'SEFAZ rejeitou o cancelamento do MDF-e.');
+            }
+
             $stmt = $conn->prepare("UPDATE fiscal_mdfe SET status = 'cancelado', updated_at = ? WHERE id = ? AND empresa_id = ?");
             $stmt->execute([date('Y-m-d H:i:s'), $id, $empresa_id]);
-            echo json_encode(['success' => true, 'message' => 'MDF-e cancelado com sucesso.', 'status' => 'cancelado']);
-            logOperacao('cancelar_mdfe', "Cancelou MDF-e #$id", 'sucesso', $id);
+            sf_pef_desvincular_mdfe((int) $empresa_id, (int) $id);
+            echo json_encode([
+                'success' => true,
+                'message' => 'MDF-e cancelado na SEFAZ com sucesso.',
+                'status' => 'cancelado',
+                'protocolo_evento' => $evento['protocolo'] ?? null,
+                'cStat' => $evento['cStat'] ?? null,
+            ]);
+            logOperacao('cancelar_mdfe', "Cancelou MDF-e #$id na SEFAZ", 'sucesso', $id);
             break;
             
         case 'encerrar_mdfe':
             fiscal_api_rate_limit_or_json_429('fiscal_encerrar_mdfe', 15, 300);
-            // Encerrar MDF-e: finaliza a viagem (obrigatório por lei)
             $id = $_POST['id'] ?? $_GET['id'] ?? null;
             if (!$id) {
                 throw new Exception('ID do MDF-e é obrigatório');
             }
             $stmt = $conn->prepare("
-                SELECT id, status, chave_acesso, data_autorizacao, data_emissao, data_encerramento
+                SELECT id, status, chave_acesso, protocolo_autorizacao, uf_fim, municipio_descarregamento,
+                       cod_mun_desc_ibge, data_autorizacao, data_emissao, data_encerramento
                 FROM fiscal_mdfe
                 WHERE id = ? AND empresa_id = ?
                 LIMIT 1
@@ -4422,10 +4842,13 @@ try {
                 throw new Exception('MDF-e já está encerrado.');
             }
 
-            // Regra crítica: validar com SEFAZ antes de encerrar (evita duplicidade e garante consistência)
             $chaveAc = preg_replace('/\D/', '', (string)($mdfe['chave_acesso'] ?? ''));
             if (empty($chaveAc) || strlen($chaveAc) < 44) {
                 throw new Exception('MDF-e sem chave_acesso válida. Faça emissão/autorização antes de encerrar.');
+            }
+            $nProt = trim((string)($mdfe['protocolo_autorizacao'] ?? ''));
+            if ($nProt === '') {
+                throw new Exception('MDF-e sem protocolo de autorização. Consulte o status na SEFAZ antes de encerrar.');
             }
 
             $mdfeService = new MdfeService((int)$empresa_id);
@@ -4440,15 +4863,44 @@ try {
                 throw new Exception('MDF-e já cancelado na SEFAZ. Encerramento não permitido.');
             }
 
+            $cMun = preg_replace('/\D/', '', (string)($mdfe['cod_mun_desc_ibge'] ?? ''));
+            if (strlen($cMun) !== 7) {
+                $cMun = mdfeResolverIbgeMunicipio(
+                    $conn,
+                    (string)($mdfe['municipio_descarregamento'] ?? ''),
+                    (string)($mdfe['uf_fim'] ?? '')
+                );
+            }
+            if (strlen($cMun) !== 7) {
+                throw new Exception('Município de encerramento (IBGE) não informado no MDF-e.');
+            }
+            $cUfIbge = mdfeUfParaCodigoIbge((string)($mdfe['uf_fim'] ?? ''));
+
+            $evento = $mdfeService->encerrarMdfe($chaveAc, $nProt, $cMun, $cUfIbge);
+            if (empty($evento['sucesso'])) {
+                throw new Exception($evento['erro'] ?? 'SEFAZ rejeitou o encerramento do MDF-e.');
+            }
+
             $stmt = $conn->prepare("UPDATE fiscal_mdfe SET status = 'encerrado', data_encerramento = ?, updated_at = ? WHERE id = ? AND empresa_id = ?");
             $stmt->execute([date('Y-m-d H:i:s'), date('Y-m-d H:i:s'), $id, $empresa_id]);
-            echo json_encode(['success' => true, 'message' => 'MDF-e encerrado com sucesso.', 'status' => 'encerrado']);
-            logOperacao('encerrar_mdfe', "Encerrou MDF-e #$id", 'sucesso', $id);
+            $avisosPef = sf_pef_encerrar_vinculados_mdfe((int) $empresa_id, (int) $id);
+            $msgEnc = 'MDF-e encerrado na SEFAZ com sucesso.';
+            if ($avisosPef) {
+                $msgEnc .= ' Avisos PEF/CIOT: ' . implode(' | ', $avisosPef);
+            }
+            echo json_encode([
+                'success' => true,
+                'message' => $msgEnc,
+                'status' => 'encerrado',
+                'protocolo_evento' => $evento['protocolo'] ?? null,
+                'cStat' => $evento['cStat'] ?? null,
+                'avisos_pef' => $avisosPef,
+            ]);
+            logOperacao('encerrar_mdfe', "Encerrou MDF-e #$id na SEFAZ", 'sucesso', $id);
             break;
             
         case 'incluir_condutor_mdfe':
             fiscal_api_rate_limit_or_json_429('fiscal_incluir_condutor_mdfe', 30, 300);
-            // Incluir/trocar condutor durante a viagem (evento SEFAZ - aqui só atualiza o banco; integração SEFAZ pode ser feita depois)
             $id = $_POST['id'] ?? null;
             $motorista_id = isset($_POST['motorista_id']) ? (int)$_POST['motorista_id'] : null;
             if (!$id) {
@@ -4457,7 +4909,11 @@ try {
             if (!$motorista_id) {
                 throw new Exception('Novo motorista é obrigatório para inclusão de condutor');
             }
-            $stmt = $conn->prepare("SELECT id, status, data_encerramento FROM fiscal_mdfe WHERE id = ? AND empresa_id = ?");
+            $stmt = $conn->prepare("
+                SELECT id, status, chave_acesso, data_encerramento
+                FROM fiscal_mdfe
+                WHERE id = ? AND empresa_id = ?
+            ");
             $stmt->execute([$id, $empresa_id]);
             $mdfe = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!$mdfe) {
@@ -4469,10 +4925,38 @@ try {
             if (!empty($mdfe['data_encerramento'])) {
                 throw new Exception('MDF-e já encerrado. Não é possível incluir condutor.');
             }
+
+            $stMot = $conn->prepare('SELECT nome, cpf FROM motoristas WHERE id = ? AND empresa_id = ? LIMIT 1');
+            $stMot->execute([$motorista_id, $empresa_id]);
+            $motorista = $stMot->fetch(PDO::FETCH_ASSOC);
+            if (!$motorista) {
+                throw new Exception('Motorista não encontrado para esta empresa.');
+            }
+
+            $chaveAc = preg_replace('/\D/', '', (string)($mdfe['chave_acesso'] ?? ''));
+            if (strlen($chaveAc) !== 44) {
+                throw new Exception('MDF-e sem chave_acesso válida.');
+            }
+
+            $mdfeService = new MdfeService((int)$empresa_id);
+            $evento = $mdfeService->incluirCondutorMdfe(
+                $chaveAc,
+                (string)($motorista['nome'] ?? ''),
+                (string)($motorista['cpf'] ?? '')
+            );
+            if (empty($evento['sucesso'])) {
+                throw new Exception($evento['erro'] ?? 'SEFAZ rejeitou a inclusão de condutor.');
+            }
+
             $stmt = $conn->prepare("UPDATE fiscal_mdfe SET motorista_id = ?, updated_at = ? WHERE id = ? AND empresa_id = ?");
             $stmt->execute([$motorista_id, date('Y-m-d H:i:s'), $id, $empresa_id]);
-            echo json_encode(['success' => true, 'message' => 'Condutor incluído/atualizado no MDF-e.']);
-            logOperacao('incluir_condutor_mdfe', "Incluiu condutor no MDF-e #$id", 'sucesso', $id);
+            echo json_encode([
+                'success' => true,
+                'message' => 'Condutor incluído na SEFAZ e atualizado no MDF-e.',
+                'protocolo_evento' => $evento['protocolo'] ?? null,
+                'cStat' => $evento['cStat'] ?? null,
+            ]);
+            logOperacao('incluir_condutor_mdfe', "Incluiu condutor no MDF-e #$id via SEFAZ", 'sucesso', $id);
             break;
             
         case 'processar_evento':
@@ -5338,7 +5822,7 @@ try {
 
     echo json_encode([
         'success' => false,
-        'error' => $e->getMessage(),
+        'error' => 'Erro ao processar a solicitação fiscal.',
     ], JSON_UNESCAPED_UNICODE);
 }
 ?>

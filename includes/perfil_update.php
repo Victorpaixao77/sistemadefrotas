@@ -70,7 +70,19 @@ elseif ($acao === 'senha') {
     if ($nova_senha !== $confirmar_senha) {
         $errors[] = 'As senhas não coincidem.';
     }
-    if (strlen($nova_senha) < 6) {
+    // Política de senha forte (conforme configuração da empresa)
+    if (is_file(__DIR__ . '/security.php')) {
+        require_once __DIR__ . '/security.php';
+        $sec_cfg = sf_security_config((int) $empresa_id);
+        if (!empty($sec_cfg['senha_forte'])) {
+            $pv = sf_password_validate($nova_senha);
+            if (!$pv['ok']) {
+                $errors[] = 'Senha fraca: ' . implode(' ', $pv['erros']);
+            }
+        } elseif (strlen($nova_senha) < 6) {
+            $errors[] = 'A nova senha deve ter pelo menos 6 caracteres.';
+        }
+    } elseif (strlen($nova_senha) < 6) {
         $errors[] = 'A nova senha deve ter pelo menos 6 caracteres.';
     }
     if (count($errors) === 0) {

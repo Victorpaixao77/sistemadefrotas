@@ -1,66 +1,72 @@
 <?php
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
+require_once 'includes/csrf.php';
 
 configure_session();
 session_start();
 
-$page_title = 'Recuperar Senha';
+$page_title = 'Recuperar senha';
 $message = '';
 $error = '';
+$recovery_url = '';
 
-// If user is already logged in, redirect to index
 if (isset($_SESSION['loggedin']) && $_SESSION['loggedin'] === true) {
-    header("location: index.php");
+    header('location: index.php');
     exit;
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = trim($_POST["email"]);
-    
-    if (empty($email)) {
-        $error = "Por favor, digite seu email.";
-    } else if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = "Por favor, digite um email válido.";
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrf_token_validate($_POST['csrf_token'] ?? null)) {
+        $error = 'Sessão expirada ou token inválido. Recarregue a página e tente novamente.';
     } else {
-        try {
-            $conn = getConnection();
-            
-            // Check if email exists
-            $sql = "SELECT id, nome, email FROM usuarios WHERE email = :email AND status = 'ativo'";
-            $stmt = $conn->prepare($sql);
-            $stmt->bindParam(":email", $email, PDO::PARAM_STR);
-            
-            if ($stmt->execute() && $stmt->rowCount() == 1) {
-                $user = $stmt->fetch();
-                
-                // Generate reset token
-                $reset_token = bin2hex(random_bytes(32));
-                $reset_expires = date('Y-m-d H:i:s', time() + (60 * 60)); // 1 hour from now
-                
-                // Store reset token in database
-                $sql_update = "UPDATE usuarios SET reset_token = :token, reset_expires = :expires WHERE id = :id";
-                $stmt_update = $conn->prepare($sql_update);
-                $stmt_update->bindParam(":token", $reset_token, PDO::PARAM_STR);
-                $stmt_update->bindParam(":expires", $reset_expires, PDO::PARAM_STR);
-                $stmt_update->bindParam(":id", $user['id'], PDO::PARAM_INT);
-                
-                if ($stmt_update->execute()) {
-                    // Send email (in a real application, you would send an actual email)
-                    $reset_link = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . "/reset_senha.php?token=" . $reset_token;
-                    
-                    // For demo purposes, we'll just show the link
-                    $message = "Um link de recuperação foi enviado para seu email. <br><br>";
-                    $message .= "<strong>Link de recuperação:</strong> <a href='" . $reset_link . "' target='_blank'>" . $reset_link . "</a><br><br>";
-                    $message .= "<small>Este link expira em 1 hora.</small>";
+        $email = trim((string) ($_POST['email'] ?? ''));
+
+        if ($email === '') {
+            $error = 'Por favor, digite seu e-mail.';
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = 'Por favor, digite um e-mail válido.';
+        } else {
+            try {
+                $conn = getConnection();
+
+                $sql = 'SELECT id, nome, email FROM usuarios WHERE email = :email AND status = \'ativo\'';
+                $stmt = $conn->prepare($sql);
+                $stmt->bindParam(':email', $email, PDO::PARAM_STR);
+
+                if ($stmt->execute() && $stmt->rowCount() === 1) {
+                    $user = $stmt->fetch();
+
+                    $reset_token = bin2hex(random_bytes(32));
+                    $reset_expires = date('Y-m-d H:i:s', time() + 3600);
+
+                    $sql_update = 'UPDATE usuarios SET reset_token = :token, reset_expires = :expires WHERE id = :id';
+                    $stmt_update = $conn->prepare($sql_update);
+                    $stmt_update->bindParam(':token', $reset_token, PDO::PARAM_STR);
+                    $stmt_update->bindParam(':expires', $reset_expires, PDO::PARAM_STR);
+                    $stmt_update->bindParam(':id', $user['id'], PDO::PARAM_INT);
+
+                    if ($stmt_update->execute()) {
+                        $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                            || (isset($_SERVER['SERVER_PORT']) && (string) $_SERVER['SERVER_PORT'] === '443')
+                            || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https');
+                        $scheme = $https ? 'https' : 'http';
+                        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                        $basePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
+                        $pathPrefix = $basePath !== '' ? $basePath : '';
+                        $reset_link = $scheme . '://' . $host . $pathPrefix . '/reset_senha.php?token=' . rawurlencode($reset_token);
+
+                        $message = 'ok';
+                        $recovery_url = $reset_link;
+                    } else {
+                        $error = 'Erro ao gerar token de recuperação. Tente novamente.';
+                    }
                 } else {
-                    $error = "Erro ao gerar token de recuperação. Tente novamente.";
+                    $error = 'E-mail não encontrado ou usuário inativo.';
                 }
-            } else {
-                $error = "Email não encontrado ou usuário inativo.";
+            } catch (PDOException $e) {
+                $error = 'Erro: ' . $e->getMessage();
             }
-        } catch(PDOException $e) {
-            $error = "Erro: " . $e->getMessage();
         }
     }
 }
@@ -70,183 +76,86 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $page_title; ?> - Sistema de Gestão de Frotas</title>
-    <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="css/theme.css">
+    <title><?php echo htmlspecialchars($page_title, ENT_QUOTES, 'UTF-8'); ?> — Frotec</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/login-frotec.css?v=<?php echo htmlspecialchars(sf_asset_v(), ENT_QUOTES, 'UTF-8'); ?>">
     <link rel="icon" type="image/png" href="logo.png">
-    
-    <style>
-        body {
-            background: #101522;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-        
-        .login-container {
-            background: #1a2332;
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-        }
-        
-        .login-header {
-            margin-bottom: 30px;
-        }
-        
-        .login-header h1 {
-            color: #ffffff;
-            font-size: 28px;
-            margin-bottom: 10px;
-        }
-        
-        .login-header p {
-            color: #b8c2d0;
-            font-size: 14px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-            text-align: left;
-        }
-        
-        .form-group label {
-            display: block;
-            color: #ffffff;
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 12px 15px;
-            border: 1px solid #2d3748;
-            border-radius: 5px;
-            background: #243041;
-            color: #ffffff;
-            font-size: 16px;
-            box-sizing: border-box;
-        }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-        }
-        
-        .btn-primary {
-            width: 100%;
-            padding: 12px;
-            background: #3b82f6;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        
-        .btn-primary:hover {
-            background: #2563eb;
-        }
-        
-        .btn-secondary {
-            width: 100%;
-            padding: 12px;
-            background: transparent;
-            color: #b8c2d0;
-            border: 1px solid #2d3748;
-            border-radius: 5px;
-            font-size: 16px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-decoration: none;
-            display: inline-block;
-            box-sizing: border-box;
-        }
-        
-        .btn-secondary:hover {
-            background: #243041;
-            color: #ffffff;
-        }
-        
-        .message {
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        
-        .message.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .message.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        .back-link {
-            margin-top: 20px;
-            text-align: center;
-        }
-        
-        .back-link a {
-            color: #3b82f6;
-            text-decoration: none;
-            font-size: 14px;
-        }
-        
-        .back-link a:hover {
-            text-decoration: underline;
-        }
-    </style>
 </head>
-<body>
-    <div class="login-container">
-        <div class="login-header">
-            <h1><i class="fas fa-key"></i> Recuperar Senha</h1>
-            <p>Digite seu email para receber um link de recuperação</p>
-        </div>
-        
-        <?php if (!empty($message)): ?>
-            <div class="message success">
-                <?php echo $message; ?>
-            </div>
-        <?php endif; ?>
-        
-        <?php if (!empty($error)): ?>
-            <div class="message error">
-                <?php echo $error; ?>
-            </div>
-        <?php endif; ?>
-        
-        <form method="POST" action="">
-            <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" placeholder="Digite seu email" required>
-            </div>
-            
-            <button type="submit" class="btn-primary">
-                <i class="fas fa-paper-plane"></i> Enviar Link de Recuperação
-            </button>
-        </form>
-        
-        <div class="back-link">
-            <a href="login.php"><i class="fas fa-arrow-left"></i> Voltar ao Login</a>
-        </div>
+<body class="login-page">
+    <div class="login-page__bg" aria-hidden="true"></div>
+
+    <div class="login-page__quotes" aria-hidden="true">
+        <div class="login-bg-phrase login-bg-phrase--1">Simples para quem dirige.<br>Poderoso para quem gerencia.</div>
+        <div class="login-bg-phrase login-bg-phrase--2">Chega de planilhas!<br>Gestão de frotas simples, visual e eficiente.</div>
+        <div class="login-bg-phrase login-bg-phrase--3">Ideal para pequenas e médias empresas.<br>Organize veículos, motoristas, rotas e despesas sem complicações.</div>
+        <div class="login-bg-phrase login-bg-phrase--4">Mais Segurança</div>
+        <div class="login-bg-phrase login-bg-phrase--5">Aumente a Eficiência</div>
+        <div class="login-bg-phrase login-bg-phrase--6">Reduza Custos</div>
+        <div class="login-bg-phrase login-bg-phrase--7">Tempo economizado</div>
+        <div class="login-bg-phrase login-bg-phrase--8">Redução de custos</div>
+        <div class="login-bg-phrase login-bg-phrase--9">Aumento médio de eficiência</div>
+        <div class="login-bg-phrase login-bg-phrase--10">Transforme dados em decisões inteligentes.</div>
+        <div class="login-bg-phrase login-bg-phrase--11">Tenha sua frota sob controle em qualquer lugar.</div>
+        <div class="login-bg-phrase login-bg-phrase--12">Automatize processos e reduza retrabalho.</div>
+        <div class="login-bg-phrase login-bg-phrase--13">Mais tempo para focar no crescimento do seu negócio.</div>
+        <div class="login-bg-phrase login-bg-phrase--14">Relatórios claros e completos em poucos cliques.</div>
+        <div class="login-bg-phrase login-bg-phrase--15">Do cadastro ao controle financeiro, tudo em um só sistema.</div>
+        <div class="login-bg-phrase login-bg-phrase--16">Tecnologia feita para simplificar a gestão de frotas.</div>
+        <div class="login-bg-phrase login-bg-phrase--17">Gestão inteligente que cresce junto com a sua empresa.</div>
+        <div class="login-bg-phrase login-bg-phrase--18">Monitoramento ágil, decisões rápidas.</div>
     </div>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></script>
+
+    <a href="#recover-form" class="login-skip visually-hidden">Ir para o formulário</a>
+
+    <main class="login-page__main login-page__main--recover">
+        <a href="login.php" class="login-page__back"><i class="fas fa-arrow-left" aria-hidden="true"></i> Voltar ao login</a>
+
+        <div class="login-card">
+            <div class="login-brand">
+                <div class="login-brand__logo-wrap">
+                    <img src="logo.png" alt="" class="login-brand__logo" width="90" height="90" decoding="async">
+                </div>
+                <h1 class="login-brand__name">Recuperar senha</h1>
+                <p class="login-brand__tagline">Informe o e-mail da sua conta. Se existir cadastro ativo, enviaremos um link para redefinir a senha.</p>
+            </div>
+
+            <?php if ($message === 'ok' && $recovery_url !== ''): ?>
+                <div class="login-alert login-alert--success login-alert--rich" role="status">
+                    <p>Link de recuperação gerado. Abra a página abaixo para definir uma nova senha.</p>
+                    <p><a href="<?php echo htmlspecialchars($recovery_url, ENT_QUOTES, 'UTF-8'); ?>">Abrir página de nova senha</a></p>
+                    <p class="login-recover-hint">O link expira em 1 hora. Em produção, o mesmo endereço pode ser enviado automaticamente por e-mail.</p>
+                    <p class="login-recover-hint"><a href="recuperar_senha.php">Enviar link para outro e-mail</a></p>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($error !== ''): ?>
+                <div class="login-alert login-alert--error" role="alert"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
+            <?php endif; ?>
+
+            <?php if ($message !== 'ok'): ?>
+            <form id="recover-form" class="login-form" method="post" action="" autocomplete="on">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token_get(), ENT_QUOTES, 'UTF-8'); ?>">
+                <div class="login-field">
+                    <label for="email">E-mail</label>
+                    <input type="email" id="email" name="email" autocomplete="email" inputmode="email" placeholder="nome@empresa.com.br" required>
+                </div>
+                <button type="submit" class="login-submit"><i class="fas fa-paper-plane" aria-hidden="true"></i> Enviar link</button>
+            </form>
+            <?php endif; ?>
+        </div>
+
+        <p class="login-fine">Precisa de ajuda? Entre em contato com o administrador da sua empresa.</p>
+    </main>
+    <script>
+        document.querySelector('.login-form')?.addEventListener('submit', function () {
+            var btn = this.querySelector('button[type="submit"]');
+            if (!btn) return;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i> Enviando…';
+        });
+    </script>
 </body>
 </html>

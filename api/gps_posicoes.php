@@ -1,7 +1,7 @@
 <?php
 /**
  * GET — últimas posições GPS dos veículos da empresa (sessão painel web).
- * Resposta: { success, data: { posicoes: [ { veiculo_id, placa, modelo, motorista_id, motorista_nome, latitude, longitude, velocidade, data_hora } ] } }
+ * Resposta: { success, data: { posicoes: [ { veiculo_id, placa, modelo, motorista_id, motorista_nome, latitude, longitude, velocidade, data_hora, idade_seg } ] } }
  */
 
 require_once dirname(__DIR__) . '/includes/config.php';
@@ -24,7 +24,8 @@ if (!function_exists('require_authentication')) {
     api_json_error('Configuração inválida', 500);
 }
 
-require_authentication();
+require_once dirname(__DIR__) . '/includes/gps_web_api_base.php';
+gps_require_web_panel_access();
 
 $empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
 if ($empresa_id <= 0) {
@@ -93,6 +94,15 @@ try {
         return (int) $row['veiculo_id'];
     }, $rows);
     $cached = gps_redis_cache_mget_ultimas($empresa_id, $ids);
+
+    // Referência de "agora" do próprio MySQL — para calcular a idade do sinal sem
+    // depender do fuso do PHP nem do navegador (data_hora também vem do MySQL).
+    try {
+        $dbNow = (string) $conn->query('SELECT NOW()')->fetchColumn();
+    } catch (Throwable $e) {
+        $dbNow = '';
+    }
+    $dbNowTs = $dbNow !== '' ? strtotime($dbNow) : null;
 
     foreach ($rows as &$r) {
         $vid = (int) $r['veiculo_id'];
@@ -173,6 +183,15 @@ try {
             $r['location_mock'] = (int) $r['location_mock'];
         } else {
             $r['location_mock'] = null;
+        }
+
+        // Idade do sinal em segundos (referência: NOW() do MySQL) — imune a fuso.
+        $r['idade_seg'] = null;
+        if ($dbNowTs !== null && !empty($r['data_hora'])) {
+            $dhTs = strtotime((string) $r['data_hora']);
+            if ($dhTs !== false) {
+                $r['idade_seg'] = max(0, $dbNowTs - $dhTs);
+            }
         }
     }
     unset($r);

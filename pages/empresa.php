@@ -2,6 +2,7 @@
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 
 // Configure session before starting it
 configure_session();
@@ -370,6 +371,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             color: var(--text-secondary, #6c757d);
         }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body>
     <div class="app-container">
@@ -385,6 +387,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="dashboard-content">
                 <div class="dashboard-header">
                     <h1>Dados da Empresa</h1>
+                    <div class="dashboard-actions">
+                        <button type="button" class="btn-help" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                    </div>
                 </div>
                 
                 <?php echo displayFlashMessage(); ?>
@@ -717,5 +722,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </script>
 
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php $sf_help_key = 'empresa'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html>

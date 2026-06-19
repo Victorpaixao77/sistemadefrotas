@@ -1,0 +1,51 @@
+---
+description: Índice de Agent Skills (UI, UX, testes, revisão) para todo o Frotec — ler SKILL.md antes de aplicar
+alwaysApply: true
+---
+
+# Agent Skills — Frotec (projeto inteiro)
+
+**Pasta externa:** `C:\Users\victo\.agents\skills\<nome-da-skill>\SKILL.md`  
+**Pasta do projeto:** `.cursor/skills/ui-ux-pro-max/SKILL.md` (design system / UX para dashboards)
+
+Sempre que a tarefa pedir **validar site**, **melhorar interface**, **UX**, **auditoria visual** ou **testar telas**, **leia o SKILL.md indicado** e siga o fluxo — não improvise.
+
+## Stack Frotec (contexto)
+
+PHP + MySQL, páginas em `pages/`, `fiscal/pages/`, `pages_motorista/`; assets em `css/`, `js/`; Bootstrap + `fornc-modern-page.css` + `theme.css`. App Android em Kotlin separado.
+
+## Qual skill usar
+
+| Objetivo | Skill | Caminho |
+|----------|--------|---------|
+| **Auditar UI/UX e acessibilidade** (regras objetivas) | `web-design-guidelines` | `C:\Users\victo\.agents\skills\web-design-guidelines\SKILL.md` |
+| **Design system + 99 UX guidelines** (dashboard frota/SaaS) | `ui-ux-pro-max` | `.cursor/skills/ui-ux-pro-max/SKILL.md` — stack `html-tailwind` adaptado ao CSS do projeto |
+| **Redesenhar / polir telas** (identidade visual) | `frontend-design` | `C:\Users\victo\.agents\skills\frontend-design\SKILL.md` |
+| **Testar site rodando** (cliques, fluxos, screenshots) | `webapp-testing` | `C:\Users\victo\.agents\skills\webapp-testing\SKILL.md` — XAMPP `http://localhost/sistema-frotas/` |
+| **Revisão de código antes de commit/PR** | `code-ultrareview` | `C:\Users\victo\.agents\skills\code-ultrareview\SKILL.md` |
+| **Planejar fases / roadmap** | `gsd-plan-phase`, `gsd-execute-phase` | `C:\Users\victo\.agents\skills\gsd-*\SKILL.md` |
+| **Idear melhorias** | `brainstorming` | `C:\Users\victo\.agents\skills\brainstorming\SKILL.md` |
+| **Exportar docs (manual, PDF)** | `docx`, `pdf` | `C:\Users\victo\.agents\skills\docx\`, `pdf\` |
+| **Fiscal / integração** | Regras do projeto | `CLAUDE.md`, `docs/MANUAL_FISCAL_INDICE.md` |
+
+## Fluxo recomendado — “validar o sistema de novo”
+
+1. **web-design-guidelines** — auditar arquivos abertos ou `pages/`, `css/`, `js/`, `fiscal/pages/` (formato `arquivo:linha`).
+2. **ui-ux-pro-max** — gerar/consultar design system:
+   `python .cursor/skills/ui-ux-pro-max/scripts/search.py "fleet management dashboard logistics SaaS" --design-system -p "Frotec"`
+3. **webapp-testing** — Playwright nos fluxos críticos (login, dashboard, rotas, fiscal) com Apache ativo.
+4. **code-ultrareview** — após mudanças, antes de commit.
+
+## Convenções ao aplicar skills
+
+- Ler **só** o `SKILL.md` necessário; não ingerir scripts grandes (ex.: `run_battery.sh`) sem precisar.
+- Manter padrões existentes: `sf_asset_v()`, CSRF, `empresa_id`, classes `fornc-*` / sidebar.
+- UX: mobile (`css/responsive.css`), foco teclado, contraste, textos em português claro.
+- Não trocar stack (React/Tailwind) sem pedido explícito — melhorar o que já existe.
+
+## Quando o usuário disser
+
+- “validar interface / UX / site” → **web-design-guidelines** + **ui-ux-pro-max**
+- “testar no navegador” → **webapp-testing**
+- “melhorar visual / redesign” → **frontend-design** + **ui-ux-pro-max**
+- “revisar antes de subir” → **code-ultrareview**

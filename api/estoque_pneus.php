@@ -1,39 +1,26 @@
 <?php
-// Include configuration and functions first
-require_once '../includes/config.php';
-require_once '../includes/functions.php';
-require_once __DIR__ . '/../includes/csrf.php';
-require_once __DIR__ . '/../includes/api_json.php';
+require_once '../includes/pneus_api_base.php';
 
-// Configure session before starting it
-configure_session();
+$empresa_id = pneus_empresa_id();
 
-// Initialize the session
-session_start();
+$action = isset($_GET['action']) ? $_GET['action'] : '';
 
-// Check if user is logged in, if not redirect to login page
-require_authentication();
+if ($action === 'update_status') {
+    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+        api_json_method_not_allowed('Use POST para atualizar status.');
+    }
+    api_require_csrf_json();
+}
 
-// Get empresa_id from session
-$empresa_id = $_SESSION['empresa_id'];
-
-// Get database connection
 try {
     $conn = getConnection();
 } catch (PDOException $e) {
-    error_log("Erro de conexão com o banco: " . $e->getMessage());
+    error_log('estoque_pneus.php conexão: ' . $e->getMessage());
     header('Content-Type: application/json');
     echo json_encode(['error' => true, 'message' => 'Erro de conexão com o banco de dados']);
     exit;
 }
 
-// Protege mutações (POST/PUT/PATCH/DELETE) com CSRF.
-api_require_csrf_json();
-
-// Get action from request
-$action = isset($_GET['action']) ? $_GET['action'] : '';
-
-// Process the requested action
 switch ($action) {
     case 'get_estoque':
         try {
@@ -65,11 +52,7 @@ switch ($action) {
             LEFT JOIN status_pneus s ON p.status_id = s.id
             LEFT JOIN estoque_pneus ep ON ep.pneu_id = p.id
             WHERE p.empresa_id = :empresa_id
-            AND NOT EXISTS (
-                SELECT 1 FROM pneus_alocacao pa 
-                WHERE pa.pneu_id = p.id 
-                AND pa.status = 'alocado'
-            )";
+            AND " . pneus_sql_nao_alocado('p.id');
             
             $params = [':empresa_id' => $empresa_id];
             
@@ -104,34 +87,22 @@ switch ($action) {
                 throw new Exception('Dados incompletos');
             }
             
-            // Verifica se o pneu pertence à empresa
-            $stmt = $conn->prepare("SELECT id FROM pneus WHERE id = :pneu_id AND empresa_id = :empresa_id");
-            $stmt->bindParam(':pneu_id', $data['pneu_id']);
-            $stmt->bindParam(':empresa_id', $empresa_id);
-            $stmt->execute();
-            
-            if ($stmt->rowCount() === 0) {
+            $pneu_id = (int) $data['pneu_id'];
+            $status_id = (int) $data['status_id'];
+            $disponivel = (int) $data['disponivel'];
+
+            if (!pneus_validar_pneu_empresa($conn, $pneu_id, $empresa_id)) {
                 throw new Exception('Pneu não encontrado');
             }
-            
-            // Atualiza o status e disponibilidade
-            $stmt = $conn->prepare("UPDATE estoque_pneus 
-                                  SET status_id = :status_id, 
-                                      disponivel = :disponivel,
-                                      updated_at = NOW()
-                                  WHERE pneu_id = :pneu_id");
-            
-            $stmt->bindParam(':pneu_id', $data['pneu_id']);
-            $stmt->bindParam(':status_id', $data['status_id']);
-            $stmt->bindParam(':disponivel', $data['disponivel']);
-            $stmt->execute();
+
+            pneus_sync_status_estoque($conn, $pneu_id, $empresa_id, $status_id, $disponivel);
             
             header('Content-Type: application/json');
             echo json_encode(['success' => true, 'message' => 'Status atualizado com sucesso']);
         } catch (Exception $e) {
-            error_log("Erro ao atualizar status do pneu: " . $e->getMessage());
+            error_log('Erro ao atualizar status do pneu: ' . $e->getMessage());
             header('Content-Type: application/json');
-            echo json_encode(['error' => true, 'message' => $e->getMessage()]);
+            echo json_encode(['error' => true, 'message' => 'Erro ao atualizar status do pneu']);
         }
         break;
         

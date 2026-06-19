@@ -40,6 +40,12 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <span>Log de Acessos</span>
                 </a>
             </li>
+            <li class="<?php echo $current_page == 'seguranca_login.php' ? 'active' : ''; ?>">
+                <a href="seguranca_login.php">
+                    <i class="fas fa-shield-halved"></i>
+                    <span>Login / reCAPTCHA</span>
+                </a>
+            </li>
             <li class="<?php echo $current_page == 'posicao_financeira.php' ? 'active' : ''; ?>">
                 <a href="posicao_financeira.php">
                     <i class="fas fa-dollar-sign"></i>

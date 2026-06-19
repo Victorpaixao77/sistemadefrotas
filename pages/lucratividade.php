@@ -16,6 +16,7 @@ foreach ($required_files as $file) {
 }
 
 require_once '../includes/config.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/permissions.php';
@@ -63,8 +64,8 @@ if ($ano < 2020 || $ano > 2030) {
     $ano = date('Y');
 }
 
-// Layout moderno (fornc-page); ?classic=1 para o layout anterior
-$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
+// Layout moderno
+$is_modern = true;
 $lucra_qs_params = ['mes' => (int) $mes, 'ano' => (int) $ano];
 $lucra_query_classic = http_build_query(array_merge($lucra_qs_params, ['classic' => '1']));
 $lucra_meses_pt = [1 => 'Janeiro', 2 => 'Fevereiro', 3 => 'Março', 4 => 'Abril', 5 => 'Maio', 6 => 'Junho', 7 => 'Julho', 8 => 'Agosto', 9 => 'Setembro', 10 => 'Outubro', 11 => 'Novembro', 12 => 'Dezembro'];
@@ -83,596 +84,13 @@ $lucra_nav_params = static function (int $m, int $y) use ($is_modern): array {
 };
 $lucra_href_prev = 'lucratividade.php?' . http_build_query($lucra_nav_params($lucra_prev_mes, $lucra_prev_ano));
 $lucra_href_next = 'lucratividade.php?' . http_build_query($lucra_nav_params($lucra_next_mes, $lucra_next_ano));
+require_once '../includes/lucratividade_funcoes.php';
 
 if (!function_exists('lucratividade_debug_log')) {
     function lucratividade_debug_log(string $message): void {
         if (defined('DEBUG_MODE') && DEBUG_MODE) {
             error_log($message);
         }
-    }
-}
-
-// Função otimizada para buscar KPIs (nova função do improved)
-function getKPIsOptimized($conn, $empresa_id, $mes, $ano) {
-    try {
-        // Query otimizada usando subconsultas para evitar duplicação de valores
-        // O problema estava nos JOINs que multiplicavam linhas, causando soma duplicada
-        // Usar valores diretos nas subconsultas para evitar problema com parâmetros duplicados
-        $sql = "
-        SELECT 
-            DATE_FORMAT(r.data_rota, '%Y-%m') AS mes_ano,
-            
-            -- Receitas (soma direta das rotas, sem JOIN que causa duplicação)
-            COALESCE(SUM(r.frete), 0) AS total_frete,
-            COALESCE(SUM(r.comissao), 0) AS total_comissao,
-            
-            -- Despesas de viagem (usando subconsulta para não multiplicar linhas)
-            (
-                SELECT COALESCE(SUM(total_despviagem), 0)
-                FROM despesas_viagem dv
-                WHERE dv.rota_id IN (
-                    SELECT id FROM rotas r2 
-                    WHERE r2.empresa_id = ?
-                      AND MONTH(r2.data_rota) = ?
-                      AND YEAR(r2.data_rota) = ?
-                )
-            ) AS total_despesas_viagem,
-            
-            -- Abastecimentos (subconsulta)
-            (
-                SELECT COALESCE(SUM(valor_total), 0)
-                FROM abastecimentos a
-                WHERE a.empresa_id = ?
-                  AND MONTH(a.data_abastecimento) = ?
-                  AND YEAR(a.data_abastecimento) = ?
-            ) AS total_abastecimentos,
-            
-            -- Despesas fixas (subconsulta)
-            (
-                SELECT COALESCE(SUM(df.valor), 0)
-                FROM despesas_fixas df
-                WHERE df.empresa_id = ?
-                  AND df.status_pagamento_id = 2
-                  AND MONTH(df.data_pagamento) = ?
-                  AND YEAR(df.data_pagamento) = ?
-            ) AS total_despesas_fixas,
-            
-            -- Parcelas de financiamento (subconsulta)
-            (
-                SELECT COALESCE(SUM(pf.valor), 0)
-                FROM parcelas_financiamento pf
-                WHERE pf.empresa_id = ?
-                  AND pf.status_id = 2
-                  AND MONTH(pf.data_pagamento) = ?
-                  AND YEAR(pf.data_pagamento) = ?
-            ) AS total_parcelas_financiamento,
-            
-            -- Contas pagas (subconsulta)
-            (
-                SELECT COALESCE(SUM(cp.valor), 0)
-                FROM contas_pagar cp
-                WHERE cp.empresa_id = ?
-                  AND cp.status_id = 2
-                  AND MONTH(cp.data_pagamento) = ?
-                  AND YEAR(cp.data_pagamento) = ?
-            ) AS total_contas_pagas,
-            
-            -- Manutenções de veículos (subconsulta)
-            (
-                SELECT COALESCE(SUM(m.valor), 0)
-                FROM manutencoes m
-                WHERE m.empresa_id = ?
-                  AND MONTH(m.data_manutencao) = ?
-                  AND YEAR(m.data_manutencao) = ?
-            ) AS total_manutencoes,
-            
-            -- Manutenção de pneus (subconsulta)
-            (
-                SELECT COALESCE(SUM(pm.custo), 0)
-                FROM pneu_manutencao pm
-                WHERE pm.empresa_id = ?
-                  AND MONTH(pm.data_manutencao) = ?
-                  AND YEAR(pm.data_manutencao) = ?
-            ) AS total_pneu_manutencao
-            
-        FROM rotas r
-        WHERE r.empresa_id = ?
-          AND MONTH(r.data_rota) = ?
-          AND YEAR(r.data_rota) = ?
-        GROUP BY DATE_FORMAT(r.data_rota, '%Y-%m')
-        ";
-
-        // Preparar array de parâmetros (cada subconsulta precisa dos 3 parâmetros)
-        $params = [
-            $empresa_id, $mes, $ano,  // despesas_viagem
-            $empresa_id, $mes, $ano,  // abastecimentos
-            $empresa_id, $mes, $ano,  // despesas_fixas
-            $empresa_id, $mes, $ano,  // parcelas_financiamento
-            $empresa_id, $mes, $ano,  // contas_pagar
-            $empresa_id, $mes, $ano,  // manutencoes
-            $empresa_id, $mes, $ano,  // pneu_manutencao
-            $empresa_id, $mes, $ano   // rotas (FROM)
-        ];
-
-        $stmt = $conn->prepare($sql);
-        $stmt->execute($params);
-        
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        // Calcular lucro líquido se houver dados
-        if ($result) {
-            $receita = floatval($result['total_frete'] ?? 0);
-            $despesas = floatval($result['total_comissao'] ?? 0) + 
-                       floatval($result['total_abastecimentos'] ?? 0) + 
-                       floatval($result['total_despesas_viagem'] ?? 0) + 
-                       floatval($result['total_despesas_fixas'] ?? 0) + 
-                       floatval($result['total_parcelas_financiamento'] ?? 0) + 
-                       floatval($result['total_contas_pagas'] ?? 0) + 
-                       floatval($result['total_manutencoes'] ?? 0) + 
-                       floatval($result['total_pneu_manutencao'] ?? 0);
-            
-            $result['lucro_liquido'] = $receita - $despesas;
-        }
-        
-        return $result;
-    } catch (Exception $e) {
-        if (DEBUG_MODE) {
-            error_log("Erro na função getKPIsOptimized: " . $e->getMessage());
-        }
-        return null;
-    }
-}
-
-// Função para buscar alertas inteligentes (nova função do improved)
-function getIntelligentAlerts($conn, $empresa_id, $mes, $ano) {
-    try {
-        $alerts = [];
-        
-        // Buscar dados do mês atual
-        $kpis = getKPIsOptimized($conn, $empresa_id, $mes, $ano);
-        
-        // Debug
-        lucratividade_debug_log("DEBUG getIntelligentAlerts - Mês: $mes, Ano: $ano");
-        lucratividade_debug_log("DEBUG getIntelligentAlerts - KPIs: " . json_encode($kpis));
-        
-        // Verificar se há dados válidos
-        if ($kpis !== null && is_array($kpis)) {
-            $lucro = isset($kpis['lucro_liquido']) ? floatval($kpis['lucro_liquido']) : 0;
-            $receita = isset($kpis['total_frete']) ? floatval($kpis['total_frete']) : 0;
-            $abastecimentos = isset($kpis['total_abastecimentos']) ? floatval($kpis['total_abastecimentos']) : 0;
-            
-            lucratividade_debug_log("DEBUG getIntelligentAlerts - Lucro: $lucro, Receita: $receita, Abastecimentos: $abastecimentos");
-            
-            // Alerta de margem baixa ou alta (verificar se receita > 0)
-            if ($receita > 0) {
-                $margem = ($lucro / $receita) * 100;
-                lucratividade_debug_log("DEBUG getIntelligentAlerts - Margem calculada: $margem%");
-                // Alerta se margem < 10% (incluindo margens negativas)
-                if ($margem < 10) {
-                    $alerts[] = [
-                        'type' => 'warning',
-                        'title' => 'Margem Baixa',
-                        'message' => "Margem de lucro está em " . number_format($margem, 1) . "%. Considere revisar custos.",
-                        'icon' => 'fas fa-exclamation-triangle'
-                    ];
-                    lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de margem baixa adicionado (margem: $margem%)");
-                } elseif ($margem >= 30) {
-                    // Alerta positivo para margem alta
-                    $alerts[] = [
-                        'type' => 'success',
-                        'title' => 'Margem Excelente',
-                        'message' => "Margem de lucro está em " . number_format($margem, 1) . "%. Parabéns!",
-                        'icon' => 'fas fa-check-circle'
-                    ];
-                    lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de margem excelente adicionado (margem: $margem%)");
-                }
-            } else {
-                lucratividade_debug_log("DEBUG getIntelligentAlerts - Receita é zero ou negativa, não é possível calcular margem");
-            }
-            
-            // Alerta de prejuízo (sempre verificar se lucro < 0)
-            if ($lucro < 0) {
-                $alerts[] = [
-                    'type' => 'danger',
-                    'title' => 'Prejuízo Detectado',
-                    'message' => "O mês está fechando com prejuízo de R$ " . number_format(abs($lucro), 2, ',', '.') . ".",
-                    'icon' => 'fas fa-times-circle'
-                ];
-                lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de prejuízo adicionado");
-            } elseif ($lucro > 0 && $receita > 0) {
-                // Alerta positivo para lucro positivo
-                $alerts[] = [
-                    'type' => 'success',
-                    'title' => 'Lucro Positivo',
-                    'message' => "O mês está fechando com lucro de R$ " . number_format($lucro, 2, ',', '.') . ".",
-                    'icon' => 'fas fa-check-circle'
-                ];
-                lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de lucro positivo adicionado");
-            }
-            
-            // Alerta de alta despesa com combustível (verificar se combustível > 40% da receita)
-            if ($receita > 0 && $abastecimentos > 0) {
-                $percentual_combustivel = ($abastecimentos / $receita) * 100;
-                lucratividade_debug_log("DEBUG getIntelligentAlerts - Percentual combustível: $percentual_combustivel%");
-                if ($percentual_combustivel > 40) {
-                    $alerts[] = [
-                        'type' => 'info',
-                        'title' => 'Alto Consumo de Combustível',
-                        'message' => "Combustível representa " . number_format($percentual_combustivel, 1) . "% da receita.",
-                        'icon' => 'fas fa-gas-pump'
-                    ];
-                    lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de alto consumo adicionado");
-                } elseif ($percentual_combustivel < 25) {
-                    // Alerta positivo para baixo consumo de combustível
-                    $alerts[] = [
-                        'type' => 'success',
-                        'title' => 'Eficiência de Combustível',
-                        'message' => "Combustível representa apenas " . number_format($percentual_combustivel, 1) . "% da receita. Excelente!",
-                        'icon' => 'fas fa-check-circle'
-                    ];
-                    lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de eficiência de combustível adicionado");
-                }
-            }
-        } else {
-            lucratividade_debug_log("DEBUG getIntelligentAlerts - KPIs é null ou não é array");
-        }
-        
-        // Buscar dados do mês anterior para comparação
-        $mes_anterior = $mes == 1 ? 12 : $mes - 1;
-        $ano_anterior = $mes == 1 ? $ano - 1 : $ano;
-        
-        $kpis_anterior = getKPIsOptimized($conn, $empresa_id, $mes_anterior, $ano_anterior);
-        
-        lucratividade_debug_log("DEBUG getIntelligentAlerts - KPIs anterior: " . json_encode($kpis_anterior));
-        
-        if ($kpis_anterior !== null && is_array($kpis_anterior) && $kpis !== null && is_array($kpis)) {
-            $lucro_anterior = isset($kpis_anterior['lucro_liquido']) ? floatval($kpis_anterior['lucro_liquido']) : 0;
-            $lucro_atual = isset($kpis['lucro_liquido']) ? floatval($kpis['lucro_liquido']) : 0;
-            
-            lucratividade_debug_log("DEBUG getIntelligentAlerts - Lucro anterior: $lucro_anterior, Lucro atual: $lucro_atual");
-            
-            // Calcular crescimento apenas se houver lucro anterior diferente de zero
-            if ($lucro_anterior != 0) {
-                $crescimento = (($lucro_atual - $lucro_anterior) / abs($lucro_anterior)) * 100;
-                lucratividade_debug_log("DEBUG getIntelligentAlerts - Crescimento calculado: $crescimento%");
-                
-                // Alerta de queda na lucratividade (queda > 20%)
-                if ($crescimento < -20) {
-                    $alerts[] = [
-                        'type' => 'warning',
-                        'title' => 'Queda na Lucratividade',
-                        'message' => "Lucro caiu " . number_format(abs($crescimento), 1) . "% em relação ao mês anterior.",
-                        'icon' => 'fas fa-chart-line'
-                    ];
-                    lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de queda adicionado");
-                } elseif ($crescimento > 20) {
-                    // Alerta de crescimento positivo
-                    $alerts[] = [
-                        'type' => 'success',
-                        'title' => 'Crescimento na Lucratividade',
-                        'message' => "Lucro aumentou " . number_format($crescimento, 1) . "% em relação ao mês anterior!",
-                        'icon' => 'fas fa-chart-line'
-                    ];
-                    lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de crescimento adicionado");
-                }
-            } elseif ($lucro_anterior == 0 && $lucro_atual < 0) {
-                // Se mês anterior teve lucro zero e atual tem prejuízo
-                $alerts[] = [
-                    'type' => 'warning',
-                    'title' => 'Queda na Lucratividade',
-                    'message' => "Lucro caiu significativamente em relação ao mês anterior.",
-                    'icon' => 'fas fa-chart-line'
-                ];
-                lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de queda (zero para negativo) adicionado");
-            } elseif ($lucro_anterior <= 0 && $lucro_atual > 0) {
-                // Se mês anterior teve prejuízo ou zero e atual tem lucro positivo
-                $alerts[] = [
-                    'type' => 'success',
-                    'title' => 'Recuperação Financeira',
-                    'message' => "Lucro positivo após período negativo. Parabéns pela recuperação!",
-                    'icon' => 'fas fa-chart-line'
-                ];
-                lucratividade_debug_log("DEBUG getIntelligentAlerts - Alerta de recuperação adicionado");
-            }
-        } else {
-            lucratividade_debug_log("DEBUG getIntelligentAlerts - Não foi possível comparar com mês anterior");
-            if ($kpis_anterior === null) {
-                lucratividade_debug_log("DEBUG getIntelligentAlerts - KPIs anterior é null");
-            }
-            if ($kpis === null) {
-                lucratividade_debug_log("DEBUG getIntelligentAlerts - KPIs atual é null");
-            }
-        }
-        
-        lucratividade_debug_log("DEBUG getIntelligentAlerts - Total de alertas: " . count($alerts));
-        
-        return $alerts;
-    } catch (Exception $e) {
-        error_log("Erro na função getIntelligentAlerts: " . $e->getMessage());
-        lucratividade_debug_log("Stack trace getIntelligentAlerts: " . $e->getTraceAsString());
-        return [];
-    }
-}
-
-// Função para calcular KPIs avançados
-function getAdvancedKPIs($conn, $empresa_id, $mes, $ano, $kpis) {
-    try {
-        $advanced = [];
-        
-        $lucro = isset($kpis['lucro_liquido']) ? floatval($kpis['lucro_liquido']) : 0;
-        $receita = isset($kpis['total_frete']) ? floatval($kpis['total_frete']) : 0;
-        
-        // Debug: Log dos valores recebidos
-        lucratividade_debug_log("DEBUG getAdvancedKPIs - Lucro: $lucro, Receita: $receita, Empresa: $empresa_id, Mês: $mes, Ano: $ano");
-        
-        // Calcular ROI (assumindo investimento total baseado em financiamentos)
-        $investimento_total = 0;
-        try {
-            $stmt = $conn->prepare("SELECT COALESCE(SUM(valor_total), 0) as total FROM financiamentos WHERE empresa_id = ?");
-            $stmt->execute([$empresa_id]);
-            $investimento = $stmt->fetch(PDO::FETCH_ASSOC);
-            $investimento_total = floatval($investimento['total'] ?? 0);
-            lucratividade_debug_log("DEBUG ROI - Investimento total: $investimento_total");
-        } catch (Exception $e) {
-            error_log("Erro ao buscar investimento: " . $e->getMessage());
-        }
-        
-        $advanced['roi'] = $investimento_total > 0 ? ($lucro / $investimento_total) * 100 : 0;
-        
-        // Calcular Ticket Médio por Rota
-        $total_rotas = 0;
-        try {
-            $stmt = $conn->prepare("SELECT COUNT(*) as total_rotas FROM rotas WHERE empresa_id = ? AND MONTH(data_rota) = ? AND YEAR(data_rota) = ?");
-            $stmt->execute([$empresa_id, $mes, $ano]);
-            $rotas = $stmt->fetch(PDO::FETCH_ASSOC);
-            $total_rotas = intval($rotas['total_rotas'] ?? 0);
-            lucratividade_debug_log("DEBUG Ticket Médio - Total rotas: $total_rotas");
-        } catch (Exception $e) {
-            error_log("Erro ao contar rotas: " . $e->getMessage());
-        }
-        
-        $advanced['ticket_medio'] = $total_rotas > 0 ? $receita / $total_rotas : 0;
-        
-        // Calcular Custo por Quilômetro - usar distancia_km (campo correto)
-        $total_km = 0;
-        try {
-            $stmt = $conn->prepare("SELECT COALESCE(SUM(distancia_km), 0) as total_km FROM rotas WHERE empresa_id = ? AND MONTH(data_rota) = ? AND YEAR(data_rota) = ?");
-            $stmt->execute([$empresa_id, $mes, $ano]);
-            $km = $stmt->fetch(PDO::FETCH_ASSOC);
-            $total_km = floatval($km['total_km'] ?? 0);
-            lucratividade_debug_log("DEBUG Custo KM - Total KM: $total_km");
-        } catch (Exception $e) {
-            error_log("Erro ao calcular km: " . $e->getMessage());
-            // Tentar com campo alternativo se houver erro
-            try {
-                $stmt = $conn->prepare("SELECT COALESCE(SUM(quilometragem), 0) as total_km FROM rotas WHERE empresa_id = ? AND MONTH(data_rota) = ? AND YEAR(data_rota) = ?");
-                $stmt->execute([$empresa_id, $mes, $ano]);
-                $km = $stmt->fetch(PDO::FETCH_ASSOC);
-                $total_km = floatval($km['total_km'] ?? 0);
-            } catch (Exception $e2) {
-                error_log("Erro ao calcular km (tentativa 2): " . $e2->getMessage());
-            }
-        }
-        
-        $despesas = floatval($kpis['total_abastecimentos'] ?? 0) + 
-                   floatval($kpis['total_despesas_viagem'] ?? 0) + 
-                   floatval($kpis['total_despesas_fixas'] ?? 0) + 
-                   floatval($kpis['total_manutencoes'] ?? 0);
-        $advanced['custo_km'] = $total_km > 0 ? $despesas / $total_km : 0;
-        
-        // Calcular Margem Operacional
-        $advanced['margem_operacional'] = $receita > 0 ? ($lucro / $receita) * 100 : 0;
-        
-        // Calcular Taxa de Ocupação (rotas com carga - assumindo que todas as rotas têm carga se têm frete > 0)
-        $rotas_com_carga = 0;
-        try {
-            $stmt = $conn->prepare("SELECT COUNT(*) as total_com_carga FROM rotas WHERE empresa_id = ? AND MONTH(data_rota) = ? AND YEAR(data_rota) = ? AND frete > 0");
-            $stmt->execute([$empresa_id, $mes, $ano]);
-            $ocupacao = $stmt->fetch(PDO::FETCH_ASSOC);
-            $rotas_com_carga = intval($ocupacao['total_com_carga'] ?? 0);
-            lucratividade_debug_log("DEBUG Taxa Ocupação - Rotas com carga: $rotas_com_carga, Total rotas: $total_rotas");
-        } catch (Exception $e) {
-            error_log("Erro ao calcular ocupação: " . $e->getMessage());
-        }
-        
-        $advanced['taxa_ocupacao'] = $total_rotas > 0 ? ($rotas_com_carga / $total_rotas) * 100 : 0;
-        
-        lucratividade_debug_log("KPIs Avançados calculados - ROI: " . $advanced['roi'] . ", Ticket: " . $advanced['ticket_medio'] . ", Custo KM: " . $advanced['custo_km'] . ", Margem: " . $advanced['margem_operacional'] . ", Ocupação: " . $advanced['taxa_ocupacao']);
-        
-        return $advanced;
-    } catch (Exception $e) {
-        error_log("Erro ao calcular KPIs avançados: " . $e->getMessage());
-        return [
-            'roi' => 0,
-            'ticket_medio' => 0,
-            'custo_km' => 0,
-            'margem_operacional' => 0,
-            'taxa_ocupacao' => 0
-        ];
-    }
-}
-
-// Função para buscar rankings
-function getRankings($conn, $empresa_id, $mes, $ano) {
-    try {
-        $rankings = [];
-        
-        lucratividade_debug_log("DEBUG getRankings - Empresa: $empresa_id, Mês: $mes, Ano: $ano");
-        
-        // Top 5 Veículos Mais Rentáveis
-        // Lucro = Receita (fretes) - Comissões - Abastecimentos das rotas do mês - Despesas de Viagem - Manutenções do mês
-        // IMPORTANTE: Só considerar veículos que tiveram rotas no mês/ano especificado
-        // Usar subconsultas para evitar duplicação de linhas causada por múltiplas manutenções
-        $stmt = $conn->prepare("
-            SELECT 
-                v.placa,
-                v.modelo,
-                COALESCE(SUM(r.frete), 0) as receita,
-                COALESCE(SUM(r.comissao), 0) as comissao,
-                COALESCE((
-                    SELECT SUM(a2.valor_total)
-                    FROM abastecimentos a2
-                    WHERE a2.rota_id IN (
-                        SELECT r2.id FROM rotas r2 
-                        WHERE r2.veiculo_id = v.id 
-                        AND r2.empresa_id = ?
-                        AND MONTH(r2.data_rota) = ?
-                        AND YEAR(r2.data_rota) = ?
-                    )
-                    AND a2.empresa_id = ?
-                ), 0) as custo_abastecimento,
-                COALESCE((
-                    SELECT SUM(dv2.total_despviagem)
-                    FROM despesas_viagem dv2
-                    WHERE dv2.rota_id IN (
-                        SELECT r3.id FROM rotas r3 
-                        WHERE r3.veiculo_id = v.id 
-                        AND r3.empresa_id = ?
-                        AND MONTH(r3.data_rota) = ?
-                        AND YEAR(r3.data_rota) = ?
-                    )
-                    AND dv2.empresa_id = ?
-                ), 0) as despesas_viagem,
-                COALESCE((
-                    SELECT SUM(m2.valor)
-                    FROM manutencoes m2
-                    WHERE m2.veiculo_id = v.id
-                    AND m2.empresa_id = ?
-                    AND MONTH(m2.data_manutencao) = ?
-                    AND YEAR(m2.data_manutencao) = ?
-                ), 0) as custo_manutencao,
-                (
-                    COALESCE(SUM(r.frete), 0) 
-                    - COALESCE(SUM(r.comissao), 0)
-                    - COALESCE((
-                        SELECT SUM(a2.valor_total)
-                        FROM abastecimentos a2
-                        WHERE a2.rota_id IN (
-                            SELECT r2.id FROM rotas r2 
-                            WHERE r2.veiculo_id = v.id 
-                            AND r2.empresa_id = ?
-                            AND MONTH(r2.data_rota) = ?
-                            AND YEAR(r2.data_rota) = ?
-                        )
-                        AND a2.empresa_id = ?
-                    ), 0)
-                    - COALESCE((
-                        SELECT SUM(dv2.total_despviagem)
-                        FROM despesas_viagem dv2
-                        WHERE dv2.rota_id IN (
-                            SELECT r3.id FROM rotas r3 
-                            WHERE r3.veiculo_id = v.id 
-                            AND r3.empresa_id = ?
-                            AND MONTH(r3.data_rota) = ?
-                            AND YEAR(r3.data_rota) = ?
-                        )
-                        AND dv2.empresa_id = ?
-                    ), 0)
-                    - COALESCE((
-                        SELECT SUM(m2.valor)
-                        FROM manutencoes m2
-                        WHERE m2.veiculo_id = v.id
-                        AND m2.empresa_id = ?
-                        AND MONTH(m2.data_manutencao) = ?
-                        AND YEAR(m2.data_manutencao) = ?
-                    ), 0)
-                ) as lucro
-            FROM rotas r
-            INNER JOIN veiculos v ON v.id = r.veiculo_id AND v.empresa_id = ?
-            WHERE r.empresa_id = ?
-                AND MONTH(r.data_rota) = ? 
-                AND YEAR(r.data_rota) = ?
-            GROUP BY v.id, v.placa, v.modelo
-            HAVING lucro > 0
-            ORDER BY lucro DESC
-            LIMIT 5
-        ");
-        $stmt->execute([
-            $empresa_id, $mes, $ano, $empresa_id,  // abastecimentos (subquery 1)
-            $empresa_id, $mes, $ano, $empresa_id,  // despesas_viagem (subquery 1)
-            $empresa_id, $mes, $ano,  // manutencoes (subquery 1)
-            $empresa_id, $mes, $ano, $empresa_id,  // abastecimentos (subquery 2 - no cálculo)
-            $empresa_id, $mes, $ano, $empresa_id,  // despesas_viagem (subquery 2 - no cálculo)
-            $empresa_id, $mes, $ano,  // manutencoes (subquery 2 - no cálculo)
-            $empresa_id,  // veiculos join
-            $empresa_id, $mes, $ano  // WHERE rotas
-        ]);
-        $rankings['veiculos'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        lucratividade_debug_log("DEBUG getRankings - Veículos encontrados: " . count($rankings['veiculos']) . " | Mês: $mes, Ano: $ano, Empresa: $empresa_id");
-        
-        // Top 5 Motoristas Mais Rentáveis
-        // Lucro = Receita (fretes) - Comissões - Despesas de Viagem das rotas do motorista
-        // IMPORTANTE: Só considerar motoristas que tiveram rotas no mês/ano especificado
-        $stmt = $conn->prepare("
-            SELECT 
-                m.nome,
-                COALESCE(SUM(r.frete), 0) as receita,
-                COALESCE(SUM(r.comissao), 0) as comissao,
-                COALESCE(SUM(dv.total_despviagem), 0) as despesas_viagem,
-                (
-                    COALESCE(SUM(r.frete), 0) 
-                    - COALESCE(SUM(r.comissao), 0)
-                    - COALESCE(SUM(dv.total_despviagem), 0)
-                ) as lucro
-            FROM rotas r
-            INNER JOIN motoristas m ON m.id = r.motorista_id AND m.empresa_id = ?
-            LEFT JOIN despesas_viagem dv ON dv.rota_id = r.id AND dv.empresa_id = ?
-            WHERE r.empresa_id = ?
-                AND MONTH(r.data_rota) = ? 
-                AND YEAR(r.data_rota) = ?
-            GROUP BY m.id, m.nome
-            HAVING lucro > 0
-            ORDER BY lucro DESC
-            LIMIT 5
-        ");
-        $stmt->execute([$empresa_id, $empresa_id, $empresa_id, $mes, $ano]);
-        $rankings['motoristas'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        lucratividade_debug_log("DEBUG getRankings - Motoristas encontrados: " . count($rankings['motoristas']) . " | Mês: $mes, Ano: $ano, Empresa: $empresa_id");
-        
-        // Top 5 Clientes Mais Rentáveis (se houver tabela de clientes)
-        // Por enquanto, usando rotas sem cliente específico
-        $rankings['clientes'] = [];
-        
-        // Lucratividade por Tipo de Frete (verificar se tabela existe)
-        try {
-            // Verificar se a tabela tipos_frete existe
-            $check_table = $conn->query("SHOW TABLES LIKE 'tipos_frete'");
-            if ($check_table->rowCount() > 0) {
-                $stmt = $conn->prepare("
-                    SELECT 
-                        COALESCE(tf.nome, 'Não especificado') as tipo_frete,
-                        COALESCE(SUM(r.frete), 0) as receita,
-                        COALESCE(SUM(r.comissao), 0) as comissao,
-                        (COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0)) as lucro
-                    FROM rotas r
-                    LEFT JOIN tipos_frete tf ON r.tipo_frete_id = tf.id
-                    WHERE r.empresa_id = ? AND MONTH(r.data_rota) = ? AND YEAR(r.data_rota) = ?
-                    GROUP BY tf.id, tf.nome
-                    HAVING lucro > 0
-                    ORDER BY lucro DESC
-                ");
-                $stmt->execute([$empresa_id, $mes, $ano]);
-                $rankings['tipos_frete'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            } else {
-                // Se não existe, usar campo direto da tabela rotas se existir
-                $rankings['tipos_frete'] = [];
-            }
-        } catch (Exception $e) {
-            error_log("Erro ao buscar tipos de frete: " . $e->getMessage());
-            $rankings['tipos_frete'] = [];
-        }
-        lucratividade_debug_log("DEBUG getRankings - Tipos de frete encontrados: " . count($rankings['tipos_frete']));
-        lucratividade_debug_log('DEBUG getRankings - resumo: veículos=' . count($rankings['veiculos']) . ', motoristas=' . count($rankings['motoristas']) . ', tipos_frete=' . count($rankings['tipos_frete']));
-        
-        return $rankings;
-    } catch (Exception $e) {
-        error_log("Erro ao buscar rankings: " . $e->getMessage());
-        return [
-            'veiculos' => [],
-            'motoristas' => [],
-            'clientes' => [],
-            'tipos_frete' => []
-        ];
     }
 }
 
@@ -791,11 +209,9 @@ try {
         }
     }
     
-} catch (Exception $e) {
-    if (DEBUG_MODE) {
-        error_log("Erro ao buscar dados de lucratividade: " . $e->getMessage());
-    }
-    $kpis = [];
+} catch (Throwable $e) {
+    error_log("Erro ao buscar dados de lucratividade: " . $e->getMessage());
+    $kpis = lucra_kpis_vazios((int)$mes, (int)$ano);
     $alerts = [];
     $lucro = 0;
     $crescimento_lucro = 0;
@@ -822,352 +238,6 @@ if (!isset($alerts) || !is_array($alerts)) {
     $alerts = [];
 }
 
-// Buscar dados para os KPIs (manter a query original como backup)
-// CORREÇÃO: Removido JOIN com despesas_viagem que causava duplicação
-$sql_kpis = "
-SELECT 
-    DATE_FORMAT(r.data_rota, '%Y-%m') AS mes_ano,
-    
-    -- Receitas
-    COALESCE(SUM(r.frete), 0) AS total_frete,
-    COALESCE(SUM(r.comissao), 0) AS total_comissao,
-    
-    -- Despesas de viagem (subconsulta para evitar duplicação)
-    (
-        SELECT COALESCE(SUM(dv.total_despviagem), 0)
-        FROM despesas_viagem dv
-        WHERE dv.rota_id IN (
-            SELECT id FROM rotas WHERE empresa_id = " . intval($empresa_id) . "
-            AND MONTH(data_rota) = " . intval($mes) . "
-            AND YEAR(data_rota) = " . intval($ano) . "
-        )
-    ) AS total_despesas_viagem,
-    
-    -- Total de abastecimentos
-    (
-        SELECT COALESCE(SUM(valor_total), 0)
-        FROM abastecimentos
-        WHERE 
-            empresa_id = r.empresa_id
-            AND YEAR(data_abastecimento) = YEAR(r.data_rota)
-            AND MONTH(data_abastecimento) = MONTH(r.data_rota)
-    ) AS total_abastecimentos,
-    
-    -- Despesas fixas pagas no mês
-    (
-        SELECT COALESCE(SUM(df.valor), 0)
-        FROM despesas_fixas df
-        WHERE 
-            df.empresa_id = r.empresa_id
-            AND df.status_pagamento_id = 2
-            AND YEAR(df.data_pagamento) = YEAR(r.data_rota)
-            AND MONTH(df.data_pagamento) = MONTH(r.data_rota)
-    ) AS total_despesas_fixas,
-    
-    -- Parcelas de financiamento pagas no mês
-    (
-        SELECT COALESCE(SUM(pf.valor), 0)
-        FROM parcelas_financiamento pf
-        WHERE 
-            pf.empresa_id = r.empresa_id
-            AND pf.status_id = 2
-            AND YEAR(pf.data_pagamento) = YEAR(r.data_rota)
-            AND MONTH(pf.data_pagamento) = MONTH(r.data_rota)
-    ) AS total_parcelas_financiamento,
-    
-    -- Contas pagas no mês
-    (
-        SELECT COALESCE(SUM(cp.valor), 0)
-        FROM contas_pagar cp
-        WHERE 
-            cp.empresa_id = r.empresa_id
-            AND cp.status_id = 2
-            AND YEAR(cp.data_pagamento) = YEAR(r.data_rota)
-            AND MONTH(cp.data_pagamento) = MONTH(r.data_rota)
-    ) AS total_contas_pagas,
-    
-    -- Manutenções de veículos no mês
-    (
-        SELECT COALESCE(SUM(m.valor), 0)
-        FROM manutencoes m
-        WHERE 
-            m.empresa_id = r.empresa_id
-            AND YEAR(m.data_manutencao) = YEAR(r.data_rota)
-            AND MONTH(m.data_manutencao) = MONTH(r.data_rota)
-    ) AS total_manutencoes,
-    
-    -- Manutenção de pneus no mês
-    (
-        SELECT COALESCE(SUM(pm.custo), 0)
-        FROM pneu_manutencao pm
-        WHERE 
-            pm.empresa_id = r.empresa_id
-            AND YEAR(pm.data_manutencao) = YEAR(r.data_rota)
-            AND MONTH(pm.data_manutencao) = MONTH(r.data_rota)
-    ) AS total_pneu_manutencao,
-    
-    -- Cálculo do lucro
-    (
-        COALESCE(SUM(r.frete), 0)
-        - COALESCE(SUM(r.comissao), 0)
-        - (
-            SELECT COALESCE(SUM(dv.total_despviagem), 0)
-            FROM despesas_viagem dv
-            WHERE dv.rota_id IN (
-                SELECT id FROM rotas WHERE empresa_id = " . intval($empresa_id) . "
-                AND MONTH(data_rota) = " . intval($mes) . "
-                AND YEAR(data_rota) = " . intval($ano) . "
-            )
-        )
-        - (
-            SELECT COALESCE(SUM(valor_total), 0)
-            FROM abastecimentos
-            WHERE 
-                empresa_id = r.empresa_id
-                AND YEAR(data_abastecimento) = YEAR(r.data_rota)
-                AND MONTH(data_abastecimento) = MONTH(r.data_rota)
-        )
-        - (
-            SELECT COALESCE(SUM(df.valor), 0)
-            FROM despesas_fixas df
-            WHERE 
-                df.empresa_id = r.empresa_id
-                AND df.status_pagamento_id = 2
-                AND YEAR(df.data_pagamento) = YEAR(r.data_rota)
-                AND MONTH(df.data_pagamento) = MONTH(r.data_rota)
-        )
-        - (
-            SELECT COALESCE(SUM(pf.valor), 0)
-            FROM parcelas_financiamento pf
-            WHERE 
-                pf.empresa_id = r.empresa_id
-                AND pf.status_id = 2
-                AND YEAR(pf.data_pagamento) = YEAR(r.data_rota)
-                AND MONTH(pf.data_pagamento) = MONTH(r.data_rota)
-        )
-        - (
-            SELECT COALESCE(SUM(cp.valor), 0)
-            FROM contas_pagar cp
-            WHERE 
-                cp.empresa_id = r.empresa_id
-                AND cp.status_id = 2
-                AND YEAR(cp.data_pagamento) = YEAR(r.data_rota)
-                AND MONTH(cp.data_pagamento) = MONTH(r.data_rota)
-        )
-        - (
-            SELECT COALESCE(SUM(m.valor), 0)
-            FROM manutencoes m
-            WHERE 
-                m.empresa_id = r.empresa_id
-                AND YEAR(m.data_manutencao) = YEAR(r.data_rota)
-                AND MONTH(m.data_manutencao) = MONTH(r.data_rota)
-        )
-        - (
-            SELECT COALESCE(SUM(pm.custo), 0)
-            FROM pneu_manutencao pm
-            WHERE 
-                pm.empresa_id = r.empresa_id
-                AND YEAR(pm.data_manutencao) = YEAR(r.data_rota)
-                AND MONTH(pm.data_manutencao) = MONTH(r.data_rota)
-        )
-    ) AS lucro_liquido
-FROM rotas r
-WHERE r.empresa_id = " . intval($empresa_id) . "
-  AND MONTH(r.data_rota) = " . intval($mes) . "
-  AND YEAR(r.data_rota) = " . intval($ano) . "
-GROUP BY DATE_FORMAT(r.data_rota, '%Y-%m')
-";
-
-// Executar a query original como backup
-try {
-    lucratividade_debug_log("Executando query backup KPIs");
-    
-    $stmt = $conn->prepare($sql_kpis);
-    $stmt->execute();
-    
-    $kpis_backup = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Usar dados do backup se os otimizados falharam
-    if (!$kpis || empty($kpis)) {
-        $kpis = $kpis_backup;
-        $lucro = isset($kpis) && is_array($kpis) && isset($kpis['lucro_liquido']) ? $kpis['lucro_liquido'] : 0;
-    }
-    
-} catch (Exception $e) {
-    error_log("Erro na query backup KPIs: " . $e->getMessage());
-    // Continuar com dados vazios se necessário
-}
-
-// Executar consultas
-$params = [
-    ':empresa_id' => $empresa_id,
-    ':mes' => $mes,
-    ':ano' => $ano
-];
-
-// Verificar se todos os parâmetros necessários estão definidos
-$required_params = [':empresa_id', ':mes', ':ano'];
-
-foreach ($required_params as $param) {
-    if (!isset($params[$param])) {
-        if (DEBUG_MODE) {
-            error_log("Parâmetro faltando: " . $param);
-        }
-        // Definir valores padrão em vez de lançar exceção
-        if ($param === ':empresa_id') $params[$param] = 1;
-        if ($param === ':mes') $params[$param] = date('m');
-        if ($param === ':ano') $params[$param] = date('Y');
-    }
-}
-
-// Queries para os gráficos - Simplificadas temporariamente
-$sql_fretes_vs_despesas = "
-        SELECT 
-        MONTH(data_rota) as mes,
-        YEAR(data_rota) as ano,
-        SUM(frete) as fretes,
-        0 as despesas
-    FROM rotas 
-            WHERE empresa_id = " . intval($empresa_id) . "
-    AND MONTH(data_rota) = " . intval($mes) . "
-    AND YEAR(data_rota) = " . intval($ano) . "
-    GROUP BY YEAR(data_rota), MONTH(data_rota)
-";
-
-$sql_distribuicao_despesas = "
-    SELECT 
-        'Abastecimento' as tipo,
-        COALESCE(SUM(valor_total), 0) as total
-    FROM abastecimentos 
-    WHERE empresa_id = " . intval($empresa_id) . "
-    AND MONTH(data_abastecimento) = " . intval($mes) . "
-    AND YEAR(data_abastecimento) = " . intval($ano) . "
-        UNION ALL
-    SELECT 
-        'Comissao' as tipo,
-        COALESCE(SUM(comissao), 0) as total
-    FROM rotas 
-    WHERE empresa_id = " . intval($empresa_id) . "
-    AND MONTH(data_rota) = " . intval($mes) . "
-    AND YEAR(data_rota) = " . intval($ano) . "
-";
-
-$sql_evolucao_lucratividade = "
-        SELECT 
-        MONTH(data_rota) as mes,
-        YEAR(data_rota) as ano,
-        SUM(frete) as lucro
-    FROM rotas 
-            WHERE empresa_id = " . intval($empresa_id) . "
-    AND MONTH(data_rota) = " . intval($mes) . "
-    AND YEAR(data_rota) = " . intval($ano) . "
-    GROUP BY YEAR(data_rota), MONTH(data_rota)
-";
-
-$sql_composicao_frete = "
-        SELECT 
-        MONTH(data_rota) as mes,
-        YEAR(data_rota) as ano,
-        SUM(comissao) as comissoes,
-        0 as abastecimentos,
-        0 as outras_despesas
-    FROM rotas 
-            WHERE empresa_id = " . intval($empresa_id) . "
-    AND MONTH(data_rota) = " . intval($mes) . "
-    AND YEAR(data_rota) = " . intval($ano) . "
-    GROUP BY YEAR(data_rota), MONTH(data_rota)
-";
-
-$sql_lucro_por_veiculo = "
-        SELECT 
-            v.placa,
-        COALESCE(SUM(r.frete), 0) as faturamento,
-        0 as despesas,
-        COALESCE(SUM(r.frete), 0) as lucro
-    FROM veiculos v
-    LEFT JOIN rotas r ON r.veiculo_id = v.id
-    WHERE v.empresa_id = " . intval($empresa_id) . "
-    AND (r.data_rota IS NULL OR (MONTH(r.data_rota) = " . intval($mes) . " AND YEAR(r.data_rota) = " . intval($ano) . "))
-        GROUP BY v.placa
-    ORDER BY lucro DESC
-    LIMIT 10
-";
-
-$sql_lucro_por_dia = "
-        SELECT 
-        DATE(data_rota) as data,
-        SUM(frete) as faturamento,
-        0 as despesas,
-        SUM(frete) as lucro
-            FROM rotas 
-            WHERE empresa_id = " . intval($empresa_id) . "
-    AND MONTH(data_rota) = " . intval($mes) . "
-    AND YEAR(data_rota) = " . intval($ano) . "
-    GROUP BY DATE(data_rota)
-    ORDER BY data
-    LIMIT 30
-";
-
-// Executar cada query individualmente com tratamento de erro adequado
-try {
-    lucratividade_debug_log("Executando query Fretes vs Despesas");
-    $stmt = $conn->prepare($sql_fretes_vs_despesas);
-    $stmt->execute();
-    $fretes_vs_despesas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {
-    error_log("Erro na query Fretes vs Despesas: " . $e->getMessage());
-    $fretes_vs_despesas = [];
-}
-
-try {
-    lucratividade_debug_log("Executando query Distribuição Despesas");
-    $stmt = $conn->prepare($sql_distribuicao_despesas);
-    $stmt->execute();
-    $distribuicao_despesas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {
-    error_log("Erro na query Distribuição Despesas: " . $e->getMessage());
-    $distribuicao_despesas = [];
-}
-
-try {
-    lucratividade_debug_log("Executando query Evolução Lucratividade");
-    $stmt = $conn->prepare($sql_evolucao_lucratividade);
-    $stmt->execute();
-    $evolucao_lucratividade = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {
-    error_log("Erro na query Evolução Lucratividade: " . $e->getMessage());
-    $evolucao_lucratividade = [];
-}
-
-try {
-    lucratividade_debug_log("Executando query Composição Frete");
-    $stmt = $conn->prepare($sql_composicao_frete);
-    $stmt->execute();
-    $composicao_frete = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {
-    error_log("Erro na query Composição Frete: " . $e->getMessage());
-    $composicao_frete = [];
-}
-
-try {
-    lucratividade_debug_log("Executando query Lucro por Veículo");
-    $stmt = $conn->prepare($sql_lucro_por_veiculo);
-    $stmt->execute();
-    $lucro_por_veiculo = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {
-    error_log("Erro na query Lucro por Veículo: " . $e->getMessage());
-    $lucro_por_veiculo = [];
-}
-
-try {
-    lucratividade_debug_log("Executando query Lucro por Dia");
-    $stmt = $conn->prepare($sql_lucro_por_dia);
-    $stmt->execute();
-    $lucro_por_dia = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {
-    error_log("Erro na query Lucro por Dia: " . $e->getMessage());
-    $lucro_por_dia = [];
-}
 
 $lucra_receita_kpi = is_array($kpis) ? floatval($kpis['total_frete'] ?? 0) : 0;
 $lucra_margem_kpi = isset($advanced_kpis['margem_operacional']) ? floatval($advanced_kpis['margem_operacional']) : 0;
@@ -1863,8 +933,24 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
         body.lucratividade-modern .dashboard-card--highlight .card-header h3 {
             color: #15803d;
         }
+        body.lucratividade-modern #lucraKpiGrid .dashboard-card .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            min-width: 0;
+        }
+        body.lucratividade-modern #lucraKpiGrid .dashboard-card .card-header .kpi-card-icon {
+            flex-shrink: 0;
+            font-size: 0.85rem;
+            color: var(--accent-primary);
+            opacity: 0.92;
+        }
+        body.lucratividade-modern .dashboard-card--highlight .card-header .kpi-card-icon {
+            color: #15803d;
+        }
         <?php endif; ?>
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'lucratividade-modern' : ''; ?>">
     <?php include '../includes/sidebar_pages.php'; ?>
@@ -1873,10 +959,10 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
         <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
             <?php if ($is_modern): ?>
             <div class="fornc-kpi-strip" aria-label="Resumo do período">
-                <div class="fornc-kpi-cell<?php echo $lucro >= 0 ? ' is-ok' : ' is-warn'; ?>"><span class="lbl">Lucro líquido</span><span class="val">R$ <?php echo number_format($lucro, 2, ',', '.'); ?></span></div>
-                <div class="fornc-kpi-cell"><span class="lbl">Receita (fretes)</span><span class="val">R$ <?php echo number_format($lucra_receita_kpi, 2, ',', '.'); ?></span></div>
-                <div class="fornc-kpi-cell"><span class="lbl">Margem</span><span class="val"><?php echo number_format($lucra_margem_kpi, 1, ',', '.'); ?>%</span></div>
-                <div class="fornc-kpi-cell"><span class="lbl">Ticket médio / rota</span><span class="val">R$ <?php echo number_format($lucra_ticket_kpi, 2, ',', '.'); ?></span></div>
+                <div class="fornc-kpi-cell<?php echo $lucro >= 0 ? ' is-ok' : ' is-warn'; ?>"><div class="fornc-kpi-head"><i class="fas fa-coins fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Lucro líquido</span></div><span class="val">R$ <?php echo number_format($lucro, 2, ',', '.'); ?></span></div>
+                <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-truck-moving fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Receita (fretes)</span></div><span class="val">R$ <?php echo number_format($lucra_receita_kpi, 2, ',', '.'); ?></span></div>
+                <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-chart-line fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Margem</span></div><span class="val"><?php echo number_format($lucra_margem_kpi, 1, ',', '.'); ?>%</span></div>
+                <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-ticket fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Ticket médio / rota</span></div><span class="val">R$ <?php echo number_format($lucra_ticket_kpi, 2, ',', '.'); ?></span></div>
             </div>
 
             <div class="fornc-toolbar">
@@ -1922,6 +1008,8 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
             </div>
             <?php endif; ?>
 
+            <div id="sfLucraInsights" class="lucra-dash-block" data-lucra-block="insights"></div>
+
             <div id="lucraDashboardStack" class="lucra-dashboard-stack">
             <?php if (!empty($alerts)): ?>
             <div class="lucra-dash-block" data-lucra-block="alerts">
@@ -1951,6 +1039,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
             <div class="dashboard-grid mb-4" id="lucraKpiGrid">
                 <div class="dashboard-card<?php echo $is_modern ? ' dashboard-card--highlight' : ''; ?>" data-card-id="lucra-kpi-lucro"<?php echo $is_modern ? '' : ' style="background: #e6f9ed; border: 2px solid #2ecc40;"'; ?>>
                     <div class="card-header">
+                        <i class="fas fa-chart-line kpi-card-icon" aria-hidden="true"></i>
                         <h3<?php echo $is_modern ? '' : ' style="color: #218838;"'; ?>>Lucro Líquido</h3>
                     </div>
                     <div class="card-body">
@@ -1968,6 +1057,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 </div>
                 <div class="dashboard-card" data-card-id="lucra-kpi-frete">
                     <div class="card-header">
+                        <i class="fas fa-sack-dollar kpi-card-icon" aria-hidden="true"></i>
                         <h3>Total de Fretes</h3>
                     </div>
                     <div class="card-body">
@@ -1985,6 +1075,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 </div>
                 <div class="dashboard-card" data-card-id="lucra-kpi-comissao">
                     <div class="card-header">
+                        <i class="fas fa-hand-holding-dollar kpi-card-icon" aria-hidden="true"></i>
                         <h3>Total de Comissões</h3>
                     </div>
                     <div class="card-body">
@@ -2006,6 +1097,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 </div>
                 <div class="dashboard-card" data-card-id="lucra-kpi-desp-viagem">
                     <div class="card-header">
+                        <i class="fas fa-suitcase-rolling kpi-card-icon" aria-hidden="true"></i>
                         <h3>Despesas de Viagem</h3>
                     </div>
                     <div class="card-body">
@@ -2027,6 +1119,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 </div>
                 <div class="dashboard-card" data-card-id="lucra-kpi-abast">
                     <div class="card-header">
+                        <i class="fas fa-gas-pump kpi-card-icon" aria-hidden="true"></i>
                         <h3>Abastecimentos</h3>
                     </div>
                     <div class="card-body">
@@ -2044,6 +1137,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 </div>
                 <div class="dashboard-card" data-card-id="lucra-kpi-fixas">
                     <div class="card-header">
+                        <i class="fas fa-file-invoice-dollar kpi-card-icon" aria-hidden="true"></i>
                         <h3>Despesas Fixas</h3>
                     </div>
                     <div class="card-body">
@@ -2065,6 +1159,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 </div>
                 <div class="dashboard-card" data-card-id="lucra-kpi-fin">
                     <div class="card-header">
+                        <i class="fas fa-landmark kpi-card-icon" aria-hidden="true"></i>
                         <h3>Parcelas de Financiamento</h3>
                     </div>
                     <div class="card-body">
@@ -2086,6 +1181,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 </div>
                 <div class="dashboard-card" data-card-id="lucra-kpi-contas">
                     <div class="card-header">
+                        <i class="fas fa-money-check-dollar kpi-card-icon" aria-hidden="true"></i>
                         <h3>Contas Pagas</h3>
                     </div>
                     <div class="card-body">
@@ -2107,6 +1203,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 </div>
                 <div class="dashboard-card" data-card-id="lucra-kpi-manut">
                     <div class="card-header">
+                        <i class="fas fa-screwdriver-wrench kpi-card-icon" aria-hidden="true"></i>
                         <h3>Manutenções de Veículos</h3>
                     </div>
                     <div class="card-body">
@@ -2128,6 +1225,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 </div>
                 <div class="dashboard-card" data-card-id="lucra-kpi-pneu">
                     <div class="card-header">
+                        <i class="fas fa-circle-dot kpi-card-icon" aria-hidden="true"></i>
                         <h3>Manutenções de Pneus</h3>
                     </div>
                     <div class="card-body">
@@ -2151,7 +1249,8 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 <!-- Novos KPIs Avançados -->
                 <div class="dashboard-card" data-card-id="lucra-kpi-roi" style="border-left: 4px solid var(--accent-secondary);">
                     <div class="card-header">
-                        <h3><i class="fas fa-chart-pie"></i> ROI (Retorno sobre Investimento)</h3>
+                        <i class="fas fa-chart-pie kpi-card-icon" aria-hidden="true"></i>
+                        <h3>ROI (Retorno sobre Investimento)</h3>
                     </div>
                     <div class="card-body">
                         <div class="metric">
@@ -2169,7 +1268,8 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 
                 <div class="dashboard-card" data-card-id="lucra-kpi-ticket" style="border-left: 4px solid var(--accent-primary);">
                     <div class="card-header">
-                        <h3><i class="fas fa-receipt"></i> Ticket Médio por Rota</h3>
+                        <i class="fas fa-receipt kpi-card-icon" aria-hidden="true"></i>
+                        <h3>Ticket Médio por Rota</h3>
                     </div>
                     <div class="card-body">
                         <div class="metric">
@@ -2187,7 +1287,8 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 
                 <div class="dashboard-card" data-card-id="lucra-kpi-custo-km" style="border-left: 4px solid var(--accent-warning);">
                     <div class="card-header">
-                        <h3><i class="fas fa-road"></i> Custo por Quilômetro</h3>
+                        <i class="fas fa-road kpi-card-icon" aria-hidden="true"></i>
+                        <h3>Custo por Quilômetro</h3>
                     </div>
                     <div class="card-body">
                         <div class="metric">
@@ -2205,7 +1306,8 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 
                 <div class="dashboard-card" data-card-id="lucra-kpi-margem" style="border-left: 4px solid var(--accent-success);">
                     <div class="card-header">
-                        <h3><i class="fas fa-percentage"></i> Margem Operacional</h3>
+                        <i class="fas fa-percent kpi-card-icon" aria-hidden="true"></i>
+                        <h3>Margem Operacional</h3>
                     </div>
                     <div class="card-body">
                         <div class="metric">
@@ -2223,7 +1325,8 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 
                 <div class="dashboard-card" data-card-id="lucra-kpi-ocupacao" style="border-left: 4px solid var(--accent-secondary);">
                     <div class="card-header">
-                        <h3><i class="fas fa-box"></i> Taxa de Ocupação</h3>
+                        <i class="fas fa-box kpi-card-icon" aria-hidden="true"></i>
+                        <h3>Taxa de Ocupação</h3>
                     </div>
                     <div class="card-body">
                         <div class="metric">
@@ -2285,7 +1388,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                                     </div>
                                 </div>
                                 <div style="text-align: right; margin-left: 15px;">
-                                    <strong style="color: var(--accent-success); font-size: 1.1rem;">R$ <?= number_format($lucro, 2, ',', '.') ?></strong>
+                                    <strong style="color: <?= $lucro >= 0 ? 'var(--accent-success)' : 'var(--accent-danger)' ?>; font-size: 1.1rem;">R$ <?= number_format($lucro, 2, ',', '.') ?></strong>
                                     <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">
                                         Lucro Líquido
                                     </div>
@@ -2326,7 +1429,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                                     </div>
                                 </div>
                                 <div style="text-align: right; margin-left: 15px;">
-                                    <strong style="color: var(--accent-success); font-size: 1.1rem;">R$ <?= number_format($lucro, 2, ',', '.') ?></strong>
+                                    <strong style="color: <?= $lucro >= 0 ? 'var(--accent-success)' : 'var(--accent-danger)' ?>; font-size: 1.1rem;">R$ <?= number_format($lucro, 2, ',', '.') ?></strong>
                                     <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">
                                         Lucro Líquido
                                     </div>
@@ -2867,7 +1970,18 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
         if (!response.ok) {
             throw new Error(chartName + ': HTTP ' + response.status);
         }
-        return response.json();
+        return response.json().then(function(data) {
+            if (data && data.success === false) {
+                throw new Error(data.message || chartName);
+            }
+            return data;
+        });
+    }
+
+    function lucraChartEmpty(el, msg) {
+        if (el && el.parentNode) {
+            el.parentNode.innerHTML = '<p class="lucra-chart-msg lucra-chart-msg--load" role="status">' + msg + '</p>';
+        }
     }
 
     function lucraOpenModal(el) {
@@ -2895,7 +2009,9 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
         const clearFilterBtn = document.getElementById('clearFilterBtn');
         const applyFilterBtn = document.getElementById('applyFilterBtn');
         const helpBtn = document.getElementById('helpBtn');
-        const helpModal = document.getElementById('helpLucratividadeModal');
+        const helpModal = document.getElementById('helpModal');
+        void helpBtn;
+        void helpModal;
         const lucraPeriodField = document.getElementById('lucraMesAnoDisplay');
 
         if (filterMonth) {
@@ -2921,9 +2037,6 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                     lucraOpenModal(filterModal);
                 }
             });
-        }
-        if (helpBtn && helpModal) {
-            helpBtn.addEventListener('click', function() { lucraOpenModal(helpModal); });
         }
 
         document.querySelectorAll('.modal .close-modal').forEach(function(btn) {
@@ -3071,14 +2184,14 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 if (data.warning) {
                     const warningDiv = document.createElement('div');
                     warningDiv.className = 'alert alert-warning';
-                    warningDiv.innerHTML = `
-                        <h5><i class="fas fa-exclamation-triangle"></i> ${data.warning}</h5>
-                        <p><strong>Sugestões:</strong></p>
-                        <ul>
-                            ${data.suggestions.map(s => `<li>${s}</li>`).join('')}
-                        </ul>
-                    `;
+                    const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+                    warningDiv.innerHTML = '<h5><i class="fas fa-exclamation-triangle"></i> ' + data.warning + '</h5>' +
+                        (suggestions.length ? '<ul>' + suggestions.map(function(s) { return '<li>' + s + '</li>'; }).join('') + '</ul>' : '');
                     document.getElementById('profitPerKmGauge').parentNode.parentNode.insertBefore(warningDiv, document.getElementById('profitPerKmGauge').parentNode);
+                }
+                if (data.empty || !data.gauge || !data.line) {
+                    lucraChartEmpty(document.getElementById('profitPerKmGauge'), data.warning || 'Sem dados de lucro por km no período.');
+                    return;
                 }
                 
                 // Configurar gráfico gauge (usando doughnut como base)
@@ -3189,6 +2302,9 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
     document.addEventListener('DOMContentLoaded', function() {
         const profitForecastEl = document.getElementById('profitForecastChart');
         if (!profitForecastEl) return;
+        const urlParamsPf = new URLSearchParams(window.location.search);
+        const mes = urlParamsPf.get('mes');
+        const ano = urlParamsPf.get('ano');
         // Função para formatar valores em reais
         const formatCurrency = (value) => {
             return new Intl.NumberFormat('pt-BR', {
@@ -3198,33 +2314,20 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
         };
         
         // Carregar dados do gráfico de projeção
-        fetch('../api/profit_forecast_analytics.php')
+        fetch('../api/profit_forecast_analytics.php' + (mes && ano ? ('?mes=' + mes + '&ano=' + ano) : ''))
             .then(function(response) { return lucraFetchJson(response, 'Projeção de lucro'); })
             .then(data => {
-                // Mostrar aviso se há dados de exemplo
-                if (data.warning) {
-                    const warningDiv = document.createElement('div');
-                    warningDiv.className = 'alert alert-warning';
-                    let suggestionsHtml = '';
-                    if (data.suggestions && data.suggestions.length > 0) {
-                        suggestionsHtml = `
-                            <p><strong>Sugestões:</strong></p>
-                            <ul>
-                                ${data.suggestions.map(s => `<li>${s}</li>`).join('')}
-                            </ul>
-                        `;
-                    }
-                    warningDiv.innerHTML = `
-                        <h5><i class="fas fa-exclamation-triangle"></i> ${data.warning}</h5>
-                        ${suggestionsHtml}
-                    `;
-                    profitForecastEl.parentNode.parentNode.insertBefore(warningDiv, profitForecastEl.parentNode);
+                if (data.empty) {
+                    lucraChartEmpty(profitForecastEl, data.warning || 'Dados insuficientes para projeção no período.');
+                    return;
                 }
-                
                 const ctx = profitForecastEl.getContext('2d');
                 new Chart(ctx, {
                     type: 'line',
-                    data: data,
+                    data: {
+                        labels: data.labels || [],
+                        datasets: data.datasets || []
+                    },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
@@ -3521,49 +2624,53 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 });
         }
         
-        // 5. Gráfico de Evolução da Lucratividade
+        // 5. Evolução da lucratividade (dados reais)
         const profitEvolutionCtx = document.getElementById('profitEvolutionChart');
         if (profitEvolutionCtx) {
-            new Chart(profitEvolutionCtx, {
-                type: 'line',
-                data: {
-                    labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
-                    datasets: [{
-                        label: 'Lucro Líquido',
-                        data: [15000, 18000, 22000, 19000, 25000, <?= $lucro ?>],
-                        borderColor: '#28a745',
-                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return formatCurrency(context.parsed.y);
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return formatCurrency(value);
-                                }
-                            }
-                        }
+            fetch(`../api/evolucao_lucratividade.php${apiParams}`)
+                .then(function(response) { return lucraFetchJson(response, 'Evolução da lucratividade'); })
+                .then(data => {
+                    if (data.empty) {
+                        lucraChartEmpty(profitEvolutionCtx, 'Sem dados de lucratividade nos últimos meses.');
+                        return;
                     }
-                }
-            });
+                    new Chart(profitEvolutionCtx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels || [],
+                            datasets: [{
+                                label: 'Lucro Líquido',
+                                data: data.lucro || [],
+                                borderColor: '#28a745',
+                                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            }, {
+                                label: 'Receita Bruta',
+                                data: data.receita || [],
+                                borderColor: '#007bff',
+                                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { position: 'top' } },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { callback: function(value) { return formatCurrency(value); } }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(function(error) {
+                    console.error('Erro ao carregar evolução:', error);
+                    profitEvolutionCtx.parentNode.innerHTML = '<p class="lucra-chart-msg lucra-chart-msg--err" role="alert">Não foi possível carregar a evolução.</p>';
+                });
         }
         
         // 6. Gráfico de Distribuição de Custos
@@ -3615,104 +2722,95 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
             });
         }
         
-        // 7. Gráfico de Margem por Tipo de Frete
+        // 7. Margem por tipo de frete (API)
         const marginByFreightCtx = document.getElementById('marginByFreightChart');
         if (marginByFreightCtx) {
-            new Chart(marginByFreightCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['Frete Local', 'Frete Regional', 'Frete Interestadual'],
-                    datasets: [{
-                        label: 'Margem de Lucro (%)',
-                        data: [25, 35, 45],
-                        backgroundColor: [
-                            'rgba(255, 99, 132, 0.8)',
-                            'rgba(54, 162, 235, 0.8)',
-                            'rgba(255, 205, 86, 0.8)'
-                        ],
-                        borderColor: [
-                            'rgba(255, 99, 132, 1)',
-                            'rgba(54, 162, 235, 1)',
-                            'rgba(255, 205, 86, 1)'
-                        ],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            ticks: {
-                                callback: function(value) {
-                                    return value + '%';
+            fetch(`../api/margem_tipo_frete.php${apiParams}`)
+                .then(function(response) { return lucraFetchJson(response, 'Margem por tipo de frete'); })
+                .then(data => {
+                    if (data.empty) {
+                        lucraChartEmpty(marginByFreightCtx, 'Sem rotas classificáveis no período.');
+                        return;
+                    }
+                    new Chart(marginByFreightCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: data.labels || [],
+                            datasets: [{
+                                label: 'Margem de Lucro (%)',
+                                data: data.margens || [],
+                                backgroundColor: 'rgba(59, 130, 246, 0.75)',
+                                borderColor: 'rgba(59, 130, 246, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { callback: function(value) { return value + '%'; } }
                                 }
                             }
                         }
-                    }
-                }
-            });
+                    });
+                })
+                .catch(function(error) {
+                    console.error('Erro margem frete:', error);
+                    marginByFreightCtx.parentNode.innerHTML = '<p class="lucra-chart-msg lucra-chart-msg--err" role="alert">Não foi possível carregar margens.</p>';
+                });
         }
         
-        // 8. Gráfico de Projeção de Lucro Avançada
+        // 8. Projeção de lucro (API)
         const profitForecastAdvancedCtx = document.getElementById('profitForecastAdvancedChart');
         if (profitForecastAdvancedCtx) {
-            new Chart(profitForecastAdvancedCtx, {
-                type: 'line',
-                data: {
-                    labels: ['Mês Atual', 'Próximo Mês', '2º Mês', '3º Mês'],
-                    datasets: [{
-                        label: 'Projeção de Lucro',
-                        data: [<?= $lucro ?>, <?= $lucro * 1.1 ?>, <?= $lucro * 1.2 ?>, <?= $lucro * 1.3 ?>],
-                        borderColor: '#28a745',
-                        backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        pointBackgroundColor: '#28a745',
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 2,
-                        pointRadius: 6
-                    }, {
-                        label: 'Meta de Lucro',
-                        data: [<?= $lucro * 1.2 ?>, <?= $lucro * 1.3 ?>, <?= $lucro * 1.4 ?>, <?= $lucro * 1.5 ?>],
-                        borderColor: '#ffc107',
-                        backgroundColor: 'rgba(255, 193, 7, 0.1)',
-                        borderDash: [5, 5],
-                        tension: 0.4,
-                        fill: false,
-                        pointBackgroundColor: '#ffc107',
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 2,
-                        pointRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top',
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return formatCurrency(value);
+            fetch(`../api/projecao_lucro.php${apiParams}`)
+                .then(function(response) { return lucraFetchJson(response, 'Projeção de lucro'); })
+                .then(data => {
+                    if (data.empty) {
+                        lucraChartEmpty(profitForecastAdvancedCtx, 'Sem histórico para projetar lucro.');
+                        return;
+                    }
+                    new Chart(profitForecastAdvancedCtx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels || [],
+                            datasets: [{
+                                label: 'Projeção de Lucro',
+                                data: data.projecao || [],
+                                borderColor: '#28a745',
+                                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                                tension: 0.4,
+                                fill: true
+                            }, {
+                                label: 'Meta',
+                                data: data.meta || [],
+                                borderColor: '#ffc107',
+                                backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                                borderDash: [5, 5],
+                                tension: 0.4,
+                                fill: false
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { position: 'top' } },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: { callback: function(value) { return formatCurrency(value); } }
                                 }
                             }
                         }
-                    }
-                }
-            });
+                    });
+                })
+                .catch(function(error) {
+                    console.error('Erro projeção:', error);
+                    profitForecastAdvancedCtx.parentNode.innerHTML = '<p class="lucra-chart-msg lucra-chart-msg--err" role="alert">Não foi possível carregar a projeção.</p>';
+                });
         }
     });
     </script>
@@ -3827,34 +2925,36 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
             // Gráfico de Cascata (Waterfall)
             const waterfallCtx = document.getElementById('waterfallChart');
             if (waterfallCtx) {
-                const receita = <?= isset($kpis['total_frete']) ? $kpis['total_frete'] : 0 ?>;
-                const combustivel = <?= isset($kpis['total_abastecimentos']) ? -$kpis['total_abastecimentos'] : 0 ?>;
-                const manutencao = <?= isset($kpis['total_manutencoes']) ? -$kpis['total_manutencoes'] : 0 ?>;
-                const despesas_fixas = <?= isset($kpis['total_despesas_fixas']) ? -$kpis['total_despesas_fixas'] : 0 ?>;
-                const despesas_viagem = <?= isset($kpis['total_despesas_viagem']) ? -$kpis['total_despesas_viagem'] : 0 ?>;
-                const lucro = <?= $lucro ?>;
+                const receita = <?= isset($kpis['total_frete']) ? (float)$kpis['total_frete'] : 0 ?>;
+                const comissao = <?= isset($kpis['total_comissao']) ? -(float)$kpis['total_comissao'] : 0 ?>;
+                const combustivel = <?= isset($kpis['total_abastecimentos']) ? -(float)$kpis['total_abastecimentos'] : 0 ?>;
+                const manutencao = <?= isset($kpis['total_manutencoes']) ? -(float)$kpis['total_manutencoes'] : 0 ?>;
+                const pneus = <?= isset($kpis['total_pneu_manutencao']) ? -(float)$kpis['total_pneu_manutencao'] : 0 ?>;
+                const despesas_fixas = <?= isset($kpis['total_despesas_fixas']) ? -(float)$kpis['total_despesas_fixas'] : 0 ?>;
+                const despesas_viagem = <?= isset($kpis['total_despesas_viagem']) ? -(float)$kpis['total_despesas_viagem'] : 0 ?>;
+                const financiamento = <?= isset($kpis['total_parcelas_financiamento']) ? -(float)$kpis['total_parcelas_financiamento'] : 0 ?>;
+                const contas = <?= isset($kpis['total_contas_pagas']) ? -(float)$kpis['total_contas_pagas'] : 0 ?>;
+                const lucro = <?= (float)$lucro ?>;
                 
                 new Chart(waterfallCtx.getContext('2d'), {
                     type: 'bar',
                     data: {
-                        labels: ['Receita Inicial', 'Despesas Combustível', 'Despesas Manutenção', 'Despesas Fixas', 'Despesas Viagem', 'Lucro Final'],
+                        labels: ['Receita', 'Comissões', 'Combustível', 'Viagem', 'Fixas', 'Financ.', 'Contas', 'Manutenção', 'Pneus', 'Lucro'],
                         datasets: [{
                             label: 'Valor (R$)',
-                            data: [receita, combustivel, manutencao, despesas_fixas, despesas_viagem, lucro],
+                            data: [receita, comissao, combustivel, despesas_viagem, despesas_fixas, financiamento, contas, manutencao, pneus, lucro],
                             backgroundColor: [
                                 'rgba(16, 185, 129, 0.8)',
-                                'rgba(239, 68, 68, 0.8)',
-                                'rgba(239, 68, 68, 0.8)',
-                                'rgba(239, 68, 68, 0.8)',
-                                'rgba(239, 68, 68, 0.8)',
+                                'rgba(239, 68, 68, 0.8)', 'rgba(239, 68, 68, 0.8)', 'rgba(239, 68, 68, 0.8)',
+                                'rgba(239, 68, 68, 0.8)', 'rgba(239, 68, 68, 0.8)', 'rgba(239, 68, 68, 0.8)',
+                                'rgba(239, 68, 68, 0.8)', 'rgba(239, 68, 68, 0.8)',
                                 'rgba(16, 185, 129, 0.8)'
                             ],
                             borderColor: [
                                 'rgba(16, 185, 129, 1)',
-                                'rgba(239, 68, 68, 1)',
-                                'rgba(239, 68, 68, 1)',
-                                'rgba(239, 68, 68, 1)',
-                                'rgba(239, 68, 68, 1)',
+                                'rgba(239, 68, 68, 1)', 'rgba(239, 68, 68, 1)', 'rgba(239, 68, 68, 1)',
+                                'rgba(239, 68, 68, 1)', 'rgba(239, 68, 68, 1)', 'rgba(239, 68, 68, 1)',
+                                'rgba(239, 68, 68, 1)', 'rgba(239, 68, 68, 1)',
                                 'rgba(16, 185, 129, 1)'
                             ],
                             borderWidth: 2
@@ -3905,18 +3005,20 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
             const costBreakdownCtx = document.getElementById('costBreakdownChart');
             if (costBreakdownCtx) {
                 const combustivel = <?= isset($kpis['total_abastecimentos']) ? $kpis['total_abastecimentos'] : 0 ?>;
+                const comissao = <?= isset($kpis['total_comissao']) ? $kpis['total_comissao'] : 0 ?>;
                 const manutencao = <?= isset($kpis['total_manutencoes']) ? $kpis['total_manutencoes'] : 0 ?>;
                 const despesas_fixas = <?= isset($kpis['total_despesas_fixas']) ? $kpis['total_despesas_fixas'] : 0 ?>;
                 const despesas_viagem = <?= isset($kpis['total_despesas_viagem']) ? $kpis['total_despesas_viagem'] : 0 ?>;
                 const financiamento = <?= isset($kpis['total_parcelas_financiamento']) ? $kpis['total_parcelas_financiamento'] : 0 ?>;
                 const pneu_manutencao = <?= isset($kpis['total_pneu_manutencao']) ? $kpis['total_pneu_manutencao'] : 0 ?>;
+                const contas = <?= isset($kpis['total_contas_pagas']) ? $kpis['total_contas_pagas'] : 0 ?>;
                 
                 new Chart(costBreakdownCtx.getContext('2d'), {
                     type: 'doughnut',
                     data: {
-                        labels: ['Combustível', 'Manutenção', 'Despesas Fixas', 'Despesas Viagem', 'Financiamento', 'Manutenção Pneus'],
+                        labels: ['Combustível', 'Comissões', 'Manutenção', 'Despesas Fixas', 'Despesas Viagem', 'Financiamento', 'Contas Pagas', 'Pneus'],
                         datasets: [{
-                            data: [combustivel, manutencao, despesas_fixas, despesas_viagem, financiamento, pneu_manutencao],
+                            data: [combustivel, comissao, manutencao, despesas_fixas, despesas_viagem, financiamento, contas, pneu_manutencao],
                             backgroundColor: [
                                 'rgba(239, 68, 68, 0.8)',
                                 'rgba(245, 158, 11, 0.8)',
@@ -3968,53 +3070,51 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                 });
             }
             
-            // Gráfico de Tendência Anual
+            // Tendência anual (12 meses — API)
             const trendCtx = document.getElementById('trendChart');
             if (trendCtx) {
-                const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                const lucroAtual = <?= $lucro ?>;
-                new Chart(trendCtx.getContext('2d'), {
-                    type: 'line',
-                    data: {
-                        labels: meses,
-                        datasets: [{
-                            label: 'Lucro <?= $ano ?>',
-                            data: [
-                                lucroAtual * 0.75, lucroAtual * 0.80, lucroAtual * 0.78, 
-                                lucroAtual * 0.85, lucroAtual * 0.88, lucroAtual * 0.90,
-                                lucroAtual * 0.92, lucroAtual * 0.95, lucroAtual * 0.98,
-                                lucroAtual * 1.0, lucroAtual * 1.02, lucroAtual
-                            ],
-                            borderColor: 'rgba(16, 185, 129, 1)',
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            tension: 0.4,
-                            fill: true
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: { display: true, position: 'top' },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        return context.dataset.label + ': R$ ' + context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2});
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: false,
-                                ticks: {
-                                    callback: function(value) {
-                                        return 'R$ ' + value.toLocaleString('pt-BR');
-                                    }
-                                }
-                            }
+                const urlTrend = new URLSearchParams(window.location.search);
+                const mesT = urlTrend.get('mes');
+                const anoT = urlTrend.get('ano');
+                const trendQs = mesT && anoT ? ('?mes=' + mesT + '&ano=' + anoT + '&meses=12') : '?meses=12';
+                fetch('../api/evolucao_lucratividade.php' + trendQs)
+                    .then(function(r) { return lucraFetchJson(r, 'Tendência anual'); })
+                    .then(function(data) {
+                        if (data.empty) {
+                            lucraChartEmpty(trendCtx, 'Sem dados para tendência anual.');
+                            return;
                         }
-                    }
-                });
+                        new Chart(trendCtx.getContext('2d'), {
+                            type: 'line',
+                            data: {
+                                labels: data.labels || [],
+                                datasets: [{
+                                    label: 'Lucro líquido',
+                                    data: data.lucro || [],
+                                    borderColor: 'rgba(16, 185, 129, 1)',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    tension: 0.4,
+                                    fill: true
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: { legend: { display: true, position: 'top' } },
+                                scales: {
+                                    y: {
+                                        ticks: {
+                                            callback: function(value) {
+                                                return 'R$ ' + Number(value).toLocaleString('pt-BR');
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    })
+                    .catch(function() {
+                        trendCtx.parentNode.innerHTML = '<p class="lucra-chart-msg lucra-chart-msg--err" role="alert">Não foi possível carregar a tendência.</p>';
+                    });
             }
             
             // Gráfico de Pareto
@@ -4100,70 +3200,36 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
             }
         });
     </script>
-    
-    <!-- Modal de Ajuda -->
-    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="helpLucratividadeModal" role="dialog" aria-modal="true" aria-labelledby="helpLucratividadeTitle" aria-hidden="true">
-        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>"<?php echo $is_modern ? '' : ' style="max-width: 800px; max-height: 90vh; overflow-y: auto;"'; ?>>
-            <div class="modal-header">
-                <h2 id="helpLucratividadeTitle"><i class="fas fa-question-circle" aria-hidden="true"></i> Ajuda - Análise de Lucratividade</h2>
-                <button type="button" class="close-modal" aria-label="Fechar">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="help-section">
-                    <h3>Visão Geral</h3>
-                    <p>A página de Lucratividade oferece uma análise completa da performance financeira da empresa. Aqui você pode acompanhar receitas, despesas, lucros e tendências para tomar decisões estratégicas.</p>
-                </div>
+    <?php $sf_help_key = 'lucratividade'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
 
-                <div class="help-section">
-                    <h3>Funcionalidades Principais</h3>
-                    <ul>
-                        <li><strong>KPIs Financeiros:</strong> Visualize indicadores-chave como receita, despesas, lucro e margem.</li>
-                        <li><strong>Faixa de resumo (layout moderno):</strong> Lucro, receita, margem e ticket médio do período selecionado.</li>
-                        <li><strong>Reordenar:</strong> Como no dashboard inicial, arraste os <strong>cards de KPI</strong> e os <strong>blocos grandes</strong> (gráficos, tabelas). A ordem fica salva neste navegador (por empresa).</li>
-                        <li><strong>Navegação:</strong> Use Anterior/Próximo ou clique no período para abrir o filtro de mês/ano. <kbd>Esc</kbd> fecha modais.</li>
-                        <li><strong>Alertas:</strong> Avisos sobre tendências e situações que merecem atenção no período.</li>
-                        <li><strong>Análise de Tendências:</strong> Acompanhe a evolução dos resultados ao longo do tempo.</li>
-                        <li><strong>Relatórios Detalhados:</strong> Acesse análises profundas de cada componente financeiro.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Indicadores (KPIs)</h3>
-                    <ul>
-                        <li><strong>Receita Total:</strong> Soma de todas as receitas do período.</li>
-                        <li><strong>Despesas Totais:</strong> Soma de todas as despesas do período.</li>
-                        <li><strong>Lucro Líquido:</strong> Diferença entre receitas e despesas.</li>
-                        <li><strong>Margem de Lucro:</strong> Percentual de lucro em relação à receita.</li>
-                        <li><strong>ROI:</strong> Retorno sobre investimento da operação.</li>
-                        <li><strong>Tendências:</strong> Análise da evolução dos resultados.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Gráficos Disponíveis</h3>
-                    <ul>
-                        <li><strong>Evolução da Lucratividade:</strong> Gráfico de linha mostrando a evolução do lucro ao longo do tempo.</li>
-                        <li><strong>Distribuição de Custos:</strong> Gráfico de pizza mostrando a composição das despesas.</li>
-                        <li><strong>Margem por Tipo de Frete:</strong> Comparação da rentabilidade por tipo de serviço.</li>
-                        <li><strong>Projeção de Lucro:</strong> Previsões baseadas em tendências históricas.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Dicas Úteis</h3>
-                    <ul>
-                        <li>Monitore regularmente os KPIs para identificar tendências.</li>
-                        <li>Analise os alertas para tomar ações preventivas.</li>
-                        <li>Compare períodos diferentes para entender sazonalidades.</li>
-                        <li>Use os gráficos para apresentações e relatórios.</li>
-                        <li>Configure metas baseadas nos dados históricos.</li>
-                        <li>Acompanhe a evolução da margem de lucro para otimizar preços.</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <?php include '../includes/scroll_to_top.php'; ?>
+
+    <script src="../js/sf_insights.js?v=1.3"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!window.SFInsights) return;
+        var urlI = new URLSearchParams(window.location.search);
+        var insightsUrl = '../api/lucratividade_insights.php';
+        if (urlI.get('mes') && urlI.get('ano')) {
+            insightsUrl += '?mes=' + urlI.get('mes') + '&ano=' + urlI.get('ano');
+        }
+        SFInsights.init({
+            mountId: 'sfLucraInsights',
+            insightsUrl: insightsUrl,
+            resumoUrl: '../api/lucratividade_resumo_ia.php',
+            title: 'Insights de lucratividade',
+            sectionTitle: 'Alertas do período',
+            emptyOk: 'Nenhum alerta relevante para o mês.',
+            stats: function (j) {
+                return [
+                    { label: 'lucro', value: 'R$ ' + Number(j.lucro_liquido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }), tone: (j.lucro_liquido || 0) >= 0 ? 'ok' : 'erro' },
+                    { label: 'margem', value: Number(j.margem || 0).toFixed(1) + '%', tone: (j.margem || 0) >= 10 ? 'ok' : 'aviso' }
+                ];
+            }
+        });
+    });
+    </script>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

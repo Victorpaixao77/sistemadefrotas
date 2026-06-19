@@ -239,6 +239,315 @@ class AuthRepository(
         return result
     }
 
+    suspend fun loadOcorrencias(): Result<OcorrenciasResponse> =
+        safeApiCall { Api.service.ocorrencias(limite = 50) }
+
+    suspend fun criarOcorrencia(
+        body: Map<String, Any?>,
+        context: Context? = null,
+        fotoUri: Uri? = null,
+    ): Result<Int> {
+        if (!NetworkConnectivity.isOnline(appContext) && localCache != null && context != null) {
+            return if (fotoUri != null) {
+                val dir = File(context.filesDir, "outbox_ocorrencias").apply { mkdirs() }
+                val dest = File(dir, "oc_${System.currentTimeMillis()}.jpg")
+                context.contentResolver.openInputStream(fotoUri)?.use { input ->
+                    dest.outputStream().use { out -> input.copyTo(out) }
+                } ?: return Result.failure(Exception("Não foi possível ler a foto."))
+                if (!dest.exists() || dest.length() == 0L) {
+                    return Result.failure(Exception("Foto vazia."))
+                }
+                val payload = body.toMutableMap()
+                payload["foto_abs_path"] = dest.absolutePath
+                val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_OCORRENCIA_MULTIPART, payload)
+                Result.success(OfflineId.fromPendingRow(rowId))
+            } else {
+                val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_OCORRENCIA_JSON, body)
+                Result.success(OfflineId.fromPendingRow(rowId))
+            }
+        }
+        if (fotoUri != null && context != null) {
+            val filePart = fotoMultipartPart(context, fotoUri, "foto")
+            if (filePart != null) {
+                return try {
+                    if (Api.getToken().isNullOrBlank()) restoreToken()
+                    val text = "text/plain; charset=utf-8".toMediaType()
+                    val parts = body.mapNotNull { (k, v) ->
+                        if (v == null) null else k to (
+                            when (v) {
+                                is Number -> v.toString()
+                                is Boolean -> if (v) "1" else "0"
+                                else -> v.toString()
+                            }
+                        ).toRequestBody(text)
+                    }.toMap()
+                    val res = Api.service.criarOcorrenciaMultipart(parts, filePart)
+                    val resBody = res.body()
+                    when {
+                        res.isSuccessful && resBody != null && resBody.success && resBody.data != null ->
+                            Result.success(resBody.data.id)
+                        res.code() == 401 -> {
+                            val msg = resBody?.message ?: parseError(res)
+                            if (!msg.contains("não informado", ignoreCase = true)) clearTokenLocally()
+                            Result.failure(Exception(msg))
+                        }
+                        else -> Result.failure(Exception(resBody?.message ?: parseError(res)))
+                    }
+                } catch (e: Exception) {
+                    Result.failure(Exception(NetworkErrors.message(e)))
+                }
+            }
+        }
+        return safeCreateCall { Api.service.criarOcorrencia(body) }
+    }
+
+    suspend fun loadAbastecimentoInsights(dias: Int = 90): Result<AbastecimentoInsightsResponse> =
+        safeApiCall { Api.service.abastecimentoInsights(dias = dias) }
+
+    suspend fun loadConferencias(): Result<ConferenciasResponse> =
+        safeApiCall { Api.service.conferencias(limite = 50) }
+
+    suspend fun criarConferencia(
+        body: Map<String, Any?>,
+        context: Context? = null,
+        fotoUri: Uri? = null,
+    ): Result<Int> {
+        if (!NetworkConnectivity.isOnline(appContext) && localCache != null && context != null) {
+            return if (fotoUri != null) {
+                val dir = File(context.filesDir, "outbox_conferencia").apply { mkdirs() }
+                val dest = File(dir, "conf_${System.currentTimeMillis()}.jpg")
+                context.contentResolver.openInputStream(fotoUri)?.use { input ->
+                    dest.outputStream().use { out -> input.copyTo(out) }
+                } ?: return Result.failure(Exception("Não foi possível ler a foto."))
+                if (!dest.exists() || dest.length() == 0L) {
+                    return Result.failure(Exception("Foto vazia."))
+                }
+                val payload = body.toMutableMap()
+                payload["foto_abs_path"] = dest.absolutePath
+                val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_CONFERENCIA_MULTIPART, payload)
+                Result.success(OfflineId.fromPendingRow(rowId))
+            } else {
+                val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_CONFERENCIA_JSON, body)
+                Result.success(OfflineId.fromPendingRow(rowId))
+            }
+        }
+        if (fotoUri != null && context != null) {
+            val filePart = fotoMultipartPart(context, fotoUri, "foto")
+            if (filePart != null) {
+                return try {
+                    if (Api.getToken().isNullOrBlank()) restoreToken()
+                    val text = "text/plain; charset=utf-8".toMediaType()
+                    val parts = body.mapNotNull { (k, v) ->
+                        if (v == null) null else k to (
+                            when (v) {
+                                is Number -> v.toString()
+                                is Boolean -> if (v) "1" else "0"
+                                else -> v.toString()
+                            }
+                        ).toRequestBody(text)
+                    }.toMap()
+                    val res = Api.service.criarConferenciaMultipart(parts, filePart)
+                    val resBody = res.body()
+                    when {
+                        res.isSuccessful && resBody != null && resBody.success && resBody.data != null ->
+                            Result.success(resBody.data.id)
+                        res.code() == 401 -> {
+                            val msg = resBody?.message ?: parseError(res)
+                            if (!msg.contains("não informado", ignoreCase = true)) clearTokenLocally()
+                            Result.failure(Exception(msg))
+                        }
+                        else -> Result.failure(Exception(resBody?.message ?: parseError(res)))
+                    }
+                } catch (e: Exception) {
+                    Result.failure(Exception(NetworkErrors.message(e)))
+                }
+            }
+        }
+        return safeCreateCall { Api.service.criarConferencia(body) }
+    }
+
+    suspend fun loadVelocidade(dias: Int = 7, limite: Int = 90): Result<VelocidadeResponse> =
+        safeApiCall { Api.service.velocidade(dias = dias, limite = limite) }
+
+    suspend fun loadDesempenho(dias: Int = 30): Result<DesempenhoResponse> =
+        safeApiCall { Api.service.desempenho(dias = dias) }
+
+    suspend fun loadPedagios(): Result<PedagiosResponse> =
+        safeApiCall { Api.service.pedagios(limite = 50) }
+
+    suspend fun criarPedagio(
+        body: Map<String, Any?>,
+        context: Context? = null,
+        fotoUri: Uri? = null,
+    ): Result<Int> {
+        if (!NetworkConnectivity.isOnline(appContext) && localCache != null && context != null) {
+            return if (fotoUri != null) {
+                val dir = File(context.filesDir, "outbox_pedagios").apply { mkdirs() }
+                val dest = File(dir, "ped_${System.currentTimeMillis()}.jpg")
+                context.contentResolver.openInputStream(fotoUri)?.use { input ->
+                    dest.outputStream().use { out -> input.copyTo(out) }
+                } ?: return Result.failure(Exception("Não foi possível ler a foto."))
+                if (!dest.exists() || dest.length() == 0L) {
+                    return Result.failure(Exception("Foto vazia."))
+                }
+                val payload = body.toMutableMap()
+                payload["foto_abs_path"] = dest.absolutePath
+                val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_PEDAGIO_MULTIPART, payload)
+                Result.success(OfflineId.fromPendingRow(rowId))
+            } else {
+                val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_PEDAGIO_JSON, body)
+                Result.success(OfflineId.fromPendingRow(rowId))
+            }
+        }
+        if (fotoUri != null && context != null) {
+            val filePart = fotoMultipartPart(context, fotoUri, "foto")
+            if (filePart != null) {
+                return try {
+                    if (Api.getToken().isNullOrBlank()) restoreToken()
+                    val text = "text/plain; charset=utf-8".toMediaType()
+                    val parts = body.mapNotNull { (k, v) ->
+                        if (v == null) null else k to (
+                            when (v) {
+                                is Number -> v.toString()
+                                is Boolean -> if (v) "1" else "0"
+                                else -> v.toString()
+                            }
+                        ).toRequestBody(text)
+                    }.toMap()
+                    val res = Api.service.criarPedagioMultipart(parts, filePart)
+                    val resBody = res.body()
+                    when {
+                        res.isSuccessful && resBody != null && resBody.success && resBody.data != null ->
+                            Result.success(resBody.data.id)
+                        res.code() == 401 -> {
+                            val msg = resBody?.message ?: parseError(res)
+                            if (!msg.contains("não informado", ignoreCase = true)) clearTokenLocally()
+                            Result.failure(Exception(msg))
+                        }
+                        else -> Result.failure(Exception(resBody?.message ?: parseError(res)))
+                    }
+                } catch (e: Exception) {
+                    Result.failure(Exception(NetworkErrors.message(e)))
+                }
+            }
+        }
+        return safeCreateCall { Api.service.criarPedagio(body) }
+    }
+
+    /**
+     * Lê um documento por IA de visão (tipo = abastecimento|painel|pedagio) e devolve os
+     * campos para o app pré-preencher o formulário. Exige internet; o motorista revisa antes de salvar.
+     */
+    suspend fun lerDocumentoOcr(context: Context, fotoUri: Uri, tipo: String): Result<OcrCampos> {
+        if (!NetworkConnectivity.isOnline(appContext)) {
+            return Result.failure(Exception("Leitura por IA precisa de internet. Preencha manualmente."))
+        }
+        val filePart = fotoMultipartPart(context, fotoUri, "image")
+            ?: return Result.failure(Exception("Não foi possível ler a foto."))
+        return try {
+            if (Api.getToken().isNullOrBlank()) restoreToken()
+            val tipoBody = tipo.toRequestBody("text/plain; charset=utf-8".toMediaType())
+            val res = Api.service.ocrDocumento(tipoBody, filePart)
+            val resBody = res.body()
+            when {
+                res.isSuccessful && resBody != null && resBody.success && resBody.data?.campos != null ->
+                    Result.success(resBody.data.campos)
+                res.code() == 401 -> {
+                    val msg = resBody?.message ?: parseError(res)
+                    if (!msg.contains("não informado", ignoreCase = true)) clearTokenLocally()
+                    Result.failure(Exception(msg))
+                }
+                else -> Result.failure(Exception(resBody?.message ?: parseError(res)))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(NetworkErrors.message(e)))
+        }
+    }
+
+    suspend fun loadJornada(): Result<JornadaResponse> =
+        safeApiCall { Api.service.jornada(limite = 50) }
+
+    suspend fun registrarJornada(body: Map<String, Any?>): Result<Int> {
+        if (!NetworkConnectivity.isOnline(appContext) && localCache != null) {
+            val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_JORNADA, body)
+            return Result.success(OfflineId.fromPendingRow(rowId))
+        }
+        return safeCreateCall { Api.service.registrarJornada(body) }
+    }
+
+    suspend fun loadPanicoAlertas(): Result<PanicoResponse> =
+        safeApiCall { Api.service.panico(limite = 20) }
+
+    suspend fun acionarPanico(body: Map<String, Any?>): Result<Int> {
+        if (!NetworkConnectivity.isOnline(appContext) && localCache != null) {
+            val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_PANICO, body)
+            return Result.success(OfflineId.fromPendingRow(rowId))
+        }
+        return safeCreateCall { Api.service.acionarPanico(body) }
+    }
+
+    suspend fun loadComprovantes(): Result<ComprovantesResponse> =
+        safeApiCall { Api.service.comprovantesEntrega(limite = 50) }
+
+    suspend fun loadDiario(): Result<DiarioResponse> =
+        safeApiCall { Api.service.diario(dias = 7, limite = 80) }
+
+    suspend fun criarComprovante(
+        body: Map<String, Any?>,
+        context: Context,
+        fotoNf: Uri?,
+        fotoCarga: Uri?,
+        assinatura: Uri?,
+    ): Result<Int> {
+        if (!NetworkConnectivity.isOnline(appContext) && localCache != null) {
+            val payload = body.toMutableMap()
+            fun stash(uri: Uri?, key: String, prefix: String) {
+                if (uri == null) return
+                val dir = File(context.filesDir, "outbox_pod").apply { mkdirs() }
+                val dest = File(dir, "${prefix}_${System.currentTimeMillis()}.jpg")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    dest.outputStream().use { out -> input.copyTo(out) }
+                }
+                if (dest.exists() && dest.length() > 0L) payload[key] = dest.absolutePath
+            }
+            stash(fotoNf, "foto_nf_abs_path", "nf")
+            stash(fotoCarga, "foto_carga_abs_path", "carga")
+            stash(assinatura, "assinatura_abs_path", "assin")
+            val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_POD, payload)
+            return Result.success(OfflineId.fromPendingRow(rowId))
+        }
+        return try {
+            if (Api.getToken().isNullOrBlank()) restoreToken()
+            val text = "text/plain; charset=utf-8".toMediaType()
+            val parts = body.mapNotNull { (k, v) ->
+                if (v == null) null else k to (
+                    when (v) {
+                        is Number -> v.toString()
+                        is Boolean -> if (v) "1" else "0"
+                        else -> v.toString()
+                    }
+                ).toRequestBody(text)
+            }.toMap()
+            val pNf = fotoNf?.let { fotoMultipartPart(context, it, "foto_nf") }
+            val pCarga = fotoCarga?.let { fotoMultipartPart(context, it, "foto_carga") }
+            val pAssin = assinatura?.let { fotoMultipartPart(context, it, "assinatura") }
+            val res = Api.service.criarComprovanteMultipart(parts, pNf, pCarga, pAssin)
+            val resBody = res.body()
+            when {
+                res.isSuccessful && resBody != null && resBody.success && resBody.data != null ->
+                    Result.success(resBody.data.id)
+                res.code() == 401 -> {
+                    val msg = resBody?.message ?: parseError(res)
+                    if (!msg.contains("não informado", ignoreCase = true)) clearTokenLocally()
+                    Result.failure(Exception(msg))
+                }
+                else -> Result.failure(Exception(resBody?.message ?: parseError(res)))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(NetworkErrors.message(e)))
+        }
+    }
+
     suspend fun loadVeiculos(): Result<VeiculosResponse> = safeApiCall { Api.service.veiculos() }
 
     suspend fun loadEstados(): Result<EstadosResponse> = safeApiCall { Api.service.estados() }
@@ -395,6 +704,61 @@ class AuthRepository(
     }
 
     suspend fun loadDespesas(rotaId: Int): Result<DespesasWrapper> = safeApiCall { Api.service.despesas(rotaId) }
+
+    suspend fun buscarPneuQr(qr: String): Result<PneuBuscaData> =
+        safeApiCall { Api.service.buscarPneuQr(qr = qr.trim()) }
+
+    suspend fun loadPneusVeiculos(): Result<VeiculosResponse> =
+        safeApiCall { Api.service.pneusVeiculosMotorista() }
+
+    suspend fun registrarInspecaoPneu(body: Map<String, Any?>): Result<Int> =
+        safeCreateCall { Api.service.registrarInspecaoPneu(body = body) }
+
+    suspend fun uploadFotoPneu(
+        pneuId: Int,
+        tipo: String,
+        context: Context,
+        uri: Uri,
+    ): Result<Int> {
+        val filePart = fotoMultipartPart(context, uri, "foto") ?: return Result.failure(Exception("Não foi possível ler a foto."))
+        val text = "text/plain; charset=utf-8".toMediaType()
+        val parts = mapOf(
+            "pneu_id" to pneuId.toString().toRequestBody(text),
+            "tipo" to tipo.toRequestBody(text),
+        )
+        return try {
+            if (Api.getToken().isNullOrBlank()) restoreToken()
+            val res = Api.service.uploadFotoPneu(parts = parts, foto = filePart)
+            val body = res.body()
+            when {
+                res.isSuccessful && body != null && body.success && body.data != null ->
+                    Result.success(body.data.id)
+                res.code() == 401 -> {
+                    val msg = body?.message ?: parseError(res)
+                    if (!msg.contains("não informado", ignoreCase = true)) clearTokenLocally()
+                    Result.failure(Exception(msg))
+                }
+                else -> Result.failure(Exception(body?.message ?: parseError(res)))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(NetworkErrors.message(e)))
+        }
+    }
+
+    private fun fotoMultipartPart(context: Context, uri: Uri, field: String): MultipartBody.Part? {
+        val cr = context.contentResolver
+        val mime = cr.getType(uri) ?: "image/jpeg"
+        val ext = when {
+            mime.contains("png") -> "png"
+            mime.contains("webp") -> "webp"
+            else -> "jpg"
+        }
+        val stream = cr.openInputStream(uri) ?: return null
+        val bytes = stream.use { it.readBytes() }
+        if (bytes.isEmpty()) return null
+        val body = bytes.toRequestBody(mime.toMediaType())
+        return MultipartBody.Part.createFormData(field, "foto.$ext", body)
+    }
 
     private fun parseError(res: retrofit2.Response<*>): String {
         val code = res.code()

@@ -289,6 +289,20 @@ class RecomendacaoPneus {
 
 // API Endpoint
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    configure_session();
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    require_authentication();
+    require_once __DIR__ . '/../includes/permissions.php';
+    require_once __DIR__ . '/../includes/csrf.php';
+    if (!can_access_tire_management()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Sem permissão']);
+        exit;
+    }
+    api_require_csrf_json();
+
     try {
         $data = json_decode(file_get_contents('php://input'), true);
         

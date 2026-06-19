@@ -1,0 +1,3 @@
+data;placa;tipo;componente;fornecedor;valor;km;descricao;nota_fiscal;status
+15/06/2025;ABC1D23;Preventiva;Motor;Oficina Central;850,00;125000;Troca de óleo e filtros;NF-12345;Concluída
+16/06/2025;XYZ9E87;Corretiva;Freios;Auto Peças Sul;420,50;89000;Pastilhas dianteiras;98765;

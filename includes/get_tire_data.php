@@ -1,45 +1,54 @@
 <?php
-require_once 'config.php';
-require_once 'functions.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/functions.php';
+require_once __DIR__ . '/pneus_helpers.php';
 
-// Iniciar a sessão
-session_start();
+header('Content-Type: application/json; charset=utf-8');
+
+configure_session();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+require_authentication();
+pneus_require_page_access();
 
 try {
     $pdo = getConnection();
-    
-    $type = isset($_GET['type']) ? $_GET['type'] : null;
-    
-    switch($type) {
+    $empresa_id = pneus_empresa_id();
+    $type = isset($_GET['type']) ? (string) $_GET['type'] : '';
+
+    switch ($type) {
         case 'status':
-            $stmt = $pdo->prepare("SELECT id, nome FROM status_pneus ORDER BY nome");
+            $stmt = $pdo->prepare('SELECT id, nome FROM status_pneus ORDER BY nome');
             $stmt->execute();
             $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
             break;
-            
+
         case 'posicoes':
-            $stmt = $pdo->prepare("SELECT id, nome FROM posicoes_pneus ORDER BY nome");
+            $stmt = $pdo->prepare('SELECT id, nome FROM posicoes_pneus ORDER BY nome');
             $stmt->execute();
             $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
             break;
 
         case 'veiculos':
-            // Buscar veículos da empresa atual
-            $empresa_id = $_SESSION['empresa_id'];
-            $stmt = $pdo->prepare("SELECT id, placa as nome FROM veiculos WHERE empresa_id = ? ORDER BY placa");
+            $stmt = $pdo->prepare('SELECT id, placa AS nome FROM veiculos WHERE empresa_id = ? ORDER BY placa');
             $stmt->execute([$empresa_id]);
             $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
             break;
-            
+
+        case 'filiais':
+            require_once __DIR__ . '/pneus_mercado_helpers.php';
+            pneus_filial_garantir_matriz($pdo, $empresa_id);
+            $data = pneus_filiais_listar($pdo, $empresa_id);
+            break;
+
         default:
-            throw new Exception('Tipo de dados não especificado');
+            throw new InvalidArgumentException('Tipo de dados não especificado');
     }
-    
-    header('Content-Type: application/json');
-    echo json_encode(['success' => true, 'data' => $data]);
-    
-} catch (Exception $e) {
-    http_response_code(500);
-    header('Content-Type: application/json');
-    echo json_encode(['error' => $e->getMessage()]);
-} 
+
+    echo json_encode(['success' => true, 'data' => $data], JSON_UNESCAPED_UNICODE);
+} catch (Throwable $e) {
+    error_log('get_tire_data.php: ' . $e->getMessage());
+    http_response_code($e instanceof InvalidArgumentException ? 400 : 500);
+    echo json_encode(['success' => false, 'error' => 'Erro ao carregar dados auxiliares'], JSON_UNESCAPED_UNICODE);
+}

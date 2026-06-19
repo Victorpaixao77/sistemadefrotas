@@ -1,5 +1,6 @@
 <?php
 require_once '../includes/config.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/csrf.php';
@@ -36,13 +37,14 @@ if (!defined('FORNECEDORES_CANONICAL_RENDER')) {
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <script src="../js/doc_validators.js"></script>
-    <script src="../js/fornecedores.js" defer></script>
+    <script src="../js/fornecedores.js?v=1.2" defer></script>
     <style>
         /* Ajuste de espaçamento igual ao padrão de rotas (dashboard mais "colada" no topo) */
         body.fornecedores-modern-page .dashboard-content.fornc-page {
             padding-top: 8px;
         }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="fornecedores-modern-page">
     <div id="fornGlobalLoading" aria-hidden="true"><div class="forn-spinner-box"><i class="fas fa-spinner fa-spin fa-2x"></i><p style="margin:0.75rem 0 0;font-size:0.9rem;">Carregando...</p></div></div>
@@ -57,14 +59,14 @@ if (!defined('FORNECEDORES_CANONICAL_RENDER')) {
             <div class="dashboard-content fornc-page">
 
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><span class="lbl">Total</span><span class="val" id="fornKpiTotal">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Ativos</span><span class="val" id="fornKpiAtivos">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Inativos</span><span class="val" id="fornKpiInativos">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">PJ</span><span class="val" id="fornKpiPJ">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">PF</span><span class="val" id="fornKpiPF">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">IBGE OK</span><span class="val" id="fornKpiIbgeOk">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Sem IBGE</span><span class="val" id="fornKpiIbgeFalta">0</span></div>
-                    <div class="fornc-kpi-cell"><span class="lbl">Com e-mail</span><span class="val" id="fornKpiEmail">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-building fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total</span></div><span class="val" id="fornKpiTotal">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Ativos</span></div><span class="val" id="fornKpiAtivos">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-ban fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Inativos</span></div><span class="val" id="fornKpiInativos">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-building fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">PJ</span></div><span class="val" id="fornKpiPJ">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-user fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">PF</span></div><span class="val" id="fornKpiPF">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-map fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">IBGE OK</span></div><span class="val" id="fornKpiIbgeOk">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-map-location-dot fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Sem IBGE</span></div><span class="val" id="fornKpiIbgeFalta">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-envelope fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Com e-mail</span></div><span class="val" id="fornKpiEmail">0</span></div>
                 </div>
                 <!-- Resumo de KPI removido: o texto "Base: ... | Ativos: ..." não deve aparecer na tela. -->
 
@@ -117,6 +119,9 @@ if (!defined('FORNECEDORES_CANONICAL_RENDER')) {
                         <button type="button" class="fornc-btn fornc-btn--ghost" id="clearFornecedorFilters" title="Limpar busca e tipo">
                             <i class="fas fa-undo"></i>
                         </button>
+                        <button type="button" class="fornc-btn fornc-btn--accent" id="importBtn" title="Importar fornecedores de CSV">
+                            <i class="fas fa-file-import"></i> Importar
+                        </button>
                         <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar CSV">
                             <i class="fas fa-file-export"></i> Exportar
                         </button>
@@ -126,7 +131,43 @@ if (!defined('FORNECEDORES_CANONICAL_RENDER')) {
                     </div>
                 </div>
 
-                <div class="fornc-table-wrap">
+                <!-- Insights de fornecedores: qualidade do cadastro + ranking -->
+                <div class="fn-insights" id="fnInsights" style="display:none;">
+                    <div class="fn-head">
+                        <button type="button" class="fn-toggle" id="fnToggle" aria-expanded="false" aria-controls="fnBody">
+                            <span class="fn-summary" id="fnSummary"></span>
+                            <i class="fas fa-chevron-down fn-caret" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="fnRefresh" title="Reanalisar" aria-label="Reanalisar"><i class="fas fa-sync-alt"></i></button>
+                    </div>
+                    <div class="fn-body" id="fnBody" style="display:none;">
+                        <div class="fn-section">
+                            <h4><i class="fas fa-clipboard-check"></i> Qualidade do cadastro</h4>
+                            <div id="fnQualList"></div>
+                        </div>
+                        <div class="fn-section">
+                            <h4><i class="fas fa-ranking-star"></i> Maior gasto (contas a pagar)</h4>
+                            <div id="fnRankList"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resumo executivo por IA -->
+                <div class="fn-resumo-ia" id="fnResumoIa" style="display:none;">
+                    <div class="fn-resumo-head">
+                        <h4><i class="fas fa-wand-magic-sparkles"></i> Resumo executivo (IA)</h4>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" id="fnResumoBtn"><i class="fas fa-bolt"></i> Gerar resumo</button>
+                    </div>
+                    <div id="fnResumoTexto" class="fn-resumo-texto text-muted">Clique em “Gerar resumo” para uma análise dos fornecedores pela IA.</div>
+                </div>
+
+                <div class="fornc-empty-state" id="fornEmptyState" role="status" aria-live="polite">
+                    <p class="fornc-empty-state-title">Nenhum fornecedor encontrado</p>
+                    <p class="fornc-empty-state-hint">Ajuste a busca ou a situação nos filtros, ou cadastre um novo fornecedor.</p>
+                    <button type="button" class="fornc-btn fornc-btn--primary" id="fornEmptyCreateBtn"><i class="fas fa-plus"></i> Cadastrar primeiro fornecedor</button>
+                </div>
+
+                <div class="fornc-table-wrap" id="fornTableWrap">
                     <table class="fornc-table">
                         <thead>
                             <tr>
@@ -226,38 +267,6 @@ if (!defined('FORNECEDORES_CANONICAL_RENDER')) {
             <div class="modal-footer">
                 <button type="button" class="btn-secondary" id="modalFornecedorClearFilter">Limpar</button>
                 <button type="button" class="btn-primary" id="modalFornecedorApplyFilter">Aplicar</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal fornc-modal" id="helpFornecedorModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Ajuda - Fornecedores</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="help-section">
-                    <h3>Visão geral</h3>
-                    <p>Cadastre fornecedores e clientes para reutilizar dados ao emitir <strong>NF-e</strong> (seleção no modal em Gestão de NF-e).</p>
-                    <ul>
-                        <li><strong>Pessoa jurídica:</strong> com CNPJ válido (14 dígitos, <strong>com ou sem</strong> pontos, barra e traço), os dados podem ser preenchidos pela <strong>BrasilAPI</strong> — botão &quot;Buscar CNPJ&quot; ou aguarde após digitar.</li>
-                        <li><strong>cMun IBGE:</strong> código de 7 dígitos do município — necessário para endereço do destinatário na NF-e.</li>
-                        <li><strong>Pessoa física:</strong> informe CPF de 11 dígitos.</li>
-                    </ul>
-                </div>
-                <div class="help-section">
-                    <h3>Filtros e lista</h3>
-                    <p>Use <strong>Situação</strong> para buscar ativos, inativos ou todos no servidor. Use <strong>Tipo</strong> e a <strong>busca</strong> para refinar.</p>
-                    <p>Clique nos títulos das colunas (exceto <strong>Ações</strong>) para ordenar: texto em ordem alfabética (A–Z ou Z–A); use novamente o mesmo título para inverter. A ordenação é feita no servidor.</p>
-                </div>
-                <div class="help-section">
-                    <h3>Exportar</h3>
-                    <p>O botão <strong>Exportar</strong> gera um CSV com os registros que batem com situação, tipo e busca (até 5.000 linhas).</p>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn-primary close-modal">Fechar</button>
             </div>
         </div>
     </div>
@@ -414,5 +423,74 @@ if (!defined('FORNECEDORES_CANONICAL_RENDER')) {
             </div>
         </div>
     </div>
+
+    <!-- Modal de importação CSV -->
+    <div class="modal fornc-modal" id="modalFornImport">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Importar fornecedores (CSV)</h2>
+                <span class="close-modal" data-close-import>&times;</span>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:0.85rem;color:var(--text-secondary);margin-top:0;">
+                    Colunas: <strong>nome</strong>, <strong>tipo</strong> (F/J), <strong>documento</strong> (CPF/CNPJ), <strong>email</strong>, <strong>cidade</strong>, <strong>uf</strong>.
+                    Separador <code>;</code> ou <code>,</code>. CNPJ/CPF inválidos e duplicados são ignorados.
+                </p>
+                <div class="form-group">
+                    <label for="fornImportFile">Arquivo CSV</label>
+                    <input type="file" id="fornImportFile" accept=".csv,text/csv">
+                </div>
+                <p id="fornImportInfo" style="font-size:0.85rem;margin:0.4rem 0;"></p>
+                <div class="table-container" style="max-height:240px;overflow:auto;">
+                    <table class="data-table"><thead><tr><th>Nome</th><th>Tipo</th><th>Documento</th><th>E-mail</th><th>Cidade/UF</th></tr></thead>
+                    <tbody id="fornImportPreview"></tbody></table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span id="fornImportResult" style="margin-right:auto;font-size:0.85rem;font-weight:600;"></span>
+                <button type="button" class="btn-secondary" data-close-import>Fechar</button>
+                <button type="button" class="btn-primary" id="fornImportSaveBtn" disabled><i class="fas fa-file-import"></i> Importar</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Painel de insights de fornecedores */
+        .fn-insights { border: 1px solid var(--border-color); border-radius: 10px; margin-bottom: 1rem; overflow: hidden; background: var(--card-bg, var(--bg-secondary)); }
+        .fn-insights.has-erros { border-color: #dc2626; }
+        .fn-insights.has-avisos { border-color: #f59e0b; }
+        .fn-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.6rem 0.5rem 0.85rem; }
+        .fn-toggle { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; background: none; border: none; cursor: pointer; color: var(--text-primary); font-weight: 600; font-size: 0.9rem; text-align: left; padding: 0.2rem 0; }
+        .fn-caret { transition: transform 0.2s ease; color: var(--text-muted); }
+        .fn-toggle[aria-expanded="true"] .fn-caret { transform: rotate(180deg); }
+        .fn-summary .fn-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; margin-left: 6px; }
+        .fn-pill.erro { background: rgba(220,38,38,0.12); color: #dc2626; }
+        .fn-pill.aviso { background: rgba(245,158,11,0.14); color: #b45309; }
+        .fn-pill.ok { background: rgba(22,163,74,0.12); color: #16a34a; }
+        .fn-body { padding: 0.25rem 0.85rem 0.7rem; max-height: 400px; overflow: auto; }
+        .fn-section { padding: 0.5rem 0; border-top: 1px solid var(--border-color); }
+        .fn-section:first-child { border-top: none; }
+        .fn-section h4 { margin: 0 0 0.4rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary); }
+        .fn-section h4 i { color: var(--accent-primary, #3b82f6); }
+        .fn-item { display: flex; gap: 0.55rem; padding: 0.4rem 0; border-top: 1px dashed var(--border-color); font-size: 0.85rem; }
+        .fn-item:first-child { border-top: none; }
+        .fn-item .fn-sev { flex: 0 0 auto; }
+        .fn-item .fn-sev.erro { color: #dc2626; }
+        .fn-item .fn-sev.aviso { color: #f59e0b; }
+        .fn-item .fn-txt { flex: 1; min-width: 0; }
+        .fn-item .fn-txt strong { color: var(--text-primary); }
+        .fn-item .fn-edit { flex: 0 0 auto; }
+        .fn-empty { font-size: 0.83rem; color: var(--text-muted); padding: 0.2rem 0; }
+        .fn-rank-row { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.3rem 0; border-top: 1px dashed var(--border-color); font-size: 0.85rem; }
+        .fn-rank-row:first-child { border-top: none; }
+        .fn-resumo-ia { border: 1px solid var(--border-color); border-radius: 10px; margin-bottom: 1rem; padding: 0.75rem 0.85rem; background: var(--card-bg, var(--bg-secondary)); }
+        .fn-resumo-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
+        .fn-resumo-head h4 { margin: 0; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem; }
+        .fn-resumo-head h4 i { color: var(--accent-primary, #3b82f6); }
+        .fn-resumo-texto { font-size: 0.9rem; line-height: 1.5; color: var(--text-primary); }
+        .fn-resumo-texto.text-muted { color: var(--text-muted); }
+    </style>
+    <?php $sf_help_key = 'fornecedores'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html>

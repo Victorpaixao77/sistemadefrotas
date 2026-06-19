@@ -6,6 +6,8 @@ require_once '../includes/functions.php';
 require_once __DIR__ . '/../includes/csrf.php';
 require_once __DIR__ . '/../includes/api_json.php';
 require_once __DIR__ . '/../includes/bi_cache_invalidate.php';
+require_once __DIR__ . '/../includes/maintenance_metrics.php';
+require_once __DIR__ . '/../includes/maintenance_conta_pagar.php';
 
 // Configure session before starting it
 configure_session();
@@ -66,9 +68,6 @@ function atualizar_plano_apos_manutencao($conn, $empresa_id, $veiculo_id, $compo
     ]);
 }
 
-// Debug session state
-error_log("Session state in manutencoes.php API: " . print_r($_SESSION, true));
-
 switch ($method) {
     case 'GET':
         // Handle GET request (fetch maintenance)
@@ -76,8 +75,13 @@ switch ($method) {
             $id = isset($_GET['id']) ? intval($_GET['id']) : null;
             
             if ($id) {
-                // Fetch specific maintenance
-                $sql = "SELECT * FROM manutencoes WHERE id = :id AND empresa_id = :empresa_id";
+                $sql = "SELECT m.*, v.placa as veiculo_placa, tm.nome as tipo_nome, sm.nome as status_nome, cm.nome as componente_nome
+                        FROM manutencoes m
+                        LEFT JOIN veiculos v ON m.veiculo_id = v.id
+                        LEFT JOIN tipos_manutencao tm ON m.tipo_manutencao_id = tm.id
+                        LEFT JOIN status_manutencao sm ON m.status_manutencao_id = sm.id
+                        LEFT JOIN componentes_manutencao cm ON m.componente_id = cm.id
+                        WHERE m.id = :id AND m.empresa_id = :empresa_id";
                 $stmt = $conn->prepare($sql);
                 $stmt->bindParam(':id', $id, PDO::PARAM_INT);
                 $stmt->bindParam(':empresa_id', $_SESSION['empresa_id'], PDO::PARAM_INT);
@@ -91,46 +95,17 @@ switch ($method) {
                     echo json_encode(['error' => 'Manutenção não encontrada']);
                 }
             } elseif (isset($_GET['list']) && $_GET['list'] === '1') {
-                // Listagem paginada (para AJAX – não recarrega a página)
-                $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-                $per_page = isset($_GET['per_page']) ? max(5, min(100, (int)$_GET['per_page'])) : 10;
-                if (!in_array($per_page, [5, 10, 25, 50, 100], true)) $per_page = 10;
-                $data_inicio = isset($_GET['data_inicio']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['data_inicio']) ? $_GET['data_inicio'] : null;
-                $data_fim = isset($_GET['data_fim']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['data_fim']) ? $_GET['data_fim'] : null;
-                $order_by = isset($_GET['order']) && in_array($_GET['order'], ['data_manutencao', 'valor', 'veiculo_placa', 'tipo_nome', 'status_nome', 'fornecedor', 'descricao'], true) ? $_GET['order'] : 'data_manutencao';
-                $order_dir = isset($_GET['dir']) && strtoupper($_GET['dir']) === 'ASC' ? 'ASC' : 'DESC';
-                $cols = ['data_manutencao' => 'm.data_manutencao', 'valor' => 'm.valor', 'veiculo_placa' => 'v.placa', 'tipo_nome' => 'tm.nome', 'status_nome' => 'sm.nome', 'fornecedor' => 'm.fornecedor', 'descricao' => 'm.descricao'];
-                $order_col = $cols[$order_by] ?? 'm.data_manutencao';
-                $where = "m.empresa_id = :empresa_id";
-                $params = [':empresa_id' => $_SESSION['empresa_id']];
-                if ($data_inicio) { $where .= " AND m.data_manutencao >= :data_inicio"; $params[':data_inicio'] = $data_inicio; }
-                if ($data_fim) { $where .= " AND m.data_manutencao <= :data_fim"; $params[':data_fim'] = $data_fim; }
-                $offset = ($page - 1) * $per_page;
-                $sql_count = "SELECT COUNT(*) as total FROM manutencoes m LEFT JOIN veiculos v ON m.veiculo_id = v.id LEFT JOIN tipos_manutencao tm ON m.tipo_manutencao_id = tm.id LEFT JOIN status_manutencao sm ON m.status_manutencao_id = sm.id WHERE $where";
-                $stmt = $conn->prepare($sql_count);
-                foreach ($params as $k => $v) $stmt->bindValue($k, $v);
-                $stmt->execute();
-                $total = (int)$stmt->fetch(PDO::FETCH_ASSOC)['total'];
-                $sql = "SELECT m.*, v.placa as veiculo_placa, tm.nome as tipo_nome, sm.nome as status_nome FROM manutencoes m LEFT JOIN veiculos v ON m.veiculo_id = v.id LEFT JOIN tipos_manutencao tm ON m.tipo_manutencao_id = tm.id LEFT JOIN status_manutencao sm ON m.status_manutencao_id = sm.id WHERE $where ORDER BY $order_col $order_dir, m.id $order_dir LIMIT " . (int)$per_page . " OFFSET " . (int)$offset;
-                $stmt = $conn->prepare($sql);
-                foreach ($params as $k => $v) $stmt->bindValue($k, $v);
-                $stmt->execute();
-                $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                $custo_12m = [];
-                try {
-                    $st = $conn->prepare("SELECT veiculo_id, COALESCE(SUM(valor), 0) as custo_12m FROM manutencoes WHERE empresa_id = :eid AND data_manutencao >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH) GROUP BY veiculo_id");
-                    $st->bindValue(':eid', $_SESSION['empresa_id'], PDO::PARAM_INT);
-                    $st->execute();
-                    while ($row = $st->fetch(PDO::FETCH_ASSOC)) {
-                        $custo_12m[(int)$row['veiculo_id']] = (float)$row['custo_12m'];
-                    }
-                } catch (PDOException $e) { /* ignore */ }
-                foreach ($result as &$r) {
-                    $r['custo_veiculo_12m'] = $custo_12m[(int)($r['veiculo_id'] ?? 0)] ?? 0;
-                }
-                unset($r);
-                $total_paginas = $per_page > 0 ? (int)ceil($total / $per_page) : 1;
-                echo json_encode(['success' => true, 'data' => $result, 'total' => $total, 'pagina_atual' => $page, 'total_paginas' => $total_paginas, 'per_page' => $per_page]);
+                $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+                $opts = sf_mnt_parse_list_opts($_GET);
+                $resultado = sf_mnt_fetch_list($conn, (int) $_SESSION['empresa_id'], $page, $opts);
+                echo json_encode([
+                    'success' => true,
+                    'data' => $resultado['manutencoes'],
+                    'total' => $resultado['total'],
+                    'pagina_atual' => $resultado['pagina_atual'],
+                    'total_paginas' => $resultado['total_paginas'],
+                    'per_page' => $resultado['per_page'],
+                ]);
             } else {
                 // Fetch all maintenances (opcional: filtrar por veiculo_id para histórico por veículo)
                 $veiculo_id = isset($_GET['veiculo_id']) ? (int)$_GET['veiculo_id'] : null;
@@ -259,8 +234,18 @@ switch ($method) {
             // Atualizar plano de manutenção (ultimo_km, ultima_data) se for preventiva concluída
             atualizar_plano_apos_manutencao($conn, $_SESSION['empresa_id'], (int)$data['veiculo_id'], (int)$data['componente_id'], (int)$data['tipo_manutencao_id'], (int)$data['status_manutencao_id'], $data['data_manutencao'], (int)$data['km_atual']);
             
+            $gerar_conta = !empty($data['gerar_conta_pagar']);
+            $conta_result = sf_mnt_sync_conta_pagar($conn, (int) $_SESSION['empresa_id'], (int) $id, $data, $gerar_conta);
+            
             bi_cache_invalidate_empresa($conn, (int) $_SESSION['empresa_id']);
-            echo json_encode(['success' => true, 'message' => 'Manutenção cadastrada com sucesso', 'id' => $id]);
+            $resp = ['success' => true, 'message' => 'Manutenção cadastrada com sucesso', 'id' => $id];
+            if (!empty($conta_result['conta_pagar_id'])) {
+                $resp['conta_pagar_id'] = $conta_result['conta_pagar_id'];
+            }
+            if (!empty($conta_result['conta_message'])) {
+                $resp['conta_message'] = $conta_result['conta_message'];
+            }
+            echo json_encode($resp);
             
         } catch (Exception $e) {
             http_response_code(400);
@@ -340,8 +325,18 @@ switch ($method) {
             
             atualizar_plano_apos_manutencao($conn, $_SESSION['empresa_id'], (int)$data['veiculo_id'], (int)$data['componente_id'], (int)$data['tipo_manutencao_id'], (int)$data['status_manutencao_id'], $data['data_manutencao'], (int)$data['km_atual']);
             
+            $gerar_conta = !empty($data['gerar_conta_pagar']);
+            $conta_result = sf_mnt_sync_conta_pagar($conn, (int) $_SESSION['empresa_id'], (int) $data['id'], $data, $gerar_conta);
+            
             bi_cache_invalidate_empresa($conn, (int) $_SESSION['empresa_id']);
-            echo json_encode(['success' => true, 'message' => 'Manutenção atualizada com sucesso']);
+            $resp = ['success' => true, 'message' => 'Manutenção atualizada com sucesso'];
+            if (!empty($conta_result['conta_pagar_id'])) {
+                $resp['conta_pagar_id'] = $conta_result['conta_pagar_id'];
+            }
+            if (!empty($conta_result['conta_message'])) {
+                $resp['conta_message'] = $conta_result['conta_message'];
+            }
+            echo json_encode($resp);
             
         } catch (Exception $e) {
             http_response_code(400);

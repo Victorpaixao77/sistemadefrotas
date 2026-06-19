@@ -5,6 +5,7 @@ error_reporting(E_ALL);
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 
 // Configure session before starting it
 configure_session();
@@ -177,6 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         body.checklists-modern .dashboard-content.fornc-page { overflow-x: auto; }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'checklists-modern' : ''; ?>">
     <div class="app-container">
@@ -187,13 +189,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             
             <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
                 <?php if ($is_modern): ?>
+                <div style="display:flex;justify-content:flex-end;margin:0 0 10px">
+                    <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                </div>
                 <?php else: ?>
                 <div class="dashboard-header">
                     <h1>Checklists de Viagem</h1>
+                    <div class="dashboard-actions">
+                        <button type="button" class="btn-help" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                    </div>
                 </div>
                 <div class="dashboard-grid">
                     <div class="dashboard-card">
-                        <div class="card-header"><h3>Total de Checklists</h3></div>
+                        <div class="card-header">
+                            <i class="fas fa-clipboard-check kpi-card-icon" aria-hidden="true"></i>
+                            <h3>Total de Checklists</h3>
+                        </div>
                         <div class="card-body"><div class="metric"><span class="metric-value"><?php echo $resultado['total']; ?></span><span class="metric-subtitle">Checklists</span></div></div>
                     </div>
                 </div>
@@ -221,7 +232,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     </div>
                 </div>
                 <?php endif; ?>
-                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'table-container'; ?>">
+                <?php
+                $checklists_modern_empty = !empty($is_modern) && empty($checklists);
+                ?>
+                <?php if (!empty($is_modern)): ?>
+                <div class="fornc-empty-state<?php echo $checklists_modern_empty ? ' visible' : ''; ?>" id="checklistsEmptyState" role="status" aria-live="polite">
+                    <p class="fornc-empty-state-title">Nenhum checklist encontrado</p>
+                    <p class="fornc-empty-state-hint">Quando os motoristas enviarem checklists pelo aplicativo, eles aparecerão nesta lista.</p>
+                </div>
+                <?php endif; ?>
+                <div class="<?php echo $is_modern ? 'fornc-table-wrap' : 'table-container'; ?>" id="checklistsTableWrap"<?php echo $checklists_modern_empty ? ' style="display:none"' : ''; ?>>
                     <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>">
                         <thead>
                             <tr>
@@ -246,7 +266,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                                 </td>
                             </tr>
                             <?php endforeach; ?>
-                            <?php if (empty($checklists)): ?>
+                            <?php if (empty($checklists) && empty($is_modern)): ?>
                             <tr>
                                 <td colspan="5" class="text-center">Nenhum checklist encontrado</td>
                             </tr>
@@ -620,5 +640,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     </script>
 
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php $sf_help_key = 'checklists'; $sf_help_modern = $is_modern; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

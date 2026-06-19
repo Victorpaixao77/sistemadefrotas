@@ -34,18 +34,21 @@ public final class AppDatabase_Impl extends AppDatabase {
 
   private volatile GpsPendingDao _gpsPendingDao;
 
+  private volatile PendingSyncDao _pendingSyncDao;
+
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(2) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(5) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `rotas_cache` (`id` INTEGER NOT NULL, `veiculoId` INTEGER, `dataRota` TEXT, `dataSaida` TEXT, `cidadeOrigemNome` TEXT, `cidadeDestinoNome` TEXT, `placa` TEXT, `status` TEXT, `distanciaKm` REAL, `syncedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `abastecimentos_cache` (`id` INTEGER NOT NULL, `veiculoId` INTEGER, `dataAbastecimento` TEXT, `placa` TEXT, `litros` REAL, `valorTotal` REAL, `status` TEXT, `syncedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `checklists_cache` (`id` INTEGER NOT NULL, `rotaId` INTEGER, `veiculoId` INTEGER, `dataChecklist` TEXT, `placa` TEXT, `cidadeOrigemNome` TEXT, `cidadeDestinoNome` TEXT, `syncedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))");
-        db.execSQL("CREATE TABLE IF NOT EXISTS `gps_pending` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `veiculo_id` INTEGER NOT NULL, `motorista_id` INTEGER NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `velocidade` REAL, `data_hora` TEXT NOT NULL, `created_at` INTEGER NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `gps_pending` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `veiculo_id` INTEGER NOT NULL, `motorista_id` INTEGER NOT NULL, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `velocidade` REAL, `bateria_pct` INTEGER, `accuracy_metros` REAL, `provider` TEXT, `location_mock` INTEGER, `data_hora` TEXT NOT NULL, `created_at` INTEGER NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `pending_sync` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `operation` TEXT NOT NULL, `payload_json` TEXT NOT NULL, `created_at` INTEGER NOT NULL, `retry_count` INTEGER NOT NULL, `last_error` TEXT)");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a555e312703ba7e38f177553e8ed7163')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '49e9bee6277517dde0dcde087cb3158f')");
       }
 
       @Override
@@ -54,6 +57,7 @@ public final class AppDatabase_Impl extends AppDatabase {
         db.execSQL("DROP TABLE IF EXISTS `abastecimentos_cache`");
         db.execSQL("DROP TABLE IF EXISTS `checklists_cache`");
         db.execSQL("DROP TABLE IF EXISTS `gps_pending`");
+        db.execSQL("DROP TABLE IF EXISTS `pending_sync`");
         final List<? extends RoomDatabase.Callback> _callbacks = mCallbacks;
         if (_callbacks != null) {
           for (RoomDatabase.Callback _callback : _callbacks) {
@@ -153,13 +157,17 @@ public final class AppDatabase_Impl extends AppDatabase {
                   + " Expected:\n" + _infoChecklistsCache + "\n"
                   + " Found:\n" + _existingChecklistsCache);
         }
-        final HashMap<String, TableInfo.Column> _columnsGpsPending = new HashMap<String, TableInfo.Column>(8);
+        final HashMap<String, TableInfo.Column> _columnsGpsPending = new HashMap<String, TableInfo.Column>(12);
         _columnsGpsPending.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsGpsPending.put("veiculo_id", new TableInfo.Column("veiculo_id", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsGpsPending.put("motorista_id", new TableInfo.Column("motorista_id", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsGpsPending.put("latitude", new TableInfo.Column("latitude", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsGpsPending.put("longitude", new TableInfo.Column("longitude", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsGpsPending.put("velocidade", new TableInfo.Column("velocidade", "REAL", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGpsPending.put("bateria_pct", new TableInfo.Column("bateria_pct", "INTEGER", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGpsPending.put("accuracy_metros", new TableInfo.Column("accuracy_metros", "REAL", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGpsPending.put("provider", new TableInfo.Column("provider", "TEXT", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsGpsPending.put("location_mock", new TableInfo.Column("location_mock", "INTEGER", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsGpsPending.put("data_hora", new TableInfo.Column("data_hora", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsGpsPending.put("created_at", new TableInfo.Column("created_at", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         final HashSet<TableInfo.ForeignKey> _foreignKeysGpsPending = new HashSet<TableInfo.ForeignKey>(0);
@@ -171,9 +179,25 @@ public final class AppDatabase_Impl extends AppDatabase {
                   + " Expected:\n" + _infoGpsPending + "\n"
                   + " Found:\n" + _existingGpsPending);
         }
+        final HashMap<String, TableInfo.Column> _columnsPendingSync = new HashMap<String, TableInfo.Column>(6);
+        _columnsPendingSync.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsPendingSync.put("operation", new TableInfo.Column("operation", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsPendingSync.put("payload_json", new TableInfo.Column("payload_json", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsPendingSync.put("created_at", new TableInfo.Column("created_at", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsPendingSync.put("retry_count", new TableInfo.Column("retry_count", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsPendingSync.put("last_error", new TableInfo.Column("last_error", "TEXT", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysPendingSync = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesPendingSync = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoPendingSync = new TableInfo("pending_sync", _columnsPendingSync, _foreignKeysPendingSync, _indicesPendingSync);
+        final TableInfo _existingPendingSync = TableInfo.read(db, "pending_sync");
+        if (!_infoPendingSync.equals(_existingPendingSync)) {
+          return new RoomOpenHelper.ValidationResult(false, "pending_sync(com.sistemafrotas.motorista.data.local.PendingSyncEntity).\n"
+                  + " Expected:\n" + _infoPendingSync + "\n"
+                  + " Found:\n" + _existingPendingSync);
+        }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "a555e312703ba7e38f177553e8ed7163", "aa278319468c9aff52d668ba8d80ca7f");
+    }, "49e9bee6277517dde0dcde087cb3158f", "622fb88255bbc49bd276bb73827121ea");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;
@@ -184,7 +208,7 @@ public final class AppDatabase_Impl extends AppDatabase {
   protected InvalidationTracker createInvalidationTracker() {
     final HashMap<String, String> _shadowTablesMap = new HashMap<String, String>(0);
     final HashMap<String, Set<String>> _viewTables = new HashMap<String, Set<String>>(0);
-    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "rotas_cache","abastecimentos_cache","checklists_cache","gps_pending");
+    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "rotas_cache","abastecimentos_cache","checklists_cache","gps_pending","pending_sync");
   }
 
   @Override
@@ -197,6 +221,7 @@ public final class AppDatabase_Impl extends AppDatabase {
       _db.execSQL("DELETE FROM `abastecimentos_cache`");
       _db.execSQL("DELETE FROM `checklists_cache`");
       _db.execSQL("DELETE FROM `gps_pending`");
+      _db.execSQL("DELETE FROM `pending_sync`");
       super.setTransactionSuccessful();
     } finally {
       super.endTransaction();
@@ -215,6 +240,7 @@ public final class AppDatabase_Impl extends AppDatabase {
     _typeConvertersMap.put(AbastecimentoDao.class, AbastecimentoDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(ChecklistDao.class, ChecklistDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(GpsPendingDao.class, GpsPendingDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(PendingSyncDao.class, PendingSyncDao_Impl.getRequiredConverters());
     return _typeConvertersMap;
   }
 
@@ -285,6 +311,20 @@ public final class AppDatabase_Impl extends AppDatabase {
           _gpsPendingDao = new GpsPendingDao_Impl(this);
         }
         return _gpsPendingDao;
+      }
+    }
+  }
+
+  @Override
+  public PendingSyncDao pendingSyncDao() {
+    if (_pendingSyncDao != null) {
+      return _pendingSyncDao;
+    } else {
+      synchronized(this) {
+        if(_pendingSyncDao == null) {
+          _pendingSyncDao = new PendingSyncDao_Impl(this);
+        }
+        return _pendingSyncDao;
       }
     }
   }

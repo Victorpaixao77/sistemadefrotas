@@ -72,6 +72,13 @@
 
     const FETCH_TIMEOUT_MS = 35000;
 
+    function fornFiscalNfeUrl(fornecedorId) {
+        var q = 'fiscal/pages/nfe.php?fornecedor_id=' + encodeURIComponent(fornecedorId);
+        if (typeof sfAppUrl === 'function') return sfAppUrl(q);
+        var b = typeof window.__SF_APP_BASE__ === 'string' ? String(window.__SF_APP_BASE__).replace(/\/+$/, '') : '';
+        return (b ? b + '/' : '../') + q.replace(/^\//, '');
+    }
+
     function onlyDigits(s) {
         return String(s || '').replace(/\D/g, '');
     }
@@ -521,16 +528,27 @@
         });
     }
 
+    function syncFornEmptyState(isEmpty) {
+        const el = document.getElementById('fornEmptyState');
+        const wrap = document.getElementById('fornTableWrap');
+        if (!el || !wrap) return;
+        el.classList.toggle('visible', !!isEmpty);
+        wrap.style.display = isEmpty ? 'none' : '';
+    }
+
     function renderTable() {
         const tbody = document.getElementById('fornecedoresTableBody');
         if (!tbody) return;
 
         const rows = _fornecedoresCache;
         if (rows.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6">Nenhum registro encontrado com os filtros atuais.</td></tr>';
+            tbody.innerHTML = '';
+            syncFornEmptyState(true);
+            syncFornSortIndicators();
             return;
         }
 
+        syncFornEmptyState(false);
         tbody.innerHTML = rows.map(f => {
             const doc = f.tipo === 'J' ? fmtDoc('J', '', f.cnpj) : fmtDoc('F', f.cpf, '');
             const sit = f.situacao === 'A'
@@ -543,7 +561,7 @@
                 '<td>' + escapeHtml(f.cidade || '') + (f.uf ? ' / ' + escapeHtml(f.uf) : '') + '</td>' +
                 '<td>' + sit + '</td>' +
                 '<td class="actions">' +
-                '<a href="' + (typeof window.__SF_APP_BASE__ === 'string' ? String(window.__SF_APP_BASE__).replace(/\/+$/, '') : '') + '/fiscal/pages/nfe.php?fornecedor_id=' + encodeURIComponent(f.id) + '" class="btn-icon" title="Emitir NF-e com este cadastro" target="_blank" rel="noopener"><i class="fas fa-paper-plane"></i></a> ' +
+                '<a href="' + escapeHtml(fornFiscalNfeUrl(f.id)) + '" class="btn-icon" title="Emitir NF-e com este cadastro" target="_blank" rel="noopener"><i class="fas fa-paper-plane"></i></a> ' +
                 '<button type="button" class="btn-icon btn-pos-fin" data-id="' + f.id + '" title="Posição financeira"><i class="fas fa-wallet"></i></button> ' +
                 '<button type="button" class="btn-icon btn-pos-fisc" data-id="' + f.id + '" title="Posição fiscal"><i class="fas fa-file-invoice"></i></button> ' +
                 '<button type="button" class="btn-icon edit-btn btn-edit-forn" data-id="' + f.id + '" title="Editar"><i class="fas fa-edit"></i></button> ' +
@@ -564,6 +582,7 @@
         }
 
         tbody.innerHTML = '<tr><td colspan="6">Carregando...</td></tr>';
+        syncFornEmptyState(false);
         setGlobalLoading(true);
 
         const qs = buildListQueryParams(false);
@@ -574,6 +593,7 @@
                 if (!data.success) {
                     tbody.innerHTML = '<tr><td colspan="6">' + (data.message || 'Erro ao listar') + '</td></tr>';
                     _fornecedoresCache = [];
+                    syncFornEmptyState(false);
                     updateKpisFromRows([]);
                     updatePagination({ page: 1, total_pages: 1, total: 0 });
                     return;
@@ -588,7 +608,8 @@
                     updatePagination(data.pagination);
                 }
                 if (_fornecedoresCache.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6">Nenhum fornecedor encontrado com os filtros atuais.</td></tr>';
+                    tbody.innerHTML = '';
+                    syncFornEmptyState(true);
                     syncFornSortIndicators();
                     return;
                 }
@@ -597,6 +618,7 @@
             .catch(function () {
                 tbody.innerHTML = '<tr><td colspan="6">Falha de rede ou tempo esgotado. Tente novamente.</td></tr>';
                 _fornecedoresCache = [];
+                syncFornEmptyState(false);
                 updateKpisFromRows([]);
                 updatePagination({ page: 1, total_pages: 1, total: 0 });
                 showToast('Não foi possível carregar a lista.', 'err');
@@ -710,11 +732,13 @@
         document.getElementById('forn_tipo').onchange = setTipoFields;
 
         if (id) {
+            setGlobalLoading(true);
             fetch(API() + '?action=get&id=' + encodeURIComponent(id), { credentials: 'same-origin' })
                 .then(r => r.json())
                 .then(data => {
+                    setGlobalLoading(false);
                     if (!data.success || !data.fornecedor) {
-                        alert(data.message || 'Não foi possível carregar.');
+                        showToast(data.message || 'Não foi possível carregar.', 'err');
                         return;
                     }
                     const f = data.fornecedor;
@@ -748,6 +772,10 @@
                     const cj = onlyDigits(f.cnpj || '');
                     _lastCnpjAutoFetched = cj.length === 14 ? cj : '';
                     showModal('modalFornecedor');
+                })
+                .catch(function () {
+                    setGlobalLoading(false);
+                    showToast('Erro ao carregar fornecedor.', 'err');
                 });
         } else {
             document.getElementById('forn_tipo').value = 'J';
@@ -983,6 +1011,211 @@
         });
     }
 
+    // ---- Insights (qualidade + ranking) + resumo por IA ----
+    var _fnLastData = null;
+    var _fnInsightsLoaded = false;
+    var _fnInsightsLoading = false;
+    var FN_CACHE_TTL_MS = 5 * 60 * 1000;
+
+    function fnInsightsUrl() {
+        return apiBase('fornecedor_insights.php');
+    }
+
+    function fnInsightsCacheKey() {
+        return 'sf_insights_v1_' + fnInsightsUrl().replace(/[^a-z0-9]/gi, '_');
+    }
+
+    function fnReadInsightsCache() {
+        try {
+            var raw = sessionStorage.getItem(fnInsightsCacheKey());
+            if (!raw) return null;
+            var o = JSON.parse(raw);
+            if (!o || !o.ts || !o.data) return null;
+            if (Date.now() - o.ts > (o.ttl || FN_CACHE_TTL_MS)) {
+                sessionStorage.removeItem(fnInsightsCacheKey());
+                return null;
+            }
+            return o.data;
+        } catch (e) { return null; }
+    }
+
+    function fnWriteInsightsCache(data) {
+        try {
+            sessionStorage.setItem(fnInsightsCacheKey(), JSON.stringify({ ts: Date.now(), ttl: FN_CACHE_TTL_MS, data: data }));
+        } catch (e) { /* quota */ }
+    }
+
+    function renderFornInsights(json) {
+        _fnLastData = json;
+        var panel = document.getElementById('fnInsights');
+        var summary = document.getElementById('fnSummary');
+        if (!panel || !summary) return;
+        panel.style.display = '';
+        var resumo = document.getElementById('fnResumoIa');
+        if (resumo) resumo.style.display = '';
+
+        var er = json.q_erros || 0, av = json.q_avisos || 0;
+        panel.classList.remove('has-erros', 'has-avisos');
+        if (er > 0) panel.classList.add('has-erros');
+        else if (av > 0) panel.classList.add('has-avisos');
+
+        var totalQ = er + av;
+        summary.innerHTML = '<i class="fas fa-clipboard-check" style="color:' + (er > 0 ? '#dc2626' : (av > 0 ? '#f59e0b' : '#16a34a')) + '"></i> Insights de fornecedores' +
+            (totalQ > 0 ? '<span class="fn-pill ' + (er > 0 ? 'erro' : 'aviso') + '">' + totalQ + ' pendência(s)</span>' : '<span class="fn-pill ok">tudo certo</span>');
+
+        var qual = json.qualidade || [];
+        document.getElementById('fnQualList').innerHTML = qual.length ? qual.map(function (q) {
+            var icon = q.severidade === 'erro' ? 'fa-circle-xmark' : 'fa-triangle-exclamation';
+            var motivos = (q.motivos || []).map(function (m) { return escapeHtml(m.msg); }).join(' ');
+            return '<div class="fn-item"><span class="fn-sev ' + q.severidade + '"><i class="fas ' + icon + '"></i></span>' +
+                '<div class="fn-txt"><strong>' + escapeHtml(q.nome) + '</strong> <span style="opacity:.7">(' + escapeHtml(q.tipo) + ')</span> — ' + motivos + '</div>' +
+                '<button type="button" class="btn-icon fn-edit" data-fn-edit="' + escapeHtml(String(q.id)) + '" title="Abrir cadastro"><i class="fas fa-edit"></i></button></div>';
+        }).join('') : '<div class="fn-empty">Nenhum problema de cadastro encontrado.</div>';
+
+        var rank = json.ranking || [];
+        document.getElementById('fnRankList').innerHTML = rank.length ? rank.map(function (r) {
+            return '<div class="fn-rank-row"><span><strong>' + escapeHtml(r.nome) + '</strong></span>' +
+                '<span>R$ ' + formatMoneyBr(r.total) + ' <span style="opacity:.6">· ' + (r.n || 0) + ' conta(s)</span></span></div>';
+        }).join('') : '<div class="fn-empty">Sem contas a pagar vinculadas a fornecedores.</div>';
+    }
+
+    function loadFornInsights(forceRefresh) {
+        if (_fnInsightsLoading) return;
+        var panel = document.getElementById('fnInsights');
+        var summary = document.getElementById('fnSummary');
+        if (!panel) return;
+        panel.style.display = '';
+
+        if (!forceRefresh) {
+            var hit = fnReadInsightsCache();
+            if (hit && hit.success) {
+                renderFornInsights(hit);
+                _fnInsightsLoaded = true;
+                return;
+            }
+        }
+
+        _fnInsightsLoading = true;
+        if (summary) summary.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analisando fornecedores…';
+        var url = fnInsightsUrl();
+        if (forceRefresh) url += (url.indexOf('?') >= 0 ? '&' : '?') + 'refresh=1&_=' + Date.now();
+        fetch(url, { credentials: 'include' })
+            .then(function (r) { return r.json(); })
+            .then(function (json) {
+                if (json && json.success) {
+                    fnWriteInsightsCache(json);
+                    renderFornInsights(json);
+                    _fnInsightsLoaded = true;
+                } else {
+                    panel.style.display = 'none';
+                }
+            })
+            .catch(function () { panel.style.display = 'none'; })
+            .then(function () { _fnInsightsLoading = false; });
+    }
+
+    function fornGerarResumoIA() {
+        if (!_fnLastData) {
+            showToast('Aguarde o painel de insights carregar ou recarregue a página.', 'err');
+            return;
+        }
+        var btn = document.getElementById('fnResumoBtn');
+        var out = document.getElementById('fnResumoTexto');
+        if (btn) { btn.disabled = true; btn.dataset.html = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Gerando…'; }
+        if (out) { out.classList.add('text-muted'); out.textContent = 'A IA está analisando os fornecedores…'; }
+        var headers = (typeof sfMutationHeaders === 'function') ? sfMutationHeaders({ 'Content-Type': 'application/json' }) : { 'Content-Type': 'application/json' };
+        if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__ && !headers['X-CSRF-Token']) headers['X-CSRF-Token'] = window.__SF_CSRF__;
+        fetch(apiBase('fornecedor_resumo_ia.php'), { method: 'POST', credentials: 'include', headers: headers, body: JSON.stringify({ dados: _fnLastData }) })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+            .then(function (o) {
+                var d = o.d || {};
+                if (o.ok && d.success) { if (out) { out.classList.remove('text-muted'); out.textContent = d.resumo; } }
+                else if (out) { out.classList.add('text-muted'); out.textContent = d.message || d.error || 'Não foi possível gerar o resumo.'; }
+            })
+            .catch(function () { if (out) out.textContent = 'Erro de comunicação ao gerar o resumo.'; })
+            .then(function () { if (btn) { btn.disabled = false; if (btn.dataset.html) btn.innerHTML = btn.dataset.html; } });
+    }
+
+    // ---- Importação CSV ----
+    var _fnImportRows = [];
+
+    function fnSplitCsvLine(line, delim) {
+        var out = [], cur = '', q = false;
+        for (var i = 0; i < line.length; i++) {
+            var c = line[i];
+            if (c === '"') { q = !q; continue; }
+            if (!q && c === delim) { out.push(cur.trim()); cur = ''; continue; }
+            cur += c;
+        }
+        out.push(cur.trim());
+        return out;
+    }
+
+    function fnParseImportCsv(text) {
+        var lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(function (l) { return l.trim() !== ''; });
+        if (!lines.length) return [];
+        var delim = (lines[0].match(/;/g) || []).length >= (lines[0].match(/,/g) || []).length ? ';' : ',';
+        var head = fnSplitCsvLine(lines[0], delim).map(function (h) { return h.toLowerCase().replace(/^﻿/, '').trim(); });
+        var idx = {};
+        ['nome', 'tipo', 'documento', 'cnpj', 'cpf', 'email', 'cidade', 'uf'].forEach(function (k) { idx[k] = head.indexOf(k); });
+        var rows = [];
+        for (var i = 1; i < lines.length; i++) {
+            var c = fnSplitCsvLine(lines[i], delim);
+            var get = function (k) { return idx[k] >= 0 ? (c[idx[k]] || '') : ''; };
+            var nome = get('nome');
+            if (!nome) continue;
+            rows.push({
+                nome: nome,
+                tipo: get('tipo'),
+                documento: get('documento') || get('cnpj') || get('cpf'),
+                email: get('email'),
+                cidade: get('cidade'),
+                uf: get('uf')
+            });
+        }
+        return rows;
+    }
+
+    function fnRenderImportPreview() {
+        var tb = document.getElementById('fornImportPreview');
+        var info = document.getElementById('fornImportInfo');
+        var btn = document.getElementById('fornImportSaveBtn');
+        if (!tb) return;
+        tb.innerHTML = _fnImportRows.slice(0, 50).map(function (r) {
+            return '<tr><td>' + escapeHtml(r.nome) + '</td><td>' + escapeHtml(r.tipo || '-') + '</td><td>' + escapeHtml(r.documento || '-') +
+                '</td><td>' + escapeHtml(r.email || '-') + '</td><td>' + escapeHtml((r.cidade || '') + (r.uf ? '/' + r.uf : '')) + '</td></tr>';
+        }).join('');
+        if (info) info.textContent = _fnImportRows.length + ' linha(s) lida(s).' + (_fnImportRows.length > 50 ? ' Exibindo as 50 primeiras.' : '');
+        if (btn) btn.disabled = _fnImportRows.length === 0;
+    }
+
+    function fnDoImport() {
+        if (!_fnImportRows.length) return;
+        var btn = document.getElementById('fornImportSaveBtn');
+        var res = document.getElementById('fornImportResult');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importando…'; }
+        if (res) { res.textContent = ''; res.style.color = ''; }
+        var headers = (typeof sfMutationHeaders === 'function') ? sfMutationHeaders({ 'Content-Type': 'application/json' }) : { 'Content-Type': 'application/json' };
+        if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__ && !headers['X-CSRF-Token']) headers['X-CSRF-Token'] = window.__SF_CSRF__;
+        fetch(apiBase('fornecedor_import.php'), { method: 'POST', credentials: 'include', headers: headers, body: JSON.stringify({ rows: _fnImportRows }) })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+            .then(function (o) {
+                var d = o.d || {};
+                if (o.ok && d.success) {
+                    var msg = d.inserted + ' fornecedor(es) importado(s).' + (d.skipped ? ' ' + d.skipped + ' ignorado(s).' : '');
+                    if (d.errors && d.errors.length) msg += ' Detalhes: ' + d.errors.slice(0, 3).join(' ');
+                    if (res) { res.style.color = '#16a34a'; res.textContent = msg; }
+                    showToast(msg, 'ok');
+                    loadList(1);
+                    if (typeof loadFornInsights === 'function') loadFornInsights(true);
+                } else {
+                    if (res) { res.style.color = '#dc2626'; res.textContent = d.message || d.error || 'Erro ao importar.'; }
+                }
+            })
+            .catch(function () { if (res) { res.style.color = '#dc2626'; res.textContent = 'Erro de comunicação.'; } })
+            .then(function () { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-import"></i> Importar'; } });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         wireKpiQuickFilters();
         wireFornecedoresSortHeaders();
@@ -1054,15 +1287,17 @@
 
         const btnNovo = document.getElementById('btnNovoFornecedor');
         if (btnNovo) btnNovo.addEventListener('click', () => openModal(null));
+        const fornEmptyCreate = document.getElementById('fornEmptyCreateBtn');
+        if (fornEmptyCreate) fornEmptyCreate.addEventListener('click', () => openModal(null));
 
         const btnSalvar = document.getElementById('btnSalvarFornecedor');
         if (btnSalvar) btnSalvar.addEventListener('click', saveFornecedor);
 
         wireModalClose('modalFornecedor');
         wireModalClose('filterFornecedorModal');
-        wireModalClose('helpFornecedorModal');
         wireModalClose('modalPosicaoFinanceira');
         wireModalClose('modalPosicaoFiscal');
+        wireModalClose('modalFornImport');
 
         const filterBtn = document.getElementById('filterBtn');
         if (filterBtn) {
@@ -1075,8 +1310,67 @@
         const exportBtn = document.getElementById('exportBtn');
         if (exportBtn) exportBtn.addEventListener('click', exportCsv);
 
-        const helpBtn = document.getElementById('helpBtn');
-        if (helpBtn) helpBtn.addEventListener('click', () => showModal('helpFornecedorModal'));
+        // Insights + resumo IA (lazy: só busca ao expandir)
+        var fnPanel = document.getElementById('fnInsights');
+        var fnSummary = document.getElementById('fnSummary');
+        if (fnPanel && fnSummary) {
+            fnPanel.style.display = '';
+            fnSummary.innerHTML = '<i class="fas fa-clipboard-check"></i> Insights de fornecedores — <span style="font-weight:500;color:var(--text-muted)">expandir para analisar</span>';
+        }
+        var fnToggle = document.getElementById('fnToggle');
+        var fnBody = document.getElementById('fnBody');
+        if (fnToggle && fnBody) {
+            fnToggle.addEventListener('click', function () {
+                var open = fnToggle.getAttribute('aria-expanded') === 'true';
+                var willOpen = !open;
+                fnToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+                fnBody.style.display = willOpen ? '' : 'none';
+                if (willOpen && !_fnInsightsLoaded && !_fnInsightsLoading) {
+                    loadFornInsights(false);
+                }
+            });
+        }
+        var fnRefresh = document.getElementById('fnRefresh');
+        if (fnRefresh) {
+            fnRefresh.addEventListener('click', function (e) {
+                e.stopPropagation();
+                _fnInsightsLoaded = false;
+                try { sessionStorage.removeItem(fnInsightsCacheKey()); } catch (err) {}
+                loadFornInsights(true);
+            });
+        }
+        var fnQual = document.getElementById('fnQualList');
+        if (fnQual) fnQual.addEventListener('click', function (e) {
+            var b = e.target.closest('[data-fn-edit]');
+            if (b && typeof openModal === 'function') openModal(parseInt(b.getAttribute('data-fn-edit'), 10));
+        });
+        var fnResumoBtn = document.getElementById('fnResumoBtn');
+        if (fnResumoBtn) fnResumoBtn.addEventListener('click', fornGerarResumoIA);
+
+        // Importação CSV
+        var importBtn = document.getElementById('importBtn');
+        if (importBtn) importBtn.addEventListener('click', function () {
+            _fnImportRows = [];
+            var fi = document.getElementById('fornImportFile'); if (fi) fi.value = '';
+            var tb = document.getElementById('fornImportPreview'); if (tb) tb.innerHTML = '';
+            var info = document.getElementById('fornImportInfo'); if (info) info.textContent = '';
+            var res = document.getElementById('fornImportResult'); if (res) res.textContent = '';
+            var sv = document.getElementById('fornImportSaveBtn'); if (sv) sv.disabled = true;
+            showModal('modalFornImport');
+        });
+        var fornImportFile = document.getElementById('fornImportFile');
+        if (fornImportFile) fornImportFile.addEventListener('change', function () {
+            var f = this.files && this.files[0];
+            if (!f) return;
+            var reader = new FileReader();
+            reader.onload = function () { _fnImportRows = fnParseImportCsv(String(reader.result || '')); fnRenderImportPreview(); };
+            reader.readAsText(f, 'UTF-8');
+        });
+        var fornImportSaveBtn = document.getElementById('fornImportSaveBtn');
+        if (fornImportSaveBtn) fornImportSaveBtn.addEventListener('click', fnDoImport);
+        document.querySelectorAll('[data-close-import]').forEach(function (el) {
+            el.addEventListener('click', function () { closeModal('modalFornImport'); });
+        });
 
         const applyModal = document.getElementById('modalFornecedorApplyFilter');
         if (applyModal) applyModal.addEventListener('click', applyModalFilter);

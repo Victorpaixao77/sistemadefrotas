@@ -338,6 +338,7 @@ $abastecimentos_pendentes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <div class="dashboard-grid">
                     <div class="dashboard-card" style="grid-column: 1 / -1;">
                         <div class="card-header">
+                            <i class="fas fa-gas-pump kpi-card-icon" aria-hidden="true"></i>
                             <h3>Novo Abastecimento</h3>
                         </div>
                         <div class="card-body">

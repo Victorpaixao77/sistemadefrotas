@@ -1,13 +1,19 @@
 <?php
 require_once '../includes/config.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
 
 configure_session();
 session_start();
 
 require_authentication();
+require_once '../includes/permissions.php';
+require_permission('access_tire_management');
+require_once '../includes/csrf.php';
 
+$csrf_token = csrf_token_get();
 $page_title = "Gestão Interativa de Pneus";
+$is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
 
 try {
     // Usar o sistema de conexão centralizado
@@ -28,69 +34,71 @@ try {
     $pneusManutencao = [];
     
     try {
-        // Buscar pneus disponíveis (status_id 2 = disponível, 5 = novo/bom)
-        // Pneus que não estão atualmente instalados em nenhum veículo
+        require_once __DIR__ . '/../includes/pneus_helpers.php';
+        $conn = getConnection();
+        $empresa_id = (int) $_SESSION['empresa_id'];
+        $idsDisp = pneus_status_ids_disponiveis($conn);
+        $inPh = implode(',', array_fill(0, count($idsDisp), '?'));
+        $naoAlocado = pneus_sql_nao_alocado('p.id');
+
         $stmt = $conn->prepare("SELECT p.*, sp.nome as status_nome 
                               FROM pneus p 
                               LEFT JOIN status_pneus sp ON p.status_id = sp.id 
-                              WHERE p.empresa_id = ? AND p.status_id IN (2, 5)
-                              AND p.id NOT IN (
-                                  SELECT pneu_id 
-                                  FROM instalacoes_pneus 
-                                  WHERE data_remocao IS NULL
-                              )
-                              AND p.id NOT IN (
-                                  SELECT pneu_id 
-                                  FROM alocacoes_pneus_flexiveis 
-                                  WHERE ativo = 1 AND data_remocao IS NULL
-                              )");
-        $stmt->execute([$_SESSION['empresa_id']]);
+                              WHERE p.empresa_id = ? AND p.status_id IN ({$inPh})
+                              AND {$naoAlocado}");
+        $stmt->execute(array_merge([$empresa_id], $idsDisp));
         $pneusDisponiveis = $stmt->fetchAll();
         
-        error_log("Pneus disponíveis encontrados: " . count($pneusDisponiveis));
-        
-        // Buscar pneus em uso (instalados + alocados no modo flexível)
+        // Pneus em uso: legado (instalacoes_pneus) + modo flexível, sem duplicar por pneu_id
         $pneusEmUso = [];
+        $idsEmUso = [];
         
-        // 1. Pneus instalados na tabela instalacoes_pneus
-        $stmt = $conn->prepare("SELECT p.*, sp.nome as status_nome, ip.veiculo_id, ip.posicao, ip.posicao_id
+        $stmt = $conn->prepare("SELECT p.*, sp.nome as status_nome, ip.veiculo_id, ip.posicao_id
                               FROM pneus p 
                               LEFT JOIN status_pneus sp ON p.status_id = sp.id 
                               INNER JOIN instalacoes_pneus ip ON p.id = ip.pneu_id
                               WHERE p.empresa_id = ? AND ip.data_remocao IS NULL");
         $stmt->execute([$_SESSION['empresa_id']]);
-        $pneusInstalados = $stmt->fetchAll();
-        
-        // 2. Pneus alocados no modo flexível (da tabela alocacoes_pneus_flexiveis)
-        $stmt = $conn->prepare("SELECT apf.*, p.numero_serie, p.marca, p.modelo, p.medida, p.status_id, sp.nome as status_nome
+        foreach ($stmt->fetchAll() as $row) {
+            $pid = (int) $row['id'];
+            if (!isset($idsEmUso[$pid])) {
+                $idsEmUso[$pid] = true;
+                $pneusEmUso[] = $row;
+            }
+        }
+
+        $stmt = $conn->prepare("SELECT apf.pneu_id, apf.slot_id, p.id, p.numero_serie, p.marca, p.modelo, p.medida, p.status_id, sp.nome as status_nome
                               FROM alocacoes_pneus_flexiveis apf
                               INNER JOIN pneus p ON apf.pneu_id = p.id
                               LEFT JOIN status_pneus sp ON p.status_id = sp.id
                               WHERE apf.empresa_id = ? AND apf.ativo = 1 AND apf.data_remocao IS NULL");
         $stmt->execute([$_SESSION['empresa_id']]);
-        $pneusFlexiveis = $stmt->fetchAll();
+        foreach ($stmt->fetchAll() as $row) {
+            $pid = (int) ($row['pneu_id'] ?? $row['id']);
+            if (!isset($idsEmUso[$pid])) {
+                $idsEmUso[$pid] = true;
+                $pneusEmUso[] = $row;
+            }
+        }
         
-        // Combinar os dois arrays
-        $pneusEmUso = array_merge($pneusInstalados, $pneusFlexiveis);
-        
-        error_log("Pneus em uso encontrados: " . count($pneusEmUso) . " (instalados: " . count($pneusInstalados) . ", flexíveis: " . count($pneusFlexiveis) . ")");
-        
-        // Buscar pneus em manutenção (status_id 1 = furado/manutenção)
+        // Pneus em manutenção (por nome de status, não ID fixo)
+        $pneusManutencao = [];
+        $statusManutId = pneus_status_id_manutencao($conn);
+        if ($statusManutId) {
         $stmt = $conn->prepare("SELECT p.*, sp.nome as status_nome 
                               FROM pneus p 
                               LEFT JOIN status_pneus sp ON p.status_id = sp.id 
-                              WHERE p.empresa_id = ? AND p.status_id = 1");
-        $stmt->execute([$_SESSION['empresa_id']]);
+                                  WHERE p.empresa_id = ? AND p.status_id = ?");
+            $stmt->execute([$_SESSION['empresa_id'], $statusManutId]);
         $pneusManutencao = $stmt->fetchAll();
-        
-        error_log("Pneus em manutenção encontrados: " . count($pneusManutencao));
+        }
     } catch (PDOException $e) {
         error_log("Erro ao buscar pneus: " . $e->getMessage());
     }
     
 } catch (Exception $e) {
-    error_log("Erro na conexão com banco: " . $e->getMessage());
-    $error = "Erro ao conectar com o banco de dados: " . $e->getMessage();
+    error_log("Erro na conexão com banco (gestao_interativa): " . $e->getMessage());
+    $error = "Erro ao conectar com o banco de dados. Tente novamente mais tarde.";
 }
 ?>
 
@@ -99,6 +107,8 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?php echo htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8'); ?>">
+    <script>window.__SF_CSRF__ = <?php echo json_encode($csrf_token); ?>;</script>
     <title>Sistema de Gestão de Frotas - <?php echo $page_title; ?></title>
     
     <!-- Favicon -->
@@ -110,6 +120,10 @@ try {
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="stylesheet" href="../css/ia_pneus_avancado.css">
+    <link rel="stylesheet" href="../css/pneus_timeline.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/fornc-modern-page.css">
+    <?php endif; ?>
     
     <style>
         /* Variáveis CSS adicionais para compatibilidade */
@@ -589,6 +603,20 @@ try {
             .dashboard-grid {
                 grid-template-columns: 1fr !important;
             }
+        }
+
+        body.gestao-interativa-modern .dashboard-header {
+            display: none;
+        }
+        body.gestao-interativa-modern .dashboard-content.fornc-page {
+            padding-top: 8px;
+        }
+        body.gestao-interativa-modern .vehicle-section > h2.gi-section-title {
+            display: none;
+        }
+        body.gestao-interativa-modern .gi-toolbar-actions {
+            justify-content: flex-end;
+            margin-bottom: 0.75rem;
         }
         
         /* Layout da seção principal */
@@ -1135,30 +1163,6 @@ try {
             border-color: var(--primary-color);
         }
         
-        .help-section {
-            margin-bottom: 25px;
-        }
-        
-        .help-section h3 {
-            color: var(--primary-color);
-            margin-bottom: 10px;
-            font-size: 1.2em;
-        }
-        
-        .help-section ul, .help-section ol {
-            margin-left: 20px;
-            line-height: 1.8;
-        }
-        
-        .help-section li {
-            margin-bottom: 8px;
-            color: var(--text-secondary);
-        }
-        
-        .help-section strong {
-            color: var(--text-primary);
-        }
-        
         @media (max-width: 768px) {
             .modal-content {
                 width: 95%;
@@ -1193,9 +1197,47 @@ try {
             max-width: 100%;
             box-sizing: border-box;
         }
+
+        /* Itens dos modais de escolha (giChoose) — herdam o tema do sistema */
+        .gi-choose-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 11px 14px;
+            border: none;
+            background: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+        .gi-choose-item:hover {
+            background: var(--bg-tertiary, rgba(127, 127, 127, 0.12));
+        }
+        .gi-choose-label {
+            display: block;
+            font-weight: 500;
+        }
+        .gi-choose-desc {
+            display: block;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .gi-prompt-input {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--input-bg, var(--card-bg, var(--bg-secondary)));
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            box-sizing: border-box;
+        }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
-<body>
+<body class="<?php echo $is_modern ? 'gestao-interativa-modern' : ''; ?>">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
@@ -1206,7 +1248,8 @@ try {
             <?php include '../includes/header.php'; ?>
             
             <!-- Dashboard Content -->
-            <div class="dashboard-content">
+            <div class="dashboard-content<?php echo $is_modern ? ' fornc-page' : ''; ?>">
+                <?php if (!$is_modern): ?>
                 <div class="dashboard-header">
                     <h1><?php echo $page_title; ?></h1>
                     <div class="dashboard-actions">
@@ -1223,17 +1266,46 @@ try {
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <?php if (isset($error)): ?>
                     <div class="alert alert-danger">
                         <?php echo $error; ?>
                     </div>
                 <?php else: ?>
+                    <?php if ($is_modern): ?>
+                    <div class="fornc-kpi-strip">
+                        <div class="fornc-kpi-cell">
+                            <div class="fornc-kpi-head"><i class="fas fa-truck fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Veículos</span></div>
+                            <span class="val" id="giKpiVeiculos"><?php echo count($veiculos); ?></span>
+                        </div>
+                        <div class="fornc-kpi-cell">
+                            <div class="fornc-kpi-head"><i class="fas fa-warehouse fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Disponíveis</span></div>
+                            <span class="val" id="giKpiDisponiveis"><?php echo count($pneusDisponiveis); ?></span>
+                        </div>
+                        <div class="fornc-kpi-cell">
+                            <div class="fornc-kpi-head"><i class="fas fa-truck-moving fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Em uso</span></div>
+                            <span class="val" id="giKpiEmUso"><?php echo count($pneusEmUso); ?></span>
+                        </div>
+                        <div class="fornc-kpi-cell">
+                            <div class="fornc-kpi-head"><i class="fas fa-screwdriver-wrench fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Manutenção</span></div>
+                            <span class="val" id="giKpiManutencao"><?php echo count($pneusManutencao); ?></span>
+                        </div>
+                    </div>
+                    <div class="fornc-toolbar gi-toolbar-actions">
+                        <div class="fornc-btn-row">
+                            <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn" title="Filtros"><i class="fas fa-sliders-h"></i> Filtros</button>
+                            <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar"><i class="fas fa-file-export"></i> Exportar</button>
+                            <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
+                        </div>
+                    </div>
+                <?php else: ?>
                     <!-- Estatísticas -->
                     <div class="dashboard-grid">
                         <div class="dashboard-card">
                             <div class="card-header">
-                                <h3><i class="fas fa-truck"></i> Veículos</h3>
+                                <i class="fas fa-truck kpi-card-icon" aria-hidden="true"></i>
+                                <h3>Veículos</h3>
                             </div>
                             <div class="card-body">
                                 <div class="metric">
@@ -1244,7 +1316,8 @@ try {
                         </div>
                         <div class="dashboard-card">
                             <div class="card-header">
-                                <h3><i class="fas fa-circle"></i> Pneus Disponíveis</h3>
+                                <i class="fas fa-circle-dot kpi-card-icon" aria-hidden="true"></i>
+                                <h3>Pneus Disponíveis</h3>
                             </div>
                             <div class="card-body">
                                 <div class="metric">
@@ -1255,7 +1328,8 @@ try {
                         </div>
                         <div class="dashboard-card">
                             <div class="card-header">
-                                <h3><i class="fas fa-cog"></i> Pneus em Uso</h3>
+                                <i class="fas fa-gear kpi-card-icon" aria-hidden="true"></i>
+                                <h3>Pneus em Uso</h3>
                             </div>
                             <div class="card-body">
                                 <div class="metric">
@@ -1266,7 +1340,8 @@ try {
                         </div>
                         <div class="dashboard-card">
                             <div class="card-header">
-                                <h3><i class="fas fa-tools"></i> Em Manutenção</h3>
+                                <i class="fas fa-screwdriver-wrench kpi-card-icon" aria-hidden="true"></i>
+                                <h3>Em Manutenção</h3>
                             </div>
                             <div class="card-body">
                                 <div class="metric">
@@ -1276,12 +1351,13 @@ try {
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
                     
                     <!-- Conteúdo Principal -->
                     <div class="main-content-grid">
                         <!-- Seção de Veículos -->
                         <div class="vehicle-section">
-                            <h2><i class="fas fa-truck"></i> Gestão de Pneus por Veículo</h2>
+                            <h2 class="gi-section-title"><i class="fas fa-truck"></i> Gestão de Pneus por Veículo</h2>
                             
                             <div id="area-modo-flexivel">
                                 <div style="margin-bottom: 16px;">
@@ -1362,6 +1438,7 @@ try {
                             <div id="allocationHistory">
                                 <p>Selecione um veículo para ver o histórico de alocações de pneus.</p>
                             </div>
+                            <div id="pneusIaPanelMount" style="margin-top:20px"></div>
                             
                             <h3><i class="fas fa-chart-line"></i> Estatísticas do Veículo</h3>
                             <div id="vehicleStats">
@@ -1421,9 +1498,242 @@ try {
     <!-- JavaScript Files -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
-    <script src="../js/ia_pneus_avancado.js"></script>
+    <script src="../js/ia_pneus.js"></script>
+    <script src="../js/pneus_timeline.js?v=1.1"></script>
+    <script src="../js/ia_pneus_avancado.js?v=1.1"></script>
 
     <script>
+        // Escapa dados do servidor antes de injetar via innerHTML (previne XSS armazenado).
+        function escapeHtml(value) {
+            if (value === null || value === undefined) return '';
+            return String(value)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // Toast não-bloqueante (substitui giToast()).
+        function giToast(message, type) {
+            type = type || 'info';
+            var host = document.getElementById('giToastHost');
+            if (!host) {
+                host = document.createElement('div');
+                host.id = 'giToastHost';
+                host.style.cssText = 'position:fixed;top:18px;right:18px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:380px;';
+                document.body.appendChild(host);
+            }
+            var colors = { success: '#16a34a', error: '#dc2626', warning: '#f59e0b', info: '#2563eb' };
+            var icons = { success: 'fa-circle-check', error: 'fa-circle-exclamation', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+            var el = document.createElement('div');
+            el.style.cssText = 'display:flex;align-items:flex-start;gap:10px;background:#fff;border-left:4px solid ' + (colors[type] || colors.info) + ';box-shadow:0 6px 20px rgba(0,0,0,.15);border-radius:8px;padding:12px 14px;font-size:.9rem;color:#1f2937;opacity:0;transform:translateX(12px);transition:all .2s ease;';
+            el.innerHTML = '<i class="fas ' + (icons[type] || icons.info) + '" style="color:' + (colors[type] || colors.info) + ';margin-top:2px;"></i><span style="flex:1;white-space:pre-line;"></span>';
+            el.querySelector('span').textContent = message;
+            host.appendChild(el);
+            requestAnimationFrame(function () { el.style.opacity = '1'; el.style.transform = 'translateX(0)'; });
+            setTimeout(function () { el.style.opacity = '0'; el.style.transform = 'translateX(12px)'; setTimeout(function () { el.remove(); }, 250); }, 4200);
+        }
+
+        // Modal informativo centralizado (substitui toast para leituras longas).
+        function giInfoModal(title, content, opts) {
+            opts = opts || {};
+            return new Promise(function (resolve) {
+                var ov = document.createElement('div');
+                ov.className = 'modal active';
+                ov.style.zIndex = '100000';
+                var box = document.createElement('div');
+                box.className = 'modal-content';
+                box.style.maxWidth = opts.maxWidth || '520px';
+                var footerHtml = '<div class="modal-footer">';
+                if (opts.secondaryLabel) {
+                    footerHtml += '<button type="button" class="btn-secondary" data-act="secondary"></button>';
+                }
+                footerHtml += '<button type="button" class="btn-primary" data-act="ok"></button></div>';
+                box.innerHTML =
+                    '<div class="modal-header"><h2></h2><span class="close-modal" data-act="cancel">&times;</span></div>' +
+                    '<div class="modal-body gi-info-modal-body"></div>' +
+                    footerHtml;
+                box.querySelector('h2').textContent = title || 'Detalhes';
+                var body = box.querySelector('.gi-info-modal-body');
+                if (opts.html) {
+                    body.innerHTML = content;
+            } else {
+                    body.style.whiteSpace = 'pre-line';
+                    body.style.lineHeight = '1.55';
+                    body.style.color = 'var(--text-primary)';
+                    body.textContent = content;
+                }
+                box.querySelector('[data-act="ok"]').textContent = opts.okLabel || 'Fechar';
+                if (opts.secondaryLabel) {
+                    box.querySelector('[data-act="secondary"]').textContent = opts.secondaryLabel;
+                }
+                ov.appendChild(box);
+                document.body.appendChild(ov);
+                var done = function (v) { ov.remove(); resolve(v); };
+                box.querySelectorAll('[data-act="cancel"]').forEach(function (el) { el.onclick = function () { done(null); }; });
+                box.querySelector('[data-act="ok"]').onclick = function () { done('ok'); };
+                if (opts.secondaryLabel) {
+                    box.querySelector('[data-act="secondary"]').onclick = function () { done('secondary'); };
+                }
+                ov.addEventListener('click', function (e) { if (e.target === ov) done(null); });
+            });
+        }
+
+        function buildPneuDetalhesHtml(pneu, slotId) {
+            const analise = analisarPneuIA(pneu);
+            const preditiva = analisePreditivaDesgaste(pneu);
+            const statusIa = (analise.status || 'ok').toUpperCase();
+            const statusColor = analise.status === 'critico' ? '#dc2626' : (analise.status === 'atencao' ? '#f59e0b' : '#16a34a');
+            let html = '<div style="display:grid;gap:14px;">';
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:.92rem;">';
+            html += '<div><strong>Pneu</strong><br>' + escapeHtml(pneu.numero_serie || '—') + '</div>';
+            html += '<div><strong>Medida</strong><br>' + escapeHtml(pneu.medida || '—') + '</div>';
+            html += '<div><strong>Marca / modelo</strong><br>' + escapeHtml((pneu.marca || '') + ' ' + (pneu.modelo || '')) + '</div>';
+            html += '<div><strong>Posição</strong><br>' + escapeHtml(pneu.posicao_nome || slotId || '—') + '</div>';
+            html += '<div><strong>Status</strong><br>' + escapeHtml(pneu.status_nome || 'N/A') + '</div>';
+            html += '<div><strong>DOT</strong><br>' + escapeHtml(pneu.dot || 'N/A') + '</div>';
+            html += '</div>';
+            html += '<div style="border-top:1px solid var(--border-color,#e5e7eb);padding-top:12px;">';
+            html += '<div style="font-weight:600;margin-bottom:8px;">Análise IA — <span style="color:' + statusColor + ';">' + escapeHtml(statusIa) + '</span></div>';
+            html += '<div style="font-size:.9rem;line-height:1.55;">';
+            html += '<div><strong>Prioridade:</strong> ' + escapeHtml(String(analise.prioridade || '—')) + '</div>';
+            html += '<div><strong>KM restante (est.):</strong> ' + escapeHtml(String(preditiva.kmRestante ?? '—')) + '</div>';
+            html += '<div><strong>Troca em (est.):</strong> ' + escapeHtml(String(preditiva.mesesRestante ?? '—')) + ' meses</div>';
+            html += '<div style="margin-top:6px;"><strong>Recomendação:</strong> ' + escapeHtml(preditiva.recomendacao || '—') + '</div>';
+            if (analise.alertas && analise.alertas.length) {
+                html += '<div style="margin-top:8px;color:#b45309;"><strong>Alertas:</strong> ' + escapeHtml(analise.alertas.join('; ')) + '</div>';
+            }
+            if (analise.recomendacoes && analise.recomendacoes.length) {
+                html += '<div style="margin-top:6px;"><strong>Ações sugeridas:</strong> ' + escapeHtml(analise.recomendacoes.join('; ')) + '</div>';
+            }
+            html += '</div></div>';
+            html += '<p style="margin:0;font-size:.85rem;color:var(--text-secondary,#6b7280);">Para histórico, fotos, carcaça e garantias, use <strong>Ficha completa</strong>.</p>';
+            html += '</div>';
+            return html;
+        }
+
+        function mostrarDetalhesPneuModal(pneu, slotId) {
+            if (!pneu) return;
+            const opts = { html: true, okLabel: 'Fechar' };
+            if (pneu.id && window.PneuTimeline) {
+                opts.secondaryLabel = 'Ficha completa';
+            }
+            giInfoModal('Detalhes do pneu', buildPneuDetalhesHtml(pneu, slotId), opts).then(function (act) {
+                if (act === 'secondary' && pneu.id && window.PneuTimeline) {
+                    PneuTimeline.openFichaModal(pneu.id);
+                }
+            });
+        }
+
+        function mostrarHistoricoPneuModal(pneu) {
+            if (!pneu) return;
+            let html = '<div style="font-size:.92rem;line-height:1.6;">';
+            html += '<p style="margin:0 0 12px;"><strong>Pneu:</strong> ' + escapeHtml(pneu.numero_serie || '—');
+            if (pneu.marca || pneu.modelo) {
+                html += ' — ' + escapeHtml((pneu.marca || '') + ' ' + (pneu.modelo || ''));
+            }
+            html += '</p>';
+            html += '<div style="border-top:1px solid var(--border-color,#e5e7eb);padding-top:12px;">';
+            html += buscarHistoricoPneu(pneu.id);
+            html += '</div></div>';
+            const opts = { html: true, okLabel: 'Fechar' };
+            if (pneu.id && window.PneuTimeline) {
+                opts.secondaryLabel = 'Ficha completa';
+            }
+            giInfoModal('Histórico de manutenção', html, opts).then(function (act) {
+                if (act === 'secondary' && pneu.id && window.PneuTimeline) {
+                    PneuTimeline.openFichaModal(pneu.id);
+                }
+            });
+        }
+
+        // Confirmação via modal (promise) — usa o modal padrão do sistema (tema-aware).
+        function giConfirm(message, opts) {
+            opts = opts || {};
+            return new Promise(function (resolve) {
+                var ov = document.createElement('div');
+                ov.className = 'modal active';
+                ov.style.zIndex = '100000';
+                var box = document.createElement('div');
+                box.className = 'modal-content';
+                box.style.maxWidth = '430px';
+                box.innerHTML =
+                    '<div class="modal-header"><h2></h2><span class="close-modal" data-act="cancel">&times;</span></div>' +
+                    '<div class="modal-body"><p style="margin:0;line-height:1.5;color:var(--text-primary);"></p></div>' +
+                    '<div class="modal-footer"><button type="button" class="btn-secondary" data-act="cancel">Cancelar</button><button type="button" class="btn-primary" data-act="ok"></button></div>';
+                box.querySelector('h2').textContent = opts.title || 'Confirmação';
+                box.querySelector('.modal-body p').textContent = message;
+                box.querySelector('[data-act="ok"]').textContent = opts.okLabel || 'Confirmar';
+                ov.appendChild(box);
+                document.body.appendChild(ov);
+                var done = function (v) { ov.remove(); resolve(v); };
+                box.querySelectorAll('[data-act="cancel"]').forEach(function (el) { el.onclick = function () { done(false); }; });
+                box.querySelector('[data-act="ok"]').onclick = function () { done(true); };
+                ov.addEventListener('click', function (e) { if (e.target === ov) done(false); });
+            });
+        }
+
+        // Seletor em modal (lista clicável) — substitui prompt() de escolha por número.
+        // options: [{ label, value, desc? }]. Resolve com o value escolhido, ou null se cancelar.
+        function giChoose(title, options, opts) {
+            opts = opts || {};
+            return new Promise(function (resolve) {
+                var ov = document.createElement('div');
+                ov.className = 'modal active';
+                ov.style.zIndex = '100000';
+                var box = document.createElement('div');
+                box.className = 'modal-content';
+                box.style.maxWidth = '460px';
+                box.innerHTML =
+                    '<div class="modal-header"><h2></h2><span class="close-modal" data-act="cancel">&times;</span></div>' +
+                    '<div class="modal-body" style="padding:8px 10px;"></div>';
+                box.querySelector('h2').textContent = title;
+                var list = box.querySelector('.modal-body');
+                (options || []).forEach(function (o) {
+                    var b = document.createElement('button');
+                    b.type = 'button';
+                    b.className = 'gi-choose-item';
+                    b.innerHTML = '<span class="gi-choose-label"></span>' + (o.desc ? '<span class="gi-choose-desc"></span>' : '');
+                    b.querySelector('.gi-choose-label').textContent = o.label;
+                    if (o.desc) b.querySelector('.gi-choose-desc').textContent = o.desc;
+                    b.onclick = function () { done(o.value); };
+                    list.appendChild(b);
+                });
+                ov.appendChild(box);
+                document.body.appendChild(ov);
+                var done = function (v) { ov.remove(); resolve(v); };
+                box.querySelector('[data-act="cancel"]').onclick = function () { done(null); };
+                ov.addEventListener('click', function (e) { if (e.target === ov) done(null); });
+            });
+        }
+
+        // Input em modal (texto) — substitui prompt() de texto livre.
+        function giPrompt(title, defaultValue, opts) {
+            opts = opts || {};
+            return new Promise(function (resolve) {
+                var ov = document.createElement('div');
+                ov.className = 'modal active';
+                ov.style.zIndex = '100000';
+                var box = document.createElement('div');
+                box.className = 'modal-content';
+                box.style.maxWidth = '440px';
+                box.innerHTML =
+                    '<div class="modal-header"><h2></h2><span class="close-modal" data-act="cancel">&times;</span></div>' +
+                    '<div class="modal-body"><input type="text" class="gi-prompt-input"></div>' +
+                    '<div class="modal-footer"><button type="button" class="btn-secondary" data-act="cancel">Cancelar</button><button type="button" class="btn-primary" data-act="ok">OK</button></div>';
+                box.querySelector('h2').textContent = title;
+                var input = box.querySelector('input');
+                input.value = defaultValue || '';
+                if (opts.placeholder) input.placeholder = opts.placeholder;
+                ov.appendChild(box);
+                document.body.appendChild(ov);
+                var done = function (v) { ov.remove(); resolve(v); };
+                setTimeout(function () { input.focus(); }, 50);
+                input.addEventListener('keydown', function (e) { if (e.key === 'Enter') done(input.value); if (e.key === 'Escape') done(null); });
+                box.querySelectorAll('[data-act="cancel"]').forEach(function (el) { el.onclick = function () { done(null); }; });
+                box.querySelector('[data-act="ok"]').onclick = function () { done(input.value); };
+                ov.addEventListener('click', function (e) { if (e.target === ov) done(null); });
+            });
+        }
+
         const veiculosData = <?php echo json_encode($veiculos); ?>;
         let pneusDisponiveis = <?php echo json_encode($pneusDisponiveis); ?>;
         const pneusEmUso = <?php echo json_encode($pneusEmUso); ?>;
@@ -1433,67 +1743,12 @@ try {
         window.pneusDisponiveis = pneusDisponiveis;
         
         let veiculoSelecionado = null;
-        let veiculoAtual = null;
-        
-        // Configurações de layout por tipo de veículo
-        const vehicleLayouts = {
-            'truck': {
-                type: 'truck-6x2',
-                positions: [
-                    '1 - Dianteira Esquerda', '2 - Dianteira Direita',
-                    '3 - Traseira Esquerda 1', '4 - Traseira Direita 1',
-                    '5 - Traseira Esquerda 2', '6 - Traseira Direita 2'
-                ],
-                image: '🚛'
-            },
-            'truck-6x4': {
-                type: 'truck-6x4',
-                positions: [
-                    '1 - Dianteira Esquerda', '2 - Dianteira Direita',
-                    '3 - Traseira Esquerda 1', '4 - Traseira Direita 1',
-                    '5 - Traseira Esquerda 2', '6 - Traseira Direita 2'
-                ],
-                image: '🚛'
-            },
-            'trailer': {
-                type: 'trailer',
-                positions: [
-                    '1 - Esquerda Dianteira', '2 - Direita Dianteira',
-                    '3 - Esquerda Traseira', '4 - Direita Traseira'
-                ],
-                image: '🚛'
-            },
-            'tractor': {
-                type: 'tractor',
-                positions: [
-                    '1 - Dianteira Esquerda', '2 - Dianteira Direita',
-                    '3 - Traseira Esquerda 1', '4 - Traseira Direita 1',
-                    '5 - Traseira Esquerda 2', '6 - Traseira Direita 2'
-                ],
-                image: '🚛'
-            }
-        };
-        
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('Página Gestão Interativa carregada com sucesso!');
             
             if (typeof initTheme === 'function') initTheme();
             if (typeof initSidebar === 'function') initSidebar();
             if (typeof initNotifications === 'function') initNotifications();
             
-            const vehicleSelector = document.getElementById('vehicleSelector');
-            if (vehicleSelector) {
-                vehicleSelector.addEventListener('change', function() {
-                    const veiculoId = this.value;
-                    if (veiculoId) {
-                        console.log('Veículo selecionado:', veiculoId);
-                        carregarPneusVeiculo(veiculoId);
-                    } else {
-                        limparGridPneus();
-                    }
-                });
-            }
-
             // Seletor de veículos modo flexível
             const selectorFlex = document.getElementById('veiculoSelectorFlex');
             if (selectorFlex) {
@@ -1502,7 +1757,7 @@ try {
                     if (veiculoSelecionado) {
                         carregarPneusDisponiveis().then(() => {
                             onSelecionarVeiculoFlexivel(veiculoSelecionado);
-                        });
+                            });
                     } else {
                         resetarFlexivel();
                     }
@@ -1516,595 +1771,13 @@ try {
                 setTimeout(inicializarGraficos, 500);
             };
             document.head.appendChild(script);
+
+            if (typeof mountPneusIAPanel === 'function') {
+                mountPneusIAPanel('pneusIaPanelMount');
+            }
         });
         
-        function carregarPneusVeiculo(veiculoId) {
-            console.log('Carregando pneus para o veículo:', veiculoId);
-            veiculoSelecionado = veiculoId;
-            
-            // Buscar dados do veículo
-            const veiculo = veiculosData.find(v => v.id == veiculoId);
-            if (veiculo) {
-                veiculoAtual = veiculo;
-                mostrarInfoVeiculo(veiculo);
-                gerarGridPneus(veiculo);
-            }
-            
-            // Buscar pneus realmente alocados a este veículo
-            buscarPneusAlocados(veiculoId);
-            
-            carregarHistorico(veiculoId);
-            carregarEstatisticas(veiculoId);
-        }
-        
-        function mostrarInfoVeiculo(veiculo) {
-            const vehicleInfo = document.getElementById('vehicleInfo');
-            const vehicleImage = document.getElementById('vehicleImage');
-            const vehicleType = document.getElementById('vehicleType');
-            const vehiclePlate = document.getElementById('vehiclePlate');
-            
-            // Determinar tipo baseado no número de eixos
-            const numeroEixos = veiculo.numero_eixos || 6;
-            let tipo = 'truck';
-            if (numeroEixos <= 4) {
-                tipo = 'truck';
-            } else if (numeroEixos <= 6) {
-                tipo = 'truck-6x4';
-            } else {
-                tipo = 'tractor';
-            }
-            
-            const layout = vehicleLayouts[tipo] || vehicleLayouts['truck'];
-            
-            vehicleImage.innerHTML = layout.image;
-            vehicleType.textContent = `${veiculo.modelo} (${numeroEixos} EIXOS)`;
-            vehiclePlate.textContent = veiculo.placa;
-            
-            vehicleInfo.style.display = 'flex';
-        }
-        
-        function gerarGridPneus(veiculo) {
-            const tireGrid = document.getElementById('tireGrid');
-            
-            // Determinar tipo baseado no número de eixos
-            const numeroEixos = veiculo.numero_eixos || 6;
-            let tipo = 'truck';
-            if (numeroEixos <= 4) {
-                tipo = 'truck';
-            } else if (numeroEixos <= 6) {
-                tipo = 'truck-6x4';
-            } else {
-                tipo = 'tractor';
-            }
-            
-            const layout = vehicleLayouts[tipo] || vehicleLayouts['truck'];
-            
-            // Limpar grid anterior
-            tireGrid.innerHTML = '';
-            tireGrid.className = `tire-grid ${layout.type}`;
-            
-            // Gerar slots baseado no layout
-            layout.positions.forEach((posicao, index) => {
-                const slot = document.createElement('div');
-                slot.className = 'tire-slot';
-                slot.dataset.position = index + 1;
-                slot.dataset.posicaoNome = posicao;
-                
-                slot.innerHTML = `
-                    <div class="tire-position">${posicao}</div>
-                    <div class="tire-info">Vazio</div>
-                    <div class="tire-details">Clique para gerenciar pneu</div>
-                `;
-                
-                slot.addEventListener('click', function() {
-                    const position = this.dataset.position;
-                    console.log('Slot clicado:', position, '-', posicao);
-                    if (veiculoSelecionado) {
-                        mostrarOpcoesPneu(position, this);
-                    }
-                });
-                
-                tireGrid.appendChild(slot);
-            });
-        }
-        
-        function buscarPneusAlocados(veiculoId) {
-            fetch(`../gestao_interativa/api/pneus_veiculo.php?veiculo_id=${veiculoId}`, {
-                credentials: 'same-origin'
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.pneus_alocados) {
-                        console.log('Pneus alocados encontrados:', data.pneus_alocados);
-                        
-                        data.pneus_alocados.forEach(pneu => {
-                            const posicao = pneu.posicao;
-                            const slot = document.querySelector(`[data-position="${posicao}"]`);
-                            
-                            if (slot) {
-                                slot.classList.add('occupied');
-                                slot.querySelector('.tire-info').textContent = `${pneu.numero_serie}\n${pneu.marca}`;
-                                
-                                // Adicionar informações detalhadas para hover
-                                slot.querySelector('.tire-details').innerHTML = `
-                                    <strong>${pneu.numero_serie}</strong><br>
-                                    Marca: ${pneu.marca}<br>
-                                    Modelo: ${pneu.modelo}<br>
-                                    Medida: ${pneu.medida}<br>
-                                    Status: ${pneu.status}<br>
-                                    Posição: ${pneu.posicao_nome || 'Não identificada'}<br>
-                                    KM: ${pneu.quilometragem || 'N/A'}
-                                `;
-                                
-                                slot.dataset.pneuId = pneu.pneu_id;
-                                slot.dataset.pneuSerie = pneu.numero_serie;
-                                slot.dataset.instalacaoId = pneu.id;
-                            }
-                        });
-                    } else {
-                        console.log('Nenhum pneu alocado encontrado para este veículo');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao buscar pneus alocados:', error);
-                });
-        }
-        
-        function limparGridPneus() {
-            veiculoSelecionado = null;
-            veiculoAtual = null;
-            
-            document.getElementById('vehicleInfo').style.display = 'none';
-            document.getElementById('tireGrid').innerHTML = '<div class="loading">Selecione um veículo para gerenciar os pneus</div>';
-            
-            document.getElementById('allocationHistory').innerHTML = '<p>Selecione um veículo para ver o histórico de alocações de pneus.</p>';
-            document.getElementById('vehicleStats').innerHTML = '<p>Selecione um veículo para ver as estatísticas.</p>';
-        }
-        
-        function mostrarOpcoesPneu(position, slot) {
-            const isOccupied = slot.classList.contains('occupied');
-            const isMaintenance = slot.classList.contains('maintenance');
-            const isCritical = slot.classList.contains('critical');
-            
-            let opcoes = [];
-            
-            if (!isOccupied && !isMaintenance && !isCritical) {
-                opcoes = ['Alocar Pneu'];
-            } else if (isOccupied) {
-                opcoes = ['Ver Detalhes', 'Enviar para Manutenção', 'Retornar ao Estoque'];
-            } else if (isMaintenance) {
-                opcoes = ['Ver Detalhes', 'Retornar ao Estoque', 'Descartar Pneu'];
-            } else if (isCritical) {
-                opcoes = ['Ver Detalhes'];
-            }
-            
-            if (opcoes.length === 0) {
-                alert('Nenhuma ação disponível para este pneu.');
-                return;
-            }
-            
-            const opcao = prompt(`Opções para posição ${position}:\n\n${opcoes.join('\n')}\n\nDigite o número da opção (1-${opcoes.length}):`);
-            const index = parseInt(opcao) - 1;
-            
-            if (isNaN(index) || index < 0 || index >= opcoes.length) {
-                console.log('Opção inválida');
-                return;
-            }
-            
-            const acao = opcoes[index];
-            
-            switch(acao) {
-                case 'Alocar Pneu':
-                    alocarPneu(position, slot);
-                    break;
-                case 'Ver Detalhes':
-                    verDetalhesPneu(slot);
-                    break;
-                case 'Enviar para Manutenção':
-                    enviarManutencao(position, slot);
-                    break;
-                case 'Retornar ao Estoque':
-                    retornarEstoque(position, slot);
-                    break;
-                case 'Descartar Pneu':
-                    descartarPneu(position, slot);
-                    break;
-                default:
-                    console.log('Ação não reconhecida');
-            }
-        }
-        
-        function verDetalhesPneu(slot) {
-            const pneuId = slot.dataset.pneuId;
-            const pneuSerie = slot.dataset.pneuSerie;
-            
-            if (!pneuId) {
-                alert('Nenhum pneu encontrado nesta posição!');
-                return;
-            }
-            
-            // Buscar detalhes completos do pneu
-            fetch(`../gestao_interativa/api/pneu_detalhes.php?pneu_id=${pneuId}`, {
-                credentials: 'same-origin'
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const pneu = data.pneu;
-                        alert(`Detalhes do Pneu:\n\n` +
-                              `Número de Série: ${pneu.numero_serie}\n` +
-                              `Marca: ${pneu.marca}\n` +
-                              `Modelo: ${pneu.modelo}\n` +
-                              `Medida: ${pneu.medida}\n` +
-                              `Status: ${pneu.status}\n` +
-                              `Posição: ${pneu.posicao_nome || 'Não identificada'}\n` +
-                              `Quilometragem: ${pneu.quilometragem || 'N/A'} km\n` +
-                              `Data de Instalação: ${pneu.data_instalacao || 'N/A'}\n` +
-                              `Última Manutenção: ${pneu.ultima_manutencao || 'N/A'}`);
-                    } else {
-                        alert('Erro ao buscar detalhes do pneu: ' + data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    alert('Erro ao buscar detalhes do pneu');
-                });
-        }
-        
-        function alocarPneu(position = null, slot = null) {
-            if (!veiculoSelecionado) {
-                alert('Selecione um veículo primeiro!');
-                return;
-            }
-            
-            console.log('Pneus disponíveis:', pneusDisponiveis);
-            
-            if (pneusDisponiveis.length === 0) {
-                alert('Não há pneus disponíveis no estoque!\n\nVerifique se existem pneus com status "disponível" ou "novo" que não estejam instalados em outros veículos.');
-                return;
-            }
-            
-            // Mostrar lista de pneus disponíveis para seleção
-            let opcoes = 'Pneus disponíveis:\n\n';
-            pneusDisponiveis.forEach((pneu, index) => {
-                opcoes += `${index + 1}. ${pneu.numero_serie} - ${pneu.marca} ${pneu.modelo} (${pneu.medida})\n`;
-            });
-            
-            const escolha = prompt(opcoes + '\nDigite o número do pneu que deseja alocar:');
-            
-            // Se o usuário cancelar o prompt, não continuar
-            if (escolha === null || escolha === '') {
-                console.log('Usuário cancelou a seleção do pneu');
-                return;
-            }
-            
-            const index = parseInt(escolha) - 1;
-            
-            if (isNaN(index) || index < 0 || index >= pneusDisponiveis.length) {
-                alert('Seleção inválida!');
-                return;
-            }
-            
-            const pneuSelecionado = pneusDisponiveis[index];
-            console.log('Alocando pneu:', pneuSelecionado, 'para posição:', position);
-            
-            // Seleção da posição identificada
-            const posicoesDisponiveis = <?php echo json_encode($posicoes); ?>;
-            
-            console.log('Posições disponíveis no sistema:', posicoesDisponiveis);
-            
-            // Verificar se existem posições cadastradas
-            if (!posicoesDisponiveis || posicoesDisponiveis.length === 0) {
-                alert('ATENÇÃO: Não há posições de pneus cadastradas no sistema!\n\n' +
-                      'Para usar este sistema, você precisa cadastrar as posições de pneus primeiro.\n' +
-                      'Exemplos de posições: Dianteiro Esquerdo, Dianteiro Direito, Traseiro Esquerdo Externo, etc.\n\n' +
-                      'Por favor, cadastre as posições antes de alocar pneus.');
-                return;
-            }
-            
-            let opcoesPosicao = 'Escolha a posição identificada:\n\n';
-            posicoesDisponiveis.forEach((pos, idx) => {
-                opcoesPosicao += `${idx + 1}. ${pos.nome}\n`;
-            });
-            
-            console.log('Exibindo prompt de posição...');
-            const escolhaPosicao = prompt(opcoesPosicao + '\nDigite o número da posição:');
-            
-            // Se o usuário cancelar o prompt, não continuar
-            if (escolhaPosicao === null || escolhaPosicao === '') {
-                console.log('Usuário cancelou a seleção da posição');
-                return;
-            }
-            
-            const indexPosicao = parseInt(escolhaPosicao) - 1;
-            
-            if (isNaN(indexPosicao) || indexPosicao < 0 || indexPosicao >= posicoesDisponiveis.length) {
-                alert('Seleção de posição inválida!');
-                return;
-            }
-            
-            const posicaoEscolhida = posicoesDisponiveis[indexPosicao];
-            console.log('Posição escolhida:', posicaoEscolhida);
-            
-            const dados = {
-                veiculo_id: veiculoSelecionado,
-                pneu_id: pneuSelecionado.id,
-                posicao: position,
-                posicao_id: posicaoEscolhida.id,
-                acao: 'alocar'
-            };
-            
-            console.log('Dados para API:', dados);
-            
-            fetch('../gestao_interativa/api/teste_alocacao.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: 'same-origin',
-                body: JSON.stringify(dados)
-            })
-            .then(response => {
-                console.log('Response status:', response.status);
-                return response.text();
-            })
-            .then(text => {
-                console.log('Response text:', text);
-                try {
-                    return JSON.parse(text);
-                } catch (e) {
-                    console.error('Erro ao fazer parse do JSON:', e);
-                    throw new Error('Resposta inválida da API: ' + text);
-                }
-            })
-            .then(data => {
-                console.log('Response data:', data);
-                if (data.success) {
-                    if (slot) {
-                        slot.classList.add('occupied');
-                        slot.querySelector('.tire-info').textContent = `${pneuSelecionado.numero_serie}\n${pneuSelecionado.marca}`;
-                        slot.dataset.pneuId = pneuSelecionado.id;
-                        slot.dataset.pneuSerie = pneuSelecionado.numero_serie;
-                        
-                        // Atualizar detalhes do hover
-                        slot.querySelector('.tire-details').innerHTML = `
-                            <strong>${pneuSelecionado.numero_serie}</strong><br>
-                            Marca: ${pneuSelecionado.marca}<br>
-                            Modelo: ${pneuSelecionado.modelo}<br>
-                            Medida: ${pneuSelecionado.medida}<br>
-                            Status: Em Uso<br>
-                            Posição: ${posicaoEscolhida.nome}
-                        `;
-                    }
-                    
-                    // Remover pneu da lista de disponíveis
-                    pneusDisponiveis.splice(index, 1);
-                    
-                    alert(`Pneu ${pneuSelecionado.numero_serie} alocado com sucesso na posição ${position || 'selecionada'}!`);
-                    carregarHistorico(veiculoSelecionado);
-                } else {
-                    alert('Erro ao alocar pneu: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Erro completo:', error);
-                alert('Erro ao salvar alocação do pneu: ' + error.message);
-            });
-        }
-        
-        function enviarManutencao(position = null, slot = null) {
-            if (!veiculoSelecionado) {
-                alert('Selecione um veículo primeiro!');
-                return;
-            }
-            
-            const pneuId = slot ? slot.dataset.pneuId : null;
-            if (!pneuId) {
-                alert('Nenhum pneu encontrado nesta posição!');
-                return;
-            }
-            
-            if (confirm('Tem certeza que deseja enviar este pneu para manutenção?')) {
-                const dados = {
-                    veiculo_id: veiculoSelecionado,
-                    pneu_id: pneuId,
-                    posicao: position,
-                    acao: 'manutencao'
-                };
-                
-                fetch('../gestao_interativa/api/teste_alocacao.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify(dados)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        if (slot) {
-                            slot.classList.remove('occupied');
-                            slot.classList.add('maintenance');
-                            slot.querySelector('.tire-info').textContent = 'Manutenção';
-                            slot.querySelector('.tire-details').innerHTML = 'Pneu em manutenção';
-                            delete slot.dataset.pneuId;
-                            delete slot.dataset.pneuSerie;
-                        }
-                        alert(`Pneu enviado para manutenção na posição ${position || 'selecionada'}!`);
-                        
-                        // Recarregar lista de pneus disponíveis
-                        carregarPneusDisponiveis();
-                    } else {
-                        alert('Erro ao enviar pneu para manutenção: ' + data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    alert('Erro ao salvar alteração do pneu');
-                });
-            }
-        }
-        
-        function retornarEstoque(position = null, slot = null) {
-            if (!veiculoSelecionado) {
-                alert('Selecione um veículo primeiro!');
-                return;
-            }
-            
-            const pneuId = slot ? slot.dataset.pneuId : null;
-            if (!pneuId) {
-                alert('Nenhum pneu encontrado nesta posição!');
-                return;
-            }
-            
-            if (confirm('Tem certeza que deseja retornar este pneu ao estoque?')) {
-                const dados = {
-                    veiculo_id: veiculoSelecionado,
-                    pneu_id: pneuId,
-                    posicao: position,
-                    acao: 'remover'
-                };
-                
-                fetch('../gestao_interativa/api/teste_alocacao.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify(dados)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Resposta da API (remover):', data);
-                    if (data.success) {
-                        if (slot) {
-                            slot.classList.remove('occupied', 'maintenance', 'critical');
-                            slot.querySelector('.tire-info').textContent = 'Vazio';
-                            slot.querySelector('.tire-details').innerHTML = 'Clique para gerenciar pneu';
-                            delete slot.dataset.pneuId;
-                            delete slot.dataset.pneuSerie;
-                        }
-                        alert(`Pneu retornado ao estoque da posição ${position || 'selecionada'}!`);
-                        carregarHistorico(veiculoSelecionado);
-                        
-                        // Recarregar lista de pneus disponíveis em tempo real
-                        console.log('Recarregando pneus disponíveis em tempo real...');
-                        carregarPneusDisponiveis()
-                            .then(() => {
-                                console.log('Lista atualizada com sucesso. Pneus disponíveis:', pneusDisponiveis.length);
-                            })
-                            .catch(error => {
-                                console.error('Erro ao atualizar lista:', error);
-                            });
-                    } else {
-                        alert('Erro ao retornar pneu ao estoque: ' + data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro completo (remover):', error);
-                    alert('Erro ao salvar alteração do pneu');
-                });
-            }
-        }
-        
-        function descartarPneu(position = null, slot = null) {
-            if (!veiculoSelecionado) {
-                alert('Selecione um veículo primeiro!');
-                return;
-            }
-            
-            if (confirm('Tem certeza que deseja descartar este pneu?')) {
-                if (slot) {
-                    slot.classList.remove('occupied', 'maintenance');
-                    slot.classList.add('critical');
-                    slot.querySelector('.tire-info').textContent = 'Descartado';
-                    slot.querySelector('.tire-details').innerHTML = 'Pneu descartado';
-                }
-                
-                alert(`Pneu descartado da posição ${position || 'selecionada'}!`);
-                carregarHistorico(veiculoSelecionado);
-            }
-        }
-        
-        function carregarHistorico(veiculoId) {
-            console.log('Carregando histórico para veículo:', veiculoId);
-            fetch(`../gestao_interativa/api/historico_alocacoes.php?veiculo_id=${veiculoId}`, {
-                credentials: 'same-origin'
-            })
-                .then(response => {
-                    console.log('Response status histórico:', response.status);
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Dados do histórico:', data);
-                    const historyDiv = document.getElementById('allocationHistory');
-                    
-                    if (data.success && data.historico && data.historico.length > 0) {
-                        let html = '<div style="max-height: 200px; overflow-y: auto;">';
-                        data.historico.forEach(item => {
-                            const acao = item.data_remocao ? 'Remoção' : 'Alocação';
-                            const data = item.data_remocao || item.data_instalacao;
-                            html += `
-                                <div style="padding: 8px; border-bottom: 1px solid #ddd; font-size: 0.9em;">
-                                    <strong>${data}</strong><br>
-                                    ${acao}: ${item.numero_serie} (Pos. ${item.posicao})<br>
-                                    <span class="status-badge status-${item.status_nome.toLowerCase().replace(' ', '-')}">${item.status_nome}</span>
-                                </div>
-                            `;
-                        });
-                        html += '</div>';
-                        historyDiv.innerHTML = html;
-                        console.log('Histórico carregado com sucesso');
-                    } else {
-                        historyDiv.innerHTML = '<p>Nenhum histórico encontrado para este veículo.</p>';
-                        console.log('Nenhum histórico encontrado');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar histórico:', error);
-                    document.getElementById('allocationHistory').innerHTML = '<p>Erro ao carregar histórico.</p>';
-                });
-        }
-        
-        function carregarEstatisticas(veiculoId) {
-            console.log('Carregando estatísticas para veículo:', veiculoId);
-            fetch(`../gestao_interativa/api/estatisticas_veiculo.php?veiculo_id=${veiculoId}`, {
-                credentials: 'same-origin'
-            })
-                .then(response => {
-                    console.log('Response status estatísticas:', response.status);
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Dados das estatísticas:', data);
-                    const statsDiv = document.getElementById('vehicleStats');
-                    
-                    if (data.success && data.estatisticas) {
-                        const stats = data.estatisticas;
-                        statsDiv.innerHTML = `
-                            <div style="font-size: 0.9em;">
-                                <p><strong>Pneus Ativos:</strong> ${stats.pneusAtivos}</p>
-                                <p><strong>Em Manutenção:</strong> ${stats.pneusManutencao}</p>
-                                <p><strong>Descartados:</strong> ${stats.pneusDescartados}</p>
-                                <p><strong>KM Médio:</strong> ${stats.quilometragemMedia.toLocaleString()} km</p>
-                                <p><strong>Total de Alocações:</strong> ${stats.totalAlocacoes}</p>
-                            </div>
-                        `;
-                        console.log('Estatísticas carregadas com sucesso');
-                    } else {
-                        statsDiv.innerHTML = '<p>Erro ao carregar estatísticas.</p>';
-                        console.log('Erro ao carregar estatísticas:', data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar estatísticas:', error);
-                    document.getElementById('vehicleStats').innerHTML = '<p>Erro ao carregar estatísticas.</p>';
-                });
-        }
-        
         function carregarPneusDisponiveis() {
-            console.log('=== INICIANDO CARREGAMENTO DE PNEUS DISPONÍVEIS ===');
             
             const timestamp = new Date().getTime();
             
@@ -2117,11 +1790,9 @@ try {
                 credentials: 'same-origin' // Garantir que cookies de sessão sejam enviados
             })
                 .then(response => {
-                    console.log('Response status:', response.status);
                     return response.json();
                 })
                 .then(data => {
-                    console.log('Resposta da API pneus_disponiveis:', data);
                     if (data.success && data.pneus) {
                         // Atualizar a lista global de pneus disponíveis usando Object.assign
                         pneusDisponiveis.length = 0; // Limpar array existente
@@ -2130,12 +1801,9 @@ try {
                         // Atualizar também a variável global
                         window.pneusDisponiveis = pneusDisponiveis;
                         
-                        console.log('Lista de pneus disponíveis atualizada:', pneusDisponiveis);
-                        console.log('Quantidade de pneus disponíveis:', pneusDisponiveis.length);
                         
                         // Verificar se a lista foi realmente atualizada
                         if (pneusDisponiveis.length > 0) {
-                            console.log('Primeiro pneu disponível:', pneusDisponiveis[0]);
                         }
                         
                         return pneusDisponiveis;
@@ -2149,86 +1817,6 @@ try {
                     throw error;
                 })
                 .finally(() => {
-                    console.log('=== FIM CARREGAMENTO DE PNEUS DISPONÍVEIS ===');
-                });
-        }
-
-        // Alternância entre modos
-        function mostrarModoPadrao(e) {
-            e.preventDefault();
-            document.getElementById('area-modo-padrao').style.display = '';
-            document.getElementById('area-modo-flexivel').style.display = 'none';
-            document.getElementById('tab-padrao').classList.add('active');
-            document.getElementById('tab-flexivel').classList.remove('active');
-        }
-        function mostrarModoFlexivel(e) {
-            e.preventDefault();
-            document.getElementById('area-modo-padrao').style.display = 'none';
-            document.getElementById('area-modo-flexivel').style.display = '';
-            document.getElementById('tab-padrao').classList.remove('active');
-            document.getElementById('tab-flexivel').classList.add('active');
-        }
-        function voltarModoPadrao() {
-            mostrarModoPadrao({preventDefault:()=>{}});
-        }
-
-        // Estado dos eixos e pneus alocados no modo flexível
-        // (Variáveis declaradas no arquivo gestao_interativa_eixos.js)
-
-        // Ao selecionar veículo, carregar layout e pneus alocados
-        function onSelecionarVeiculoFlexivel(veiculoId) {
-            fetch('../gestao_interativa/api/eixos_veiculos.php?action=layout_completo&veiculo_id=' + veiculoId, {
-                credentials: 'same-origin'
-            })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success && data.layout) {
-                        eixosCaminhao = data.layout.eixosCaminhao || [];
-                        eixosCarreta = data.layout.eixosCarreta || [];
-                        idEixo = data.layout.idEixo || 1;
-                        
-                        // Reconectar pneus alocados aos dados atuais
-                        const salvos = data.layout.pneusFlexAlocados || {};
-                        pneusFlexAlocados = {};
-                        for (const slotId in salvos) {
-                            const pneuSalvo = salvos[slotId];
-                            // Tenta encontrar o pneu pelo ID na lista global (pode estar em uso, então busca em todas as listas)
-                            let pneuAtual = null;
-                            if (window.pneusDisponiveis) {
-                                pneuAtual = window.pneusDisponiveis.find(p => p.id == pneuSalvo.id);
-                            }
-                            // Se não encontrar, mantém o snapshot salvo
-                            if (pneuAtual) {
-                                // Mesclar dados do pneu atual com informações de posição salvas
-                                pneusFlexAlocados[slotId] = {
-                                    ...pneuAtual,
-                                    posicao_id: pneuSalvo.posicao_id,
-                                    posicao_nome: pneuSalvo.posicao_nome
-                                };
-                            } else {
-                                // Usar o snapshot salvo completo
-                                pneusFlexAlocados[slotId] = pneuSalvo;
-                            }
-                        }
-                    } else {
-                        eixosCaminhao = [];
-                        eixosCarreta = [];
-                        idEixo = 1;
-                        pneusFlexAlocados = {};
-                    }
-                    renderizarEixosFlexivel();
-                    atualizarDashboardPneusEmUso(); // Atualizar dashboard
-                    
-                    // Carregar histórico e estatísticas
-                    setTimeout(() => {
-                        carregarHistoricoFlexivel(veiculoId);
-                        carregarEstatisticasFlexivel(veiculoId);
-                    }, 100);
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar layout:', error);
-                    // Fallback para sistema antigo se necessário
-                    carregarLayoutFallback(veiculoId);
                 });
         }
 
@@ -2238,8 +1826,8 @@ try {
             for (let i = 0; i < qtdPneus; i++) {
                 const slotId = tipo + '-' + idxEixo + '-' + i;
                 const pneu = pneusFlexAlocados[slotId];
-                pneusHTML += `<div class='pneu-flex' data-ocupado='${!!pneu}' onclick="mostrarOpcoesPneuFlexivel('${slotId}')" title="${pneu ? tooltipPneu(pneu) : 'Clique para gerenciar seu pneu'}">
-                    ${pneu ? `<span style='font-size:10px;'>${pneu.numero_serie}</span>` : ''}
+                pneusHTML += `<div class='pneu-flex' data-ocupado='${!!pneu}' onclick="mostrarOpcoesPneuFlexivel('${escapeHtml(slotId)}')" title="${pneu ? escapeHtml(tooltipPneu(pneu)) : 'Clique para gerenciar seu pneu'}">
+                    ${pneu ? `<span style='font-size:10px;'>${escapeHtml(pneu.numero_serie)}</span>` : ''}
                 </div>`;
             }
             return `
@@ -2297,23 +1885,16 @@ try {
                 // Adicionar análise da IA se o pneu existe
                 const analise = analisarPneuIA(pneu);
                 if (analise.status === 'critico') {
-                    opcoes = ['🚨 Análise IA (CRÍTICO)', 'Ver Detalhes', 'Remover Pneu', 'Enviar para Manutenção'];
+                    opcoes = ['🚨 Análise IA (CRÍTICO)', 'Ficha completa', 'Ver Detalhes', 'Remover Pneu', 'Enviar para Manutenção'];
                 } else if (analise.status === 'atencao') {
-                    opcoes = ['⚠️ Análise IA (ATENÇÃO)', 'Ver Detalhes', 'Remover Pneu', 'Enviar para Manutenção'];
+                    opcoes = ['⚠️ Análise IA (ATENÇÃO)', 'Ficha completa', 'Ver Detalhes', 'Remover Pneu', 'Enviar para Manutenção'];
                 } else {
-                    opcoes = ['✅ Análise IA (BOM)', 'Ver Detalhes', 'Remover Pneu', 'Enviar para Manutenção'];
+                    opcoes = ['✅ Análise IA (BOM)', 'Ficha completa', 'Ver Detalhes', 'Remover Pneu', 'Enviar para Manutenção'];
                 }
             }
             
-            const opcao = prompt(`Opções para o slot ${slotId}:\n\n${opcoes.map((o,i)=>`${i+1}. ${o}`).join('\n')}\n\nDigite o número da opção (1-${opcoes.length}):`);
-            const index = parseInt(opcao) - 1;
-            
-            if (isNaN(index) || index < 0 || index >= opcoes.length) {
-                return;
-            }
-            
-            const acao = opcoes[index];
-            
+            giChoose('Opções do pneu', opcoes.map(function (o) { return { label: o, value: o }; })).then(function (acao) {
+                if (!acao) return;
             switch(acao) {
                 case 'Alocar Pneu':
                     alocarPneuFlexivelPrompt(slotId);
@@ -2325,48 +1906,41 @@ try {
                         mostrarNotificacaoIA(pneu, slotId);
                     }
                     break;
-                case 'Ver Detalhes':
-                    if (pneu) {
-                        const analise = analisarPneuIA(pneu);
-                        const preditiva = analisePreditivaDesgaste(pneu);
-                        const detalhes = `
-                            Pneu: ${pneu.numero_serie}
-                            Marca: ${pneu.marca}
-                            Modelo: ${pneu.modelo}
-                            Medida: ${pneu.medida}
-                            Status: ${pneu.status_nome || 'N/A'}
-                            KM Atual: ${pneu.quilometragem || 'N/A'}
-                            DOT: ${pneu.dot || 'N/A'}
-                            
-                            === ANÁLISE IA ===
-                            Status: ${analise.status.toUpperCase()}
-                            Prioridade: ${analise.prioridade}
-                            KM Restante: ${preditiva.kmRestante}
-                            Meses Restante: ${preditiva.mesesRestante}
-                            Recomendação: ${preditiva.recomendacao}
-                            
-                            Alertas: ${analise.alertas.join(', ')}
-                            Recomendações: ${analise.recomendacoes.join(', ')}
-                        `;
-                        alert(detalhes);
+                case 'Ficha completa':
+                    if (pneu && pneu.id && window.PneuTimeline) {
+                        PneuTimeline.openFichaModal(pneu.id);
                     }
                     break;
+                case 'Ver Detalhes':
+                    mostrarDetalhesPneuModal(pneu, slotId);
+                    break;
                 case 'Remover Pneu':
-                    if (confirm('Remover pneu deste slot?')) {
-                        removerPneuFlexivel(slotId);
+                    if (typeof solicitarRemocaoPneuFlexivel === 'function') {
+                        solicitarRemocaoPneuFlexivel(slotId);
+                    } else {
+                        giConfirm('Remover pneu deste slot?', { okLabel: 'Remover' }).then(function (ok) {
+                            if (ok) removerPneuFlexivel(slotId);
+                        });
                     }
                     break;
                 case 'Enviar para Manutenção':
                     if (pneu) {
-                        const analise = analisarPneuIA(pneu);
-                        if (analise.status === 'critico') {
-                            alert('🚨 PNEU CRÍTICO!\n\nAção: Enviar para manutenção URGENTE\n\nPróximos passos:\n1. Remover pneu do veículo\n2. Registrar motivo da manutenção\n3. Enviar para oficina credenciada\n4. Alocar pneu de reposição');
-                        } else {
-                            alert('Funcionalidade de manutenção será implementada em breve.');
-                        }
+                        const msg = analisarPneuIA(pneu).status === 'critico'
+                            ? '🚨 Pneu em estado CRÍTICO. Confirma envio urgente para manutenção?'
+                            : 'Enviar este pneu para manutenção? Ele será removido do veículo.';
+                        giConfirm(msg, { okLabel: 'Enviar' }).then(function (ok) {
+                            if (!ok) return;
+                            giPrompt('Motivo ou observação (opcional):', '', { placeholder: 'Enviado para manutenção' }).then(function (obsInput) {
+                                const obs = (obsInput && obsInput.trim()) ? obsInput.trim() : 'Enviado para manutenção';
+                                if (typeof enviarManutencaoFlexivel === 'function') {
+                                    enviarManutencaoFlexivel(slotId, obs);
+                                }
+                            });
+                        });
                     }
                     break;
             }
+            });
         }
 
         function alocarPneuFlexivelPrompt(slotId) {
@@ -2377,40 +1951,44 @@ try {
                     const pneusDisponiveisFiltrados = pneusDisponiveis.filter(p => !idsAlocados.includes(p.id));
                     
                     if (!pneusDisponiveisFiltrados || pneusDisponiveisFiltrados.length === 0) {
-                        alert('Não há pneus disponíveis no estoque!');
+                        giToast('Não há pneus disponíveis no estoque!');
                         return;
                     }
                     
-                    let opcoes = 'Pneus disponíveis:\n\n';
-                    pneusDisponiveisFiltrados.forEach((pneu, index) => {
-                        opcoes += `${index + 1}. ${pneu.numero_serie} - ${pneu.marca} ${pneu.modelo} (${pneu.medida})\n`;
+                    const opcoes = pneusDisponiveisFiltrados.map(function (pneu) {
+                        return {
+                            label: `${pneu.numero_serie} - ${pneu.marca} ${pneu.modelo}`,
+                            desc: `Medida: ${pneu.medida || '—'}`,
+                            value: pneu.id
+                        };
                     });
-                    
-                    const escolha = prompt(opcoes + '\nDigite o número do pneu que deseja alocar:');
-                    const index = parseInt(escolha) - 1;
-                    
-                    if (isNaN(index) || index < 0 || index >= pneusDisponiveisFiltrados.length) {
-                        alert('Seleção inválida!');
-                        return;
-                    }
-                    
-                    const pneuSelecionado = pneusDisponiveisFiltrados[index];
-                    
+
+                    giChoose('Selecione o pneu para alocar', opcoes).then(function (pneuId) {
+                        if (pneuId === null || pneuId === undefined) return;
                     // Usar a nova API para alocar o pneu
-                    alocarPneuFlexivel(slotId, pneuSelecionado.id);
+                        alocarPneuFlexivel(slotId, pneuId);
+                    });
                 })
                 .catch(error => {
                     console.error('Erro ao alocar pneu:', error);
-                    alert('Erro ao carregar pneus disponíveis: ' + error.message);
+                    giToast('Erro ao carregar pneus disponíveis: ' + error.message);
                 });
         }
 
         // Função para atualizar o dashboard com pneus em uso
         function atualizarDashboardPneusEmUso() {
-            // Contar pneus alocados no modo flexível
             const totalPneusFlexiveis = Object.keys(pneusFlexAlocados).length;
             
-            // Atualizar o elemento específico do dashboard "Pneus em Uso"
+            const modernEl = document.getElementById('giKpiEmUso');
+            if (modernEl) {
+                modernEl.textContent = totalPneusFlexiveis;
+            }
+
+            const legacyEl = document.getElementById('pneus-em-uso-count');
+            if (legacyEl) {
+                legacyEl.textContent = totalPneusFlexiveis;
+            }
+
             const dashboardCards = document.querySelectorAll('.dashboard-card');
             dashboardCards.forEach(card => {
                 const header = card.querySelector('.card-header h3');
@@ -2421,8 +1999,6 @@ try {
                     }
                 }
             });
-            
-            console.log('Dashboard atualizado: ' + totalPneusFlexiveis + ' pneus em uso');
         }
 
         function tooltipPneu(pneu) {
@@ -2521,7 +2097,7 @@ try {
                     // Mostrar posição do pneu se disponível
                     let posicaoInfo = '';
                     if (hasPneu && pneu.posicao_nome) {
-                        posicaoInfo = `<div style='font-size:8px;color:#666;margin-top:2px;'>${pneu.posicao_nome}</div>`;
+                        posicaoInfo = `<div style='font-size:8px;color:#666;margin-top:2px;'>${escapeHtml(pneu.posicao_nome)}</div>`;
                     }
                     
                     pneusHTML += `
@@ -2531,15 +2107,15 @@ try {
                              data-eixo='${idxEixo}' 
                              data-posicao='${i}'
                              draggable='${hasPneu}'
-                             onclick="mostrarOpcoesPneuFlexivel('${slotId}')"
-                             onmouseenter='showTooltipAvancado(event, ${hasPneu ? JSON.stringify(pneu) : 'null'})'
+                             onclick="mostrarOpcoesPneuFlexivel('${escapeHtml(slotId)}')"
+                             onmouseenter='showTooltipAvancado(event, ${hasPneu ? escapeHtml(JSON.stringify(pneu)) : 'null'})'
                              onmouseleave='hideTooltipAvancado()'
-                             ondragstart='handleDragStart(event, "${slotId}")'
+                             ondragstart='handleDragStart(event, "${escapeHtml(slotId)}")'
                              ondragover='handleDragOver(event)'
-                             ondrop='handleDrop(event, "${slotId}")'
-                             ondragenter='handleDragEnter(event, "${slotId}")'
-                             ondragleave='handleDragLeave(event, "${slotId}")'>
-                            ${hasPneu ? `<span style='font-size:10px;'>${pneu.numero_serie}</span>` : ''}
+                             ondrop='handleDrop(event, "${escapeHtml(slotId)}")'
+                             ondragenter='handleDragEnter(event, "${escapeHtml(slotId)}")'
+                             ondragleave='handleDragLeave(event, "${escapeHtml(slotId)}")'>
+                            ${hasPneu ? `<span style='font-size:10px;'>${escapeHtml(pneu.numero_serie)}</span>` : ''}
                             ${posicaoInfo}
                             ${alertaIndicator}
                         </div>
@@ -2610,20 +2186,30 @@ try {
                 const target = event.target.closest('.pneu-flex');
                 if (!target) return;
                 
-                // Validar drop
                 if (!validateDrop(targetSlotId)) {
                     showDragFeedback('Posição incompatível!', 'error');
+                    resetDragState();
+                    target.classList.remove('valid', 'invalid');
                     return;
                 }
                 
-                // Executar movimento
-                movePneu(dragState.originalSlot, targetSlotId);
-                
-                // Limpar estado
+                const fromSlot = dragState.originalSlot;
+                const mover = typeof moverPneuFlexivel === 'function'
+                    ? moverPneuFlexivel(fromSlot, targetSlotId)
+                    : Promise.resolve({ success: false });
+
+                mover.then(function (data) {
+                    if (data && data.success) {
+                        showDragFeedback('Pneu movido com sucesso!', 'success');
+                    } else {
+                        showDragFeedback('Não foi possível mover o pneu.', 'error');
+                    }
                 resetDragState();
                 target.classList.remove('valid', 'invalid');
+                });
             } catch (error) {
                 console.error('Erro ao processar drop:', error);
+                resetDragState();
             }
         }
 
@@ -2631,26 +2217,31 @@ try {
             try {
                 event.preventDefault();
                 
-                if (!dragState.isDragging) return;
+                if (!dragState.isDragging || !dragState.originalSlot) return;
                 
-                // Remover pneu do slot original
-                delete pneusFlexAlocados[dragState.originalSlot];
-                
-                showDragFeedback('Pneu movido para estoque!', 'success');
-                
-                // Atualizar interface
-                renderizarEixosFlexivel();
-                salvarLayoutFlexivel(true);
-                
-                // Limpar estado
+                const slotOrigem = dragState.originalSlot;
+                const mover = typeof removerPneuFlexivel === 'function'
+                    ? removerPneuFlexivel(slotOrigem)
+                    : Promise.resolve({ success: false });
+
+                mover.then(function (data) {
+                    if (data && data.success) {
+                        showDragFeedback('Pneu retornado ao estoque!', 'success');
+                        if (typeof carregarPneusDisponiveis === 'function') {
+                            carregarPneusDisponiveis().catch(function () {});
+                        }
+                    } else {
+                        showDragFeedback('Não foi possível remover o pneu do veículo.', 'error');
+                    }
                 resetDragState();
-                
                 const areaEstoque = document.getElementById('areaEstoque');
                 if (areaEstoque) {
                     areaEstoque.classList.remove('drop-active');
                 }
+                });
             } catch (error) {
                 console.error('Erro ao processar drop no estoque:', error);
+                resetDragState();
             }
         }
 
@@ -2672,26 +2263,22 @@ try {
             }
         }
 
-        // Mover pneu entre slots
+        // Mover pneu entre slots (persiste via API)
         function movePneu(fromSlotId, toSlotId) {
             try {
-                const pneu = pneusFlexAlocados[fromSlotId];
-                if (!pneu) return;
-                
-                // Remover do slot original
-                delete pneusFlexAlocados[fromSlotId];
-                
-                // Adicionar ao novo slot
-                pneusFlexAlocados[toSlotId] = pneu;
-                
+                if (!pneusFlexAlocados[fromSlotId]) return;
+                if (typeof moverPneuFlexivel === 'function') {
+                    moverPneuFlexivel(fromSlotId, toSlotId).then(function (data) {
+                        if (data && data.success) {
                 showDragFeedback('Pneu movido com sucesso!', 'success');
-                
-                // Atualizar interface
-                renderizarEixosFlexivel();
-                salvarLayoutFlexivel(true);
-                atualizarDashboardPneusEmUso(); // Atualizar dashboard
+                        } else {
+                            showDragFeedback('Não foi possível mover o pneu.', 'error');
+                        }
+                    });
+                }
             } catch (error) {
                 console.error('Erro ao mover pneu:', error);
+                showDragFeedback('Erro ao mover pneu.', 'error');
             }
         }
 
@@ -2784,17 +2371,17 @@ try {
                 
                 tooltip.innerHTML = `
                     <div style="margin-bottom: 8px;">
-                        <strong>${pneu.numero_serie}</strong>
-                        <span class="status-indicator status-${getStatusClass(pneu.status_nome)}"></span>
+                        <strong>${escapeHtml(pneu.numero_serie)}</strong>
+                        <span class="status-indicator status-${escapeHtml(getStatusClass(pneu.status_nome))}"></span>
                     </div>
                     <div style="font-size: 11px; line-height: 1.3;">
-                        <strong>Marca:</strong> ${pneu.marca}<br>
-                        <strong>Modelo:</strong> ${pneu.modelo}<br>
-                        <strong>Medida:</strong> ${pneu.medida}<br>
-                        <strong>Posição:</strong> ${pneu.posicao_nome || 'Não identificada'}<br>
-                        <strong>DOT:</strong> ${pneu.dot || 'N/A'}<br>
-                        <strong>KM Atual:</strong> ${pneu.quilometragem || 'N/A'} km<br>
-                        <strong>Próxima Manutenção:</strong> ${proximaManutencao}<br>
+                        <strong>Marca:</strong> ${escapeHtml(pneu.marca)}<br>
+                        <strong>Modelo:</strong> ${escapeHtml(pneu.modelo)}<br>
+                        <strong>Medida:</strong> ${escapeHtml(pneu.medida)}<br>
+                        <strong>Posição:</strong> ${escapeHtml(pneu.posicao_nome || 'Não identificada')}<br>
+                        <strong>DOT:</strong> ${escapeHtml(pneu.dot || 'N/A')}<br>
+                        <strong>KM Atual:</strong> ${escapeHtml(pneu.quilometragem || 'N/A')} km<br>
+                        <strong>Próxima Manutenção:</strong> ${escapeHtml(proximaManutencao)}<br>
                         <strong>Custo Acumulado:</strong> R$ ${custoAcumulado}<br>
                         <hr style="margin: 4px 0; border-color: #555;">
                         <strong>Últimas Alocações:</strong><br>
@@ -3002,11 +2589,11 @@ try {
                 modal.innerHTML = `
                     <div class="modal-content-ia ${notificacao.tipo}">
                         <div class="modal-header-ia">
-                            <h3>${notificacao.titulo}</h3>
+                            <h3>${escapeHtml(notificacao.titulo)}</h3>
                             <span class="close-ia" onclick="this.parentElement.parentElement.parentElement.remove()">&times;</span>
                         </div>
                         <div class="modal-body-ia">
-                            <p>${notificacao.mensagem}</p>
+                            <p>${escapeHtml(notificacao.mensagem)}</p>
                             <div class="acoes-ia">
                                 ${notificacao.acoes.map(acao => `<button onclick="executarAcaoIA('${acao}', '${slotId}')">${acao}</button>`).join('')}
                             </div>
@@ -3036,41 +2623,29 @@ try {
                 
                 switch(acao) {
                     case 'Trocar Imediatamente':
-                        alert('Ação: Trocar pneu imediatamente\n\nPróximos passos:\n1. Remover pneu do veículo\n2. Verificar estoque de reposição\n3. Alocar novo pneu\n4. Registrar troca no sistema');
+                        giToast('Ação: Trocar pneu imediatamente\n\nPróximos passos:\n1. Remover pneu do veículo\n2. Verificar estoque de reposição\n3. Alocar novo pneu\n4. Registrar troca no sistema');
                         break;
                     case 'Agendar Manutenção':
-                        alert('Ação: Agendar manutenção\n\nPróximos passos:\n1. Verificar disponibilidade da oficina\n2. Agendar data e horário\n3. Preparar pneu de reposição\n4. Notificar motorista');
+                        giToast('Ação: Agendar manutenção\n\nPróximos passos:\n1. Verificar disponibilidade da oficina\n2. Agendar data e horário\n3. Preparar pneu de reposição\n4. Notificar motorista');
                         break;
                     case 'Verificar Estoque':
-                        alert('Verificando estoque de pneus compatíveis...');
+                        giToast('Verificando estoque de pneus compatíveis...');
                         // Aqui você pode integrar com a API de estoque
                         break;
                     case 'Planejar Troca':
-                        alert('Ação: Planejar troca\n\nRecomendações:\n1. Monitorar desgaste semanalmente\n2. Preparar pneu de reposição\n3. Agendar troca para próxima manutenção\n4. Documentar planejamento');
+                        giToast('Ação: Planejar troca\n\nRecomendações:\n1. Monitorar desgaste semanalmente\n2. Preparar pneu de reposição\n3. Agendar troca para próxima manutenção\n4. Documentar planejamento');
                         break;
                     case 'Monitorar Desgaste':
-                        alert('Ação: Monitorar desgaste\n\nChecklist:\n1. Verificar sulcos (mínimo 1.6mm)\n2. Observar desgaste irregular\n3. Medir pressão regularmente\n4. Registrar medições');
+                        giToast('Ação: Monitorar desgaste\n\nChecklist:\n1. Verificar sulcos (mínimo 1.6mm)\n2. Observar desgaste irregular\n3. Medir pressão regularmente\n4. Registrar medições');
                         break;
                     case 'Verificar Histórico':
-                        alert('Histórico do pneu:\n\n' + buscarHistoricoPneu(pneu.id));
+                        mostrarHistoricoPneuModal(pneu);
                         break;
                     case 'Ver Detalhes':
-                        if (pneu) {
-                            const detalhes = `
-                                Pneu: ${pneu.numero_serie}
-                                Marca: ${pneu.marca}
-                                Modelo: ${pneu.modelo}
-                                Medida: ${pneu.medida}
-                                Posição: ${pneu.posicao_nome || 'Não identificada'}
-                                Status: ${pneu.status_nome || 'N/A'}
-                                KM: ${pneu.quilometragem || 'N/A'}
-                                DOT: ${pneu.dot || 'N/A'}
-                            `;
-                            alert(detalhes);
-                        }
+                        mostrarDetalhesPneuModal(pneu, slotId);
                         break;
                     case 'Histórico de Manutenção':
-                        alert('Histórico de manutenção:\n\n' + buscarHistoricoPneu(pneu.id));
+                        mostrarHistoricoPneuModal(pneu);
                         break;
                 }
                 
@@ -3107,7 +2682,6 @@ try {
             try {
                 // Verificar se Chart.js está carregado
                 if (typeof Chart === 'undefined') {
-                    console.log('Chart.js não carregado, aguardando...');
                     setTimeout(inicializarGraficos, 1000);
                     return;
                 }
@@ -3125,13 +2699,6 @@ try {
                     // Pneus críticos = pneus em uso com status crítico (pode ser baseado em data de instalação ou outro critério)
                     // Por enquanto, vamos usar 20% dos pneus em uso como críticos para demonstração
                     const pneusCriticosCount = Math.round(pneusEmUsoCount * 0.2);
-                    
-                    console.log('Dados para gráfico:', {
-                        disponiveis: pneusDisponiveisCount,
-                        emUso: pneusEmUsoCount,
-                        manutencao: pneusManutencaoCount,
-                        criticos: pneusCriticosCount
-                    });
                     
                     new Chart(ctxPizza, {
                         type: 'doughnut',
@@ -3303,7 +2870,6 @@ try {
                     });
                 }
                 
-                console.log('Gráficos inicializados com sucesso!');
             } catch (error) {
                 console.error('Erro ao inicializar gráficos:', error);
             }
@@ -3335,13 +2901,11 @@ try {
 
         // Função para carregar histórico no modo flexível
         function carregarHistoricoFlexivel(veiculoId) {
-            console.log('Carregando histórico flexível para veículo:', veiculoId);
             fetch(`../gestao_interativa/api/historico_alocacoes.php?veiculo_id=${veiculoId}`, {
                 credentials: 'same-origin'
             })
                 .then(response => response.json())
                 .then(data => {
-                    console.log('Dados do histórico flexível:', data);
                     const historyDiv = document.getElementById('allocationHistory');
                     
                     if (data.success && data.historico && data.historico.length > 0) {
@@ -3359,10 +2923,8 @@ try {
                         });
                         html += '</div>';
                         historyDiv.innerHTML = html;
-                        console.log('Histórico flexível carregado com sucesso');
                     } else {
                         historyDiv.innerHTML = '<p>Nenhum histórico encontrado para este veículo.</p>';
-                        console.log('Nenhum histórico flexível encontrado');
                     }
                 })
                 .catch(error => {
@@ -3376,13 +2938,11 @@ try {
 
         // Função para carregar estatísticas no modo flexível
         function carregarEstatisticasFlexivel(veiculoId) {
-            console.log('Carregando estatísticas flexível para veículo:', veiculoId);
             fetch(`../gestao_interativa/api/estatisticas_veiculo.php?veiculo_id=${veiculoId}`, {
                 credentials: 'same-origin'
             })
                 .then(response => response.json())
                 .then(data => {
-                    console.log('Dados das estatísticas flexível:', data);
                     const statsDiv = document.getElementById('vehicleStats');
                     
                     if (data.success && data.estatisticas) {
@@ -3396,10 +2956,8 @@ try {
                                 <p><strong>Total de Alocações:</strong> ${stats.totalAlocacoes}</p>
                             </div>
                         `;
-                        console.log('Estatísticas flexível carregadas com sucesso');
                     } else {
                         statsDiv.innerHTML = '<p>Erro ao carregar estatísticas.</p>';
-                        console.log('Erro ao carregar estatísticas flexível:', data.error);
                     }
                 })
                 .catch(error => {
@@ -3453,30 +3011,10 @@ try {
                 });
             }
             
-            // Modal de Ajuda
-            const helpBtn = document.getElementById('helpBtn');
-            const helpModal = document.getElementById('helpModal');
-            const helpClose = helpModal?.querySelector('.close-modal');
-            
-            if (helpBtn && helpModal) {
-                helpBtn.addEventListener('click', function() {
-                    helpModal.style.display = 'flex';
-                });
-            }
-            
-            if (helpClose) {
-                helpClose.addEventListener('click', function() {
-                    helpModal.style.display = 'none';
-                });
-            }
-            
-            // Fechar modais ao clicar fora
+            // Fechar modal de filtros ao clicar fora
             window.addEventListener('click', function(event) {
                 if (event.target === filterModal) {
                     filterModal.style.display = 'none';
-                }
-                if (event.target === helpModal) {
-                    helpModal.style.display = 'none';
                 }
             });
             
@@ -3508,8 +3046,7 @@ try {
                 });
                 
                 // Atualizar área de estoque ou lista de pneus disponíveis
-                console.log('Pneus filtrados:', pneusFiltrados.length);
-                alert(`Filtros aplicados! ${pneusFiltrados.length} pneu(s) encontrado(s).`);
+                giToast(`Filtros aplicados! ${pneusFiltrados.length} pneu(s) encontrado(s).`);
             }
             
             // Se houver veículo selecionado, recarregar
@@ -3548,7 +3085,7 @@ try {
             const veiculoSelecionado = document.getElementById('veiculoSelectorFlex')?.value;
             
             if (!veiculoSelecionado) {
-                alert('Por favor, selecione um veículo primeiro.');
+                giToast('Por favor, selecione um veículo primeiro.');
                 return;
             }
             
@@ -3597,12 +3134,12 @@ try {
             link.click();
             document.body.removeChild(link);
             
-            alert('Relatório exportado com sucesso!');
+            giToast('Relatório exportado com sucesso!');
         }
     </script>
     
     <!-- Novo sistema de eixos com banco de dados -->
-    <script src="../js/gestao_interativa_eixos.js"></script>
+    <script src="../js/gestao_interativa_eixos.js?v=2.1"></script>
     
     <!-- Modal de Filtros -->
     <div class="modal" id="filterModal">
@@ -3656,113 +3193,7 @@ try {
     </div>
     
     <!-- Modal de Ajuda -->
-    <div class="modal" id="helpModal">
-        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
-            <div class="modal-header">
-                <h2><i class="fas fa-question-circle"></i> Ajuda - Gestão Interativa de Pneus</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="help-section">
-                    <h3>Visão Geral</h3>
-                    <p>A página de Gestão Interativa de Pneus permite gerenciar toda a frota de pneus de forma visual e intuitiva. Aqui você pode alocar, remover, enviar para manutenção e acompanhar o status de cada pneu em tempo real.</p>
-                </div>
-
-                <div class="help-section">
-                    <h3>Funcionalidades Principais</h3>
-                    <ul>
-                        <li><strong>Gestão Visual:</strong> Visualize os pneus instalados em cada veículo através de uma interface gráfica interativa.</li>
-                        <li><strong>Drag and Drop:</strong> Arraste pneus entre posições ou para o estoque de forma simples.</li>
-                        <li><strong>Modo Flexível:</strong> Configure eixos personalizados para cada veículo (caminhão e carreta).</li>
-                        <li><strong>Alertas Inteligentes:</strong> Receba notificações sobre pneus que precisam de atenção.</li>
-                        <li><strong>Histórico:</strong> Acompanhe todo o histórico de alocações e movimentações.</li>
-                        <li><strong>Estatísticas:</strong> Visualize gráficos e métricas de performance dos pneus.</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Como Usar</h3>
-                    <ol>
-                        <li><strong>Selecionar Veículo:</strong>
-                            <ul>
-                                <li>Escolha um veículo no seletor no topo da página</li>
-                                <li>O sistema carregará automaticamente os pneus instalados</li>
-                            </ul>
-                        </li>
-                        <li><strong>Alocar Pneu:</strong>
-                            <ul>
-                                <li>Clique em uma posição vazia no veículo</li>
-                                <li>Selecione um pneu disponível do estoque</li>
-                                <li>Confirme a alocação</li>
-                            </ul>
-                        </li>
-                        <li><strong>Mover Pneu (Drag and Drop):</strong>
-                            <ul>
-                                <li>Clique e segure um pneu instalado</li>
-                                <li>Arraste para outra posição ou para a área de estoque</li>
-                                <li>Solte para confirmar a movimentação</li>
-                            </ul>
-                        </li>
-                        <li><strong>Enviar para Manutenção:</strong>
-                            <ul>
-                                <li>Clique em um pneu instalado</li>
-                                <li>Selecione "Enviar para Manutenção"</li>
-                                <li>O pneu será removido e marcado como em manutenção</li>
-                            </ul>
-                        </li>
-                        <li><strong>Configurar Eixos (Modo Flexível):</strong>
-                            <ul>
-                                <li>Use os botões "Adicionar Eixo" para criar novos eixos</li>
-                                <li>Configure a quantidade de pneus por eixo</li>
-                                <li>Salve o layout para uso futuro</li>
-                            </ul>
-                        </li>
-                    </ol>
-                </div>
-
-                <div class="help-section">
-                    <h3>Legenda de Cores</h3>
-                    <ul>
-                        <li><strong style="color: #28a745;">Verde (Disponível):</strong> Posição vazia, pronta para receber um pneu</li>
-                        <li><strong style="color: #007bff;">Azul (Em Uso):</strong> Pneu instalado e em bom estado</li>
-                        <li><strong style="color: #ffc107;">Amarelo (Alerta):</strong> Pneu precisa de atenção, planejar troca</li>
-                        <li><strong style="color: #fd7e14;">Laranja (Pressão):</strong> Problema de pressão ou calibração</li>
-                        <li><strong style="color: #dc3545;">Vermelho (Crítico):</strong> Troca urgente necessária</li>
-                        <li><strong style="color: #6c757d;">Cinza (Manutenção):</strong> Pneu em reparo</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Indicadores (KPIs)</h3>
-                    <ul>
-                        <li><strong>Total de Veículos:</strong> Número de veículos cadastrados no sistema</li>
-                        <li><strong>Pneus Disponíveis:</strong> Quantidade de pneus em estoque prontos para uso</li>
-                        <li><strong>Pneus em Uso:</strong> Total de pneus atualmente instalados em veículos</li>
-                        <li><strong>Em Manutenção:</strong> Pneus que estão sendo reparados</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Gráficos e Análises</h3>
-                    <ul>
-                        <li><strong>Distribuição por Status:</strong> Visualize a distribuição de pneus por status</li>
-                        <li><strong>Tendência de Uso:</strong> Acompanhe o uso de pneus nos últimos 6 meses</li>
-                        <li><strong>Indicadores de Performance:</strong> Métricas importantes de eficiência</li>
-                    </ul>
-                </div>
-
-                <div class="help-section">
-                    <h3>Dicas</h3>
-                    <ul>
-                        <li>Use os filtros para encontrar pneus específicos rapidamente</li>
-                        <li>Exporte relatórios para análise externa</li>
-                        <li>Configure alertas para pneus críticos</li>
-                        <li>Mantenha o histórico atualizado para análises futuras</li>
-                        <li>Use o modo flexível para veículos com configurações especiais</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
+    <?php $sf_help_key = 'gestao_interativa'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

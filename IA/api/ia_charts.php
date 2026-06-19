@@ -49,6 +49,7 @@ try {
         FROM veiculos v
         LEFT JOIN rotas r ON v.id = r.veiculo_id
         LEFT JOIN abastecimentos a ON r.id = a.rota_id
+            AND a.data_abastecimento >= DATE_SUB(NOW(), INTERVAL {$period} DAY)
         WHERE v.empresa_id = ?
         GROUP BY v.id, v.placa
         ORDER BY total_litros DESC
@@ -83,6 +84,7 @@ try {
         JOIN rotas r ON a.rota_id = r.id
         JOIN veiculos v ON r.veiculo_id = v.id
         WHERE v.empresa_id = ?
+        AND a.data_abastecimento >= DATE_SUB(NOW(), INTERVAL {$period} DAY)
     ");
     $stmt->execute([$empresa_id]);
     $combustivel = $stmt->fetch()['total'];
@@ -94,6 +96,7 @@ try {
         FROM manutencoes m
         JOIN veiculos v ON m.veiculo_id = v.id
         WHERE v.empresa_id = ?
+        AND m.data_manutencao >= DATE_SUB(NOW(), INTERVAL {$period} DAY)
     ");
     $stmt->execute([$empresa_id]);
     $manutencao = $stmt->fetch()['total'];
@@ -105,6 +108,7 @@ try {
         FROM multas mt
         JOIN veiculos v ON mt.veiculo_id = v.id
         WHERE v.empresa_id = ?
+        AND mt.data_infracao >= DATE_SUB(NOW(), INTERVAL {$period} DAY)
     ");
     $stmt->execute([$empresa_id]);
     $multas = $stmt->fetch()['total'];
@@ -122,7 +126,7 @@ try {
         FROM manutencoes m
         JOIN veiculos v ON m.veiculo_id = v.id
         WHERE v.empresa_id = ?
-        AND m.data_manutencao >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+        AND m.data_manutencao >= DATE_SUB(NOW(), INTERVAL {$period} DAY)
         GROUP BY DATE_FORMAT(m.data_manutencao, '%Y-%m')
         ORDER BY mes
     ");

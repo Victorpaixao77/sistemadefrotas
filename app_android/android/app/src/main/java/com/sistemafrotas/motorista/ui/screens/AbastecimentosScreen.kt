@@ -22,6 +22,9 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sistemafrotas.motorista.ui.viewmodel.AbastecimentosViewModel
+import com.sistemafrotas.motorista.ui.viewmodel.AuthViewModelFactory
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +38,7 @@ import com.sistemafrotas.motorista.data.api.RotaItem
 import com.sistemafrotas.motorista.data.api.VeiculoItem
 import com.sistemafrotas.motorista.ui.components.DatePickerField
 import com.sistemafrotas.motorista.ui.components.AbastecimentosListSkeleton
+import com.sistemafrotas.motorista.ui.components.OcrLeitorButton
 import coil.compose.AsyncImage
 import java.io.File
 import kotlinx.coroutines.launch
@@ -50,27 +54,16 @@ fun AbastecimentosScreen(
     modifier: Modifier = Modifier,
     onSubScreenChange: (title: String?, onBack: (() -> Unit)?) -> Unit = { _, _ -> },
 ) {
+    val vm: AbastecimentosViewModel = viewModel(
+        factory = AuthViewModelFactory(authRepository) { AbastecimentosViewModel(it) }
+    )
+    val list by vm.list.collectAsState()
+    val refreshing by vm.refreshing.collectAsState()
+    val error by vm.error.collectAsState()
     var showForm by remember { mutableStateOf(false) }
-    var list by remember { mutableStateOf<List<AbastecimentoItem>>(emptyList()) }
-    var refreshing by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
 
-    fun refresh() {
-        scope.launch {
-            refreshing = true
-            error = null
-            try {
-                authRepository.loadAbastecimentos()
-                    .onSuccess { list = it.abastecimentos ?: emptyList() }
-                    .onFailure { error = it.message }
-            } finally {
-                refreshing = false
-            }
-        }
-    }
-    LaunchedEffect(Unit) { refresh() }
-    val pullRefreshState = rememberPullRefreshState(refreshing, onRefresh = { refresh() })
+    LaunchedEffect(Unit) { vm.carregarSeNecessario() }
+    val pullRefreshState = rememberPullRefreshState(refreshing, onRefresh = { vm.refresh() })
 
     if (showForm) {
         LaunchedEffect(showForm) {
@@ -79,7 +72,7 @@ fun AbastecimentosScreen(
         NovoAbastecimentoScreen(
             authRepository = authRepository,
             onBack = { showForm = false },
-            onSuccess = { showForm = false; refresh() },
+            onSuccess = { showForm = false; vm.refresh() },
             showTopBar = false,
             modifier = modifier,
         )
@@ -107,9 +100,9 @@ fun AbastecimentosScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(error!!, color = MaterialTheme.colorScheme.error)
+                    Text(error ?: "", color = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.height(8.dp))
-                    Button(onClick = { error = null; refresh() }) { Text("Tentar novamente") }
+                    Button(onClick = { vm.setError(null); vm.refresh() }) { Text("Tentar novamente") }
                 }
             } else if (list.isEmpty()) {
                 Column(
@@ -280,15 +273,19 @@ private fun NovoAbastecimentoScreen(authRepository: AuthRepository, onBack: () -
                             error = "Informe o posto de combustível."
                             return@Button
                         }
-                        if (parseDouble(litros) == null || parseDouble(valorTotal) == null || kmAtual.replace(",", ".").toDoubleOrNull() == null) {
+                        val litrosVal = parseDouble(litros)
+                        val valorTotalVal = parseDouble(valorTotal)
+                        if (litrosVal == null || valorTotalVal == null || kmAtual.replace(",", ".").toDoubleOrNull() == null) {
                             error = "Preencha litros, valor total e quilometragem."
+                            return@Button
+                        }
+                        if (litrosVal <= 0.0) {
+                            error = "A quantidade de litros deve ser maior que zero."
                             return@Button
                         }
                         loading = true
                         error = null
-                        val litrosVal = parseDouble(litros)!!
-                        val valorLitroVal = parseDouble(valorLitro) ?: (parseDouble(valorTotal)!! / litrosVal)
-                        val valorTotalVal = parseDouble(valorTotal)!!
+                        val valorLitroVal = parseDouble(valorLitro) ?: (valorTotalVal / litrosVal)
                         val dataAbastStr = if (dataAbast.contains("T")) dataAbast.replace("T", " ") + ":00" else normalizarDataApi(dataAbast) + " 00:00:00"
                         scope.launch {
                             authRepository.criarAbastecimento(
@@ -338,6 +335,34 @@ private fun NovoAbastecimentoScreen(authRepository: AuthRepository, onBack: () -
                     .padding(16.dp),
             ) {
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 8.dp)) }
+
+            OcrLeitorButton(
+                authRepository = authRepository,
+                tipo = "abastecimento",
+                titulo = "Preencher por foto (IA)",
+                descricao = "Tire a foto do cupom do posto e preenchemos posto, litros e valores. Você só confere e informa o KM.",
+                onResultado = { c ->
+                    c.posto?.let { if (it.isNotBlank()) posto = it }
+                    c.litros?.let { if (it > 0) litros = formatDecimal(it, 2) }
+                    c.valorLitro?.let { if (it > 0) valorLitro = formatDecimal(it, 3) }
+                    c.valorTotal?.let { if (it > 0) valorTotal = formatDecimal(it, 2) }
+                    c.combustivel?.lowercase(Locale.US)?.let { comb ->
+                        tipoCombustivel = when {
+                            comb.contains("diesel") -> "Diesel"
+                            comb.contains("gasolina") -> "Gasolina"
+                            comb.contains("etanol") || comb.contains("alcool") || comb.contains("álcool") -> "Etanol"
+                            comb.contains("gnv") -> "GNV"
+                            else -> tipoCombustivel
+                        }
+                    }
+                    c.data?.let { d ->
+                        val hora = c.hora ?: SimpleDateFormat("HH:mm", Locale.US).format(Calendar.getInstance().time)
+                        dataAbast = d + "T" + hora
+                    }
+                },
+                onImagem = { uri -> comprovanteUri = uri },
+            )
+            Spacer(Modifier.height(12.dp))
 
             Text("Data da Rota *", style = MaterialTheme.typography.labelLarge)
             Spacer(Modifier.height(4.dp))
@@ -414,6 +439,14 @@ private fun NovoAbastecimentoScreen(authRepository: AuthRepository, onBack: () -
             OutlinedTextField(value = valorLitro, onValueChange = { onValorLitroChange(it) }, label = { Text("Preço por Litro (R$) *") }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(value = valorTotal, onValueChange = { onValorTotalChange(it) }, label = { Text("Valor Total (R$) *") }, modifier = Modifier.fillMaxWidth())
+            Spacer(Modifier.height(8.dp))
+            OcrLeitorButton(
+                authRepository = authRepository,
+                tipo = "painel",
+                titulo = "Ler KM do painel (IA)",
+                descricao = "Tire a foto do hodômetro e preenchemos a quilometragem automaticamente.",
+                onResultado = { c -> c.km?.let { if (it > 0) kmAtual = it.toString() } },
+            )
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(value = kmAtual, onValueChange = { kmAtual = it.filter { c -> c.isDigit() || c == '.' || c == ',' } }, label = { Text("Quilometragem Atual *") }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))

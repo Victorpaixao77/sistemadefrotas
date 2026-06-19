@@ -4,6 +4,9 @@ require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/permissions.php';
 require_once '../includes/auto_reports.php';
+require_once '../includes/csrf.php';
+require_once '../includes/relatorios_helpers.php';
+require_once __DIR__ . '/../includes/sf_page_help.php';
 
 // Configure session before starting it
 configure_session();
@@ -20,15 +23,19 @@ require_permission('access_advanced_reports');
 // Set page title
 $page_title = "Relatórios";
 
+$relatorio_flash_error = $_SESSION['relatorio_error'] ?? '';
+$relatorio_flash_success = $_SESSION['relatorio_success'] ?? '';
+unset($_SESSION['relatorio_error'], $_SESSION['relatorio_success']);
+
 // Função para gerar relatório em PDF
 function generatePDF($html, $filename) {
     try {
-        require_once '../vendor/autoload.php';
+        $autoload = dirname(__DIR__) . '/vendor/autoload.php';
+        if (!is_file($autoload)) {
+            throw new RuntimeException('Dependências não instaladas. Execute composer install na raiz do projeto.');
+        }
+        require_once $autoload;
         
-        error_log("Iniciando geração do PDF: $filename");
-        error_log("HTML a ser convertido: " . substr($html, 0, 500) . "...");
-        
-        // Criar diretório temporário se não existir
         $tempDir = dirname(__DIR__) . '/tmp';
         if (!file_exists($tempDir)) {
             mkdir($tempDir, 0755, true);
@@ -62,25 +69,24 @@ function generatePDF($html, $filename) {
         $mpdf->WriteHTML($css, \Mpdf\HTMLParserMode::HEADER_CSS);
         $mpdf->WriteHTML($html);
         
-        error_log("PDF gerado com sucesso: $filename");
         return $mpdf->Output($filename . '.pdf', 'D');
-    } catch(Exception $e) {
+    } catch (Throwable $e) {
         error_log("ERRO ao gerar PDF $filename: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
-        throw new Exception("Erro ao gerar PDF: " . $e->getMessage());
+        throw new RuntimeException('Não foi possível gerar o PDF. Verifique se o Composer está instalado e tente novamente.');
     }
 }
 
 // Função para gerar relatório em Excel
 function generateExcel($data, $filename) {
     try {
-        require_once '../vendor/autoload.php';
-        
-        error_log("Iniciando geração do Excel: $filename");
-        error_log("Quantidade de registros: " . count($data));
-        
+        $autoload = dirname(__DIR__) . '/vendor/autoload.php';
+        if (!is_file($autoload)) {
+            throw new RuntimeException('Dependências não instaladas. Execute composer install na raiz do projeto.');
+        }
+        require_once $autoload;
+
         if (empty($data)) {
-            throw new Exception("Nenhum dado disponível para gerar o relatório Excel");
+            $data = [['mensagem' => 'Nenhum registro encontrado para o período selecionado.']];
         }
         
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
@@ -104,21 +110,17 @@ function generateExcel($data, $filename) {
             }
             $row++;
         }
-        
-        error_log("Excel gerado com sucesso: $filename");
-        
-        // Configurar cabeçalho HTTP para download
+
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment;filename="' . $filename . '.xlsx"');
         header('Cache-Control: max-age=0');
-        
+
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
         $writer->save('php://output');
         exit;
-    } catch(Exception $e) {
+    } catch (Throwable $e) {
         error_log("ERRO ao gerar Excel $filename: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
-        throw new Exception("Erro ao gerar Excel: " . $e->getMessage());
+        throw new RuntimeException('Não foi possível gerar o Excel. Tente novamente.');
     }
 }
 
@@ -127,30 +129,39 @@ function getReportData($reportType, $month, $year) {
     try {
         $conn = getConnection();
         $data = [];
-        
-        // Log inicial
-        error_log("Iniciando geração do relatório: $reportType para $month/$year");
+        $empresa_id = relatorio_empresa_id();
+        if ($empresa_id < 1) {
+            throw new InvalidArgumentException('Empresa não identificada na sessão.');
+        }
+        $year = (int) $year;
+        $month = (int) $month;
+        $rotaPeriod = relatorio_rota_period_sql('r');
+        $rotaPeriodLit = relatorio_rota_period_literal($year, $month, 'r');
+        $rotaPeriodRvLit = relatorio_rota_period_literal($year, $month, 'rv');
         
         switch ($reportType) {
             case 'rotas':
                 $sql = "SELECT r.id, v.placa, v.modelo, m.nome as motorista,
-                        r.data_saida, r.data_chegada, 
-                        CONCAT(r.estado_origem, ' - ', r.cidade_origem_id) as origem,
-                        CONCAT(r.estado_destino, ' - ', r.cidade_destino_id) as destino,
+                        COALESCE(r.data_rota, r.data_saida) AS data_viagem,
+                        r.data_chegada,
+                        CONCAT(COALESCE(r.estado_origem, ''), ' - ', COALESCE(co.nome, '')) AS origem,
+                        CONCAT(COALESCE(r.estado_destino, ''), ' - ', COALESCE(cd.nome, '')) AS destino,
                         r.distancia_km, r.frete, r.comissao, r.km_vazio,
                         r.total_km, r.percentual_vazio, r.eficiencia_viagem,
                         r.peso_carga, r.descricao_carga, r.status
                         FROM rotas r
-                        JOIN veiculos v ON v.id = r.veiculo_id
-                        JOIN motoristas m ON m.id = r.motorista_id
-                        WHERE YEAR(r.data_saida) = :year 
-                        AND MONTH(r.data_saida) = :month
-                        ORDER BY r.data_saida DESC";
+                        JOIN veiculos v ON v.id = r.veiculo_id AND v.empresa_id = r.empresa_id AND v.empresa_id = r.empresa_id
+                        JOIN motoristas m ON m.id = r.motorista_id AND m.empresa_id = r.empresa_id
+                        LEFT JOIN cidades co ON co.id = r.cidade_origem_id
+                        LEFT JOIN cidades cd ON cd.id = r.cidade_destino_id
+                        WHERE r.empresa_id = :empresa_id
+                        AND {$rotaPeriod}
+                        ORDER BY COALESCE(r.data_rota, r.data_saida) DESC";
                 break;
                 
             case 'despesas_viagem':
                 $sql = "SELECT r.id AS id_viagem, 
-                        CONCAT(r.estado_origem, ' - ', r.estado_destino) as rota,
+                        CONCAT(COALESCE(r.estado_origem, ''), ' → ', COALESCE(r.estado_destino, '')) as rota,
                         SUM(dv.total_despviagem) AS total_despesas,
                         SUM(dv.descarga) as total_descarga,
                         SUM(dv.pedagios) as total_pedagios,
@@ -160,11 +171,12 @@ function getReportData($reportType, $month, $year) {
                         SUM(dv.borracharia) as total_borracharia,
                         SUM(dv.eletrica_mecanica) as total_eletrica_mecanica,
                         SUM(dv.adiantamento) as total_adiantamento,
+                        SUM(dv.outros) as total_outros,
                         COUNT(dv.id) as quantidade_despesas
                         FROM despesas_viagem dv
                         JOIN rotas r ON r.id = dv.rota_id
-                        WHERE YEAR(r.data_saida) = :year 
-                        AND MONTH(r.data_saida) = :month
+                        WHERE r.empresa_id = :empresa_id
+                        AND {$rotaPeriod}
                         GROUP BY r.id, r.estado_origem, r.estado_destino
                         ORDER BY total_despesas DESC";
                 break;
@@ -172,7 +184,8 @@ function getReportData($reportType, $month, $year) {
             case 'despesas_fixas':
                 $sql = "SELECT df.*
                         FROM despesas_fixas df
-                        WHERE YEAR(df.data_pagamento) = :year 
+                        WHERE df.empresa_id = :empresa_id
+                        AND YEAR(df.data_pagamento) = :year 
                         AND MONTH(df.data_pagamento) = :month";
                 break;
                 
@@ -180,7 +193,8 @@ function getReportData($reportType, $month, $year) {
                 $sql = "SELECT m.*, v.placa, v.modelo
                         FROM manutencoes m
                         JOIN veiculos v ON v.id = m.veiculo_id
-                        WHERE YEAR(m.data_manutencao) = :year 
+                        WHERE m.empresa_id = :empresa_id
+                        AND YEAR(m.data_manutencao) = :year 
                         AND MONTH(m.data_manutencao) = :month
                         ORDER BY m.data_manutencao DESC";
                 break;
@@ -192,105 +206,100 @@ function getReportData($reportType, $month, $year) {
                         AVG(a.valor_litro) as media_valor_litro
                         FROM abastecimentos a
                         JOIN veiculos v ON v.id = a.veiculo_id
-                        WHERE YEAR(a.data_abastecimento) = :year 
+                        WHERE a.empresa_id = :empresa_id
+                        AND YEAR(a.data_abastecimento) = :year 
                         AND MONTH(a.data_abastecimento) = :month
                         GROUP BY v.id, v.placa, v.modelo
                         ORDER BY total_valor DESC";
                 break;
                 
             case 'lucro_viagem':
-                // Lucro por viagem: Frete - Comissão - Despesas Viagem - Abastecimentos
                 $sql = "SELECT r.id, 
-                        CONCAT(r.estado_origem, ' - ', r.estado_destino) as rota,
-                        r.data_saida,
+                        CONCAT(COALESCE(r.estado_origem, ''), ' - ', COALESCE(r.estado_destino, '')) as rota,
+                        COALESCE(r.data_rota, r.data_saida) AS data_viagem,
                         v.placa,
                         r.frete, 
                         r.comissao,
-                        -- Despesas de viagem (subconsulta para não multiplicar linhas)
                         (
                             SELECT COALESCE(SUM(total_despviagem), 0)
                             FROM despesas_viagem dv
-                            WHERE dv.rota_id = r.id
+                            WHERE dv.rota_id = r.id AND dv.empresa_id = r.empresa_id
                         ) AS total_despesas_viagem,
-                        -- Abastecimentos (subconsulta)
                         (
                             SELECT COALESCE(SUM(a.valor_total), 0)
                             FROM abastecimentos a
                             WHERE a.veiculo_id = r.veiculo_id
-                              AND DATE(a.data_abastecimento) = DATE(r.data_saida)
+                              AND a.empresa_id = r.empresa_id
+                              AND DATE(a.data_abastecimento) = DATE(COALESCE(r.data_rota, r.data_saida))
                         ) AS total_abastecimentos,
-                        -- Lucro Bruto (Frete - Comissão)
                         (r.frete - COALESCE(r.comissao, 0)) AS lucro_bruto,
-                        -- Lucro Líquido (Frete - Comissão - Despesas - Abastecimentos)
                         (
                             r.frete - COALESCE(r.comissao, 0) - 
                             COALESCE((
                                 SELECT SUM(total_despviagem)
                                 FROM despesas_viagem dv
-                                WHERE dv.rota_id = r.id
+                                WHERE dv.rota_id = r.id AND dv.empresa_id = r.empresa_id
                             ), 0) - 
                             COALESCE((
                                 SELECT SUM(a.valor_total)
                                 FROM abastecimentos a
                                 WHERE a.veiculo_id = r.veiculo_id
-                                  AND DATE(a.data_abastecimento) = DATE(r.data_saida)
+                                  AND a.empresa_id = r.empresa_id
+                                  AND DATE(a.data_abastecimento) = DATE(COALESCE(r.data_rota, r.data_saida))
                             ), 0)
                         ) AS lucro_liquido
                         FROM rotas r
-                        JOIN veiculos v ON v.id = r.veiculo_id
-                        WHERE YEAR(r.data_saida) = :year 
-                        AND MONTH(r.data_saida) = :month
-                        ORDER BY r.data_saida DESC";
+                        JOIN veiculos v ON v.id = r.veiculo_id AND v.empresa_id = r.empresa_id
+                        WHERE r.empresa_id = :empresa_id
+                        AND {$rotaPeriod}
+                        ORDER BY COALESCE(r.data_rota, r.data_saida) DESC";
                 break;
                 
             case 'lucro_total':
-                // Lucro total do período: Frete - Comissão - Despesas Viagem - Abastecimentos
-                // Usando valores literais nas subconsultas para evitar erro de parâmetros duplicados
                 $sql = "SELECT 
-                        -- Totais
                         COALESCE(SUM(r.frete), 0) AS total_frete,
                         COALESCE(SUM(r.comissao), 0) AS total_comissao,
-                        -- Despesas de viagem (subconsulta com valores literais)
                         (
                             SELECT COALESCE(SUM(dv.total_despviagem), 0)
                             FROM despesas_viagem dv
-                            WHERE dv.rota_id IN (
-                                SELECT id FROM rotas 
-                                WHERE YEAR(data_saida) = " . intval($year) . "
-                                AND MONTH(data_saida) = " . intval($month) . "
+                            WHERE dv.empresa_id = {$empresa_id}
+                            AND dv.rota_id IN (
+                                SELECT id FROM rotas
+                                WHERE empresa_id = {$empresa_id}
+                                AND {$rotaPeriodLit}
                             )
                         ) AS total_despesas_viagem,
-                        -- Abastecimentos (subconsulta com valores literais)
                         (
                             SELECT COALESCE(SUM(a.valor_total), 0)
                             FROM abastecimentos a
-                            WHERE YEAR(a.data_abastecimento) = " . intval($year) . "
-                            AND MONTH(a.data_abastecimento) = " . intval($month) . "
+                            WHERE a.empresa_id = {$empresa_id}
+                            AND YEAR(a.data_abastecimento) = " . (int) $year . "
+                            AND MONTH(a.data_abastecimento) = " . (int) $month . "
                         ) AS total_abastecimentos,
-                        -- Lucro Bruto (Frete - Comissão)
                         (COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0)) AS lucro_bruto,
-                        -- Lucro Líquido (Frete - Comissão - Despesas - Abastecimentos)
                         (
                             COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0) - 
                             COALESCE((
                                 SELECT SUM(dv.total_despviagem)
                                 FROM despesas_viagem dv
-                                WHERE dv.rota_id IN (
-                                    SELECT id FROM rotas 
-                                    WHERE YEAR(data_saida) = " . intval($year) . "
-                                    AND MONTH(data_saida) = " . intval($month) . "
+                                WHERE dv.empresa_id = {$empresa_id}
+                                AND dv.rota_id IN (
+                                    SELECT id FROM rotas
+                                    WHERE empresa_id = {$empresa_id}
+                                    AND {$rotaPeriodLit}
                                 )
                             ), 0) - 
                             COALESCE((
                                 SELECT SUM(a.valor_total)
                                 FROM abastecimentos a
-                                WHERE YEAR(a.data_abastecimento) = " . intval($year) . "
-                                AND MONTH(a.data_abastecimento) = " . intval($month) . "
+                                WHERE a.empresa_id = {$empresa_id}
+                                AND YEAR(a.data_abastecimento) = " . (int) $year . "
+                                AND MONTH(a.data_abastecimento) = " . (int) $month . "
                             ), 0)
                         ) AS lucro_liquido
                         FROM rotas r
-                        WHERE YEAR(r.data_saida) = :year 
-                        AND MONTH(r.data_saida) = :month";
+                        WHERE r.empresa_id = :empresa_id
+                        AND {$rotaPeriod}";
                 break;
                 
             case 'lucro_veiculo':
@@ -311,7 +320,7 @@ function getReportData($reportType, $month, $year) {
                                 CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0
                             ))
                             FROM abastecimentos a
-                            WHERE a.veiculo_id = v.id
+                            WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id}
                             AND YEAR(a.data_abastecimento) = " . intval($year) . "
                             AND MONTH(a.data_abastecimento) = " . intval($month) . "
                             AND a.status = 'aprovado'
@@ -321,9 +330,8 @@ function getReportData($reportType, $month, $year) {
                             SELECT SUM(dv.total_despviagem)
                             FROM despesas_viagem dv
                             INNER JOIN rotas rv ON rv.id = dv.rota_id
-                            WHERE rv.veiculo_id = v.id
-                            AND YEAR(rv.data_saida) = " . intval($year) . "
-                            AND MONTH(rv.data_saida) = " . intval($month) . "
+                            WHERE rv.veiculo_id = v.id AND rv.empresa_id = {$empresa_id}
+                            AND {$rotaPeriodRvLit}
                         ), 0) AS total_despesas_viagem,
                         -- Quantidade de rotas
                         COUNT(DISTINCT r.id) AS quantidade_rotas,
@@ -338,7 +346,7 @@ function getReportData($reportType, $month, $year) {
                                     CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0
                                 ))
                                 FROM abastecimentos a
-                                WHERE a.veiculo_id = v.id
+                                WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id}
                                 AND YEAR(a.data_abastecimento) = " . intval($year) . "
                                 AND MONTH(a.data_abastecimento) = " . intval($month) . "
                                 AND a.status = 'aprovado'
@@ -347,15 +355,14 @@ function getReportData($reportType, $month, $year) {
                                 SELECT SUM(dv.total_despviagem)
                                 FROM despesas_viagem dv
                                 INNER JOIN rotas rv ON rv.id = dv.rota_id
-                                WHERE rv.veiculo_id = v.id
-                                AND YEAR(rv.data_saida) = " . intval($year) . "
-                                AND MONTH(rv.data_saida) = " . intval($month) . "
+                                WHERE rv.veiculo_id = v.id AND rv.empresa_id = {$empresa_id}
+                                AND {$rotaPeriodRvLit}
                             ), 0)
                         ) AS lucro_liquido
                         FROM veiculos v
-                        LEFT JOIN rotas r ON r.veiculo_id = v.id
-                            AND YEAR(r.data_saida) = :year 
-                            AND MONTH(r.data_saida) = :month
+                        LEFT JOIN rotas r ON r.veiculo_id = v.id AND r.empresa_id = v.empresa_id
+                            AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year 
+                            AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month
                         WHERE v.empresa_id = :empresa_id
                         GROUP BY v.id, v.placa, v.modelo
                         HAVING COALESCE(SUM(r.frete), 0) > 0 OR 
@@ -364,7 +371,7 @@ function getReportData($reportType, $month, $year) {
                                        CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0
                                    ))
                                    FROM abastecimentos a
-                                   WHERE a.veiculo_id = v.id
+                                   WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id}
                                    AND YEAR(a.data_abastecimento) = " . intval($year) . "
                                    AND MONTH(a.data_abastecimento) = " . intval($month) . "
                                    AND a.status = 'aprovado'
@@ -392,7 +399,7 @@ function getReportData($reportType, $month, $year) {
                                 CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0
                             ))
                             FROM abastecimentos a
-                            WHERE a.veiculo_id = v.id
+                            WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id}
                             AND YEAR(a.data_abastecimento) = " . intval($year) . "
                             AND MONTH(a.data_abastecimento) = " . intval($month) . "
                             AND a.status = 'aprovado'
@@ -402,16 +409,15 @@ function getReportData($reportType, $month, $year) {
                             SELECT SUM(dv.total_despviagem)
                             FROM despesas_viagem dv
                             INNER JOIN rotas rv ON rv.id = dv.rota_id
-                            WHERE rv.veiculo_id = v.id
-                            AND YEAR(rv.data_saida) = " . intval($year) . "
-                            AND MONTH(rv.data_saida) = " . intval($month) . "
+                            WHERE rv.veiculo_id = v.id AND rv.empresa_id = {$empresa_id}
+                            AND {$rotaPeriodRvLit}
                         ), 0) AS total_despesas_viagem,
                         -- Financiamentos (parcelas pagas no mês do veículo)
                         COALESCE((
                             SELECT SUM(pf.valor)
                             FROM parcelas_financiamento pf
                             INNER JOIN financiamentos f ON f.id = pf.financiamento_id
-                            WHERE f.veiculo_id = v.id
+                            WHERE f.veiculo_id = v.id AND f.empresa_id = {$empresa_id}
                             AND pf.status_id = 2
                             AND YEAR(pf.data_pagamento) = " . intval($year) . "
                             AND MONTH(pf.data_pagamento) = " . intval($month) . "
@@ -420,7 +426,7 @@ function getReportData($reportType, $month, $year) {
                         COALESCE((
                             SELECT SUM(mu.valor)
                             FROM multas mu
-                            WHERE mu.veiculo_id = v.id
+                            WHERE mu.veiculo_id = v.id AND mu.empresa_id = {$empresa_id}
                             AND mu.status_pagamento = 'pago'
                             AND YEAR(mu.data_pagamento) = " . intval($year) . "
                             AND MONTH(mu.data_pagamento) = " . intval($month) . "
@@ -429,7 +435,7 @@ function getReportData($reportType, $month, $year) {
                         COALESCE((
                             SELECT SUM(df.valor)
                             FROM despesas_fixas df
-                            WHERE df.veiculo_id = v.id
+                            WHERE df.veiculo_id = v.id AND df.empresa_id = {$empresa_id}
                             AND df.status_pagamento_id = 2
                             AND YEAR(df.data_pagamento) = " . intval($year) . "
                             AND MONTH(df.data_pagamento) = " . intval($month) . "
@@ -445,7 +451,7 @@ function getReportData($reportType, $month, $year) {
                                     CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0
                                 ))
                                 FROM abastecimentos a
-                                WHERE a.veiculo_id = v.id
+                                WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id}
                                 AND YEAR(a.data_abastecimento) = " . intval($year) . "
                                 AND MONTH(a.data_abastecimento) = " . intval($month) . "
                                 AND a.status = 'aprovado'
@@ -454,9 +460,8 @@ function getReportData($reportType, $month, $year) {
                                 SELECT SUM(dv.total_despviagem)
                                 FROM despesas_viagem dv
                                 INNER JOIN rotas rv ON rv.id = dv.rota_id
-                                WHERE rv.veiculo_id = v.id
-                                AND YEAR(rv.data_saida) = " . intval($year) . "
-                                AND MONTH(rv.data_saida) = " . intval($month) . "
+                                WHERE rv.veiculo_id = v.id AND rv.empresa_id = {$empresa_id}
+                                AND {$rotaPeriodRvLit}
                             ), 0)
                         ) AS lucro_operacional,
                         -- Lucro/Prejuízo Final (Lucro Operacional - Financiamentos - Multas - Despesas Fixas)
@@ -469,7 +474,7 @@ function getReportData($reportType, $month, $year) {
                                     CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0
                                 ))
                                 FROM abastecimentos a
-                                WHERE a.veiculo_id = v.id
+                                WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id}
                                 AND YEAR(a.data_abastecimento) = " . intval($year) . "
                                 AND MONTH(a.data_abastecimento) = " . intval($month) . "
                                 AND a.status = 'aprovado'
@@ -478,16 +483,15 @@ function getReportData($reportType, $month, $year) {
                                 SELECT SUM(dv.total_despviagem)
                                 FROM despesas_viagem dv
                                 INNER JOIN rotas rv ON rv.id = dv.rota_id
-                                WHERE rv.veiculo_id = v.id
-                                AND YEAR(rv.data_saida) = " . intval($year) . "
-                                AND MONTH(rv.data_saida) = " . intval($month) . "
+                                WHERE rv.veiculo_id = v.id AND rv.empresa_id = {$empresa_id}
+                                AND {$rotaPeriodRvLit}
                              ), 0)) -
                             -- Menos Descontos Fixos
                             COALESCE((
                                 SELECT SUM(pf.valor)
                                 FROM parcelas_financiamento pf
                                 INNER JOIN financiamentos f ON f.id = pf.financiamento_id
-                                WHERE f.veiculo_id = v.id
+                                WHERE f.veiculo_id = v.id AND f.empresa_id = {$empresa_id}
                                 AND pf.status_id = 2
                                 AND YEAR(pf.data_pagamento) = " . intval($year) . "
                                 AND MONTH(pf.data_pagamento) = " . intval($month) . "
@@ -495,7 +499,7 @@ function getReportData($reportType, $month, $year) {
                             COALESCE((
                                 SELECT SUM(mu.valor)
                                 FROM multas mu
-                                WHERE mu.veiculo_id = v.id
+                                WHERE mu.veiculo_id = v.id AND mu.empresa_id = {$empresa_id}
                                 AND mu.status_pagamento = 'pago'
                                 AND YEAR(mu.data_pagamento) = " . intval($year) . "
                                 AND MONTH(mu.data_pagamento) = " . intval($month) . "
@@ -503,7 +507,7 @@ function getReportData($reportType, $month, $year) {
                             COALESCE((
                                 SELECT SUM(df.valor)
                                 FROM despesas_fixas df
-                                WHERE df.veiculo_id = v.id
+                                WHERE df.veiculo_id = v.id AND df.empresa_id = {$empresa_id}
                                 AND df.status_pagamento_id = 2
                                 AND YEAR(df.data_pagamento) = " . intval($year) . "
                                 AND MONTH(df.data_pagamento) = " . intval($month) . "
@@ -519,7 +523,7 @@ function getReportData($reportType, $month, $year) {
                                         CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0
                                     ))
                                     FROM abastecimentos a
-                                    WHERE a.veiculo_id = v.id
+                                    WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id}
                                     AND YEAR(a.data_abastecimento) = " . intval($year) . "
                                     AND MONTH(a.data_abastecimento) = " . intval($month) . "
                                     AND a.status = 'aprovado'
@@ -528,15 +532,14 @@ function getReportData($reportType, $month, $year) {
                                     SELECT SUM(dv.total_despviagem)
                                     FROM despesas_viagem dv
                                     INNER JOIN rotas rv ON rv.id = dv.rota_id
-                                    WHERE rv.veiculo_id = v.id
-                                    AND YEAR(rv.data_saida) = " . intval($year) . "
-                                    AND MONTH(rv.data_saida) = " . intval($month) . "
+                                    WHERE rv.veiculo_id = v.id AND rv.empresa_id = {$empresa_id}
+                                    AND {$rotaPeriodRvLit}
                                  ), 0)) -
                                 COALESCE((
                                     SELECT SUM(pf.valor)
                                     FROM parcelas_financiamento pf
                                     INNER JOIN financiamentos f ON f.id = pf.financiamento_id
-                                    WHERE f.veiculo_id = v.id
+                                    WHERE f.veiculo_id = v.id AND f.empresa_id = {$empresa_id}
                                     AND pf.status_id = 2
                                     AND YEAR(pf.data_pagamento) = " . intval($year) . "
                                     AND MONTH(pf.data_pagamento) = " . intval($month) . "
@@ -544,7 +547,7 @@ function getReportData($reportType, $month, $year) {
                                 COALESCE((
                                     SELECT SUM(mu.valor)
                                     FROM multas mu
-                                    WHERE mu.veiculo_id = v.id
+                                    WHERE mu.veiculo_id = v.id AND mu.empresa_id = {$empresa_id}
                                     AND mu.status_pagamento = 'pago'
                                     AND YEAR(mu.data_pagamento) = " . intval($year) . "
                                     AND MONTH(mu.data_pagamento) = " . intval($month) . "
@@ -552,7 +555,7 @@ function getReportData($reportType, $month, $year) {
                                 COALESCE((
                                     SELECT SUM(df.valor)
                                     FROM despesas_fixas df
-                                    WHERE df.veiculo_id = v.id
+                                    WHERE df.veiculo_id = v.id AND df.empresa_id = {$empresa_id}
                                     AND df.status_pagamento_id = 2
                                     AND YEAR(df.data_pagamento) = " . intval($year) . "
                                     AND MONTH(df.data_pagamento) = " . intval($month) . "
@@ -561,9 +564,9 @@ function getReportData($reportType, $month, $year) {
                             ELSE 'Prejuízo'
                         END AS status_financeiro
                         FROM veiculos v
-                        LEFT JOIN rotas r ON r.veiculo_id = v.id
-                            AND YEAR(r.data_saida) = :year 
-                            AND MONTH(r.data_saida) = :month
+                        LEFT JOIN rotas r ON r.veiculo_id = v.id AND r.empresa_id = v.empresa_id
+                            AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year 
+                            AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month
                         WHERE v.empresa_id = :empresa_id
                         GROUP BY v.id, v.placa, v.modelo
                         HAVING COALESCE(SUM(r.frete), 0) > 0 OR 
@@ -572,7 +575,7 @@ function getReportData($reportType, $month, $year) {
                                        CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0
                                    ))
                                    FROM abastecimentos a
-                                   WHERE a.veiculo_id = v.id
+                                   WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id}
                                    AND YEAR(a.data_abastecimento) = " . intval($year) . "
                                    AND MONTH(a.data_abastecimento) = " . intval($month) . "
                                    AND a.status = 'aprovado'
@@ -581,7 +584,7 @@ function getReportData($reportType, $month, $year) {
                                    SELECT SUM(pf.valor)
                                    FROM parcelas_financiamento pf
                                    INNER JOIN financiamentos f ON f.id = pf.financiamento_id
-                                   WHERE f.veiculo_id = v.id
+                                   WHERE f.veiculo_id = v.id AND f.empresa_id = {$empresa_id}
                                    AND pf.status_id = 2
                                    AND YEAR(pf.data_pagamento) = " . intval($year) . "
                                    AND MONTH(pf.data_pagamento) = " . intval($month) . "
@@ -589,7 +592,7 @@ function getReportData($reportType, $month, $year) {
                                COALESCE((
                                    SELECT SUM(mu.valor)
                                    FROM multas mu
-                                   WHERE mu.veiculo_id = v.id
+                                   WHERE mu.veiculo_id = v.id AND mu.empresa_id = {$empresa_id}
                                    AND mu.status_pagamento = 'pago'
                                    AND YEAR(mu.data_pagamento) = " . intval($year) . "
                                    AND MONTH(mu.data_pagamento) = " . intval($month) . "
@@ -597,7 +600,7 @@ function getReportData($reportType, $month, $year) {
                                COALESCE((
                                    SELECT SUM(df.valor)
                                    FROM despesas_fixas df
-                                   WHERE df.veiculo_id = v.id
+                                   WHERE df.veiculo_id = v.id AND df.empresa_id = {$empresa_id}
                                    AND df.status_pagamento_id = 2
                                    AND YEAR(df.data_pagamento) = " . intval($year) . "
                                    AND MONTH(df.data_pagamento) = " . intval($month) . "
@@ -612,7 +615,8 @@ function getReportData($reportType, $month, $year) {
                         JOIN veiculos v ON v.id = pm.veiculo_id
                         JOIN pneus p ON p.id = pm.pneu_id
                         JOIN tipos_manutencao tm ON tm.id = pm.tipo_manutencao_id
-                        WHERE YEAR(pm.data_manutencao) = :year 
+                        WHERE v.empresa_id = :empresa_id
+                        AND YEAR(pm.data_manutencao) = :year 
                         AND MONTH(pm.data_manutencao) = :month
                         ORDER BY pm.data_manutencao DESC";
                 break;
@@ -666,9 +670,9 @@ function getReportData($reportType, $month, $year) {
                         LEFT JOIN manutencoes m ON v.id = m.veiculo_id 
                             AND YEAR(m.data_manutencao) = :year_manutencao 
                             AND MONTH(m.data_manutencao) = :month_manutencao
-                        LEFT JOIN rotas r ON v.id = r.veiculo_id 
-                            AND YEAR(r.data_saida) = :year_rota 
-                            AND MONTH(r.data_saida) = :month_rota
+                        LEFT JOIN rotas r ON v.id = r.veiculo_id AND r.empresa_id = v.empresa_id
+                            AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year_rota 
+                            AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month_rota
                         LEFT JOIN despesas_viagem dv ON r.id = dv.rota_id
                         LEFT JOIN despesas_fixas df ON v.id = df.veiculo_id 
                             AND YEAR(df.data_pagamento) = :year_despesa 
@@ -699,9 +703,9 @@ function getReportData($reportType, $month, $year) {
                             ELSE 0 
                         END as percentual_ocupacao
                         FROM veiculos v
-                        LEFT JOIN rotas r ON v.id = r.veiculo_id 
-                            AND YEAR(r.data_saida) = :year_rota 
-                            AND MONTH(r.data_saida) = :month_rota
+                        LEFT JOIN rotas r ON v.id = r.veiculo_id AND r.empresa_id = v.empresa_id
+                            AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year_rota 
+                            AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month_rota
                         LEFT JOIN abastecimentos a ON v.id = a.veiculo_id 
                             AND YEAR(a.data_abastecimento) = :year_abastecimento 
                             AND MONTH(a.data_abastecimento) = :month_abastecimento
@@ -719,8 +723,8 @@ function getReportData($reportType, $month, $year) {
                         cm.nome as componente,
                         DATEDIFF(m.data_conclusao, m.data_manutencao) as dias_duracao,
                         CASE 
-                            WHEN m.valor > (SELECT AVG(valor) FROM manutencoes) THEN 'Acima da Média'
-                            WHEN m.valor < (SELECT AVG(valor) FROM manutencoes) THEN 'Abaixo da Média'
+                            WHEN m.valor > (SELECT AVG(m2.valor) FROM manutencoes m2 WHERE m2.empresa_id = {$empresa_id}) THEN 'Acima da Média'
+                            WHEN m.valor < (SELECT AVG(m2.valor) FROM manutencoes m2 WHERE m2.empresa_id = {$empresa_id}) THEN 'Abaixo da Média'
                             ELSE 'Na Média'
                         END as comparacao_custo
                         FROM manutencoes m
@@ -820,6 +824,7 @@ function getReportData($reportType, $month, $year) {
                         END as status,
                         COUNT(*) AS quantidade
                         FROM veiculos v
+                        WHERE v.empresa_id = :empresa_id
                         GROUP BY v.status_id
                         ORDER BY quantidade DESC";
                 break;
@@ -828,27 +833,30 @@ function getReportData($reportType, $month, $year) {
                 $sql = "SELECT v.id, v.placa, 
                         SUM(r.total_km) AS total_km
                         FROM rotas r
-                        JOIN veiculos v ON v.id = r.veiculo_id
-                        WHERE YEAR(r.data_saida) = :year 
-                        AND MONTH(r.data_saida) = :month
+                        JOIN veiculos v ON v.id = r.veiculo_id AND v.empresa_id = r.empresa_id
+                        WHERE r.empresa_id = :empresa_id
+                        AND {$rotaPeriod}
                         GROUP BY v.id, v.placa
                         ORDER BY total_km DESC";
                 break;
                 
             case 'recebimentos':
-                $sql = "SELECT ec.id, ec.razao_social, SUM(r.frete) AS total_recebido
+                $sql = "SELECT 
+                        CONCAT(COALESCE(r.estado_origem, ''), ' → ', COALESCE(r.estado_destino, '')) AS trecho,
+                        COUNT(*) AS quantidade_viagens,
+                        COALESCE(SUM(r.frete), 0) AS total_recebido
                         FROM rotas r
-                        JOIN empresa_clientes ec ON ec.id = r.empresa_id
-                        WHERE YEAR(r.data_saida) = :year 
-                        AND MONTH(r.data_saida) = :month
-                        GROUP BY ec.id, ec.razao_social
+                        WHERE r.empresa_id = :empresa_id
+                        AND {$rotaPeriod}
+                        GROUP BY r.estado_origem, r.estado_destino
                         ORDER BY total_recebido DESC";
                 break;
                 
             case 'contas_pagar':
                 $sql = "SELECT cp.*
                         FROM contas_pagar cp
-                        WHERE YEAR(cp.data_vencimento) = :year 
+                        WHERE cp.empresa_id = :empresa_id
+                        AND YEAR(cp.data_vencimento) = :year 
                         AND MONTH(cp.data_vencimento) = :month";
                 break;
                 
@@ -857,7 +865,8 @@ function getReportData($reportType, $month, $year) {
                         FROM contas_pagar cp
                         LEFT JOIN formas_pagamento fp ON fp.id = cp.forma_pagamento_id
                         LEFT JOIN bancos b ON b.id = cp.banco_id
-                        WHERE cp.status_id = 2 -- Assumindo que 2 é o ID para status 'PAGO'
+                        WHERE cp.empresa_id = :empresa_id
+                        AND cp.status_id = 2
                         AND YEAR(cp.data_pagamento) = :year 
                         AND MONTH(cp.data_pagamento) = :month
                         ORDER BY cp.data_pagamento DESC";
@@ -870,7 +879,8 @@ function getReportData($reportType, $month, $year) {
                         JOIN veiculos v ON v.id = f.veiculo_id
                         JOIN bancos b ON b.id = f.banco_id
                         JOIN status_pagamento sp ON sp.id = f.status_pagamento_id
-                        WHERE YEAR(f.data_inicio) = :year 
+                        WHERE f.empresa_id = :empresa_id
+                        AND YEAR(f.data_inicio) = :year 
                         AND MONTH(f.data_inicio) = :month
                         ORDER BY f.data_inicio DESC";
                 break;
@@ -883,7 +893,8 @@ function getReportData($reportType, $month, $year) {
                         JOIN tipos_manutencao tm ON tm.id = m.tipo_manutencao_id
                         JOIN componentes_manutencao cm ON cm.id = m.componente_id
                         JOIN status_manutencao sm ON sm.id = m.status_manutencao_id
-                        WHERE YEAR(m.data_manutencao) = :year 
+                        WHERE m.empresa_id = :empresa_id
+                        AND YEAR(m.data_manutencao) = :year 
                         AND MONTH(m.data_manutencao) = :month
                         ORDER BY m.data_manutencao DESC";
                 break;
@@ -897,9 +908,9 @@ function getReportData($reportType, $month, $year) {
                         SUM(r.km_vazio) as total_km_vazio,
                         AVG(r.percentual_vazio) as media_percentual_vazio
                         FROM veiculos v
-                        LEFT JOIN rotas r ON r.veiculo_id = v.id
-                        WHERE YEAR(r.data_saida) = :year 
-                        AND MONTH(r.data_saida) = :month
+                        LEFT JOIN rotas r ON r.veiculo_id = v.id AND r.empresa_id = v.empresa_id
+                            AND {$rotaPeriod}
+                        WHERE v.empresa_id = :empresa_id
                         GROUP BY v.id, v.placa, v.modelo
                         ORDER BY total_frete DESC";
                 break;
@@ -919,9 +930,9 @@ function getReportData($reportType, $month, $year) {
                         COALESCE(SUM(CASE WHEN r.status = 'rejeitado' THEN 1 ELSE 0 END), 0) as rotas_rejeitadas,
                         COALESCE(SUM(r.distancia_km) / NULLIF(COUNT(r.id), 0), 0) as km_medio_por_rota
                     FROM motoristas m
-                    LEFT JOIN rotas r ON m.id = r.motorista_id 
-                        AND YEAR(r.data_saida) = :year 
-                        AND MONTH(r.data_saida) = :month
+                    LEFT JOIN rotas r ON m.id = r.motorista_id AND r.empresa_id = m.empresa_id
+                        AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year 
+                        AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month
                     WHERE m.empresa_id = :empresa_id
                     GROUP BY m.id, m.nome, m.cpf
                     ORDER BY km_rodados DESC
@@ -970,10 +981,10 @@ function getReportData($reportType, $month, $year) {
                             SUM(a.valor_total) / NULLIF(SUM(r.distancia_km), 0), 0
                         ) as custo_por_km
                     FROM veiculos v
-                    LEFT JOIN rotas r ON v.id = r.veiculo_id 
-                        AND YEAR(r.data_saida) = :year 
-                        AND MONTH(r.data_saida) = :month
-                    LEFT JOIN abastecimentos a ON v.id = a.veiculo_id 
+                    LEFT JOIN rotas r ON v.id = r.veiculo_id AND r.empresa_id = v.empresa_id
+                        AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year 
+                        AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month
+                    LEFT JOIN abastecimentos a ON v.id = a.veiculo_id AND a.empresa_id = v.empresa_id
                         AND YEAR(a.data_abastecimento) = :year2 
                         AND MONTH(a.data_abastecimento) = :month2
                         AND a.status = 'aprovado'
@@ -990,7 +1001,7 @@ function getReportData($reportType, $month, $year) {
                         r.id,
                         CONCAT(r.estado_origem, ' - ', r.estado_destino) as rota,
                         r.distancia_km,
-                        r.data_saida,
+                        COALESCE(r.data_rota, r.data_saida) AS data_viagem,
                         v.placa,
                         m.nome as motorista,
                         r.frete,
@@ -1011,9 +1022,9 @@ function getReportData($reportType, $month, $year) {
                     LEFT JOIN motoristas m ON r.motorista_id = m.id
                     LEFT JOIN despesas_viagem dv ON r.id = dv.rota_id
                     WHERE r.empresa_id = :empresa_id
-                        AND YEAR(r.data_saida) = :year 
-                        AND MONTH(r.data_saida) = :month
-                    GROUP BY r.id, r.estado_origem, r.estado_destino, r.distancia_km, r.data_saida, v.placa, m.nome, r.frete, r.comissao
+                        AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year 
+                        AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month
+                    GROUP BY r.id, r.estado_origem, r.estado_destino, r.distancia_km, r.data_rota, r.data_saida, v.placa, m.nome, r.frete, r.comissao
                     ORDER BY lucro_estimado DESC
                 ";
                 break;
@@ -1062,9 +1073,9 @@ function getReportData($reportType, $month, $year) {
                             (COUNT(r.id) * 100.0) / 30, 0
                         ) as percentual_ocupacao
                     FROM veiculos v
-                    LEFT JOIN rotas r ON v.id = r.veiculo_id 
-                        AND YEAR(r.data_saida) = :year 
-                        AND MONTH(r.data_saida) = :month
+                    LEFT JOIN rotas r ON v.id = r.veiculo_id AND r.empresa_id = v.empresa_id
+                        AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year 
+                        AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month
                     WHERE v.empresa_id = :empresa_id
                     GROUP BY v.id, v.placa, v.modelo, v.marca
                     ORDER BY total_viagens DESC
@@ -1080,15 +1091,15 @@ function getReportData($reportType, $month, $year) {
                         v.marca,
                         v.km_atual,
                         'Ativo' as status,
-                        COALESCE(MAX(r.data_saida), 'Nunca') as ultima_viagem,
-                        DATEDIFF(CURDATE(), COALESCE(MAX(r.data_saida), v.created_at)) as dias_sem_viagem
+                        COALESCE(MAX(COALESCE(r.data_rota, r.data_saida)), 'Nunca') as ultima_viagem,
+                        DATEDIFF(CURDATE(), COALESCE(MAX(COALESCE(r.data_rota, r.data_saida)), v.created_at)) as dias_sem_viagem
                     FROM veiculos v
-                    LEFT JOIN rotas r ON v.id = r.veiculo_id 
-                        AND YEAR(r.data_saida) = :year 
-                        AND MONTH(r.data_saida) = :month
+                    LEFT JOIN rotas r ON v.id = r.veiculo_id AND r.empresa_id = v.empresa_id
+                        AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year 
+                        AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month
                     WHERE v.empresa_id = :empresa_id
                     GROUP BY v.id, v.placa, v.modelo, v.marca, v.km_atual, v.created_at
-                    HAVING COUNT(r.id) = 0 OR MAX(r.data_saida) < DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+                    HAVING COUNT(r.id) = 0 OR MAX(COALESCE(r.data_rota, r.data_saida)) < DATE_SUB(CURDATE(), INTERVAL 7 DAY)
                     ORDER BY dias_sem_viagem DESC
                 ";
                 break;
@@ -1174,16 +1185,16 @@ function getReportData($reportType, $month, $year) {
                         v.modelo,
                         COALESCE(SUM(r.frete), 0) AS receita_bruta,
                         (COALESCE(SUM(r.comissao), 0) +
-                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) +
-                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND YEAR(rv.data_saida) = " . intval($year) . " AND MONTH(rv.data_saida) = " . intval($month) . "), 0)) AS custos_variaveis,
+                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id} AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) +
+                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND rv.empresa_id = {$empresa_id} AND {$rotaPeriodRvLit}), 0)) AS custos_variaveis,
                         (COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0) -
-                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) -
-                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND YEAR(rv.data_saida) = " . intval($year) . " AND MONTH(rv.data_saida) = " . intval($month) . "), 0)) AS margem_operacional,
+                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id} AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) -
+                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND rv.empresa_id = {$empresa_id} AND {$rotaPeriodRvLit}), 0)) AS margem_operacional,
                         CASE WHEN COALESCE(SUM(r.frete), 0) > 0 THEN ROUND((COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0) -
-                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) -
-                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND YEAR(rv.data_saida) = " . intval($year) . " AND MONTH(rv.data_saida) = " . intval($month) . "), 0)) / COALESCE(SUM(r.frete), 1) * 100, 2) ELSE 0 END AS percentual_margem
+                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id} AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) -
+                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND rv.empresa_id = {$empresa_id} AND {$rotaPeriodRvLit}), 0)) / COALESCE(SUM(r.frete), 1) * 100, 2) ELSE 0 END AS percentual_margem
                         FROM veiculos v
-                        LEFT JOIN rotas r ON r.veiculo_id = v.id AND YEAR(r.data_saida) = :year AND MONTH(r.data_saida) = :month
+                        LEFT JOIN rotas r ON r.veiculo_id = v.id AND r.empresa_id = v.empresa_id AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month
                         WHERE v.empresa_id = :empresa_id
                         GROUP BY v.id, v.placa, v.modelo
                         HAVING receita_bruta > 0
@@ -1196,10 +1207,10 @@ function getReportData($reportType, $month, $year) {
                         v.modelo,
                         COALESCE(SUM(r.frete), 0) AS total_frete,
                         (COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0) -
-                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) -
-                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND YEAR(rv.data_saida) = " . intval($year) . " AND MONTH(rv.data_saida) = " . intval($month) . "), 0)) AS lucro_liquido
+                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id} AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) -
+                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND rv.empresa_id = {$empresa_id} AND {$rotaPeriodRvLit}), 0)) AS lucro_liquido
                         FROM veiculos v
-                        LEFT JOIN rotas r ON r.veiculo_id = v.id AND YEAR(r.data_saida) = :year AND MONTH(r.data_saida) = :month
+                        LEFT JOIN rotas r ON r.veiculo_id = v.id AND r.empresa_id = v.empresa_id AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month
                         WHERE v.empresa_id = :empresa_id
                         GROUP BY v.id, v.placa, v.modelo
                         HAVING lucro_liquido < 0
@@ -1213,13 +1224,13 @@ function getReportData($reportType, $month, $year) {
                         COUNT(DISTINCT r.id) AS quantidade_rotas,
                         COALESCE(SUM(r.frete), 0) AS total_frete,
                         (COALESCE(SUM(r.frete), 0) - COALESCE(SUM(r.comissao), 0) -
-                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) -
-                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND YEAR(rv.data_saida) = " . intval($year) . " AND MONTH(rv.data_saida) = " . intval($month) . "), 0)) AS lucro_liquido
+                         COALESCE((SELECT SUM(a.valor_total + COALESCE(CASE WHEN a.inclui_arla = 1 THEN a.valor_total_arla ELSE 0 END, 0)) FROM abastecimentos a WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id} AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . " AND a.status = 'aprovado'), 0) -
+                         COALESCE((SELECT SUM(dv.total_despviagem) FROM despesas_viagem dv INNER JOIN rotas rv ON rv.id = dv.rota_id WHERE rv.veiculo_id = v.id AND rv.empresa_id = {$empresa_id} AND {$rotaPeriodRvLit}), 0)) AS lucro_liquido
                         FROM veiculos v
-                        LEFT JOIN rotas r ON r.veiculo_id = v.id AND YEAR(r.data_saida) = :year AND MONTH(r.data_saida) = :month
+                        LEFT JOIN rotas r ON r.veiculo_id = v.id AND r.empresa_id = v.empresa_id AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month
                         WHERE v.empresa_id = :empresa_id
                         GROUP BY v.id, v.placa, v.modelo
-                        HAVING COALESCE(SUM(r.frete), 0) > 0 OR (SELECT COUNT(*) FROM abastecimentos a WHERE a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . ") > 0
+                        HAVING COALESCE(SUM(r.frete), 0) > 0 OR (SELECT COUNT(*) FROM abastecimentos a WHERE a.veiculo_id = v.id AND a.empresa_id = {$empresa_id} AND YEAR(a.data_abastecimento) = " . intval($year) . " AND MONTH(a.data_abastecimento) = " . intval($month) . ") > 0
                         ORDER BY lucro_liquido DESC";
                 break;
 
@@ -1267,7 +1278,7 @@ function getReportData($reportType, $month, $year) {
                            CASE WHEN COALESCE(SUM(a.litros), 0) > 0 THEN ROUND(COALESCE(SUM(r.total_km), 0) / SUM(a.litros), 2) ELSE 0 END AS km_por_litro
                     FROM veiculos v
                     LEFT JOIN abastecimentos a ON a.veiculo_id = v.id AND YEAR(a.data_abastecimento) = :year_abast AND MONTH(a.data_abastecimento) = :month_abast AND a.status = 'aprovado'
-                    LEFT JOIN rotas r ON r.veiculo_id = v.id AND YEAR(r.data_saida) = :year_rota AND MONTH(r.data_saida) = :month_rota
+                    LEFT JOIN rotas r ON r.veiculo_id = v.id AND r.empresa_id = v.empresa_id AND YEAR(COALESCE(r.data_rota, r.data_saida)) = :year_rota AND MONTH(COALESCE(r.data_rota, r.data_saida)) = :month_rota
                     WHERE v.empresa_id = :empresa_id
                     GROUP BY v.id, v.placa, v.modelo
                     HAVING total_litros > 0 AND total_km > 0
@@ -1344,81 +1355,44 @@ function getReportData($reportType, $month, $year) {
                 return $data;
                 
             default:
-                throw new Exception("Tipo de relatório inválido");
+                throw new InvalidArgumentException('Tipo de relatório inválido.');
         }
-        
-        // Log da query
-        error_log("Query SQL para $reportType: $sql");
         
         $stmt = $conn->prepare($sql);
-        
-        // Adicionar parâmetros apenas se o relatório precisar de mês/ano
-        if (!in_array($reportType, ['veiculos_status', 'vida_util_pneus', 'otimizacao_pneus', 'analise_preditiva'])) {
-            if ($reportType === 'eficiencia_frota') {
-                $stmt->bindParam(':year_rota', $year, PDO::PARAM_INT);
-                $stmt->bindParam(':month_rota', $month, PDO::PARAM_INT);
-                $stmt->bindParam(':year_abastecimento', $year, PDO::PARAM_INT);
-                $stmt->bindParam(':month_abastecimento', $month, PDO::PARAM_INT);
-            } elseif ($reportType === 'custos_veiculo') {
-                $stmt->bindParam(':year_abastecimento', $year, PDO::PARAM_INT);
-                $stmt->bindParam(':month_abastecimento', $month, PDO::PARAM_INT);
-                $stmt->bindParam(':year_manutencao', $year, PDO::PARAM_INT);
-                $stmt->bindParam(':month_manutencao', $month, PDO::PARAM_INT);
-                $stmt->bindParam(':year_rota', $year, PDO::PARAM_INT);
-                $stmt->bindParam(':month_rota', $month, PDO::PARAM_INT);
-                $stmt->bindParam(':year_despesa', $year, PDO::PARAM_INT);
-                $stmt->bindParam(':month_despesa', $month, PDO::PARAM_INT);
-            } else {
-                $stmt->bindParam(':year', $year, PDO::PARAM_INT);
-                $stmt->bindParam(':month', $month, PDO::PARAM_INT);
-            }
-            error_log("Parâmetros para $reportType - Ano: $year, Mês: $month");
-        }
-        
-        // Adicionar empresa_id para relatórios que precisam
-        if (in_array($reportType, ['vida_util_pneus', 'custos_veiculo', 'eficiencia_frota', 'historico_manutencoes', 'analise_preditiva', 'otimizacao_pneus', 'produtividade_motoristas', 'consumo_combustivel', 'custo_por_km', 'rentabilidade_rotas', 'multas_motorista_veiculo', 'ocupacao_frota', 'veiculos_ociosos', 'custos_manutencao_veiculo', 'lucro_veiculo', 'lucro_completo_veiculo', 'margem_veiculo', 'veiculos_prejuizo', 'ranking', 'sla_manutencao', 'custo_tipo_manutencao'])) {
-            $empresa_id = $_SESSION['empresa_id'];
-            $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
-            error_log("Parâmetro empresa_id para $reportType: $empresa_id");
-        }
-        
-        // Adicionar parâmetros duplicados para relatórios específicos
-        if ($reportType === 'custo_por_km') {
-            $stmt->bindParam(':year2', $year, PDO::PARAM_INT);
-            $stmt->bindParam(':month2', $month, PDO::PARAM_INT);
-        }
-        
-        // Executar a query
+        relatorio_bind_stmt_params($stmt, $reportType, $month, $year, $empresa_id, $sql);
         $stmt->execute();
         $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Log do resultado
-        error_log("Quantidade de registros encontrados para $reportType: " . count($data));
-        if (empty($data)) {
-            error_log("AVISO: Nenhum dado encontrado para o relatório $reportType");
-        }
-        
         return $data;
-    } catch(PDOException $e) {
+    } catch (PDOException $e) {
         error_log("ERRO SQL ao gerar relatório $reportType: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
-        throw new Exception("Erro ao gerar relatório: " . $e->getMessage());
-    } catch(Exception $e) {
+        throw new RuntimeException('Não foi possível consultar os dados do relatório.');
+    } catch (Throwable $e) {
+        if ($e instanceof InvalidArgumentException || $e instanceof RuntimeException) {
+            throw $e;
+        }
         error_log("ERRO ao gerar relatório $reportType: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
-        throw $e;
+        throw new RuntimeException('Não foi possível gerar o relatório.');
     }
 }
 
 // Processar requisição de relatório
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        $reportType = $_POST['report_type'] ?? '';
-        $month = $_POST['month'] ?? date('m');
-        $year = $_POST['year'] ?? date('Y');
-        $format = $_POST['format'] ?? 'pdf';
-        
-        error_log("Iniciando processamento do relatório: $reportType em formato $format para $month/$year");
+        if (!csrf_token_validate($_POST['csrf_token'] ?? '')) {
+            throw new InvalidArgumentException('Sessão expirada. Atualize a página e tente novamente.');
+        }
+
+        $validated = relatorio_validate_request(
+            (string) ($_POST['report_type'] ?? ''),
+            $_POST['month'] ?? date('n'),
+            $_POST['year'] ?? date('Y'),
+            (string) ($_POST['format'] ?? 'pdf')
+        );
+        $reportType = $validated['report_type'];
+        $month = $validated['month'];
+        $year = $validated['year'];
+        $format = $validated['format'];
         
         // Verificar se é um relatório fiscal
         if (strpos($reportType, 'fiscal_') === 0) {
@@ -1565,12 +1539,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             generateExcel($data, 'relatorio_' . $reportType . '_' . $month . '_' . $year);
         }
-        
-        error_log("Relatório $reportType gerado com sucesso");
-    } catch (Exception $e) {
-        error_log("ERRO ao processar relatório: " . $e->getMessage());
-        error_log("Stack trace: " . $e->getTraceAsString());
-        $_SESSION['error'] = $e->getMessage();
+    } catch (Throwable $e) {
+        error_log('relatorios POST: ' . $e->getMessage());
+        $_SESSION['relatorio_error'] = ($e instanceof InvalidArgumentException)
+            ? $e->getMessage()
+            : 'Não foi possível gerar o relatório. Verifique o período e tente novamente.';
+        header('Location: relatorios.php');
+        exit;
     }
 }
 ?>
@@ -1798,6 +1773,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         /* Título da página vem do header superior (.header-title) */
+        .relatorio-flash {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.6rem;
+            padding: 0.75rem 1rem;
+            margin: 0 0 1rem 0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            line-height: 1.45;
+        }
+        .relatorio-flash--error {
+            background: rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #b91c1c;
+        }
+        .relatorio-flash--ok {
+            background: rgba(34, 197, 94, 0.12);
+            border: 1px solid rgba(34, 197, 94, 0.35);
+            color: #15803d;
+        }
         .relatorios-lead {
             margin: 0 0 1.25rem 0;
             font-size: 0.9rem;
@@ -1828,6 +1823,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body>
     <div class="app-container">
@@ -1841,7 +1837,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <!-- Page Content -->
             <div class="dashboard-content">
-                <p class="relatorios-lead" id="relatorios-descricao">Escolha o relatório e exporte em <strong>PDF</strong> ou <strong>Excel</strong>.</p>
+                <?php if ($relatorio_flash_error !== ''): ?>
+                <div class="relatorio-flash relatorio-flash--error" role="alert">
+                    <i class="fas fa-circle-exclamation"></i>
+                    <?php echo htmlspecialchars($relatorio_flash_error); ?>
+                </div>
+                <?php endif; ?>
+                <?php if ($relatorio_flash_success !== ''): ?>
+                <div class="relatorio-flash relatorio-flash--ok" role="status">
+                    <i class="fas fa-circle-check"></i>
+                    <?php echo htmlspecialchars($relatorio_flash_success); ?>
+                </div>
+                <?php endif; ?>
+                <p class="relatorios-lead" id="relatorios-descricao">Escolha o relatório e exporte em <strong>PDF</strong> ou <strong>Excel</strong>.
+                    <button type="button" class="btn-help" id="helpBtn" title="Ajuda" aria-label="Ajuda" style="margin-left:12px;vertical-align:middle"><i class="fas fa-question-circle"></i></button>
+                </p>
                 
                 <!-- Seção de Relatórios Operacionais -->
                 <div class="dashboard-section">
@@ -2584,6 +2594,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="report-form" id="reportForm" role="dialog" aria-modal="true" aria-labelledby="reportFormModalTitle" aria-hidden="true">
         <h2 id="reportFormModalTitle">Gerar Relatório</h2>
         <form id="generateReportForm" method="POST">
+            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(csrf_token_get()); ?>">
             <input type="hidden" id="reportType" name="report_type">
             <input type="hidden" id="reportFormat" name="format">
             
@@ -2977,5 +2988,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </script>
 
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php $sf_help_key = 'relatorios'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

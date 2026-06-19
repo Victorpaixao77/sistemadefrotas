@@ -1,108 +1,100 @@
 <?php
-// Incluir arquivos na ordem correta usando caminhos absolutos
 require_once dirname(__DIR__) . '/includes/config.php';
 require_once dirname(__DIR__) . '/includes/db_connect.php';
-require_once dirname(__DIR__) . '/includes/functions.php';
+require_once dirname(__DIR__) . '/includes/notificacoes_helpers.php';
+require_once dirname(__DIR__) . '/includes/notificacoes_sync_operacional.php';
 
-// NOTA: ia_regras.php foi removido porque executa análises pesadas automaticamente
-// O arquivo de notificações apenas busca e retorna dados, não precisa executar análises
-// require_once dirname(__DIR__) . '/IA/ia_regras.php';
-
-// Prevenir qualquer saída antes do JSON
 ob_start();
-
-// Configurar sessão
 configure_session();
-
-// Verificar se a sessão já está ativa antes de iniciá-la
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Definir header antes de qualquer saída
 header('Content-Type: application/json');
 
-// Verificar se o usuário está autenticado
-if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
+if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || empty($_SESSION['empresa_id'])) {
     ob_clean();
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Usuário não autenticado']);
     exit;
 }
 
-$empresa_id = $_SESSION['empresa_id'];
-$conn = getConnection();
-
-$todas = isset($_GET['todas']) && $_GET['todas'] == '1';
+$empresa_id = (int) $_SESSION['empresa_id'];
+$usuario_id = sf_notif_usuario_id();
+$escopo = sf_notif_escopo_valido($_GET['escopo'] ?? 'todos');
+$todas = isset($_GET['todas']) && $_GET['todas'] === '1';
+$tipoFiltro = trim((string) ($_GET['tipo'] ?? ''));
+$severidadeFiltro = trim((string) ($_GET['severidade'] ?? ''));
+$dias = SF_NOTIF_DIAS_JANELA;
 
 try {
-    // Verificar se a conexão com o banco está funcionando
-    if (!$conn) {
-        throw new Exception("Falha na conexão com o banco de dados");
+    $conn = getConnection();
+    sf_notif_ensure_schema($conn);
+    $sistema_ativo = sf_notificacoes_sistema_ativo($conn, $empresa_id);
+
+    if (!$sistema_ativo) {
+        ob_clean();
+        echo json_encode(['success' => true, 'sistema_ativo' => false, 'notificacoes' => [], 'total_nao_lidas' => 0, 'escopo' => $escopo]);
+        exit;
     }
-    
-    if ($todas) {
-        // Para "Ver todas": mostrar apenas notificações dos últimos 30 dias
-        $stmt = $conn->prepare("SELECT * FROM notificacoes 
-                               WHERE empresa_id = ? 
-                               AND data_criacao >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-                               ORDER BY data_criacao DESC 
-                               LIMIT 100");
-        $stmt->execute([$empresa_id]);
-    } else {
-        // Para notificações não lidas: mostrar apenas dos últimos 7 dias
-        $stmt = $conn->prepare("SELECT * FROM notificacoes 
-                               WHERE empresa_id = ? 
-                               AND lida = 0 
-                               AND data_criacao >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                               ORDER BY data_criacao DESC 
-                               LIMIT 200");
-        $stmt->execute([$empresa_id]);
-    }
-    
-    $notificacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Obter total real de notificações não lidas dos últimos 7 dias
-    $stmt_total = $conn->prepare("SELECT COUNT(*) as total FROM notificacoes 
-                                 WHERE empresa_id = ? 
-                                 AND lida = 0 
-                                 AND data_criacao >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
-    $stmt_total->execute([$empresa_id]);
-    $total_real = $stmt_total->fetch(PDO::FETCH_ASSOC)['total'];
-    
-    // Filtrar notificações duplicadas baseado em tipo, título e data
-    $notificacoes_filtradas = [];
-    $chaves_vistas = [];
-    
-    foreach ($notificacoes as $notif) {
-        // Criar chave única baseada em tipo, título e data (dia)
-        $data_dia = date('Y-m-d', strtotime($notif['data_criacao']));
-        $chave = $notif['tipo'] . '_' . $notif['titulo'] . '_' . $data_dia;
-        
-        if (!in_array($chave, $chaves_vistas)) {
-            $chaves_vistas[] = $chave;
-            $notificacoes_filtradas[] = $notif;
+
+    sf_notif_sync_cnh($conn, $empresa_id);
+
+    $sql = 'SELECT * FROM notificacoes WHERE empresa_id = :empresa_id';
+    $params = [':empresa_id' => $empresa_id];
+
+    [$inSql, $tipos] = sf_notif_escopo_tipos($escopo);
+    if ($inSql !== '') {
+        $sql .= ' AND tipo IN (' . $inSql . ')';
+        foreach ($tipos as $i => $t) {
+            $params[':tipo' . $i] = $t;
         }
     }
-    
-    // Limpar buffer antes de enviar resposta
+    if ($tipoFiltro !== '') {
+        $sql .= ' AND tipo = :tipo_filtro';
+        $params[':tipo_filtro'] = $tipoFiltro;
+    }
+    if ($severidadeFiltro !== '' && in_array($severidadeFiltro, ['info', 'aviso', 'critico'], true)) {
+        $sql .= ' AND severidade = :sev';
+        $params[':sev'] = $severidadeFiltro;
+    }
+
+    if ($todas) {
+        $sql .= ' AND data_criacao >= DATE_SUB(NOW(), INTERVAL 365 DAY) ORDER BY FIELD(severidade, \'critico\', \'aviso\', \'info\'), data_criacao DESC LIMIT 500';
+    } else {
+        $diasSql = (int) SF_NOTIF_DIAS_JANELA;
+        $sql .= ' AND lida = 0 AND data_criacao >= DATE_SUB(NOW(), INTERVAL ' . $diasSql . ' DAY) ORDER BY FIELD(severidade, \'critico\', \'aviso\', \'info\'), data_criacao DESC LIMIT 200';
+    }
+
+    $stmt = $conn->prepare($sql);
+    $stmt->execute($params);
+    $notificacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $notificacoes = sf_notif_filtrar_para_usuario($notificacoes, $conn, $usuario_id, $empresa_id);
+    $total_nao_lidas = sf_notif_contar_nao_lidas_usuario($conn, $empresa_id, $usuario_id, $escopo, $dias);
+
+    if ($todas) {
+        $notificacoes_filtradas = $notificacoes;
+    } else {
+        $notificacoes_filtradas = sf_notif_deduplicar_lista($notificacoes);
+    }
+
+    $notificacoes_filtradas = sf_notif_anexar_urls($notificacoes_filtradas);
+
     ob_clean();
-    
     echo json_encode([
-        'success' => true, 
+        'success' => true,
+        'sistema_ativo' => true,
+        'escopo' => $escopo,
         'notificacoes' => $notificacoes_filtradas,
+        'total_nao_lidas' => $total_nao_lidas,
+        'total_real_nao_lidas' => $total_nao_lidas,
         'total_original' => count($notificacoes),
         'total_filtrado' => count($notificacoes_filtradas),
-        'total_real_nao_lidas' => (int)$total_real
     ]);
-    
-} catch (Exception $e) {
+} catch (Throwable $e) {
     ob_clean();
-    error_log("Erro ao buscar notificações: " . $e->getMessage());
+    error_log('notificacoes/notificacoes.php: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode([
-        'success' => false, 
-        'error' => 'Erro ao buscar notificações',
-        'details' => $e->getMessage()
-    ]);
-} 
+    echo json_encode(['success' => false, 'error' => 'Erro ao buscar notificações']);
+}

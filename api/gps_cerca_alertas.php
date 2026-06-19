@@ -19,7 +19,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') {
     api_json_method_not_allowed();
 }
 
-require_authentication();
+require_once dirname(__DIR__) . '/includes/gps_web_api_base.php';
+gps_require_web_panel_access();
 $empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
 if ($empresa_id <= 0) {
     api_json_unauthorized();

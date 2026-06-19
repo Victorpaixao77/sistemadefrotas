@@ -30,20 +30,40 @@ if (!function_exists('gps_inteligencia_kpis_mapa')) {
         try {
             $st = $conn->prepare('
                 SELECT
-                    SUM(CASE WHEN data_hora >= DATE_SUB(NOW(), INTERVAL 15 MINUTE) THEN 1 ELSE 0 END) AS ok15,
-                    SUM(CASE WHEN data_hora < DATE_SUB(NOW(), INTERVAL 30 MINUTE) THEN 1 ELSE 0 END) AS stale30
-                FROM gps_ultima_posicao
-                WHERE empresa_id = :eid
+                    SUM(CASE WHEN g.data_hora >= DATE_SUB(NOW(), INTERVAL 15 MINUTE) THEN 1 ELSE 0 END) AS ok15,
+                    SUM(CASE WHEN g.data_hora IS NULL OR g.data_hora < DATE_SUB(NOW(), INTERVAL 30 MINUTE) THEN 1 ELSE 0 END) AS stale30
+                FROM veiculos v
+                LEFT JOIN gps_ultima_posicao g ON g.veiculo_id = v.id AND g.empresa_id = :eid
+                WHERE v.empresa_id = :eid2
             ');
-            $st->execute([':eid' => $empresa_id]);
+            $st->execute([':eid' => $empresa_id, ':eid2' => $empresa_id]);
             $row = $st->fetch(PDO::FETCH_ASSOC);
             if ($row) {
                 $out['veiculos_sinal_recente'] = (int) ($row['ok15'] ?? 0);
                 $out['veiculos_sem_sinal_30m'] = (int) ($row['stale30'] ?? 0);
             }
         } catch (PDOException $e) {
-            if (strpos($e->getMessage(), 'gps_ultima_posicao') === false) {
+            if (strpos($e->getMessage(), 'gps_ultima_posicao') === false && strpos($e->getMessage(), 'veiculos') === false) {
                 error_log('gps_inteligencia_kpis ultima: ' . $e->getMessage());
+            }
+            try {
+                $st = $conn->prepare('
+                    SELECT
+                        SUM(CASE WHEN data_hora >= DATE_SUB(NOW(), INTERVAL 15 MINUTE) THEN 1 ELSE 0 END) AS ok15,
+                        SUM(CASE WHEN data_hora < DATE_SUB(NOW(), INTERVAL 30 MINUTE) THEN 1 ELSE 0 END) AS stale30
+                    FROM gps_ultima_posicao
+                    WHERE empresa_id = :eid
+                ');
+                $st->execute([':eid' => $empresa_id]);
+                $row = $st->fetch(PDO::FETCH_ASSOC);
+                if ($row) {
+                    $out['veiculos_sinal_recente'] = (int) ($row['ok15'] ?? 0);
+                    $out['veiculos_sem_sinal_30m'] = (int) ($row['stale30'] ?? 0);
+                }
+            } catch (PDOException $e2) {
+                if (strpos($e2->getMessage(), 'gps_ultima_posicao') === false) {
+                    error_log('gps_inteligencia_kpis ultima fallback: ' . $e2->getMessage());
+                }
             }
         }
 
