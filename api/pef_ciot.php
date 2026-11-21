@@ -17,6 +17,7 @@ session_start();
 
 header('Content-Type: application/json; charset=utf-8');
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 if (!can_access_fiscal_system()) {
     api_json_error('Sem permissão para o módulo fiscal.', 403);

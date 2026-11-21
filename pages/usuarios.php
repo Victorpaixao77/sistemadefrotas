@@ -2,9 +2,11 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/permissions.php';
+require_once '../includes/sf_page_help.php';
 
 configure_session();
 session_start();
+require_authentication();
 
 if (!isset($_SESSION['empresa_id'])) {
     header('Location: ../login.php');
@@ -60,6 +62,26 @@ $stmt = $conn->prepare('
 $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
 $stmt->execute();
 $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// -------- Indicadores (KPIs) — calculados só com dados reais --------
+$kpi_total = count($usuarios);
+$kpi_ativos = 0; $kpi_inativos = 0; $kpi_admins = 0; $kpi_gestores = 0;
+$kpi_motoristas = 0; $kpi_2fa = 0; $kpi_novos_mes = 0;
+$mes_atual = date('Y-m');
+foreach ($usuarios as $u) {
+    $eh_mot = ($u['tipo_usuario_sistema'] ?? '') === 'motorista';
+    if (($u['status'] ?? '') === 'ativo') { $kpi_ativos++; } else { $kpi_inativos++; }
+    if ($eh_mot) {
+        $kpi_motoristas++;
+    } else {
+        if (($u['tipo_usuario'] ?? '') === 'admin') { $kpi_admins++; }
+        elseif (($u['tipo_usuario'] ?? '') === 'gestor') { $kpi_gestores++; }
+        if (!empty($u['two_factor_enabled'])) { $kpi_2fa++; }
+    }
+    if (!empty($u['data_cadastro']) && strpos((string) $u['data_cadastro'], $mes_atual) === 0) { $kpi_novos_mes++; }
+}
+$kpi_sistema = $kpi_admins + $kpi_gestores;
+$pct = function ($n, $t) { return $t > 0 ? round(($n / $t) * 100) : 0; };
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -72,6 +94,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <link rel="stylesheet" href="../css/sf-premium.css?v=<?php echo function_exists('sf_asset_v') ? sf_asset_v() : '1'; ?>">
     <style>
         .checkbox-label {
             display: flex;
@@ -327,71 +350,112 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
         .confirm-box p { margin: 0 0 1rem; color: var(--text-secondary); font-size: 0.9rem; }
         .confirm-box .confirm-actions { display: flex; gap: 0.5rem; justify-content: center; }
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
-<body>
+<body class="page-usuarios sf-premium">
     <div class="app-container">
         <?php include '../includes/sidebar_pages.php'; ?>
         <div class="main-content">
             <?php include '../includes/header.php'; ?>
             <div class="dashboard-content">
-                <div class="dashboard-header">
-                    <div class="user-permission-info">
-                        <span class="badge <?php echo $permissions['is_admin'] ? 'badge-warning' : ($permissions['is_gestor'] ? 'badge-primary' : 'badge-info'); ?>">
-                            <?php echo ucfirst($permissions['permission_level']); ?>
+                <!-- Cabeçalho da página -->
+                <div class="u-pagehead">
+                    <div class="u-pagehead__title">
+                        <h1><i class="fas fa-users-gear" style="color:var(--accent-primary,#3b82f6)"></i> Usuários</h1>
+                        <p>Gerencie usuários do sistema e do app de motoristas, permissões e segurança.</p>
+                    </div>
+                    <div class="u-pagehead__meta">
+                        <button type="button" id="helpBtn" class="fornc-btn fornc-btn--ghost fornc-btn--icon" title="Ajuda desta tela" aria-label="Ajuda desta tela"><i class="fas fa-question-circle"></i></button>
+                        <span class="u-badge <?php echo $permissions['is_admin'] ? 'u-badge--admin' : ($permissions['is_gestor'] ? 'u-badge--gestor' : 'u-badge--muted'); ?>" title="Seu nível de acesso">
+                            <i class="fas fa-user-shield"></i> <?php echo ucfirst($permissions['permission_level']); ?>
                         </span>
-                        <small class="text-muted" style="margin-left: 10px;">
-                            <?php if ($permissions['is_admin']): ?>
-                                Acesso total - Pode gerenciar todos os usuários e acessar todas as funcionalidades
-                            <?php elseif ($permissions['is_gestor']): ?>
-                                Acesso limitado - Pode gerenciar apenas motoristas
-                            <?php else: ?>
-                                Acesso básico - Apenas visualização
-                            <?php endif; ?>
+                        <small class="text-muted" style="font-size:0.76rem;">
+                            <?php if ($permissions['is_admin']): ?>Acesso total
+                            <?php elseif ($permissions['is_gestor']): ?>Gerencia motoristas
+                            <?php else: ?>Somente visualização<?php endif; ?>
                         </small>
                     </div>
                 </div>
-                
+
+                <!-- Indicadores (dados reais) -->
+                <div class="u-kpis">
+                    <div class="u-kpi">
+                        <div class="u-kpi__top"><span class="u-kpi__label">Total de usuários</span><span class="u-kpi__icon"><i class="fas fa-users"></i></span></div>
+                        <div class="u-kpi__value"><?php echo $kpi_total; ?></div>
+                        <div class="u-kpi__hint"><?php echo $kpi_sistema; ?> do sistema · <?php echo $kpi_motoristas; ?> motoristas</div>
+                    </div>
+                    <div class="u-kpi u-kpi--ok">
+                        <div class="u-kpi__top"><span class="u-kpi__label">Ativos</span><span class="u-kpi__icon"><i class="fas fa-circle-check"></i></span></div>
+                        <div class="u-kpi__value"><?php echo $kpi_ativos; ?></div>
+                        <div class="u-kpi__bar"><i style="width:<?php echo $pct($kpi_ativos, $kpi_total); ?>%"></i></div>
+                    </div>
+                    <div class="u-kpi u-kpi--danger">
+                        <div class="u-kpi__top"><span class="u-kpi__label">Inativos</span><span class="u-kpi__icon"><i class="fas fa-circle-minus"></i></span></div>
+                        <div class="u-kpi__value"><?php echo $kpi_inativos; ?></div>
+                        <div class="u-kpi__hint"><?php echo $pct($kpi_inativos, $kpi_total); ?>% do total</div>
+                    </div>
+                    <div class="u-kpi u-kpi--warn">
+                        <div class="u-kpi__top"><span class="u-kpi__label">Administradores</span><span class="u-kpi__icon"><i class="fas fa-user-shield"></i></span></div>
+                        <div class="u-kpi__value"><?php echo $kpi_admins; ?></div>
+                        <div class="u-kpi__hint"><?php echo $kpi_gestores; ?> gestor(es)</div>
+                    </div>
+                    <div class="u-kpi u-kpi--ok">
+                        <div class="u-kpi__top"><span class="u-kpi__label">2FA habilitado</span><span class="u-kpi__icon"><i class="fas fa-shield-halved"></i></span></div>
+                        <div class="u-kpi__value"><?php echo $kpi_2fa; ?></div>
+                        <div class="u-kpi__hint"><?php echo $kpi_sistema > 0 ? $pct($kpi_2fa, $kpi_sistema) . '% dos usuários do sistema' : 'nenhum usuário do sistema'; ?></div>
+                    </div>
+                    <div class="u-kpi">
+                        <div class="u-kpi__top"><span class="u-kpi__label">Novos este mês</span><span class="u-kpi__icon"><i class="fas fa-user-plus"></i></span></div>
+                        <div class="u-kpi__value"><?php echo $kpi_novos_mes; ?></div>
+                        <div class="u-kpi__hint">Referência <?php echo date('m/Y'); ?></div>
+                    </div>
+                </div>
+
                 <!-- Lista de Usuários -->
                 <div class="dashboard-grid">
-                    <div class="dashboard-card" style="grid-column: 1 / -1;">
-                        <div class="card-header">
-                            <i class="fas fa-users kpi-card-icon" aria-hidden="true"></i>
-                            <h3>Usuários Cadastrados</h3>
+                    <div class="u-panel" style="grid-column: 1 / -1;">
+                        <div class="u-panel__head">
+                            <span class="u-panel__ic"><i class="fas fa-users" aria-hidden="true"></i></span>
+                            <div><h3>Usuários cadastrados</h3><p>Busque, filtre e gerencie o acesso de cada usuário.</p></div>
                         </div>
-                        <div class="card-body">
-                            <div class="users-filterbar">
-                                <div class="uf-search">
+                        <div class="u-panel__body">
+                            <div class="u-toolbar">
+                                <div class="u-search">
                                     <i class="fas fa-search" aria-hidden="true"></i>
-                                    <input type="text" id="ufSearch" placeholder="Buscar por nome ou e-mail…" autocomplete="off">
+                                    <input type="text" id="ufSearch" placeholder="Buscar por nome, e-mail, CPF, tipo…" autocomplete="off" aria-label="Buscar usuários">
                                 </div>
-                                <select id="ufTipo" aria-label="Filtrar por tipo">
+                                <select id="ufTipo" class="u-select" aria-label="Filtrar por tipo">
                                     <option value="">Todos os tipos</option>
                                     <option value="admin">Administrador</option>
                                     <option value="gestor">Gestor</option>
                                     <option value="motorista">Motorista</option>
                                 </select>
-                                <select id="ufStatus" aria-label="Filtrar por status">
+                                <select id="ufStatus" class="u-select" aria-label="Filtrar por status">
                                     <option value="">Todos os status</option>
                                     <option value="ativo">Ativo</option>
                                     <option value="inativo">Inativo</option>
                                 </select>
-                                <span class="uf-count" id="ufCount"></span>
+                                <select id="ufSort" class="u-select" aria-label="Ordenar">
+                                    <option value="recent">Mais recentes</option>
+                                    <option value="name">Nome (A–Z)</option>
+                                </select>
+                                <button type="button" id="ufClear" class="u-btn-ghost" title="Limpar filtros"><i class="fas fa-rotate-left"></i> Limpar</button>
+                                <span class="u-count" id="ufCount"></span>
                             </div>
-                            <div class="table-responsive">
-                                <table class="table" style="width: 100%; table-layout: fixed;">
+                            <div class="u-table-wrap">
+                                <table class="u-table" id="usersTable">
                                     <thead>
                                         <tr>
-                                            <th style="width: 18%; text-align: left; padding: 12px 8px;">Nome</th>
-                                            <th style="width: 16%; text-align: left; padding: 12px 8px;">E-mail</th>
-                                            <th style="width: 9%; text-align: center; padding: 12px 8px;">Tipo</th>
-                                            <th style="width: 13%; text-align: center; padding: 12px 8px;">Permissões</th>
-                                            <th style="width: 8%; text-align: center; padding: 12px 8px;">Status</th>
-                                            <th style="width: 11%; text-align: center; padding: 12px 8px;">2FA</th>
-                                            <th style="width: 11%; text-align: center; padding: 12px 8px;">Data Cadastro</th>
-                                            <th style="width: 14%; text-align: center; padding: 12px 8px;">Ações</th>
+                                            <th>Usuário</th>
+                                            <th class="u-col-center">Tipo</th>
+                                            <th class="u-col-center">Permissões</th>
+                                            <th class="u-col-center">Status</th>
+                                            <th class="u-col-center">2FA</th>
+                                            <th class="u-col-center">Cadastro</th>
+                                            <th class="u-col-center">Ações</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
+                                    <tbody id="usersTbody">
                                         <?php foreach ($usuarios as $usuario):
                                             $is_motorista = $usuario['tipo_usuario_sistema'] === 'motorista';
                                             $row_nome = $is_motorista ? ($usuario['nome_motorista'] ?? '') : ($usuario['nome'] ?? '');
@@ -400,121 +464,135 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                             $row_status = $usuario['status'] ?? '';
                                             $row_proprio = !$is_motorista && (int) $usuario['id'] === (int) ($_SESSION['usuario_id'] ?? 0);
                                         ?>
+                                        <?php
+                                            $row_cpf = $is_motorista ? preg_replace('/\D+/', '', (string) ($usuario['cpf'] ?? '')) : '';
+                                            $parts = preg_split('/\s+/', trim((string) $row_nome));
+                                            $ini = $parts && $parts[0] !== '' ? mb_strtoupper(mb_substr($parts[0], 0, 1)) : '?';
+                                            if ($parts && count($parts) > 1) { $ini .= mb_strtoupper(mb_substr(end($parts), 0, 1)); }
+                                            $avatar_class = $is_motorista ? 'u-avatar--motorista' : ($row_tipo === 'admin' ? 'u-avatar--admin' : '');
+                                            $search_blob = mb_strtolower(trim($row_nome . ' ' . $row_email . ' ' . $row_cpf . ' ' . $row_tipo . ' ' . $row_status));
+                                            $ts_cad = !empty($usuario['data_cadastro']) ? strtotime((string) $usuario['data_cadastro']) : 0;
+                                        ?>
                                         <tr class="user-row<?php echo $row_proprio ? ' is-self' : ''; ?>"
                                             data-user-id="<?php echo (int) $usuario['id']; ?>"
                                             data-user-tipo="<?php echo htmlspecialchars($usuario['tipo_usuario_sistema'], ENT_QUOTES, 'UTF-8'); ?>"
                                             data-nome="<?php echo htmlspecialchars(mb_strtolower($row_nome), ENT_QUOTES, 'UTF-8'); ?>"
                                             data-email="<?php echo htmlspecialchars(mb_strtolower($row_email), ENT_QUOTES, 'UTF-8'); ?>"
                                             data-tipo="<?php echo htmlspecialchars($row_tipo, ENT_QUOTES, 'UTF-8'); ?>"
-                                            data-status="<?php echo htmlspecialchars($row_status, ENT_QUOTES, 'UTF-8'); ?>">
-                                            <td style="padding: 12px 8px; text-align: left; word-wrap: break-word;">
-                                                <?php echo htmlspecialchars($row_nome); ?>
-                                                <?php if ($row_proprio): ?><span class="user-self-tag" title="Esta é a sua conta">você</span><?php endif; ?>
+                                            data-status="<?php echo htmlspecialchars($row_status, ENT_QUOTES, 'UTF-8'); ?>"
+                                            data-cadastro="<?php echo (int) $ts_cad; ?>"
+                                            data-search="<?php echo htmlspecialchars($search_blob, ENT_QUOTES, 'UTF-8'); ?>">
+                                            <td class="u-cell-identity" data-label="Usuário">
+                                                <div class="u-identity">
+                                                    <span class="u-avatar <?php echo $avatar_class; ?>" aria-hidden="true"><?php echo htmlspecialchars($ini); ?></span>
+                                                    <div class="u-identity__txt">
+                                                        <div class="u-identity__name" title="<?php echo htmlspecialchars($row_nome); ?>">
+                                                            <?php echo htmlspecialchars($row_nome); ?>
+                                                            <?php if ($row_proprio): ?><span class="u-self-tag" title="Esta é a sua conta">você</span><?php endif; ?>
+                                                        </div>
+                                                        <div class="u-identity__mail" title="<?php echo htmlspecialchars($row_email); ?>"><?php echo $row_email !== '' ? htmlspecialchars($row_email) : '—'; ?></div>
+                                                    </div>
+                                                </div>
                                             </td>
-                                            <td style="padding: 12px 8px; text-align: left; word-wrap: break-word;">
-                                                <?php 
-                                                if ($usuario['tipo_usuario_sistema'] === 'motorista') {
-                                                    $em = isset($usuario['email_motorista']) ? trim((string) $usuario['email_motorista']) : '';
-                                                    echo $em !== '' ? htmlspecialchars($em) : '<span class="text-muted">—</span>';
-                                                } else {
-                                                    echo htmlspecialchars($usuario['email']);
-                                                }
-                                                ?>
-                                            </td>
-                                            <td style="padding: 12px 8px; text-align: center;">
-                                                <?php if ($usuario['tipo_usuario_sistema'] === 'motorista'): ?>
-                                                    <span class="badge badge-info">Motorista</span>
+                                            <td class="u-col-center" data-label="Tipo">
+                                                <?php if ($is_motorista): ?>
+                                                    <span class="u-badge u-badge--motorista"><i class="fas fa-id-card"></i> Motorista</span>
                                                 <?php else: ?>
-                                                    <span class="badge <?php echo $usuario['tipo_usuario'] === 'admin' ? 'badge-warning' : 'badge-primary'; ?>">
-                                                        <?php echo ucfirst($usuario['tipo_usuario']); ?>
+                                                    <span class="u-badge <?php echo $usuario['tipo_usuario'] === 'admin' ? 'u-badge--admin' : 'u-badge--gestor'; ?>">
+                                                        <i class="fas <?php echo $usuario['tipo_usuario'] === 'admin' ? 'fa-user-shield' : 'fa-user-tie'; ?>"></i> <?php echo ucfirst($usuario['tipo_usuario']); ?>
                                                     </span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td style="padding: 12px 8px; text-align: center;">
+                                            <td class="u-col-center" data-label="Permissões">
                                                 <?php if ($usuario['tipo_usuario_sistema'] === 'sistema'): ?>
-                                                    <div class="permissions-display" style="font-size: 11px;">
-                                                        <?php if ($usuario['tipo_usuario'] === 'admin'): ?>
-                                                            <span class="badge badge-success" style="font-size: 10px;">Todas</span>
+                                                    <?php if ($usuario['tipo_usuario'] === 'admin'): ?>
+                                                        <span class="u-badge u-badge--ok"><i class="fas fa-check"></i> Todas</span>
+                                                    <?php else:
+                                                        $rowPerms = [];
+                                                        if (!empty($usuario['pode_acessar_lucratividade'])) $rowPerms[] = 'Lucratividade';
+                                                        if (!empty($usuario['pode_editar_usuarios_sistema'])) $rowPerms[] = 'Editar Usuários';
+                                                        if (!empty($usuario['pode_criar_usuarios_sistema'])) $rowPerms[] = 'Criar Usuários';
+                                                        if (!empty($usuario['pode_acessar_relatorios_avancados'])) $rowPerms[] = 'Relatórios';
+                                                        if (!empty($usuario['pode_gerenciar_configuracoes'])) $rowPerms[] = 'Configurações';
+                                                        if (!empty($usuario['pode_aprovar_abastecimentos'])) $rowPerms[] = 'Gestão de Motoristas';
+                                                        if (!empty($usuario['pode_ver_dados_financeiros'])) $rowPerms[] = 'Dados Financeiros';
+                                                        if (!empty($usuario['pode_acessar_sistema_fiscal'])) $rowPerms[] = 'Sistema Fiscal';
+                                                        if (!empty($usuario['pode_acessar_gestao_pneus'])) $rowPerms[] = 'Gestão de Pneus';
+                                                    ?>
+                                                        <?php if (empty($rowPerms)): ?>
+                                                            <span class="u-badge u-badge--muted">Básicas</span>
                                                         <?php else: ?>
-                                                            <?php 
-                                                            $permissions = [];
-                                                            if (isset($usuario['pode_acessar_lucratividade']) && $usuario['pode_acessar_lucratividade']) $permissions[] = 'Lucratividade';
-                                                            if (isset($usuario['pode_editar_usuarios_sistema']) && $usuario['pode_editar_usuarios_sistema']) $permissions[] = 'Editar Usuários';
-                                                            if (isset($usuario['pode_criar_usuarios_sistema']) && $usuario['pode_criar_usuarios_sistema']) $permissions[] = 'Criar Usuários';
-                                                            if (isset($usuario['pode_acessar_relatorios_avancados']) && $usuario['pode_acessar_relatorios_avancados']) $permissions[] = 'Relatórios';
-                                                            if (isset($usuario['pode_gerenciar_configuracoes']) && $usuario['pode_gerenciar_configuracoes']) $permissions[] = 'Configurações';
-                                                            if (isset($usuario['pode_aprovar_abastecimentos']) && $usuario['pode_aprovar_abastecimentos']) $permissions[] = 'Gestão de Motoristas';
-                                                            if (isset($usuario['pode_ver_dados_financeiros']) && $usuario['pode_ver_dados_financeiros']) $permissions[] = 'Dados Financeiros';
-                                                            if (isset($usuario['pode_acessar_sistema_fiscal']) && $usuario['pode_acessar_sistema_fiscal']) $permissions[] = 'Sistema Fiscal';
-                                                            if (isset($usuario['pode_acessar_gestao_pneus']) && $usuario['pode_acessar_gestao_pneus']) $permissions[] = 'Gestão de Pneus';
-                                                            ?>
-                                                            <?php if (empty($permissions)): ?>
-                                                                <span class="text-muted" style="font-size: 10px;">Básicas</span>
-                                                            <?php else: ?>
-                                                                <?php foreach ($permissions as $permission): ?>
-                                                                    <span class="badge badge-info" style="font-size: 9px; margin: 1px;"><?php echo $permission; ?></span>
+                                                            <div class="u-perms">
+                                                                <?php $shown = array_slice($rowPerms, 0, 3); foreach ($shown as $p): ?>
+                                                                    <span class="u-badge u-badge--perm"><?php echo htmlspecialchars($p); ?></span>
                                                                 <?php endforeach; ?>
-                                                            <?php endif; ?>
+                                                                <?php if (count($rowPerms) > 3): ?>
+                                                                    <span class="u-badge u-badge--muted" title="<?php echo htmlspecialchars(implode(', ', $rowPerms)); ?>">+<?php echo count($rowPerms) - 3; ?></span>
+                                                                <?php endif; ?>
+                                                            </div>
                                                         <?php endif; ?>
-                                                    </div>
+                                                    <?php endif; ?>
                                                 <?php else: ?>
-                                                    <span class="text-muted" style="font-size: 10px;">-</span>
+                                                    <span class="text-muted">—</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td style="padding: 12px 8px; text-align: center;">
-                                                <span class="badge <?php echo $usuario['status'] === 'ativo' ? 'badge-success' : 'badge-danger'; ?>">
-                                                    <?php echo ucfirst($usuario['status']); ?>
+                                            <td class="u-col-center" data-label="Status">
+                                                <span class="u-badge <?php echo $row_status === 'ativo' ? 'u-badge--ok' : 'u-badge--off'; ?>">
+                                                    <span class="u-dot <?php echo $row_status === 'ativo' ? 'u-dot--on' : 'u-dot--off'; ?>"></span> <?php echo ucfirst($row_status); ?>
                                                 </span>
                                             </td>
-                                            <td style="padding: 12px 8px; text-align: center;">
+                                            <td class="u-col-center" data-label="2FA">
                                                 <?php if ($usuario['tipo_usuario_sistema'] === 'sistema'):
                                                     $tfa_on = !empty($usuario['two_factor_enabled']);
                                                     $eh_proprio = ((int) $usuario['id'] === (int) ($_SESSION['usuario_id'] ?? 0));
                                                 ?>
-                                                    <span class="badge <?php echo $tfa_on ? 'badge-success' : 'badge-secondary'; ?>" style="font-size:10px;">
-                                                        <?php echo $tfa_on ? 'Ativo' : 'Inativo'; ?>
-                                                    </span>
-                                                    <div style="margin-top:4px;">
+                                                    <div style="display:inline-flex;align-items:center;gap:6px;">
+                                                        <span class="u-badge <?php echo $tfa_on ? 'u-badge--ok' : 'u-badge--muted'; ?>">
+                                                            <i class="fas fa-shield-halved"></i> <?php echo $tfa_on ? 'Ativo' : 'Inativo'; ?>
+                                                        </span>
                                                         <?php if ($eh_proprio && !$tfa_on): ?>
-                                                            <button class="btn btn-sm btn-primary" style="font-size:10px;" onclick="setup2FA()"><i class="fas fa-qrcode"></i> Configurar</button>
+                                                            <button class="u-iconbtn u-iconbtn--2fa" title="Configurar 2FA" aria-label="Configurar 2FA" onclick="setup2FA()"><i class="fas fa-qrcode"></i></button>
                                                         <?php elseif ($tfa_on && ($eh_proprio || $can_edit_system_users)): ?>
-                                                            <button class="btn btn-sm btn-danger" style="font-size:10px;" onclick="disable2FA(<?php echo (int) $usuario['id']; ?>, <?php echo $eh_proprio ? 'true' : 'false'; ?>)"><i class="fas fa-shield-halved"></i> Desativar</button>
-                                                        <?php elseif (!$tfa_on): ?>
-                                                            <span class="text-muted" style="font-size:10px;">—</span>
+                                                            <button class="u-iconbtn u-iconbtn--danger" title="Desativar 2FA" aria-label="Desativar 2FA" onclick="disable2FA(<?php echo (int) $usuario['id']; ?>, <?php echo $eh_proprio ? 'true' : 'false'; ?>)"><i class="fas fa-ban"></i></button>
                                                         <?php endif; ?>
                                                     </div>
                                                 <?php else: ?>
-                                                    <span class="text-muted" style="font-size:10px;">—</span>
+                                                    <span class="text-muted">—</span>
                                                 <?php endif; ?>
                                             </td>
-                                            <td style="padding: 12px 8px; text-align: center;"><?php echo date('d/m/Y H:i', strtotime($usuario['data_cadastro'])); ?></td>
-                                            <td style="padding: 12px 8px; text-align: center;">
+                                            <td class="u-col-center" data-label="Cadastro">
+                                                <span style="font-size:0.8rem;color:var(--text-secondary);white-space:nowrap;"><?php echo $ts_cad ? date('d/m/Y', $ts_cad) : '—'; ?></span>
+                                            </td>
+                                            <td class="u-col-center" data-label="Ações">
                                                 <?php if ($usuario['tipo_usuario_sistema'] === 'motorista' || $can_edit_system_users): ?>
-                                                    <button class="btn btn-sm btn-primary btn-acao" title="Editar usuário" aria-label="Editar usuário" onclick="editarUsuario(<?php echo $usuario['id']; ?>, '<?php echo $usuario['tipo_usuario_sistema']; ?>')">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                    <button class="btn btn-sm btn-danger btn-acao" title="Excluir usuário" aria-label="Excluir usuário" onclick="excluirUsuario(<?php echo $usuario['id']; ?>, '<?php echo $usuario['tipo_usuario_sistema']; ?>')">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
+                                                    <div class="u-actions">
+                                                        <button class="u-iconbtn u-iconbtn--edit" title="Editar usuário" aria-label="Editar usuário" onclick="editarUsuario(<?php echo $usuario['id']; ?>, '<?php echo $usuario['tipo_usuario_sistema']; ?>')"><i class="fas fa-pen"></i></button>
+                                                        <button class="u-iconbtn u-iconbtn--danger" title="Excluir usuário" aria-label="Excluir usuário" onclick="excluirUsuario(<?php echo $usuario['id']; ?>, '<?php echo $usuario['tipo_usuario_sistema']; ?>')"><i class="fas fa-trash"></i></button>
+                                                    </div>
                                                 <?php else: ?>
-                                                    <span class="text-muted">Sem permissão</span>
+                                                    <span class="text-muted" style="font-size:0.75rem;">Sem permissão</span>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>
                                         <?php endforeach; ?>
+                                        <?php if (empty($usuarios)): ?>
+                                        <tr><td colspan="7"><div class="u-empty"><i class="fas fa-users-slash"></i>Nenhum usuário cadastrado ainda.</div></td></tr>
+                                        <?php endif; ?>
                                     </tbody>
                                 </table>
                             </div>
                         </div>
                     </div>
 
+                    <!-- Cadastros (lado a lado) -->
+                    <div class="u-forms-row">
                     <!-- Cadastro de Usuário Motorista -->
-                    <div class="dashboard-card" style="grid-column: 1 / -1;">
-                        <div class="card-header">
-                            <i class="fas fa-user-plus kpi-card-icon" aria-hidden="true"></i>
-                            <h3>Cadastro de Usuário Motorista</h3>
+                    <div class="u-panel">
+                        <div class="u-panel__head">
+                            <span class="u-panel__ic"><i class="fas fa-id-card" aria-hidden="true"></i></span>
+                            <div><h3>Novo usuário motorista</h3><p>Dê acesso ao app a um motorista já cadastrado, usando o e-mail dele.</p></div>
                         </div>
-                        <div class="card-body">
+                        <div class="u-panel__body">
                             <form id="cadastroMotoristaForm" method="post" action="../api/usuarios_motoristas.php">
                                 <input type="hidden" name="action" value="create">
                                 <div class="form-group">
@@ -542,9 +620,9 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     <label for="confirmar_senha_motorista">Confirmar Senha</label>
                                     <input type="password" id="confirmar_senha_motorista" name="confirmar_senha" class="form-control" required minlength="6">
                                 </div>
-                                <div class="form-actions">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save"></i> Cadastrar Motorista
+                                <div class="u-form-actions">
+                                    <button type="submit" class="u-btn u-btn--primary">
+                                        <i class="fas fa-user-plus u-btn__ic"></i> Cadastrar motorista
                                     </button>
                                 </div>
                             </form>
@@ -553,12 +631,12 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                     <!-- Cadastro de Usuário do Sistema -->
                     <?php if ($can_create_system_users): ?>
-                    <div class="dashboard-card" style="grid-column: 1 / -1;">
-                        <div class="card-header">
-                            <i class="fas fa-user-gear kpi-card-icon" aria-hidden="true"></i>
-                            <h3>Cadastro de Usuário do Sistema</h3>
+                    <div class="u-panel">
+                        <div class="u-panel__head">
+                            <span class="u-panel__ic"><i class="fas fa-user-gear" aria-hidden="true"></i></span>
+                            <div><h3>Novo usuário do sistema</h3><p>Cadastre um administrador ou gestor e defina suas permissões de acesso.</p></div>
                         </div>
-                        <div class="card-body">
+                        <div class="u-panel__body">
                             <form id="cadastroSistemaForm" method="post" action="../api/usuarios.php">
                                 <input type="hidden" name="action" value="create">
                                 <div class="form-group">
@@ -602,7 +680,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label>Permissões Especiais</label>
+                                    <div class="u-section-label"><i class="fas fa-shield-halved"></i> Permissões especiais</div>
                                     <div class="permissions-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
                                         <div class="permission-item">
                                             <label class="checkbox-label">
@@ -669,33 +747,45 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                                         </div>
                                     </div>
                                 </div>
-                                <div class="form-actions">
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save"></i> Cadastrar Usuário do Sistema
+                                <div class="u-form-actions">
+                                    <button type="submit" class="u-btn u-btn--primary">
+                                        <i class="fas fa-user-plus u-btn__ic"></i> Cadastrar usuário do sistema
                                     </button>
                                 </div>
                             </form>
                         </div>
                     </div>
                     <?php endif; ?>
+                    </div><!-- /.u-forms-row -->
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Botão voltar ao topo -->
+    <button type="button" id="uScrollTop" class="u-scrolltop" aria-label="Voltar ao topo" title="Voltar ao topo">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
     <!-- Modal de Edição -->
-    <div id="editModal" class="modal" style="display: none;">
+    <div id="editModal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="modalTitle">Editar Usuário</h3>
-                <span class="close" onclick="fecharModal()">&times;</span>
+                <span class="u-modal-ic"><i class="fas fa-user-pen"></i></span>
+                <div class="u-modal-headtext">
+                    <h3 id="modalTitle">Editar Usuário</h3>
+                    <p>Atualize os dados, o acesso e as permissões deste usuário.</p>
+                </div>
+                <span class="close" onclick="fecharModal()" role="button" tabindex="0" aria-label="Fechar">&times;</span>
             </div>
             <div class="modal-body">
                 <form id="editForm">
                     <input type="hidden" id="edit_id" name="id">
                     <input type="hidden" id="edit_tipo" name="tipo_usuario_sistema">
                     <input type="hidden" name="action" value="update">
-                    
+
+                    <div class="u-section-label"><i class="fas fa-id-badge"></i> Identificação</div>
+
                     <div id="edit_motorista_fields" style="display: none;">
                         <div class="form-group">
                             <label for="edit_motorista_id">Motorista</label>
@@ -804,6 +894,8 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                         </div>
                     </div>
                     
+                    <div class="u-section-label"><i class="fas fa-lock"></i> Acesso e segurança</div>
+
                     <div class="form-group">
                         <label for="edit_senha">Nova Senha (deixe em branco para manter a atual)</label>
                         <input type="password" id="edit_senha" name="senha" class="form-control" minlength="6">
@@ -817,7 +909,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             </ul>
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="edit_status">Status</label>
                         <select id="edit_status" name="status" class="form-control">
@@ -825,13 +917,13 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <option value="inativo">Inativo</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Salvar Alterações
+                        <button type="button" class="u-btn u-btn--secondary" onclick="fecharModal()">
+                            <i class="fas fa-times u-btn__ic"></i> Cancelar
                         </button>
-                        <button type="button" class="btn btn-secondary" onclick="fecharModal()">
-                            <i class="fas fa-times"></i> Cancelar
+                        <button type="submit" class="u-btn u-btn--primary">
+                            <i class="fas fa-save u-btn__ic"></i> Salvar alterações
                         </button>
                     </div>
                 </form>
@@ -1090,8 +1182,8 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     const sel = document.getElementById('edit_motorista_id');
                     if (sel) sel.value = usuario.motorista_id || '';
                 }
-                
-                modal.style.display = 'block';
+
+                modal.style.display = 'flex';
             } else {
                 uaToast(data.message || data.error || 'Erro ao carregar dados do usuário.', 'error');
             }
@@ -1281,16 +1373,17 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
             });
         };
 
-        // ---- Busca + filtros da tabela ----
+        // ---- Busca instantânea + filtros + ordenação ----
         function applyFilter() {
             var s = document.getElementById('ufSearch');
             var q = (s ? s.value : '').trim().toLowerCase();
             var tipo = (document.getElementById('ufTipo') || {}).value || '';
             var status = (document.getElementById('ufStatus') || {}).value || '';
-            var rows = document.querySelectorAll('tr.user-row');
+            var rows = Array.prototype.slice.call(document.querySelectorAll('tr.user-row'));
             var visible = 0;
             rows.forEach(function (r) {
-                var okQ = !q || (r.getAttribute('data-nome') || '').indexOf(q) >= 0 || (r.getAttribute('data-email') || '').indexOf(q) >= 0;
+                var blob = r.getAttribute('data-search') || ((r.getAttribute('data-nome') || '') + ' ' + (r.getAttribute('data-email') || ''));
+                var okQ = !q || blob.indexOf(q) >= 0;
                 var okT = !tipo || r.getAttribute('data-tipo') === tipo;
                 var okS = !status || r.getAttribute('data-status') === status;
                 var show = okQ && okT && okS;
@@ -1299,13 +1392,66 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
             });
             var c = document.getElementById('ufCount');
             if (c) c.textContent = visible + ' de ' + rows.length + ' usuário(s)';
+            // Ordenação (reordena as linhas visíveis no tbody)
+            var sort = (document.getElementById('ufSort') || {}).value || 'recent';
+            var body = document.getElementById('usersTbody');
+            if (body) {
+                rows.sort(function (a, b) {
+                    if (sort === 'name') {
+                        return (a.getAttribute('data-nome') || '').localeCompare(b.getAttribute('data-nome') || '');
+                    }
+                    return (parseInt(b.getAttribute('data-cadastro'), 10) || 0) - (parseInt(a.getAttribute('data-cadastro'), 10) || 0);
+                });
+                rows.forEach(function (r) { body.appendChild(r); });
+            }
         }
         window.uaApplyFilter = applyFilter;
-        ['ufSearch', 'ufTipo', 'ufStatus'].forEach(function (id) {
+        ['ufSearch', 'ufTipo', 'ufStatus', 'ufSort'].forEach(function (id) {
             var el = document.getElementById(id);
             if (el) el.addEventListener(id === 'ufSearch' ? 'input' : 'change', applyFilter);
         });
+        var clearBtn = document.getElementById('ufClear');
+        if (clearBtn) clearBtn.addEventListener('click', function () {
+            var s = document.getElementById('ufSearch'); if (s) s.value = '';
+            var t = document.getElementById('ufTipo'); if (t) t.value = '';
+            var st = document.getElementById('ufStatus'); if (st) st.value = '';
+            var so = document.getElementById('ufSort'); if (so) so.value = 'recent';
+            applyFilter();
+            if (s) s.focus();
+        });
         applyFilter();
+
+        // ESC fecha qualquer modal aberto (editModal / modal2FA)
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            ['editModal', 'modal2FA'].forEach(function (mid) {
+                var m = document.getElementById(mid);
+                if (m && (m.style.display === 'flex' || m.style.display === 'block')) { m.style.display = 'none'; }
+            });
+        });
+        // Fechar 2FA clicando fora
+        var m2fa = document.getElementById('modal2FA');
+        if (m2fa) m2fa.addEventListener('click', function (e) { if (e.target === m2fa) m2fa.style.display = 'none'; });
+
+        // ---- Botão "voltar ao topo" ----
+        var topBtn = document.getElementById('uScrollTop');
+        if (topBtn) {
+            // Detecta o container que realmente rola (window ou .main-content/.dashboard-content)
+            var scroller = null;
+            ['.main-content', '.dashboard-content'].forEach(function (sel) {
+                var el = document.querySelector(sel);
+                if (!scroller && el && el.scrollHeight > el.clientHeight + 40) { scroller = el; }
+            });
+            function scrollPos() { return scroller ? scroller.scrollTop : (window.pageYOffset || document.documentElement.scrollTop || 0); }
+            function onScroll() { topBtn.classList.toggle('show', scrollPos() > 260); }
+            (scroller || window).addEventListener('scroll', onScroll, { passive: true });
+            window.addEventListener('resize', onScroll, { passive: true });
+            topBtn.addEventListener('click', function () {
+                if (scroller) { scroller.scrollTo({ top: 0, behavior: 'smooth' }); }
+                else { window.scrollTo({ top: 0, behavior: 'smooth' }); }
+            });
+            onScroll();
+        }
 
         // ---- Medidor de senha forte ----
         document.querySelectorAll('.pwd-meter').forEach(function (meter) {
@@ -1328,5 +1474,7 @@ $motoristas_disponiveis = $stmt->fetchAll(PDO::FETCH_ASSOC);
     </script>
 
     <?php include '../includes/footer.php'; ?>
+    <?php $sf_help_key = 'usuarios'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

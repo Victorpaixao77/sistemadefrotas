@@ -1,0 +1,33 @@
+-- Ordens de Transporte (unifica Cotação → OT → Viagem por status).
+-- Aplicar: mysql -h 127.0.0.1 -P 3307 -u root sistema_frotas < sql/ordens_transporte.sql
+CREATE TABLE IF NOT EXISTS ordens_transporte (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    empresa_id INT NOT NULL,
+    numero VARCHAR(20) NOT NULL,
+    cliente_nome VARCHAR(160) NULL,
+    cliente_doc VARCHAR(40) NULL,
+    origem VARCHAR(160) NULL,
+    destino VARCHAR(160) NULL,
+    estado_origem VARCHAR(2) NULL,
+    estado_destino VARCHAR(2) NULL,
+    distancia_km DECIMAL(10,2) NOT NULL DEFAULT 0,
+    tipo_carga VARCHAR(40) NOT NULL DEFAULT 'geral',
+    eixos TINYINT UNSIGNED NOT NULL DEFAULT 5,
+    peso_carga DECIMAL(10,2) NULL,
+    descricao_carga VARCHAR(255) NULL,
+    valor_frete DECIMAL(12,2) NOT NULL DEFAULT 0,
+    valor_custo_estimado DECIMAL(12,2) NULL,
+    veiculo_id INT NULL,
+    motorista_id INT NULL,
+    rota_id INT NULL,
+    data_coleta DATETIME NULL,
+    data_entrega DATETIME NULL,
+    status ENUM('cotacao','aprovada','em_viagem','concluida','cancelada') NOT NULL DEFAULT 'cotacao',
+    observacoes TEXT NULL,
+    criado_por INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_num (empresa_id, numero),
+    KEY idx_emp_status (empresa_id, status),
+    KEY idx_rota (rota_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

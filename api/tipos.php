@@ -19,6 +19,7 @@ header('Content-Type: application/json');
 
 // Ensure the request is authenticated
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Protege mutações (POST/PUT/PATCH/DELETE) com CSRF.
 api_require_csrf_json();
@@ -60,7 +61,7 @@ try {
 } catch (PDOException $e) {
     error_log("Error in tipos.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Erro ao buscar tipos: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Erro ao buscar tipos: ']);
 } catch (Exception $e) {
     error_log("General error in tipos.php: " . $e->getMessage());
     http_response_code(500);

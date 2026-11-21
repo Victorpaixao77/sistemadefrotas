@@ -1,19 +1,24 @@
 <?php
-require_once '../includes/conexao.php';
-session_start();
+require_once __DIR__ . '/includes/adm_auth.php';
+require_once __DIR__ . '/includes/adm_post_guard.php';
+require_once __DIR__ . '/lib/adm_events.php';
+require_once __DIR__ . '/lib/adm_schema.php';
+require_once __DIR__ . '/lib/adm_phase2.php';
+adm_schema_ensure($pdo);
 
-// Verificar se o usuário está logado
-if (!isset($_SESSION['admin_id'])) {
-    header('Location: login.php');
-    exit;
-}
+$page_title = 'Empresas';
+
+// Modais usam classes Bootstrap, mas o visual vem de adm-pages.css (evita conflito no menu lateral).
 
 // Processar ações (mantendo toda a lógica existente)
 $mensagem = '';
 $tipo_mensagem = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['action'])) {
+    if (!adm_csrf_valid_post()) {
+        $mensagem = 'Sessão expirada ou token inválido. Recarregue a página.';
+        $tipo_mensagem = 'error';
+    } elseif (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'add':
                 try {
@@ -48,15 +53,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     }
 
                     // Manter campo 'plano' como 'basic' por padrão (compatibilidade)
-                    $stmt = $pdo->prepare("INSERT INTO empresa_adm (razao_social, cnpj, telefone, email, valor_por_veiculo, plano, plano_id, tem_acesso_seguro) VALUES (?, ?, ?, ?, ?, 'basic', ?, ?)");
+                    $cidade = trim((string) ($_POST['cidade'] ?? ''));
+                    $estado = strtoupper(substr(trim((string) ($_POST['estado'] ?? '')), 0, 2));
+                    $stmt = $pdo->prepare("INSERT INTO empresa_adm (razao_social, cnpj, telefone, email, status_saas, valor_por_veiculo, plano, plano_id, tem_acesso_seguro, cidade, estado) VALUES (?, ?, ?, ?, ?, ?, 'basic', ?, ?, ?, ?)");
                     $stmt->execute([
                         $_POST['razao_social'],
                         $_POST['cnpj'],
                         $_POST['telefone'],
                         $_POST['email'],
+                        adm_status_saas_normalize($_POST['status_saas'] ?? 'ativa'),
                         $valor_por_veiculo,
                         $plano_id,
-                        $tem_acesso_seguro
+                        $tem_acesso_seguro,
+                        $cidade !== '' ? $cidade : null,
+                        $estado !== '' ? $estado : null,
                     ]);
 
                     $empresa_adm_id = $pdo->lastInsertId();
@@ -124,14 +134,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                     $pdo->commit();
 
+                    adm_event_log($pdo, 'empresas', 'criar', 'Empresa criada: ' . ($_POST['razao_social'] ?? ''), 'info', (int) $empresa_cliente_id, (int) $empresa_adm_id);
+                    adm_licensing_sync_limits($pdo, (int) $empresa_adm_id, $plano_id);
+
                     $mensagem_extra = $tem_acesso_seguro === 'sim' ? ' Sistema Seguro habilitado! Login: ' . $_POST['email'] . ' | Senha: 123456' : '';
                     $mensagem = "Empresa cadastrada com sucesso!" . $mensagem_extra;
                     $tipo_mensagem = "success";
+                } catch (PDOException $e) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    error_log('empresas add: ' . $e->getMessage());
+                    $mensagem = "Erro ao cadastrar empresa. Tente novamente.";
+                    $tipo_mensagem = "error";
                 } catch (Exception $e) {
                     if ($pdo->inTransaction()) {
                         $pdo->rollBack();
                     }
-                    $mensagem = "Erro ao cadastrar empresa: " . $e->getMessage();
+                    $mensagem = $e->getMessage();
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -152,6 +172,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                     $pdo->beginTransaction();
 
+                    $stOldPlano = $pdo->prepare('SELECT plano_id FROM empresa_adm WHERE id = ?');
+                    $stOldPlano->execute([$_POST['id']]);
+                    $oldPlanoRaw = $stOldPlano->fetchColumn();
+                    $oldPlanoId = $oldPlanoRaw !== false && $oldPlanoRaw !== null ? (int) $oldPlanoRaw : null;
+
                     // Sistema Seguro: Sim ou Não
                     $tem_acesso_seguro = isset($_POST['tem_acesso_seguro']) && $_POST['tem_acesso_seguro'] === 'sim' ? 'sim' : 'nao';
                     
@@ -169,15 +194,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     }
 
                     // Manter campo 'plano' como 'basic' por padrão (compatibilidade)
-                    $stmt = $pdo->prepare("UPDATE empresa_adm SET razao_social = ?, cnpj = ?, telefone = ?, email = ?, valor_por_veiculo = ?, plano = 'basic', plano_id = ?, tem_acesso_seguro = ? WHERE id = ?");
+                    $status_saas = adm_status_saas_normalize($_POST['status_saas'] ?? 'ativa');
+                    $cancelada_em = $status_saas === 'cancelada' ? date('Y-m-d') : null;
+                    $cidade = trim((string) ($_POST['cidade'] ?? ''));
+                    $estado = strtoupper(substr(trim((string) ($_POST['estado'] ?? '')), 0, 2));
+
+                    $stmt = $pdo->prepare("UPDATE empresa_adm SET razao_social = ?, cnpj = ?, telefone = ?, email = ?, status_saas = ?, cancelada_em = COALESCE(?, cancelada_em), valor_por_veiculo = ?, plano = 'basic', plano_id = ?, tem_acesso_seguro = ?, cidade = ?, estado = ? WHERE id = ?");
                     $stmt->execute([
                         $_POST['razao_social'],
                         $_POST['cnpj'],
                         $_POST['telefone'],
                         $_POST['email'],
+                        $status_saas,
+                        $cancelada_em,
                         $valor_por_veiculo,
                         $plano_id,
                         $tem_acesso_seguro,
+                        $cidade !== '' ? $cidade : null,
+                        $estado !== '' ? $estado : null,
                         $_POST['id']
                     ]);
 
@@ -266,13 +300,24 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                     $pdo->commit();
 
+                    adm_event_log($pdo, 'empresas', 'atualizar', 'Empresa atualizada: ' . ($_POST['razao_social'] ?? ''), 'info', null, (int) $_POST['id']);
+                    adm_empresa_plano_change_log($pdo, (int) $_POST['id'], $oldPlanoId, $plano_id, (string) ($_POST['razao_social'] ?? ''));
+                    adm_licensing_sync_limits($pdo, (int) $_POST['id'], $plano_id);
+
                     $mensagem = "Empresa atualizada com sucesso!" . $mensagem_extra;
                     $tipo_mensagem = "success";
+                } catch (PDOException $e) {
+                    if ($pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    error_log('empresas edit: ' . $e->getMessage());
+                    $mensagem = "Erro ao atualizar empresa. Tente novamente.";
+                    $tipo_mensagem = "error";
                 } catch (Exception $e) {
                     if ($pdo->inTransaction()) {
                         $pdo->rollBack();
                     }
-                    $mensagem = "Erro ao atualizar empresa: " . $e->getMessage();
+                    $mensagem = $e->getMessage();
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -289,13 +334,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
                     $pdo->commit();
 
+                    adm_event_log($pdo, 'empresas', 'excluir', 'Empresa excluída ID ' . (int) $_POST['id'], 'aviso', null, (int) $_POST['id']);
+
                     $mensagem = "Empresa excluída com sucesso!";
                     $tipo_mensagem = "success";
                 } catch (PDOException $e) {
                     if ($pdo->inTransaction()) {
                         $pdo->rollBack();
                     }
-                    $mensagem = "Erro ao excluir empresa: " . $e->getMessage();
+                    error_log('empresas delete: ' . $e->getMessage());
+                    $mensagem = "Erro ao excluir empresa. Tente novamente.";
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -303,11 +351,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Criar coluna plano_id se não existir
+// Criar coluna plano_id se não existir (checa antes de ALTER — evita rodar DDL a cada load)
 try {
-    $pdo->exec("ALTER TABLE empresa_adm ADD COLUMN plano_id INT NULL COMMENT 'ID do plano de cobrança' AFTER plano");
+    $temPlanoId = (int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'empresa_adm' AND COLUMN_NAME = 'plano_id'")->fetchColumn();
+    if ($temPlanoId === 0) {
+        $pdo->exec("ALTER TABLE empresa_adm ADD COLUMN plano_id INT NULL COMMENT 'ID do plano de cobrança' AFTER plano");
+    }
 } catch (PDOException $e) {
-    // Coluna já existe
+    error_log('empresas plano_id ensure: ' . $e->getMessage());
 }
 
 // Buscar empresas com dados adicionais
@@ -323,7 +375,8 @@ try {
                p.valor_por_veiculo as plano_valor_por_veiculo,
                p.limite_veiculos as plano_limite_veiculos,
                p.valor_maximo as plano_valor_maximo,
-               CASE 
+               (SELECT s.nota_geral FROM adm_empresa_scores s WHERE s.empresa_adm_id = e.id ORDER BY s.id DESC LIMIT 1) AS health_score,
+               CASE
                    WHEN p.id IS NOT NULL AND p.tipo = 'pacote' THEN 
                        -- Planos tipo PACOTE: valor fixo (valor_maximo)
                        COALESCE(p.valor_maximo, 0)
@@ -348,162 +401,20 @@ try {
     $planos_stmt = $pdo->query("SELECT id, nome, tipo, limite_veiculos, valor_por_veiculo, valor_maximo FROM adm_planos WHERE status = 'ativo' ORDER BY ordem ASC, nome ASC");
     $planos = $planos_stmt->fetchAll();
 } catch (PDOException $e) {
-    $mensagem = "Erro ao carregar empresas: " . $e->getMessage();
+    error_log('empresas load: ' . $e->getMessage());
+    $mensagem = "Erro ao carregar empresas.";
     $tipo_mensagem = "error";
     $empresas = [];
     $planos = [];
 }
+require_once __DIR__ . '/includes/layout_start.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciar Empresas - Sistema de Frotas</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #f8f9fa;
-        }
-        
-        /* Sidebar */
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 250px;
-            height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            z-index: 1000;
-            transition: transform 0.3s ease;
-            overflow-y: auto;
-        }
-        
-        .sidebar .nav-link {
-            color: white;
-            padding: 15px 20px;
-            border-radius: 10px;
-            margin: 5px 10px;
-            transition: all 0.3s;
-            text-decoration: none;
-            display: block;
-        }
-        
-        .sidebar .nav-link:hover,
-        .sidebar .nav-link.active {
-            background-color: rgba(255, 255, 255, 0.2);
-        }
-        
-        /* Main Content */
-        .main-content {
-            margin-left: 250px;
-            padding: 20px;
-            transition: margin-left 0.3s ease;
-            min-height: 100vh;
-        }
-        
-        /* Header */
-        .header {
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 30px;
-            background: white;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-        }
-        
-        /* Cards */
-        .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-            transition: transform 0.3s;
-        }
-        
-        .card:hover {
-            transform: translateY(-5px);
-        }
-        
-        /* Table Container */
-        .table-container {
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-            background: white;
-        }
-        
-        /* Action Icons */
-        .action-icons {
-            display: flex;
-            gap: 3px;
-            flex-wrap: nowrap;
-            justify-content: center;
-        }
-        
-        .action-icon {
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 0.9rem;
-        }
-        
-        .action-icon:hover {
-            transform: scale(1.1);
-        }
-        
-        .icon-view { background-color: #17a2b8; color: white; }
-        .icon-edit { background-color: #ffc107; color: #212529; }
-        .icon-money { background-color: #28a745; color: white; }
-        .icon-log { background-color: #6c757d; color: white; }
-        .icon-user { background-color: #007bff; color: white; }
-        
-        /* Badges */
-        .badge-basic {
-            background: #6c757d;
-        }
-        .badge-premium {
-            background: #28a745;
-        }
-        .badge-enterprise {
-            background: #007bff;
-        }
-        
-        @media (max-width: 768px) {
-            .main-content {
-                margin-left: 0;
-            }
-            .sidebar {
-                transform: translateX(-100%);
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Sidebar -->
-    <?php include 'includes/sidebar.php'; ?>
 
-    <!-- Main Content -->
-    <div class="main-content">
-        <div class="header">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2 class="mb-1">
-                        <i class="fas fa-building me-2"></i>
-                        Gerenciar Empresas
-                    </h2>
-                    <p class="text-muted mb-0">Cadastro e gestão de empresas clientes</p>
-                </div>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaEmpresa">
-                    <i class="fas fa-plus me-1"></i> Nova Empresa
-                </button>
-            </div>
+        <div class="adm-toolbar">
+            <p class="text-muted mb-0" style="margin:0">Cadastro e gestão de empresas clientes</p>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovaEmpresa">
+                <i class="fas fa-plus me-1"></i> Nova Empresa
+            </button>
         </div>
 
         <?php if ($mensagem): ?>
@@ -521,6 +432,9 @@ try {
                         <tr>
                             <th width="120">Ações</th>
                             <th>Razão Social</th>
+                            <th>Status</th>
+                            <th>Score</th>
+                            <th>Local</th>
                             <th>CNPJ</th>
                             <th>Email</th>
                             <th>Telefone</th>
@@ -533,7 +447,7 @@ try {
                     <tbody>
                         <?php if (empty($empresas)): ?>
                             <tr>
-                                <td colspan="9" class="text-center py-5">
+                                <td colspan="12" class="text-center py-5">
                                     <i class="fas fa-inbox fa-3x text-muted mb-3 d-block"></i>
                                     <p class="text-muted">Nenhuma empresa cadastrada</p>
                                 </td>
@@ -561,6 +475,28 @@ try {
                                         </div>
                                     </td>
                                     <td><strong><?php echo htmlspecialchars($empresa['razao_social']); ?></strong></td>
+                                    <td><span class="badge bg-<?php echo ($empresa['status_saas'] ?? 'ativa') === 'ativa' ? 'success' : (($empresa['status_saas'] ?? '') === 'trial' ? 'info' : 'secondary'); ?>"><?php echo htmlspecialchars($empresa['status_saas'] ?? 'ativa'); ?></span></td>
+                                    <td>
+                                        <?php
+                                        $hs = isset($empresa['health_score']) && $empresa['health_score'] !== null ? (int) $empresa['health_score'] : null;
+                                        if ($hs !== null && $hs > 0):
+                                            $hsClass = $hs >= 70 ? 'success' : ($hs >= 40 ? 'warning text-dark' : 'danger');
+                                        ?>
+                                            <a href="health_score.php" class="badge bg-<?php echo $hsClass; ?>" title="Health score"><?php echo $hs; ?></a>
+                                        <?php else: ?>
+                                            <span class="text-muted">—</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        $loc = trim(($empresa['cidade'] ?? '') . (($empresa['estado'] ?? '') !== '' ? '/' . $empresa['estado'] : ''));
+                                        if ($loc !== '') {
+                                            echo htmlspecialchars($loc);
+                                        } else {
+                                            echo '<span class="text-muted">—</span>';
+                                        }
+                                        ?>
+                                    </td>
                                     <td><?php echo htmlspecialchars($empresa['cnpj']); ?></td>
                                     <td><?php echo htmlspecialchars($empresa['email']); ?></td>
                                     <td><?php echo htmlspecialchars($empresa['telefone']); ?></td>
@@ -640,20 +576,20 @@ try {
                 </table>
             </div>
         </div>
-    </div>
 
     <!-- Modal Nova Empresa -->
     <div class="modal fade" id="modalNovaEmpresa" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered adm-modal-dialog adm-modal-dialog--form">
             <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Nova Empresa</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST">
-                    <div class="modal-body">
+                    <div class="modal-body adm-modal-form-grid">
                         <input type="hidden" name="action" value="add">
-                        <div class="mb-3">
+                        <?php echo adm_csrf_field(); ?>
+                        <div class="mb-3 adm-modal-field--full">
                             <label for="razao_social" class="form-label">Razão Social *</label>
                             <input type="text" class="form-control" id="razao_social" name="razao_social" required>
                         </div>
@@ -668,6 +604,24 @@ try {
                         <div class="mb-3">
                             <label for="telefone" class="form-label">Telefone</label>
                             <input type="text" class="form-control" id="telefone" name="telefone">
+                        </div>
+                        <div class="mb-3">
+                            <label for="cidade" class="form-label">Cidade</label>
+                            <input type="text" class="form-control" id="cidade" name="cidade" placeholder="Ex.: São Paulo">
+                        </div>
+                        <div class="mb-3">
+                            <label for="estado" class="form-label">UF</label>
+                            <input type="text" class="form-control" id="estado" name="estado" maxlength="2" placeholder="SP">
+                        </div>
+                        <div class="mb-3">
+                            <label for="status_saas" class="form-label">Status SaaS</label>
+                            <select class="form-select" id="status_saas" name="status_saas">
+                                <option value="ativa">Ativa</option>
+                                <option value="trial">Trial</option>
+                                <option value="bloqueada">Bloqueada</option>
+                                <option value="suspensa">Suspensa</option>
+                                <option value="cancelada">Cancelada</option>
+                            </select>
                         </div>
                         <div class="mb-3">
                             <label for="plano_id" class="form-label">Plano de Cobrança</label>
@@ -695,7 +649,7 @@ try {
                             <input type="number" class="form-control" id="valor_por_veiculo" name="valor_por_veiculo" step="0.01" value="0.00">
                             <small class="text-muted">Será preenchido automaticamente se um plano for selecionado</small>
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-3 adm-modal-field--full">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="tem_acesso_seguro" value="sim" id="tem_acesso_seguro">
                                 <label class="form-check-label" for="tem_acesso_seguro">
@@ -719,17 +673,18 @@ try {
 
     <!-- Modal Editar Empresa -->
     <div class="modal fade" id="modalEditarEmpresa" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered adm-modal-dialog adm-modal-dialog--form">
             <div class="modal-content">
-                <div class="modal-header bg-warning">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Editar Empresa</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST">
-                    <div class="modal-body">
+                    <div class="modal-body adm-modal-form-grid">
                         <input type="hidden" name="action" value="edit">
                         <input type="hidden" name="id" id="edit_id">
-                        <div class="mb-3">
+                        <?php echo adm_csrf_field(); ?>
+                        <div class="mb-3 adm-modal-field--full">
                             <label for="edit_razao_social" class="form-label">Razão Social *</label>
                             <input type="text" class="form-control" id="edit_razao_social" name="razao_social" required>
                         </div>
@@ -746,6 +701,24 @@ try {
                             <input type="text" class="form-control" id="edit_telefone" name="telefone">
                         </div>
                         <div class="mb-3">
+                            <label for="edit_cidade" class="form-label">Cidade</label>
+                            <input type="text" class="form-control" id="edit_cidade" name="cidade">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_estado" class="form-label">UF</label>
+                            <input type="text" class="form-control" id="edit_estado" name="estado" maxlength="2">
+                        </div>
+                        <div class="mb-3">
+                            <label for="edit_status_saas" class="form-label">Status SaaS</label>
+                            <select class="form-select" id="edit_status_saas" name="status_saas">
+                                <option value="ativa">Ativa</option>
+                                <option value="trial">Trial</option>
+                                <option value="bloqueada">Bloqueada</option>
+                                <option value="suspensa">Suspensa</option>
+                                <option value="cancelada">Cancelada</option>
+                            </select>
+                        </div>
+                        <div class="mb-3 adm-modal-field--full">
                             <label for="edit_plano_id" class="form-label">Plano de Cobrança</label>
                             <select class="form-select" id="edit_plano_id" name="plano_id" onchange="atualizarValorPorVeiculoEdit()">
                                 <option value="">Selecione um plano (opcional)</option>
@@ -771,7 +744,7 @@ try {
                             <input type="number" class="form-control" id="edit_valor_por_veiculo" name="valor_por_veiculo" step="0.01">
                             <small class="text-muted">Será preenchido automaticamente se um plano for selecionado</small>
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-3 adm-modal-field--full">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" name="tem_acesso_seguro" value="sim" id="edit_tem_acesso_seguro">
                                 <label class="form-check-label" for="edit_tem_acesso_seguro">
@@ -792,11 +765,11 @@ try {
 
     <!-- Modal Visualizar Empresa -->
     <div class="modal fade" id="modalVisualizarEmpresa" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-dialog-centered adm-modal-dialog adm-modal-dialog--lg">
             <div class="modal-content">
-                <div class="modal-header" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white;">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-eye me-2"></i>Detalhes da Empresa</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body" id="conteudoVisualizarEmpresa">
                     <!-- Será preenchido via JavaScript -->
@@ -811,16 +784,16 @@ try {
         </div>
     </div>
 
-    <!-- Modal Posição Financeira -->
-    <div class="modal fade" id="modalPosicaoFinanceira" tabindex="-1">
-        <div class="modal-dialog modal-xl" style="max-width: 95%;">
-            <div class="modal-content">
-                <div class="modal-header" style="background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: white; padding: 10px 20px;">
-                    <h5 class="modal-title mb-0"><i class="fas fa-chart-line me-2"></i>Posição Financeira</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    <!-- Modal Posição Financeira (portal → body via JS; landscape grande, não fullscreen) -->
+    <div class="modal fade" id="modalPosicaoFinanceira" tabindex="-1" aria-labelledby="modalPosicaoFinanceiraTitle" aria-hidden="true">
+        <div class="modal-dialog adm-modal-dialog adm-modal-dialog--finance">
+            <div class="modal-content adm-modal-finance">
+                <div class="modal-header">
+                    <h5 class="modal-title mb-0" id="modalPosicaoFinanceiraTitle"><i class="fas fa-chart-line me-2"></i>Posição Financeira</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
                 </div>
-                <div class="modal-body" style="padding: 0; overflow: hidden;">
-                    <iframe id="iframeFinanceiro" src="" style="width: 100%; height: 80vh; border: none;"></iframe>
+                <div class="modal-body modal-body--flush p-0">
+                    <iframe id="iframeFinanceiro" src="" title="Posição financeira da empresa"></iframe>
                 </div>
             </div>
         </div>
@@ -828,15 +801,15 @@ try {
 
     <!-- Modal Log de Acessos -->
     <div class="modal fade" id="modalLogAcessos" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+        <div class="modal-dialog modal-dialog-centered adm-modal-dialog adm-modal-dialog--xl">
             <div class="modal-content">
-                <div class="modal-header" style="background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); color: white;">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-history me-2"></i>Log de Acessos</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div id="infoEmpresaLog" style="margin-bottom: 20px;"></div>
-                    <iframe id="iframeLog" src="" style="width: 100%; height: 600px; border: none;"></iframe>
+                <div class="modal-body modal-body--flush">
+                    <div id="infoEmpresaLog" class="adm-modal-iframe-bar"></div>
+                    <iframe id="iframeLog" src=""></iframe>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
@@ -847,11 +820,11 @@ try {
 
     <!-- Modal Usuários -->
     <div class="modal fade" id="modalUsuarios" tabindex="-1">
-        <div class="modal-dialog modal-xl">
+        <div class="modal-dialog modal-dialog-centered adm-modal-dialog adm-modal-dialog--xl">
             <div class="modal-content">
-                <div class="modal-header" style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white;">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-users me-2"></i>Usuários da Empresa</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div id="infoEmpresaUsuarios" style="margin-bottom: 20px;"></div>
@@ -864,7 +837,7 @@ try {
                     </div>
 
                     <!-- Tabela de Usuários -->
-                    <div class="table-responsive">
+                    <div class="adm-modal-table">
                         <table class="table table-hover">
                             <thead class="table-light">
                                 <tr>
@@ -895,14 +868,14 @@ try {
 
     <!-- Modal Novo Usuário -->
     <div class="modal fade" id="modalNovoUsuario" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered adm-modal-dialog adm-modal-dialog--form">
             <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-user-plus me-2"></i>Novo Usuário</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="formNovoUsuario">
-                    <div class="modal-body">
+                    <div class="modal-body adm-modal-form-grid">
                         <input type="hidden" id="novoUsuarioEmpresaId">
                         <div class="mb-3">
                             <label for="novoUsuarioNome" class="form-label">Nome *</label>
@@ -938,14 +911,14 @@ try {
 
     <!-- Modal Editar Usuário -->
     <div class="modal fade" id="modalEditarUsuario" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered adm-modal-dialog adm-modal-dialog--form">
             <div class="modal-content">
-                <div class="modal-header bg-warning">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-user-edit me-2"></i>Editar Usuário</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form id="formEditarUsuario">
-                    <div class="modal-body">
+                    <div class="modal-body adm-modal-form-grid">
                         <input type="hidden" id="editarUsuarioId">
                         <input type="hidden" id="editarUsuarioEmpresaId">
                         <div class="mb-3">
@@ -990,11 +963,75 @@ try {
     <!-- Formulário de Exclusão -->
     <form id="deleteForm" method="POST" style="display: none;">
         <input type="hidden" name="action" value="delete">
+        <?php echo adm_csrf_field(); ?>
         <input type="hidden" name="id" id="delete_id">
     </form>
 
+<?php
+$adm_extra_scripts = <<<'HTML'
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        /** Move modal para o body — cobre sidebar + conteúdo (tela inteira). */
+        function admPortalModalToBody(modalId) {
+            const el = document.getElementById(modalId);
+            if (el && el.parentElement !== document.body) {
+                document.body.appendChild(el);
+            }
+            return el;
+        }
+
+        /**
+         * Move TODOS os modais para o <body>. Dentro de .main-content o backdrop
+         * do Bootstrap não captura o clique "fora", então o modal não fechava.
+         * No body o position:fixed volta a valer e clicar fora (ou ESC) fecha —
+         * igual ao padrão das páginas do gestor.
+         */
+        (function admPortalAllModals() {
+            document.querySelectorAll('.modal').forEach(function(m) {
+                if (m.parentElement !== document.body) {
+                    document.body.appendChild(m);
+                }
+            });
+        })();
+
+        /** Token CSRF (reaproveita o hidden já presente nos forms da página). */
+        function admCsrfToken() {
+            const el = document.querySelector('input[name="csrf_token"]');
+            return el ? el.value : '';
+        }
+
+        let modalFinanceiroBs = null;
+        function getModalFinanceiro() {
+            const el = admPortalModalToBody('modalPosicaoFinanceira');
+            if (!el) return null;
+            if (!modalFinanceiroBs) {
+                modalFinanceiroBs = bootstrap.Modal.getOrCreateInstance(el);
+
+                // Fechamento à prova de falhas: o iframe rouba o foco e às vezes o
+                // dismiss nativo do Bootstrap não dispara. Garantimos o hide no X.
+                el.querySelectorAll('[data-bs-dismiss="modal"]').forEach(function (btn) {
+                    btn.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        modalFinanceiroBs.hide();
+                    });
+                });
+
+                // Ao fechar: para o iframe e remove qualquer backdrop/estado preso
+                // (evita a tela ficar travada atrás de um overlay cinza).
+                el.addEventListener('hidden.bs.modal', function () {
+                    const ifr = document.getElementById('iframeFinanceiro');
+                    if (ifr) ifr.src = 'about:blank';
+                    if (!document.querySelector('.modal.show')) {
+                        document.querySelectorAll('.modal-backdrop').forEach(function (b) { b.remove(); });
+                        document.body.classList.remove('modal-open');
+                        document.body.style.removeProperty('overflow');
+                        document.body.style.removeProperty('padding-right');
+                    }
+                });
+            }
+            return modalFinanceiroBs;
+        }
+
         let empresaAtual = null;
 
         // Mostrar/ocultar info do Sistema Seguro
@@ -1091,15 +1128,18 @@ try {
             document.getElementById('edit_cnpj').value = empresa.cnpj;
             document.getElementById('edit_email').value = empresa.email;
             document.getElementById('edit_telefone').value = empresa.telefone || '';
+            document.getElementById('edit_cidade').value = empresa.cidade || '';
+            document.getElementById('edit_estado').value = empresa.estado || '';
             document.getElementById('edit_valor_por_veiculo').value = empresa.valor_por_veiculo;
             document.getElementById('edit_plano_id').value = empresa.plano_id || '';
             document.getElementById('edit_tem_acesso_seguro').checked = empresa.tem_acesso_seguro === 'sim';
+            document.getElementById('edit_status_saas').value = empresa.status_saas || 'ativa';
             new bootstrap.Modal(document.getElementById('modalEditarEmpresa')).show();
         }
 
         function abrirFinanceiro(empresaId) {
             // Buscar empresa_cliente_id
-            fetch(`./api/get_empresa_cliente_id.php?empresa_adm_id=${empresaId}`)
+            fetch('./api/get_empresa_cliente_id.php', { method: 'POST', body: (function () { const fd = new FormData(); fd.append('csrf_token', admCsrfToken()); fd.append('empresa_adm_id', empresaId); return fd; })() })
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Erro na resposta do servidor: ' + response.status);
@@ -1111,7 +1151,8 @@ try {
                     if (data.success && data.empresa_cliente_id) {
                         const url = `./posicao_financeira.php?empresa_id=${data.empresa_cliente_id}`;
                         document.getElementById('iframeFinanceiro').src = url;
-                        new bootstrap.Modal(document.getElementById('modalPosicaoFinanceira')).show();
+                        const modal = getModalFinanceiro();
+                        if (modal) modal.show();
                     } else {
                         const errorMsg = data.error || 'Empresa não encontrada';
                         console.error('Erro:', errorMsg);
@@ -1126,7 +1167,7 @@ try {
 
         function abrirLogAcessos(empresaId) {
             // Buscar empresa_cliente_id
-            fetch(`./api/get_empresa_cliente_id.php?empresa_adm_id=${empresaId}`)
+            fetch('./api/get_empresa_cliente_id.php', { method: 'POST', body: (function () { const fd = new FormData(); fd.append('csrf_token', admCsrfToken()); fd.append('empresa_adm_id', empresaId); return fd; })() })
                 .then(response => {
                     if (!response.ok) {
                         throw new Error('Erro ao buscar empresa: ' + response.status);
@@ -1276,6 +1317,7 @@ try {
             
             const formData = new FormData();
             formData.append('action', 'add');
+            formData.append('csrf_token', admCsrfToken());
             formData.append('empresa_id', document.getElementById('novoUsuarioEmpresaId').value);
             formData.append('nome', document.getElementById('novoUsuarioNome').value);
             formData.append('email', document.getElementById('novoUsuarioEmail').value);
@@ -1342,6 +1384,7 @@ try {
             
             const formData = new FormData();
             formData.append('action', 'edit');
+            formData.append('csrf_token', admCsrfToken());
             formData.append('id', document.getElementById('editarUsuarioId').value);
             formData.append('empresa_id', document.getElementById('editarUsuarioEmpresaId').value);
             formData.append('nome', document.getElementById('editarUsuarioNome').value);
@@ -1386,6 +1429,7 @@ try {
             
             const formData = new FormData();
             formData.append('action', 'delete');
+            formData.append('csrf_token', admCsrfToken());
             formData.append('id', usuarioId);
             
             fetch('./api/salvar_usuario.php', {
@@ -1412,7 +1456,5 @@ try {
             });
         }
     </script>
-
-    <?php include '../includes/scroll_to_top.php'; ?>
-</body>
-</html>
+HTML;
+require_once __DIR__ . '/includes/layout_end.php';

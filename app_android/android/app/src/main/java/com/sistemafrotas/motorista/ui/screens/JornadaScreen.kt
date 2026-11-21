@@ -1,5 +1,6 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -48,10 +49,10 @@ fun JornadaScreen(
     val vm: JornadaViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository) { JornadaViewModel(it) }
     )
-    val eventos by vm.eventos.collectAsState()
-    val resumo by vm.resumo.collectAsState()
-    val error by vm.error.collectAsState()
-    val registrando by vm.registrando.collectAsState()
+    val eventos by vm.eventos.collectAsStateWithLifecycle()
+    val resumo by vm.resumo.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
+    val registrando by vm.registrando.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
@@ -130,7 +131,7 @@ fun JornadaScreen(
                     Text("Nenhum evento registrado ainda.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
-                items(eventos) { ev ->
+                items(eventos, key = { it.id }) { ev ->
                     Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
                         Row(
                             Modifier.fillMaxWidth().padding(14.dp),

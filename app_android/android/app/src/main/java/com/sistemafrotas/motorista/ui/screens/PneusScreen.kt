@@ -1,5 +1,6 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -39,12 +40,12 @@ fun PneusScreen(
     val vm: PneusViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository) { PneusViewModel(it) }
     )
-    val loading by vm.loading.collectAsState()
-    val saving by vm.saving.collectAsState()
-    val error by vm.error.collectAsState()
-    val success by vm.success.collectAsState()
-    val pneuData by vm.pneuData.collectAsState()
-    val veiculos by vm.veiculos.collectAsState()
+    val loading by vm.loading.collectAsStateWithLifecycle()
+    val saving by vm.saving.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
+    val success by vm.success.collectAsStateWithLifecycle()
+    val pneuData by vm.pneuData.collectAsStateWithLifecycle()
+    val veiculos by vm.veiculos.collectAsStateWithLifecycle()
 
     // Campos do formulário: estado local da tela.
     var qrInput by remember { mutableStateOf("") }

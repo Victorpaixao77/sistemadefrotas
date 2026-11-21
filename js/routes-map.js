@@ -358,24 +358,8 @@ function sfWaitForGoogleMapsReady(maxMs) {
             });
         }
 
-        // Configurar botão de simular rota
-        const btnSimularRota = document.getElementById('simulateRouteBtn');
-        if (btnSimularRota) {
-            window.__SF_DEBUG__ && console.log('Botão simular rota encontrado');
-            btnSimularRota.addEventListener('click', function() {
-                window.__SF_DEBUG__ && console.log('Abrindo simulador de rotas...');
-                const modal = document.getElementById('routeSimulationModal');
-                if (modal) {
-                    modal.style.display = 'block';
-                    window.__SF_DEBUG__ && console.log('Modal aberto');
-                    initRouteSimulator();
-                } else {
-                    console.error('Modal não encontrado');
-                }
-            });
-        } else {
-            console.error('Botão simular rota não encontrado');
-        }
+        // Simulador de rota agora é uma página própria (pages/simulador_rota.php);
+        // o botão na barra de Rotas virou um link. Nada a configurar aqui.
         }); // fim rAF interno
         }); // fim rAF externo
 }); // Fim do DOMContentLoaded

@@ -79,7 +79,7 @@ try {
 } catch (InvalidArgumentException $e) {
     error_log('commissions_actions: ' . $e->getMessage());
     http_response_code(400);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'error' => 'Erro interno.'], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     error_log('commissions_actions: ' . $e->getMessage());
     http_response_code(500);

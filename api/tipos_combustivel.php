@@ -21,5 +21,5 @@ try {
     $tipos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     echo json_encode(['success' => true, 'tipos' => $tipos]);
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Erro interno.']);
 } 

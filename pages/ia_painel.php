@@ -1,9 +1,10 @@
-<?php
+﻿<?php
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/cache.php';
+require_once '../includes/sf_page_help.php';
 
 // Configure session before starting it
 configure_session();
@@ -845,6 +846,7 @@ function sortByDate($array, $date_key = 'data') {
         }
 
     </style>
+    <?php sf_page_help_css('..'); ?>
 </head>
 
 <body>
@@ -855,6 +857,9 @@ function sortByDate($array, $date_key = 'data') {
             <?php include '../includes/header.php'; ?>
             
             <div class="dashboard-content">
+                <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+                    <button type="button" id="helpBtn" title="Ajuda desta tela" aria-label="Ajuda desta tela" style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--border-color,#2d3748);border-radius:8px;background:var(--bg-secondary,#1a2332);color:var(--text-secondary,#94a3b8);cursor:pointer;font-size:.85rem;"><i class="fas fa-question-circle"></i> Ajuda</button>
+                </div>
                 <?php if ($total_veiculos_empresa == 0): ?>
                 <div class="alert alert-info">
                     <h3><i class="fas fa-info-circle"></i> Nenhum veículo cadastrado</h3>
@@ -1281,7 +1286,7 @@ function sortByDate($array, $date_key = 'data') {
     <!-- JavaScript -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js" 
             onerror="console.warn('Font Awesome CDN falhou, usando fallback')"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" 
             onerror="console.warn('Chart.js CDN falhou, carregando fallback')"></script>
     <script src="<?php echo htmlspecialchars(sf_app_url('js/theme.js')); ?>"></script>
     <script src="<?php echo htmlspecialchars(sf_app_url('js/sidebar.js')); ?>"></script>
@@ -1293,7 +1298,7 @@ function sortByDate($array, $date_key = 'data') {
         console.warn('Chart.js não carregado, tentando fallback...');
         // Tentar carregar de outro CDN
         var script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js';
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js';
         script.onerror = function() {
             console.error('Chart.js não disponível, gráficos não funcionarão');
         };
@@ -2141,5 +2146,7 @@ function sortByDate($array, $date_key = 'data') {
     })();
     </script>
     <?php include '../includes/scroll_to_top.php'; ?>
+    <?php $sf_help_key = 'ia_painel'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html> 

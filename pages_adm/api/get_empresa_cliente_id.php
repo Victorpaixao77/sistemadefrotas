@@ -1,6 +1,7 @@
 <?php
 require_once '../../includes/conexao.php';
-session_start();
+require_once __DIR__ . '/../includes/adm_session.php';
+require_once __DIR__ . '/../includes/adm_post_guard.php';
 
 header('Content-Type: application/json');
 
@@ -10,7 +11,14 @@ if (!isset($_SESSION['admin_id'])) {
     exit;
 }
 
-$empresa_adm_id = isset($_GET['empresa_adm_id']) ? (int)$_GET['empresa_adm_id'] : 0;
+// Endpoint faz get-or-create — exige POST + CSRF para não ser acionável por link/CSRF.
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST' || !adm_csrf_valid_post()) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Requisição inválida. Recarregue a página.']);
+    exit;
+}
+
+$empresa_adm_id = isset($_POST['empresa_adm_id']) ? (int)$_POST['empresa_adm_id'] : 0;
 
 if ($empresa_adm_id <= 0) {
     echo json_encode(['success' => false, 'error' => 'ID da empresa inválido']);
@@ -58,13 +66,14 @@ try {
             } catch (PDOException $e) {
                 $pdo->rollBack();
                 error_log("Erro ao criar empresa_cliente: " . $e->getMessage());
-                echo json_encode(['success' => false, 'error' => 'Erro ao criar empresa cliente: ' . $e->getMessage()]);
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Não foi possível preparar os dados da empresa.']);
             }
         }
     }
 } catch (PDOException $e) {
     error_log("Erro em get_empresa_cliente_id.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Erro ao buscar empresa: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Erro ao buscar empresa.']);
 }
 ?>

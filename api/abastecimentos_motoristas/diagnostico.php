@@ -1,6 +1,10 @@
 <?php
+require_once __DIR__ . '/../../includes/sf_api_guard_debug.php';
 header('Content-Type: text/plain; charset=utf-8');
-echo "Diagnóstico PHP\n";
+require_once __DIR__ . '/../../includes/config.php';
+configure_session();
+session_start();
+require_authentication();
 echo "----------------\n";
 echo "Data/Hora: ".date('Y-m-d H:i:s')."\n";
 echo "Versão do PHP: ".phpversion()."\n";
@@ -17,7 +21,7 @@ try {
     }
 } catch (Exception $e) {
     $ok = false;
-    echo "[ERRO] Exceção ao executar PHP: ".$e->getMessage()."\n";
+    echo "[ERRO] Exceção ao executar PHP: "."\n";
 }
 
 // Teste de permissão de arquivo

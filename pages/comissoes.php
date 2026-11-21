@@ -1,3 +1,4 @@
+
 <?php
 require_once '../includes/config.php';
 require_once __DIR__ . '/../includes/sf_page_help.php';
@@ -147,7 +148,8 @@ function formatarDataRota(?string $data): string
     <?php if ($is_modern): ?>
     <link rel="stylesheet" href="../css/fornc-modern-page.css">
     <?php endif; ?>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
     <style>
         .commission-charts {
             display: flex;
@@ -454,18 +456,8 @@ function formatarDataRota(?string $data): string
                                 <input type="text" id="searchCommission" name="search" value="<?php echo htmlspecialchars($_GET['search'] ?? ''); ?>" placeholder="Motorista, veículo ou data..." autocomplete="off">
                             </div>
                         </div>
+                        <input type="hidden" name="mes" id="mes" data-sf-periodo-month value="<?php echo htmlspecialchars($filters['mes'] ?? ''); ?>">
                         <div class="fornc-filters-inline">
-                            <div class="fg">
-                                <label for="mes">Período</label>
-                                <select id="mes" name="mes" title="Período">
-                            <option value="">Todos os períodos</option>
-                            <?php foreach ($periodos as $periodo): ?>
-                                <option value="<?php echo htmlspecialchars($periodo); ?>" <?php echo $filters['mes'] === $periodo ? 'selected' : ''; ?>>
-                                    <?php echo date('m/Y', strtotime($periodo . '-01')); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                            </div>
                             <div class="fg">
                                 <label for="motorista">Motorista</label>
                                 <select id="motorista" name="motorista" title="Motorista">
@@ -508,6 +500,7 @@ function formatarDataRota(?string $data): string
                             </div>
                         </div>
                         <div class="fornc-btn-row">
+                            <button type="button" data-sf-periodo class="fornc-btn fornc-btn--ghost" title="Filtrar por período"><i class="fas fa-calendar-alt"></i> Período</button>
                             <button type="submit" class="fornc-btn fornc-btn--accent" title="Aplicar filtros"><i class="fas fa-search"></i> Pesquisar</button>
                             <a href="comissoes.php" class="fornc-btn fornc-btn--ghost" title="Limpar filtros"><i class="fas fa-undo"></i></a>
                             <button type="button" id="filterBtn" class="fornc-btn fornc-btn--ghost" title="Destacar filtros"><i class="fas fa-sliders-h"></i> Opções</button>
@@ -853,6 +846,7 @@ function formatarDataRota(?string $data): string
 
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <script src="../js/sf-periodo.js"></script>
     <?php sf_render_api_scripts(); ?>
     <script>
         window.__COMISSOES_CHARTS__ = <?php echo json_encode([

@@ -4,7 +4,22 @@ require_once __DIR__ . '/sf_paths.php';
 if (!function_exists('can_access_fiscal_system')) {
     require_once __DIR__ . '/permissions.php';
 }
+$__sf_color_theme_v = function_exists('sf_asset_v') ? sf_asset_v() : '1';
 ?>
+<script>
+(function() {
+    try {
+        var savedTheme = localStorage.getItem('theme');
+        var isLight = savedTheme === 'light';
+        var root = document.documentElement;
+        if (isLight) {
+            root.classList.add('light-theme');
+            if (document.body) document.body.classList.add('light-theme');
+        }
+    } catch (e) { /* ignore */ }
+})();
+</script>
+<script src="<?php echo htmlspecialchars(sf_app_url('js/color-theme.js?v=' . $__sf_color_theme_v)); ?>"></script>
 <!-- Sidebar Navigation -->
 <div class="sidebar">
     <div class="sidebar-header">
@@ -172,6 +187,7 @@ if (!function_exists('can_access_fiscal_system')) {
             </ul>
         </nav>
     </div>
+    <?php include __DIR__ . '/sidebar_support.php'; ?>
 </div>
 
 <!-- Mobile Sidebar Overlay -->

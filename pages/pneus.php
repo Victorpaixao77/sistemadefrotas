@@ -1,3 +1,4 @@
+
 <?php
 // Include configuration and functions first
 require_once '../includes/config.php';
@@ -14,6 +15,44 @@ session_start();
 require_authentication();
 require_once '../includes/permissions.php';
 require_permission('access_tire_management');
+
+require_once '../includes/db_connect.php';
+require_once '../includes/pneus_list.php';
+require_once '../includes/pneus_repository.php';
+
+$conn = getConnection();
+$empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
+$pn_per_page = isset($_GET['per_page']) ? (int) $_GET['per_page'] : 10;
+if (!in_array($pn_per_page, [5, 10, 25, 50, 100], true)) {
+    $pn_per_page = 10;
+}
+$pn_page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+$pn_status = isset($_GET['status']) ? trim((string) $_GET['status']) : '';
+$pn_veiculo = isset($_GET['veiculo']) ? trim((string) $_GET['veiculo']) : '';
+$pn_search = isset($_GET['search']) ? trim((string) $_GET['search']) : '';
+
+$pn_initial = ['success' => true, 'tires' => [], 'pagination' => ['total' => 0, 'current_page' => 1, 'per_page' => $pn_per_page, 'total_pages' => 1], 'metrics' => []];
+if ($empresa_id > 0) {
+    try {
+        $pn_initial = pneus_fetch_list($conn, $empresa_id, [
+            'page' => $pn_page,
+            'per_page' => $pn_per_page,
+            'status' => $pn_status,
+            'veiculo' => $pn_veiculo,
+            'search' => $pn_search,
+        ]);
+        $pn_initial['metrics'] = pneus_fetch_page_metrics($conn, $empresa_id);
+        $pn_initial['success'] = true;
+    } catch (Throwable $e) {
+        error_log('pneus SSR: ' . $e->getMessage());
+    }
+}
+$pn_metrics = $pn_initial['metrics'] ?? [];
+$pn_rows = $pn_initial['tires'] ?? [];
+$pn_pag = $pn_initial['pagination'] ?? ['total' => 0, 'current_page' => 1, 'per_page' => $pn_per_page, 'total_pages' => 1];
+$pn_cur_page = (int) ($pn_pag['current_page'] ?? 1);
+$pn_total_pages = max(1, (int) ($pn_pag['total_pages'] ?? 1));
+$pn_total = (int) ($pn_pag['total'] ?? 0);
 
 // Set page title
 $page_title = "Pneus";
@@ -41,7 +80,8 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
     <link rel="icon" type="image/png" href="../logo.png">
     
     <!-- Chart.js for analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
 
     <style>
         /* Estilos para paginação */
@@ -137,10 +177,10 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
 
                 <?php if ($is_modern): ?>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-dot fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total</span></div><span class="val" id="pneusKpiTotal">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-truck-moving fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Em uso</span></div><span class="val" id="pneusKpiEmUso">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-percent fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Vida útil média</span></div><span class="val" id="pneusKpiVidaMedia">0%</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-triangle-exclamation fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Em alerta</span></div><span class="val" id="pneusKpiAlerta">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-dot fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total</span></div><span class="val" id="pneusKpiTotal"><?php echo (int) ($pn_metrics['total_pneus'] ?? 0); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-truck-moving fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Em uso</span></div><span class="val" id="pneusKpiEmUso"><?php echo (int) ($pn_metrics['total_em_uso'] ?? 0); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-percent fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Vida útil média</span></div><span class="val" id="pneusKpiVidaMedia"><?php echo (int) ($pn_metrics['vida_media'] ?? 0); ?>%</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-triangle-exclamation fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Em alerta</span></div><span class="val" id="pneusKpiAlerta"><?php echo (int) ($pn_metrics['pneus_alerta'] ?? 0); ?></span></div>
                 </div>
                 <div id="sfPneusInsights"></div>
                 <div class="fornc-toolbar">
@@ -204,7 +244,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">0</span>
+                                <span class="metric-value"><?php echo (int) ($pn_metrics['total_pneus'] ?? 0); ?></span>
                                 <span class="metric-subtitle">Total</span>
                             </div>
                         </div>
@@ -217,7 +257,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">0</span>
+                                <span class="metric-value"><?php echo (int) ($pn_metrics['total_em_uso'] ?? 0); ?></span>
                                 <span class="metric-subtitle">Em uso</span>
                             </div>
                         </div>
@@ -230,7 +270,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">0%</span>
+                                <span class="metric-value"><?php echo (int) ($pn_metrics['vida_media'] ?? 0); ?>%</span>
                                 <span class="metric-subtitle">Vida útil média</span>
                             </div>
                         </div>
@@ -243,7 +283,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value">0</span>
+                                <span class="metric-value"><?php echo (int) ($pn_metrics['pneus_alerta'] ?? 0); ?></span>
                                 <span class="metric-subtitle">Em alerta</span>
                             </div>
                         </div>
@@ -307,6 +347,9 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                             </tr>
                         </thead>
                         <tbody>
+                            <?php if (empty($pn_rows)): ?>
+                            <tr><td colspan="9" class="text-center text-muted">Nenhum pneu encontrado.</td></tr>
+                            <?php else: foreach ($pn_rows as $t): echo pneus_render_table_row($t); endforeach; endif; ?>
                         </tbody>
                     </table>
                 </div>
@@ -315,22 +358,22 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                 <?php if ($is_modern): ?>
                 <div class="fornc-pagination-bar">
                     <div class="pagination fornc-modern-pagination">
-                        <a href="#" class="pagination-btn disabled" id="prevPage" title="Página anterior" aria-label="Página anterior">
+                        <a href="?page=<?php echo max(1, $pn_cur_page - 1); ?>&per_page=<?php echo (int) $pn_per_page; ?>" class="pagination-btn<?php echo ($pn_cur_page <= 1) ? ' disabled' : ''; ?>" id="prevPage" title="Página anterior" aria-label="Página anterior">
                             <i class="fas fa-chevron-left"></i>
                         </a>
-                        <span class="pagination-info" id="currentPage">0 registros</span>
-                        <a href="#" class="pagination-btn disabled" id="nextPage" title="Próxima página" aria-label="Próxima página">
+                        <span class="pagination-info" id="currentPage"><?php echo $pn_total_pages > 1 ? 'Página ' . (int) $pn_cur_page . ' de ' . (int) $pn_total_pages . ' (' . (int) $pn_total . ' registros)' : (int) $pn_total . ' registros'; ?></span>
+                        <a href="?page=<?php echo min($pn_total_pages, $pn_cur_page + 1); ?>&per_page=<?php echo (int) $pn_per_page; ?>" class="pagination-btn<?php echo ($pn_cur_page >= $pn_total_pages) ? ' disabled' : ''; ?>" id="nextPage" title="Próxima página" aria-label="Próxima página">
                             <i class="fas fa-chevron-right"></i>
                         </a>
                     </div>
                 </div>
                 <?php else: ?>
                 <div class="pagination">
-                    <a href="#" class="pagination-btn disabled" id="prevPage" title="Página anterior">
+                    <a href="?page=<?php echo max(1, $pn_cur_page - 1); ?>&per_page=<?php echo (int) $pn_per_page; ?>" class="pagination-btn<?php echo ($pn_cur_page <= 1) ? ' disabled' : ''; ?>" id="prevPage" title="Página anterior">
                         <i class="fas fa-chevron-left"></i>
                     </a>
-                    <span class="pagination-info" id="currentPage">0 registros</span>
-                    <a href="#" class="pagination-btn disabled" id="nextPage" title="Próxima página">
+                    <span class="pagination-info" id="currentPage"><?php echo $pn_total_pages > 1 ? 'Página ' . (int) $pn_cur_page . ' de ' . (int) $pn_total_pages . ' (' . (int) $pn_total . ' registros)' : (int) $pn_total . ' registros'; ?></span>
+                    <a href="?page=<?php echo min($pn_total_pages, $pn_cur_page + 1); ?>&per_page=<?php echo (int) $pn_per_page; ?>" class="pagination-btn<?php echo ($pn_cur_page >= $pn_total_pages) ? ' disabled' : ''; ?>" id="nextPage" title="Próxima página">
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
@@ -557,6 +600,7 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
     </div>
 
     <!-- JavaScript Files -->
+    <script>window.__PNEUS_INITIAL__=<?php echo json_encode($pn_initial, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
     <script>
         // Variáveis globais
         const EMPRESA_ID = '<?php echo $_SESSION['empresa_id']; ?>';
@@ -570,9 +614,14 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
             initializePage();
             setupModals();
             setupTireDetailsModal();
-            loadTires(1); // Carrega a primeira página
+            const hasInitial = !!(window.__PNEUS_INITIAL__ && window.__PNEUS_INITIAL__.success);
+            if (hasInitial) {
+                applyPneusInitialPayload(window.__PNEUS_INITIAL__, false);
+            } else {
+                loadTires(1);
+                loadDashboardMetrics();
+            }
             loadFilters();
-            loadDashboardMetrics(); // Carrega as métricas do dashboard
             if (/[?&]debug=1/.test(window.location.search)) {
                 document.getElementById('debugBannerMovimentacoes').style.display = 'block';
                 fetch('../api/pneu_movimentacoes_debug.php?action=status').then(r => r.json()).then(d => {
@@ -673,6 +722,25 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
             loadTires(1); // Reinicia na primeira página ao aplicar filtros
         }
 
+        function applyPneusInitialPayload(initial, refreshTable) {
+            if (!initial || !initial.success) return;
+            if (initial.pagination) {
+                currentPage = initial.pagination.current_page || 1;
+                totalPages = initial.pagination.total_pages || 1;
+                updatePagination(initial.pagination);
+            }
+            if (initial.metrics) {
+                updateDashboardMetrics(initial.metrics);
+            }
+            if (refreshTable !== false) {
+                const tbody = document.querySelector('#tiresTable tbody');
+                const alreadyRendered = tbody && tbody.querySelector('tr') && tbody.querySelector('td') && !tbody.querySelector('td[colspan="9"]');
+                if (!alreadyRendered) {
+                    updateTiresTable(initial.tires || []);
+                }
+            }
+        }
+
         async function loadTires(page = 1) {
             try {
                 const statusFilter = document.getElementById('statusFilter')?.value || '';
@@ -692,6 +760,9 @@ $is_modern = !isset($_GET['classic']) || (string) $_GET['classic'] !== '1';
                 const response = await fetch(url);
                 const data = await response.json();
                 if (data.success) {
+                    if (data.metrics) {
+                        updateDashboardMetrics(data.metrics);
+                    }
                     updateTiresTable(data.data);
                     updatePagination(data.pagination);
                 }

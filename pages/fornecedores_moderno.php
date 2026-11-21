@@ -5,6 +5,7 @@ require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/csrf.php';
 require_once '../includes/sf_api_base.php';
+require_once '../includes/fornecedores_list.php';
 
 configure_session();
 session_start();
@@ -12,6 +13,44 @@ require_authentication();
 
 $page_title = 'Fornecedores';
 $csrf_token = csrf_token_get();
+$empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
+
+// Primeira página já no HTML (paint instantâneo; JS só atualiza em filtros/paginação).
+$forn_per_page = isset($_GET['per_page']) ? (int) $_GET['per_page'] : 10;
+if (!in_array($forn_per_page, [5, 10, 25, 50, 100], true)) {
+    $forn_per_page = 10;
+}
+$forn_page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+$forn_situacao = $_GET['situacao'] ?? 'A';
+if (!in_array($forn_situacao, ['A', 'I', 'all'], true)) {
+    $forn_situacao = 'A';
+}
+$forn_tipo = isset($_GET['tipo']) && in_array($_GET['tipo'], ['F', 'J'], true) ? $_GET['tipo'] : '';
+$forn_q = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
+$forn_sort = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'nome';
+$forn_dir = (isset($_GET['dir']) && strtoupper((string) $_GET['dir']) === 'DESC') ? 'DESC' : 'ASC';
+
+$forn_initial = ['success' => true, 'fornecedores' => [], 'kpi' => ['total' => 0, 'ativos' => 0, 'inativos' => 0, 'pj' => 0, 'pf' => 0, 'ibge_ok' => 0, 'email_ok' => 0], 'pagination' => ['page' => 1, 'per_page' => $forn_per_page, 'total' => 0, 'total_pages' => 1]];
+if ($empresa_id > 0) {
+    try {
+        $forn_initial = fornecedores_fetch_list(getConnection(), $empresa_id, [
+            'situacao' => $forn_situacao,
+            'tipo' => $forn_tipo,
+            'q' => $forn_q,
+            'page' => $forn_page,
+            'per_page' => $forn_per_page,
+            'sort' => $forn_sort,
+            'dir' => $forn_dir,
+        ]);
+    } catch (Throwable $e) {
+        error_log('fornecedores_moderno SSR: ' . $e->getMessage());
+    }
+}
+$forn_kpi = $forn_initial['kpi'] ?? [];
+$forn_rows = $forn_initial['fornecedores'] ?? [];
+$forn_pag = $forn_initial['pagination'] ?? ['page' => 1, 'per_page' => $forn_per_page, 'total' => 0, 'total_pages' => 1];
+$forn_total = (int) ($forn_kpi['total'] ?? 0);
+$forn_ibge_falta = max(0, $forn_total - (int) ($forn_kpi['ibge_ok'] ?? 0));
 
 // Canônico: se alguém acessar /fornecedores_moderno.php diretamente,
 // redirecionar para /fornecedores.php (a URL principal).
@@ -37,7 +76,7 @@ if (!defined('FORNECEDORES_CANONICAL_RENDER')) {
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <script src="../js/doc_validators.js"></script>
-    <script src="../js/fornecedores.js?v=1.2" defer></script>
+    <script src="../js/fornecedores.js?v=1.3" defer></script>
     <style>
         /* Ajuste de espaçamento igual ao padrão de rotas (dashboard mais "colada" no topo) */
         body.fornecedores-modern-page .dashboard-content.fornc-page {
@@ -59,14 +98,14 @@ if (!defined('FORNECEDORES_CANONICAL_RENDER')) {
             <div class="dashboard-content fornc-page">
 
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-building fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total</span></div><span class="val" id="fornKpiTotal">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Ativos</span></div><span class="val" id="fornKpiAtivos">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-ban fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Inativos</span></div><span class="val" id="fornKpiInativos">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-building fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">PJ</span></div><span class="val" id="fornKpiPJ">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-user fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">PF</span></div><span class="val" id="fornKpiPF">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-map fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">IBGE OK</span></div><span class="val" id="fornKpiIbgeOk">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-map-location-dot fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Sem IBGE</span></div><span class="val" id="fornKpiIbgeFalta">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-envelope fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Com e-mail</span></div><span class="val" id="fornKpiEmail">0</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-building fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total</span></div><span class="val" id="fornKpiTotal"><?php echo (int) ($forn_kpi['total'] ?? 0); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Ativos</span></div><span class="val" id="fornKpiAtivos"><?php echo htmlspecialchars(fornecedores_kpi_cell_text((int) ($forn_kpi['ativos'] ?? 0), $forn_total, true), ENT_QUOTES, 'UTF-8'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-ban fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Inativos</span></div><span class="val" id="fornKpiInativos"><?php echo htmlspecialchars(fornecedores_kpi_cell_text((int) ($forn_kpi['inativos'] ?? 0), $forn_total, true), ENT_QUOTES, 'UTF-8'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-building fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">PJ</span></div><span class="val" id="fornKpiPJ"><?php echo htmlspecialchars(fornecedores_kpi_cell_text((int) ($forn_kpi['pj'] ?? 0), $forn_total, true), ENT_QUOTES, 'UTF-8'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-user fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">PF</span></div><span class="val" id="fornKpiPF"><?php echo htmlspecialchars(fornecedores_kpi_cell_text((int) ($forn_kpi['pf'] ?? 0), $forn_total, true), ENT_QUOTES, 'UTF-8'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-map fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">IBGE OK</span></div><span class="val" id="fornKpiIbgeOk"><?php echo htmlspecialchars(fornecedores_kpi_cell_text((int) ($forn_kpi['ibge_ok'] ?? 0), $forn_total, true), ENT_QUOTES, 'UTF-8'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-map-location-dot fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Sem IBGE</span></div><span class="val" id="fornKpiIbgeFalta"><?php echo htmlspecialchars(fornecedores_kpi_cell_text($forn_ibge_falta, $forn_total, true), ENT_QUOTES, 'UTF-8'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-envelope fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Com e-mail</span></div><span class="val" id="fornKpiEmail"><?php echo htmlspecialchars(fornecedores_kpi_cell_text((int) ($forn_kpi['email_ok'] ?? 0), $forn_total, true), ENT_QUOTES, 'UTF-8'); ?></span></div>
                 </div>
                 <!-- Resumo de KPI removido: o texto "Base: ... | Ativos: ..." não deve aparecer na tela. -->
 
@@ -161,13 +200,13 @@ if (!defined('FORNECEDORES_CANONICAL_RENDER')) {
                     <div id="fnResumoTexto" class="fn-resumo-texto text-muted">Clique em “Gerar resumo” para uma análise dos fornecedores pela IA.</div>
                 </div>
 
-                <div class="fornc-empty-state" id="fornEmptyState" role="status" aria-live="polite">
+                <div class="fornc-empty-state<?php echo empty($forn_rows) ? ' visible' : ''; ?>" id="fornEmptyState" role="status" aria-live="polite">
                     <p class="fornc-empty-state-title">Nenhum fornecedor encontrado</p>
                     <p class="fornc-empty-state-hint">Ajuste a busca ou a situação nos filtros, ou cadastre um novo fornecedor.</p>
                     <button type="button" class="fornc-btn fornc-btn--primary" id="fornEmptyCreateBtn"><i class="fas fa-plus"></i> Cadastrar primeiro fornecedor</button>
                 </div>
 
-                <div class="fornc-table-wrap" id="fornTableWrap">
+                <div class="fornc-table-wrap" id="fornTableWrap"<?php echo empty($forn_rows) ? ' style="display:none"' : ''; ?>>
                     <table class="fornc-table">
                         <thead>
                             <tr>
@@ -180,18 +219,53 @@ if (!defined('FORNECEDORES_CANONICAL_RENDER')) {
                             </tr>
                         </thead>
                         <tbody id="fornecedoresTableBody">
-                            <tr><td colspan="6" style="text-align:center;padding:1rem;">Carregando...</td></tr>
+                            <?php if (empty($forn_rows)): ?>
+                            <tr><td colspan="6" style="text-align:center;padding:1rem;">Nenhum fornecedor encontrado.</td></tr>
+                            <?php else: foreach ($forn_rows as $f):
+                                $fid = (int) ($f['id'] ?? 0);
+                                $doc = fornecedores_fmt_doc((string) ($f['tipo'] ?? ''), $f['cpf'] ?? null, $f['cnpj'] ?? null);
+                                $sit = (($f['situacao'] ?? '') === 'A')
+                                    ? '<span class="status-badge success">Ativo</span>'
+                                    : '<span class="status-badge warning">Inativo</span>';
+                                $cidade = htmlspecialchars((string) ($f['cidade'] ?? ''), ENT_QUOTES, 'UTF-8');
+                                $uf = htmlspecialchars((string) ($f['uf'] ?? ''), ENT_QUOTES, 'UTF-8');
+                                $nfeUrl = htmlspecialchars(sf_app_url('fiscal/pages/nfe.php?fornecedor_id=' . $fid), ENT_QUOTES, 'UTF-8');
+                            ?>
+                            <tr data-id="<?php echo $fid; ?>">
+                                <td><?php echo htmlspecialchars((string) ($f['nome'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo ($f['tipo'] ?? '') === 'J' ? 'PJ' : 'PF'; ?></td>
+                                <td><?php echo htmlspecialchars($doc, ENT_QUOTES, 'UTF-8'); ?></td>
+                                <td><?php echo $cidade . ($uf !== '' ? ' / ' . $uf : ''); ?></td>
+                                <td><?php echo $sit; ?></td>
+                                <td class="actions">
+                                    <a href="<?php echo $nfeUrl; ?>" class="btn-icon" title="Emitir NF-e com este cadastro" target="_blank" rel="noopener"><i class="fas fa-paper-plane"></i></a>
+                                    <button type="button" class="btn-icon btn-pos-fin" data-id="<?php echo $fid; ?>" title="Posição financeira"><i class="fas fa-wallet"></i></button>
+                                    <button type="button" class="btn-icon btn-pos-fisc" data-id="<?php echo $fid; ?>" title="Posição fiscal"><i class="fas fa-file-invoice"></i></button>
+                                    <button type="button" class="btn-icon edit-btn btn-edit-forn" data-id="<?php echo $fid; ?>" title="Editar"><i class="fas fa-edit"></i></button>
+                                    <button type="button" class="btn-icon delete-btn btn-del-forn" data-id="<?php echo $fid; ?>" title="Inativar"><i class="fas fa-ban"></i></button>
+                                </td>
+                            </tr>
+                            <?php endforeach; endif; ?>
                         </tbody>
                     </table>
                 </div>
 
                 <div class="fornc-pagination-bar">
                     <div class="pagination fornc-modern-pagination" id="fornecedoresPagination">
-                        <a href="#" class="pagination-btn disabled" id="fornPrevPage" title="Página anterior" aria-label="Página anterior">
+                        <a href="#" class="pagination-btn<?php echo ((int) ($forn_pag['page'] ?? 1) <= 1) ? ' disabled' : ''; ?>" id="fornPrevPage" title="Página anterior" aria-label="Página anterior">
                             <i class="fas fa-chevron-left"></i>
                         </a>
-                        <span class="pagination-info" id="fornPaginationInfo">—</span>
-                        <a href="#" class="pagination-btn disabled" id="fornNextPage" title="Próxima página" aria-label="Próxima página">
+                        <span class="pagination-info" id="fornPaginationInfo"><?php
+                            $fp = (int) ($forn_pag['page'] ?? 1);
+                            $ftp = (int) ($forn_pag['total_pages'] ?? 1);
+                            $ft = (int) ($forn_pag['total'] ?? 0);
+                            if ($ftp > 1) {
+                                echo 'Página ' . $fp . ' de ' . $ftp . ' (' . $ft . ' registros)';
+                            } else {
+                                echo $ft === 1 ? '1 registro' : $ft . ' registros';
+                            }
+                        ?></span>
+                        <a href="#" class="pagination-btn<?php echo ((int) ($forn_pag['page'] ?? 1) >= (int) ($forn_pag['total_pages'] ?? 1)) ? ' disabled' : ''; ?>" id="fornNextPage" title="Próxima página" aria-label="Próxima página">
                             <i class="fas fa-chevron-right"></i>
                         </a>
                     </div>
@@ -492,5 +566,6 @@ if (!defined('FORNECEDORES_CANONICAL_RENDER')) {
     </style>
     <?php $sf_help_key = 'fornecedores'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
     <?php sf_page_help_js('..'); ?>
+    <script>window.__FORN_INITIAL__=<?php echo json_encode($forn_initial, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
 </body>
 </html>

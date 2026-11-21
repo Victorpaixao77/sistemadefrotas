@@ -56,16 +56,23 @@ function getRotasPendentes($page = 1) {
 }
 function getDashboardCounts() {
     $conn = getConnection();
-    $empresa_id = $_SESSION['empresa_id'];
-    $total = $conn->query("SELECT COUNT(*) FROM rotas WHERE empresa_id = $empresa_id")->fetchColumn();
-    $pendentes = $conn->query("SELECT COUNT(*) FROM rotas WHERE empresa_id = $empresa_id AND status = 'pendente'")->fetchColumn();
-    $aceitas = $conn->query("SELECT COUNT(*) FROM rotas WHERE empresa_id = $empresa_id AND status = 'aprovado'")->fetchColumn();
-    $rejeitadas = $conn->query("SELECT COUNT(*) FROM rotas WHERE empresa_id = $empresa_id AND status = 'rejeitado'")->fetchColumn();
+    $empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
+    // 1 query agregada (antes eram 4 COUNTs separados) + prepared statement.
+    $stmt = $conn->prepare(
+        "SELECT
+            COUNT(*)                  AS total,
+            SUM(status = 'pendente')  AS pendentes,
+            SUM(status = 'aprovado')  AS aceitas,
+            SUM(status = 'rejeitado') AS rejeitadas
+         FROM rotas WHERE empresa_id = :e"
+    );
+    $stmt->execute([':e' => $empresa_id]);
+    $r = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
     return [
-        'total' => $total,
-        'pendentes' => $pendentes,
-        'aceitas' => $aceitas,
-        'rejeitadas' => $rejeitadas
+        'total' => (int) ($r['total'] ?? 0),
+        'pendentes' => (int) ($r['pendentes'] ?? 0),
+        'aceitas' => (int) ($r['aceitas'] ?? 0),
+        'rejeitadas' => (int) ($r['rejeitadas'] ?? 0)
     ];
 }
 $pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;

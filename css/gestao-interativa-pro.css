@@ -1,0 +1,348 @@
+/* =====================================================================
+   Gestão Interativa Pro — pneus/frota (visual premium, dark/light)
+   Gestão Interativa — visualização interativa de pneus por veículo.
+   ===================================================================== */
+
+.gip-wrap { padding: 4px 2px 24px; }
+
+/* Cabeçalho */
+.gip-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.gip-head h1 { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; color: var(--text-primary); display: flex; align-items: center; gap: 10px; }
+.gip-head h1 .gip-eyebrow-dot { width: 9px; height: 9px; border-radius: 50%; background: #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,.18); }
+.gip-head .gip-sub { margin: 4px 0 0; font-size: .86rem; color: var(--text-muted, var(--text-secondary)); }
+
+/* Barra de filtros */
+.gip-filters { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: end; background: var(--card-bg, var(--bg-secondary)); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; }
+.gip-field { display: flex; flex-direction: column; gap: 4px; min-width: 150px; }
+.gip-field > label { font-size: .68rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted, var(--text-secondary)); font-weight: 700; }
+.gip-field select, .gip-field input { padding: 8px 10px; font-size: .86rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary, var(--bg-secondary)); color: var(--text-primary); }
+.gip-field.gip-grow { flex: 1; min-width: 220px; }
+.gip-filters .gip-spacer { flex: 1; }
+.gip-btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 14px; border-radius: 9px; border: 1px solid var(--border-color); background: var(--bg-tertiary, var(--bg-secondary)); color: var(--text-primary); font-weight: 600; font-size: .85rem; cursor: pointer; transition: filter .12s, transform .12s, background .12s; }
+.gip-btn:hover { transform: translateY(-1px); }
+.gip-btn--primary { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+.gip-btn--primary:hover { filter: brightness(1.07); }
+.gip-btn--ghost { background: transparent; }
+
+/* KPIs — mesmo visual premium da routes.php (biq-kpi).
+   O bi-premium.css só define as variáveis --biq-* dentro de .biq, então
+   replicamos aqui no container para os cards renderizarem fora do dashboard BI. */
+.gip-kpis.biq-kpis {
+    --biq-surface: var(--card-bg, var(--bg-secondary));
+    --biq-border: var(--border-color);
+    --biq-text: var(--text-primary);
+    --biq-muted: var(--text-muted, var(--text-secondary));
+    --biq-primary: #3b82f6;
+    --biq-success: #22c55e;
+    --biq-error: #ef4444;
+    --biq-shadow: 0 1px 2px rgba(0, 0, 0, .18), 0 14px 36px -22px rgba(0, 0, 0, .55);
+    --biq-radius: 14px;
+    --biq-gap: 12px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin-bottom: 16px;
+}
+/* Cor de destaque por card (borda no hover) */
+.gip-kpis .biq-kpi[data-k="total"]   { --biq-primary: #3b82f6; }
+.gip-kpis .biq-kpi[data-k="uso"]     { --biq-primary: #22c55e; }
+.gip-kpis .biq-kpi[data-k="alerta"]  { --biq-primary: #f59e0b; }
+.gip-kpis .biq-kpi[data-k="critico"] { --biq-primary: #ef4444; }
+.gip-kpis .biq-kpi[data-k="vida"]    { --biq-primary: #8b5cf6; }
+.gip-kpis .biq-kpi[data-k="custo"]   { --biq-primary: #06b6d4; }
+.gip-kpis .biq-kpi[data-k="custokm"] { --biq-primary: #14b8a6; }
+.gip-kpis .biq-kpi[data-k="semmed"]  { --biq-primary: #f97316; }
+@media (max-width: 1100px) { .gip-kpis.biq-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .gip-kpis.biq-kpis { grid-template-columns: 1fr; } }
+/* Compacto: reduz ao máximo sem perder rótulo/valor/dica */
+.gip-kpis.biq-kpis { gap: 8px; margin-bottom: 12px; }
+.gip-kpis .biq-card.biq-kpi { padding: 8px 10px; border-radius: 11px; }
+.gip-kpis .biq-kpi__top { margin-bottom: 4px; gap: 6px; }
+.gip-kpis .biq-kpi__label { font-size: .6rem; letter-spacing: .02em; line-height: 1.15; }
+.gip-kpis .biq-kpi__icon { width: 24px; height: 24px; border-radius: 7px; font-size: .68rem; flex-shrink: 0; }
+.gip-kpis .biq-kpi__value { font-size: 1.18rem; line-height: 1; }
+.gip-kpis .biq-kpi__hint { font-size: .62rem; margin-top: 2px; line-height: 1.2; }
+/* Escopo dos KPIs (frota x veículo) */
+.gip-kpi-scope { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 8px; font-size: .8rem; color: var(--text-secondary); padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-tertiary, var(--bg-secondary)); }
+.gip-kpi-scope i { color: #3b82f6; }
+.gip-kpi-scope b { color: var(--text-primary); }
+/* KPI clicável (filtro ativo) */
+.gip-kpis .biq-kpi { cursor: pointer; }
+.gip-kpis .biq-kpi.kpi-active { outline: 1.5px solid var(--biq-primary); outline-offset: 1px; border-color: var(--biq-primary); }
+.gip-kpis .biq-kpi.kpi-active .biq-kpi__icon { box-shadow: 0 0 0 2px color-mix(in srgb, var(--biq-primary) 35%, transparent); }
+/* Alerta: realce no hover */
+.gip-alert { transition: border-color .12s, background .12s, transform .12s; }
+.gip-alert:hover { transform: translateX(2px); border-color: color-mix(in srgb, var(--text-primary) 25%, var(--border-color)); }
+/* Rodízio */
+.gip-rod-h { margin: 14px 0 8px; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted, var(--text-secondary)); }
+.gip-rod-sug { border: 1px solid var(--border-color); border-radius: 10px; padding: 11px 12px; margin-bottom: 9px; background: var(--bg-tertiary, var(--bg-secondary)); }
+.gip-rod-leg { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gip-rod-leg > i { color: #3b82f6; }
+.gip-rod-from, .gip-rod-to { display: flex; flex-direction: column; gap: 1px; }
+.gip-rod-from small, .gip-rod-to small { color: var(--text-muted, var(--text-secondary)); font-size: .72rem; }
+.gip-rod-mm { font-size: .76rem; font-weight: 700; color: var(--text-secondary); }
+.gip-rod-why { font-size: .78rem; color: var(--text-secondary); margin: 7px 0; }
+.gip-rod-go { width: auto; }
+.gip-rod-rank { display: flex; flex-direction: column; gap: 4px; }
+.gip-rod-row { display: flex; align-items: center; gap: 9px; padding: 6px 9px; border-radius: 7px; background: var(--bg-tertiary, var(--bg-secondary)); border: 1px solid var(--border-color); }
+.gip-rod-row .n { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: .68rem; font-weight: 800; background: color-mix(in srgb, var(--accent-primary, #3b82f6) 16%, transparent); color: var(--accent-primary, #3b82f6); }
+.gip-rod-row small { color: var(--text-muted, var(--text-secondary)); font-size: .74rem; }
+.gip-rod-row .mm { margin-left: auto; font-weight: 700; font-size: .8rem; }
+@keyframes gipRodFlash { 0%,100% { filter: none; } 30%,70% { filter: drop-shadow(0 0 8px #3b82f6) drop-shadow(0 0 12px #3b82f6); } }
+.gip-tire.gip-rod-flash { animation: gipRodFlash 1.3s ease-in-out 2; }
+.gip-rod-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.gip-rod-go, .gip-rod-apply { width: auto; }
+/* Resumo IA */
+.gip-resumo-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
+.gip-resumo-chips span { font-size: .76rem; padding: 4px 9px; border-radius: 999px; background: var(--bg-tertiary, var(--bg-secondary)); border: 1px solid var(--border-color); color: var(--text-secondary); }
+.gip-resumo-chips span b { color: var(--text-primary); }
+.gip-resumo-chips span.cr { border-color: rgba(239,68,68,.4); } .gip-resumo-chips span.cr b { color: #ef4444; }
+.gip-resumo-chips span.at { border-color: rgba(245,158,11,.4); } .gip-resumo-chips span.at b { color: #f59e0b; }
+.gip-resumo-text { font-size: .92rem; line-height: 1.65; color: var(--text-primary); background: color-mix(in srgb, #8b5cf6 7%, transparent); border: 1px solid var(--border-color); border-radius: 10px; padding: 13px 15px; }
+/* Recomendações da IA */
+.gip-acoes-title { margin: 14px 0 8px; font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary); display: flex; align-items: center; gap: 7px; }
+.gip-acoes-title i { color: #8b5cf6; }
+.gip-acoes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.gip-acoes li { position: relative; padding: 9px 12px 9px 32px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-tertiary, var(--bg-secondary)); font-size: .88rem; color: var(--text-primary); }
+.gip-acoes li::before { content: '\f054'; font-family: 'Font Awesome 6 Free'; font-weight: 900; position: absolute; left: 12px; top: 11px; font-size: .7rem; color: #8b5cf6; }
+/* Timeline vertical do veículo */
+.gip-tl-vert { list-style: none; margin: 0; padding: 4px 0 4px 6px; }
+.gip-tl-vert li { position: relative; display: flex; gap: 12px; padding: 0 0 16px 0; }
+.gip-tl-vert li::before { content: ''; position: absolute; left: 13px; top: 26px; bottom: -4px; width: 2px; background: var(--border-color); }
+.gip-tl-vert li:last-child::before { display: none; }
+.gip-tl-dot { flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: .72rem; z-index: 1; }
+.gip-tl-content { flex: 1; }
+.gip-tl-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.gip-tl-top b { font-size: .9rem; color: var(--text-primary); }
+.gip-tl-date { font-size: .76rem; color: var(--text-muted, var(--text-secondary)); white-space: nowrap; }
+.gip-tl-desc { font-size: .8rem; color: var(--text-secondary); margin-top: 2px; }
+/* Saúde geral + heatmap */
+.gip-saude-top { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.gip-saude-num { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+.gip-saude-lbl { font-size: 1rem; font-weight: 700; color: var(--text-secondary); }
+.gip-saude-bar { height: 12px; border-radius: 7px; background: var(--bg-tertiary, var(--bg-secondary)); border: 1px solid var(--border-color); overflow: hidden; }
+.gip-saude-bar i { display: block; height: 100%; border-radius: 7px; transition: width .4s; }
+.gip-hm-title { margin: 18px 0 10px; font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-secondary); display: flex; align-items: center; gap: 7px; }
+.gip-heatmap { display: flex; flex-direction: column; gap: 6px; }
+.gip-hm-unit { font-size: .72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted, var(--text-secondary)); margin: 6px 0 2px; }
+.gip-hm-row { display: flex; align-items: center; gap: 10px; }
+.gip-hm-eixo { width: 24px; font-size: .72rem; font-weight: 700; color: var(--text-secondary); }
+.gip-hm-cells { display: flex; gap: 5px; }
+.gip-hm-cell { width: 26px; height: 22px; border-radius: 5px; display: inline-block; }
+.gip-hm-legend { display: flex; gap: 14px; margin-top: 14px; }
+.gip-hm-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: .76rem; color: var(--text-secondary); }
+.gip-hm-legend i { width: 12px; height: 12px; border-radius: 3px; }
+/* Frota: ranking + comparação */
+.gip-frota-dest { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+.gip-frota-card { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-tertiary, var(--bg-secondary)); }
+.gip-frota-card span { font-size: .72rem; color: var(--text-muted, var(--text-secondary)); }
+.gip-frota-card b { font-size: .95rem; color: var(--text-primary); }
+.gip-frota-card small { font-size: .76rem; color: var(--text-secondary); }
+.gip-frota-hint { font-size: .78rem; color: var(--text-muted, var(--text-secondary)); margin-bottom: 8px; }
+.gip-frota-list { display: flex; flex-direction: column; gap: 6px; }
+.gip-frota-row { display: grid; grid-template-columns: 18px 1.4fr 1.2fr 52px 1fr 1fr; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-tertiary, var(--bg-secondary)); cursor: pointer; }
+.gip-frota-row:hover { border-color: color-mix(in srgb, var(--accent-primary, #3b82f6) 40%, var(--border-color)); }
+.gip-frota-row .pl { display: flex; flex-direction: column; }
+.gip-frota-row .pl b { font-size: .86rem; color: var(--text-primary); }
+.gip-frota-row .pl small { font-size: .72rem; color: var(--text-muted, var(--text-secondary)); }
+.gip-frota-row .hb { height: 9px; border-radius: 6px; background: var(--bg-secondary); border: 1px solid var(--border-color); overflow: hidden; }
+.gip-frota-row .hb i { display: block; height: 100%; }
+.gip-frota-row .sa { font-weight: 800; font-size: .85rem; text-align: right; }
+.gip-frota-row .cu, .gip-frota-row .re { font-size: .8rem; color: var(--text-secondary); text-align: right; }
+/* Foco por teclado no pneu */
+.gip-tire-hit:focus { outline: none; }
+.gip-tire-hit:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; border-radius: 5px; }
+
+/* Layout principal: estágio + painel */
+.gip-main { display: grid; grid-template-columns: 1fr 360px; gap: 16px; align-items: start; }
+.gip-card { background: var(--card-bg, var(--bg-secondary)); border: 1px solid var(--border-color); border-radius: 14px; }
+.gip-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 15px; border-bottom: 1px solid var(--border-color); }
+.gip-card-head h3 { margin: 0; font-size: .92rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.gip-card-head h3 i { color: #3b82f6; }
+.gip-card-body { padding: 14px 15px; }
+
+/* Estágio do veículo */
+.gip-stage-wrap { position: relative; }
+.gip-stage { width: 100%; min-height: 300px; border-radius: 12px; background: #141c26; overflow-x: auto; overflow-y: hidden; border: 1px solid var(--border-color); }
+.gip-stage svg, .gip-stage-svg, .gsp-stage { width: 100%; height: auto; display: block; min-width: 520px; max-height: min(70vh, 520px); }
+html.light-theme .gip-stage { background: #d0d8e2; }
+/* Modo montagem: arrastar eixos */
+.gsp-stage.gsp-assembly [data-axle] { cursor: grab; }
+.gsp-stage.gsp-assembly [data-axle]:active { cursor: grabbing; }
+.gsp-stage.gsp-assembly [data-axle]:hover { filter: drop-shadow(0 0 6px rgba(59,130,246,.55)); }
+.gsp-stage.gsp-assembly .gip-tire { cursor: grab; }
+.gsp-tank-hit { pointer-events: none; }
+.gsp-stage.gsp-assembly .gsp-tank-hit { pointer-events: all; cursor: grab; }
+.gsp-stage.gsp-assembly [data-part="tank"]:hover { filter: drop-shadow(0 0 6px rgba(34,197,94,.6)); }
+/* Cabeçalho do estágio com ferramentas */
+.gip-stage-head { flex-wrap: wrap; row-gap: 10px; }
+.gip-stage-headline { display: flex; flex-direction: column; gap: 2px; }
+.gip-stage-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gip-btn--sm { padding: 7px 11px; font-size: .8rem; border-radius: 8px; }
+/* Seletor de visão Tudo / Cavalo / Carreta (segmented) */
+.gip-view-toggle { display: inline-flex; padding: 3px; gap: 2px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--bg-tertiary, var(--bg-secondary)); }
+.gip-view-toggle button { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); font-weight: 600; font-size: .8rem; cursor: pointer; transition: background .12s, color .12s; }
+.gip-view-toggle button i { font-size: .82rem; }
+.gip-view-toggle button:hover { color: var(--text-primary); }
+.gip-view-toggle button.active { background: #3b82f6; color: #fff; box-shadow: 0 1px 4px rgba(59, 130, 246, .4); }
+/* Menu Eixos (dropdown) */
+.gip-eixos-wrap { position: relative; }
+.gip-eixos-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 232px; padding: 6px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-secondary, #fff); box-shadow: 0 12px 32px rgba(0, 0, 0, .22); display: flex; flex-direction: column; gap: 2px; }
+.gip-eixos-menu[hidden] { display: none; }
+.gip-eixos-menu button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 9px 11px; border: 0; border-radius: 7px; background: transparent; color: var(--text-primary); font-size: .82rem; cursor: pointer; transition: background .12s; }
+.gip-eixos-menu button:hover { background: color-mix(in srgb, var(--accent-primary, #3b82f6) 12%, transparent); }
+.gip-eixos-menu button i { width: 14px; text-align: center; color: var(--text-muted, var(--text-secondary)); }
+.gip-eixos-menu button[data-act^="del"] i { color: #ef4444; }
+.gip-eixos-sep { height: 1px; margin: 4px 6px; background: var(--border-color); }
+/* Modal pequeno (confirmar / escolher eixo) */
+.gip-modal-box.gip-modal-sm { max-width: 440px; width: calc(100% - 32px); }
+.gip-confirm-msg { font-size: .9rem; line-height: 1.5; color: var(--text-secondary); margin: 0; }
+.gip-btn.gip-btn--danger { background: #ef4444; border-color: #ef4444; color: #fff; }
+.gip-btn.gip-btn--danger:hover { background: #dc2626; border-color: #dc2626; }
+.gip-eixo-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.gip-eixo-opt { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 16px 12px; border: 1.5px solid var(--border-color); border-radius: 12px; background: var(--bg-tertiary, var(--bg-secondary)); color: var(--text-primary); cursor: pointer; transition: border-color .14s, transform .1s, background .14s; }
+.gip-eixo-opt:hover { border-color: var(--accent-primary, #3b82f6); background: color-mix(in srgb, var(--accent-primary, #3b82f6) 9%, transparent); transform: translateY(-2px); }
+.gip-eixo-opt b { font-size: .98rem; }
+.gip-eixo-opt > span:last-child { font-size: .76rem; color: var(--text-muted, var(--text-secondary)); text-align: center; }
+.gip-eixo-opt-ico { display: flex; align-items: center; gap: 3px; margin-bottom: 4px; color: #334155; }
+.gip-eixo-opt-ico i { font-size: .82rem; }
+.gip-eixo-opt-ico .gap { width: 7px; }
+.gip-eixo-opt:hover .gip-eixo-opt-ico { color: var(--accent-primary, #3b82f6); }
+/* Arrastar pneu para trocar: alvo de drop */
+.gip-tire.gip-drop-target { filter: drop-shadow(0 0 7px rgba(59,130,246,.9)); }
+.gip-tire.gip-drop-target rect, .gip-tire.gip-drop-target path { opacity: 1; }
+/* Lista de pneus disponíveis (alocar) */
+.gip-alocar-item { display: flex; flex-direction: column; width: 100%; text-align: left; gap: 2px; padding: 9px 11px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary, var(--bg-secondary)); color: var(--text-primary); cursor: pointer; margin-bottom: 6px; transition: border-color .12s, background .12s; }
+.gip-alocar-item:hover { border-color: var(--accent-primary, #3b82f6); background: color-mix(in srgb, var(--accent-primary, #3b82f6) 10%, transparent); }
+.gip-alocar-item span { font-size: .76rem; color: var(--text-muted, var(--text-secondary)); }
+.gip-aloc-hint { font-size: .84rem; line-height: 1.5; color: var(--text-secondary); margin-bottom: 10px; padding: 9px 11px; border-radius: 8px; background: color-mix(in srgb, var(--accent-primary, #3b82f6) 8%, transparent); border: 1px solid var(--border-color); }
+.gip-aloc-hint i { color: var(--accent-primary, #3b82f6); margin-right: 4px; }
+.gip-alocar-item.gip-aloc-sug { border-color: #22c55e; background: color-mix(in srgb, #22c55e 10%, transparent); }
+.gip-aloc-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #22c55e; color: #fff; font-size: .64rem; font-weight: 700; vertical-align: middle; }
+.gip-alocar-item.gip-aloc-skip { border-style: dashed; }
+.gip-alocar-item.gip-aloc-skip b { color: var(--text-secondary); font-weight: 600; }
+/* Pneus interativos — cartão premium + hover */
+.gip-tire { cursor: pointer; transition: transform .18s ease, filter .18s ease; transform-box: fill-box; transform-origin: center; }
+.gip-tire-hit { pointer-events: all; cursor: pointer; }
+.gsp-tire-rubber { pointer-events: none; transition: filter .18s ease; }
+.gip-tire:hover { transform: translateY(-3px); filter: drop-shadow(0 6px 10px rgba(0,0,0,.28)); }
+.gip-tire:hover .gsp-tire-rubber { filter: brightness(1.06); }
+.gip-tire-ring { pointer-events: none; transition: stroke .18s ease, stroke-opacity .18s ease, stroke-width .18s ease; }
+.gip-tire:hover .gip-tire-ring { stroke-width: 3; stroke-opacity: 1; }
+.gip-tire.is-selected .gip-tire-ring { stroke-width: 3.2; stroke-opacity: 1; }
+.gip-chip-wrap { pointer-events: none; }
+.gip-tire .gip-chip { transition: stroke-width .18s ease, filter .18s ease; }
+.gip-tire:hover .gip-chip { filter: brightness(1.12) drop-shadow(0 0 4px rgba(59,130,246,.35)); stroke-width: 2; }
+.gip-tire.is-selected { transform: translateY(-2px); filter: drop-shadow(0 4px 12px rgba(59,130,246,.35)); }
+.gip-tire.is-selected .gip-chip { filter: drop-shadow(0 0 6px rgba(59,130,246,.75)); stroke-width: 2.4; }
+.gip-chip-txt, .gip-chip-lbl { pointer-events: none; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+.gip-chip-bar { pointer-events: none; transition: width .18s ease, fill .18s ease, opacity .18s ease; }
+.gip-slot-plus { fill: var(--text-muted, #9fb3c8); font-size: 14px; font-weight: 700; pointer-events: none; }
+.gip-slot-empty .gsp-tire-rubber path:first-child { fill: rgba(148,163,184,.12); stroke: #7c8aa0; stroke-dasharray: 5 4; }
+.gsp-tire-hub, .gsp-dual-hub { pointer-events: none; }
+.gip-axle-tires-steer .gsp-tire-rubber { filter: url(#gspTireSh); }
+.gip-axle-tires-steer .gip-tire { filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); }
+.gsp-cab, .gsp-cardan, .gsp-fifth, .gsp-fuel { pointer-events: none; }
+/* Chassi em traço (line-art) */
+.gip-line { stroke: var(--text-muted, #8fa6bd); stroke-width: 2.2; fill: none; stroke-linecap: round; opacity: .9; }
+.gip-line-thin { stroke: var(--text-muted, #8fa6bd); stroke-width: 1.4; fill: none; opacity: .7; }
+.gip-fill-soft { fill: color-mix(in srgb, var(--text-muted, #8fa6bd) 8%, transparent); stroke: var(--text-muted, #8fa6bd); stroke-width: 1.8; }
+.gip-hub { fill: color-mix(in srgb, var(--text-muted, #8fa6bd) 12%, transparent); stroke: var(--text-muted, #8fa6bd); stroke-width: 1.8; }
+.gip-axle-label { fill: var(--text-muted, #94a3b8); font-size: 9px; font-weight: 700; }
+.gip-unit-label { fill: var(--text-secondary, #94a3b8); font-size: 11px; font-weight: 800; letter-spacing: .06em; }
+
+/* Legenda */
+.gip-legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 10px 15px 0; }
+.gip-legend span { display: inline-flex; align-items: center; gap: 6px; font-size: .76rem; color: var(--text-secondary); }
+.gip-legend i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.gip-legend i.gip-leg-dash { background: transparent; border: 1.6px dashed var(--text-muted, #94a3b8); }
+.gip-legend span { padding: 2px 6px; border-radius: 6px; transition: background .12s; }
+.gip-legend span:hover { background: color-mix(in srgb, var(--text-primary) 8%, transparent); }
+.gip-legend span.leg-active { background: color-mix(in srgb, #3b82f6 16%, transparent); color: var(--text-primary); font-weight: 600; }
+/* Zoom do estágio */
+.gip-zoom { position: absolute; top: 18px; right: 20px; z-index: 5; display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--border-color); border-radius: 9px; background: color-mix(in srgb, var(--card-bg, var(--bg-secondary)) 85%, transparent); backdrop-filter: blur(4px); }
+.gip-zoom button { width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: .72rem; transition: background .12s, color .12s; }
+.gip-zoom button:hover { background: color-mix(in srgb, var(--accent-primary, #3b82f6) 14%, transparent); color: var(--accent-primary, #3b82f6); }
+/* Modo comparar: cursor de alvo nos pneus */
+.gip-stage.gip-compare-pick .gip-tire { cursor: crosshair; }
+/* Modal comparar */
+.gip-cmp-heads { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.gip-cmp-head { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-tertiary, var(--bg-secondary)); }
+.gip-cmp-head b { font-size: .95rem; color: var(--text-primary); }
+.gip-cmp-head > span:last-child { font-size: .76rem; color: var(--text-muted, var(--text-secondary)); }
+.gip-cmp-rows { display: flex; flex-direction: column; }
+.gip-cmp-row { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 8px; padding: 8px 4px; border-bottom: 1px solid var(--border-color); font-size: .84rem; }
+.gip-cmp-row:last-child { border-bottom: 0; }
+.gip-cmp-row .k { color: var(--text-muted, var(--text-secondary)); text-transform: uppercase; font-size: .68rem; letter-spacing: .04em; font-weight: 700; align-self: center; }
+.gip-cmp-row .v { color: var(--text-primary); font-weight: 600; }
+
+/* Tooltip flutuante */
+.gip-tooltip { position: fixed; z-index: 12000; pointer-events: none; min-width: 190px; max-width: 260px; background: var(--card-bg, #0f172a); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 14px 40px -12px rgba(0,0,0,.65); padding: 10px 12px; font-size: .78rem; opacity: 0; transform: translateY(4px); transition: opacity .12s, transform .12s; }
+.gip-tooltip.show { opacity: 1; transform: translateY(0); }
+.gip-tooltip .tt-title { font-weight: 800; margin-bottom: 6px; display: flex; align-items: center; gap: 7px; }
+.gip-tooltip .tt-dot { width: 10px; height: 10px; border-radius: 50%; }
+.gip-tooltip .tt-row { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; }
+.gip-tooltip .tt-row span:first-child { color: var(--text-muted, var(--text-secondary)); }
+
+/* Painel lateral do pneu */
+.gip-panel .gip-empty { padding: 30px 16px; text-align: center; color: var(--text-muted, var(--text-secondary)); }
+.gip-panel .gip-empty i { font-size: 2rem; opacity: .5; display: block; margin-bottom: 10px; }
+.gip-pnl-status { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: .8rem; padding: 3px 10px; border-radius: 999px; }
+.gip-pnl-title { font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin: 8px 0 2px; }
+.gip-pnl-sub { font-size: .8rem; color: var(--text-muted, var(--text-secondary)); margin-bottom: 12px; }
+.gip-pnl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-bottom: 12px; }
+.gip-pnl-item { display: flex; flex-direction: column; gap: 1px; }
+.gip-pnl-item .k { font-size: .66rem; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted, var(--text-secondary)); font-weight: 700; }
+.gip-pnl-item .v { font-size: .9rem; font-weight: 600; color: var(--text-primary); }
+.gip-meter { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--text-muted, #64748b) 25%, transparent); overflow: hidden; margin-top: 4px; }
+.gip-meter > i { display: block; height: 100%; border-radius: 999px; }
+.gip-pnl-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+.gip-pnl-actions .gip-btn { justify-content: center; }
+.gip-pnl-actions .gip-btn--wide { grid-column: 1 / -1; }
+
+/* Rodapé: histórico + alertas */
+.gip-bottom { display: grid; grid-template-columns: 1fr 380px; gap: 16px; margin-top: 16px; }
+.gip-timeline { list-style: none; margin: 0; padding: 4px 4px 4px 6px; max-height: 360px; overflow: auto; }
+.gip-tl-item { position: relative; padding: 0 0 14px 22px; border-left: 2px solid var(--border-color); margin-left: 6px; }
+.gip-tl-item:last-child { border-left-color: transparent; }
+.gip-tl-item::before { content: ''; position: absolute; left: -7px; top: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--gip-tl, #3b82f6); border: 2px solid var(--card-bg, var(--bg-secondary)); }
+.gip-tl-item .tl-when { font-size: .72rem; color: var(--text-muted, var(--text-secondary)); }
+.gip-tl-item .tl-what { font-size: .86rem; font-weight: 700; color: var(--text-primary); text-transform: capitalize; }
+.gip-tl-item .tl-desc { font-size: .8rem; color: var(--text-secondary); }
+.gip-alerts { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
+.gip-alert { display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--bg-tertiary, var(--bg-secondary)); cursor: pointer; }
+.gip-alert .ico { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font-size: .8rem; }
+.gip-alert .tit { font-weight: 700; font-size: .84rem; color: var(--text-primary); }
+.gip-alert .dsc { font-size: .78rem; color: var(--text-secondary); }
+.gip-alert.critico { border-color: rgba(239,68,68,.4); } .gip-alert.critico .ico { background: rgba(239,68,68,.15); color: #ef4444; }
+.gip-alert.atencao .ico { background: rgba(245,158,11,.15); color: #f59e0b; }
+.gip-alert.info .ico { background: rgba(59,130,246,.15); color: #3b82f6; }
+.gip-alerts-empty, .gip-tl-empty { padding: 24px 12px; text-align: center; color: var(--text-muted, var(--text-secondary)); font-size: .85rem; }
+
+/* Modais */
+.gip-modal { position: fixed; inset: 0; z-index: 12500; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.55); padding: 16px; }
+.gip-modal.open { display: flex; }
+.gip-modal-box { background: var(--card-bg, var(--bg-secondary)); border: 1px solid var(--border-color); border-radius: 14px; width: 100%; max-width: 440px; box-shadow: 0 24px 60px -20px rgba(0,0,0,.7); }
+.gip-modal-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--border-color); }
+.gip-modal-head h4 { margin: 0; font-size: 1rem; font-weight: 800; color: var(--text-primary); }
+.gip-modal-head .x { cursor: pointer; color: var(--text-muted, var(--text-secondary)); font-size: 1.3rem; line-height: 1; background: none; border: none; }
+.gip-modal-body { padding: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.gip-modal-body .full { grid-column: 1 / -1; }
+.gip-modal-body label { display: block; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--text-muted, var(--text-secondary)); margin-bottom: 4px; }
+.gip-modal-body input, .gip-modal-body textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: .88rem; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary, var(--bg-secondary)); color: var(--text-primary); }
+.gip-modal-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 16px; border-top: 1px solid var(--border-color); }
+.gip-modal-foot .msg { margin-right: auto; font-size: .82rem; font-weight: 600; }
+
+/* Toast */
+.gip-toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px); z-index: 13000; background: #0f172a; color: #fff; border-radius: 10px; padding: 11px 16px; font-size: .86rem; font-weight: 600; box-shadow: 0 14px 40px -12px rgba(0,0,0,.7); opacity: 0; transition: opacity .18s, transform .18s; pointer-events: none; }
+.gip-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.gip-toast.success { background: #15803d; } .gip-toast.error { background: #b91c1c; }
+
+/* Responsivo */
+@media (max-width: 1100px) {
+    .gip-kpis { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .gip-main { grid-template-columns: 1fr; }
+    .gip-bottom { grid-template-columns: 1fr; }
+}
+@media (max-width: 560px) {
+    .gip-kpis { grid-template-columns: 1fr 1fr; }
+    .gip-modal-body { grid-template-columns: 1fr; }
+}

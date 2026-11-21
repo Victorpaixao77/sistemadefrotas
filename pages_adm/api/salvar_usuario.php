@@ -1,11 +1,20 @@
 <?php
 require_once '../../includes/conexao.php';
-session_start();
+require_once __DIR__ . '/../includes/adm_session.php';
+require_once __DIR__ . '/../includes/adm_post_guard.php';
+require_once __DIR__ . '/../lib/adm_events.php';
 
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['admin_id'])) {
+    http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Não autorizado']);
+    exit;
+}
+
+if (!adm_csrf_valid_post()) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Sessão expirada ou token inválido. Recarregue a página.']);
     exit;
 }
 
@@ -108,6 +117,7 @@ try {
                 }
             }
             
+            adm_event_log($pdo, 'usuarios', 'criar', 'Usuário criado: ' . ($_POST['email'] ?? ''), 'info', (int) $empresa_cliente['id'], (int) $_POST['empresa_id'], (int) $usuario_id);
             echo json_encode(['success' => true, 'message' => 'Usuário cadastrado com sucesso!']);
             break;
             
@@ -214,6 +224,7 @@ try {
                 }
             }
             
+            adm_event_log($pdo, 'usuarios', 'atualizar', 'Usuário atualizado: ' . ($_POST['email'] ?? ''), 'info', (int) $empresa_cliente['id'], (int) $_POST['empresa_id'], (int) $_POST['id']);
             echo json_encode(['success' => true, 'message' => 'Usuário atualizado com sucesso!']);
             break;
             
@@ -221,13 +232,20 @@ try {
             $stmt = $pdo->prepare("DELETE FROM usuarios WHERE id = ?");
             $stmt->execute([$_POST['id']]);
             
+            adm_event_log($pdo, 'usuarios', 'excluir', 'Usuário excluído ID ' . (int) $_POST['id'], 'aviso', null, null, (int) $_POST['id']);
             echo json_encode(['success' => true, 'message' => 'Usuário excluído com sucesso!']);
             break;
             
         default:
             throw new Exception("Ação inválida");
     }
+} catch (PDOException $e) {
+    // Erro de banco: registrar internamente, nunca expor detalhe técnico.
+    error_log('salvar_usuario PDO: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Não foi possível concluir a operação. Tente novamente.']);
 } catch (Exception $e) {
+    // Mensagens de validação intencionais (email duplicado, empresa não encontrada, etc.).
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }
 ?>

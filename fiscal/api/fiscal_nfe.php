@@ -5,7 +5,7 @@
  */
 
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
+require __DIR__ . '/_cors_same_origin.php';
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
@@ -33,7 +33,14 @@ try {
     // Configurar sessão
     configure_session();
     session_start();
-    
+
+    // Exige sessão autenticada com empresa (isolamento multi-empresa).
+    if (!isset($_SESSION['empresa_id']) || empty($_SESSION['empresa_id'])) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'message' => 'Não autorizado']);
+        exit;
+    }
+
     // Obter dados do POST (esta rota recebe tanto JSON quanto FormData/multipart)
     $empresa_id = $_SESSION['empresa_id'];
     $action = $_POST['action'] ?? $_GET['action'] ?? 'list';

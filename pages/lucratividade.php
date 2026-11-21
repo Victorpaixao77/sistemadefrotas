@@ -1,3 +1,4 @@
+
 <?php
 // Include configuration and functions first
 $required_files = [
@@ -261,695 +262,10 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="../logo.png">
 
-    <style>
-        /* Estilos específicos para os gráficos de lucratividade */
-        .analytics-card canvas {
-            max-height: 280px !important;
-            width: 100% !important;
-        }
-        
-        /* Ajuste para o gráfico gauge */
-        #profitPerKmGauge {
-            max-height: 250px !important;
-        }
-
-        .lucra-chart-msg {
-            padding: 0.85rem 1rem;
-            text-align: center;
-            font-size: 0.875rem;
-            line-height: 1.45;
-            border-radius: 8px;
-            margin: 0.5rem 0;
-        }
-        .lucra-chart-msg--load {
-            color: var(--text-muted);
-            background: var(--bg-tertiary, rgba(0, 0, 0, 0.04));
-        }
-        .lucra-chart-msg--err {
-            color: #b91c1c;
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.25);
-        }
-        
-        /* Responsividade para telas menores */
-        @media (max-width: 768px) {
-            .analytics-grid {
-                grid-template-columns: 1fr !important;
-            }
-            
-            .analytics-card canvas {
-                max-height: 250px !important;
-            }
-        }
-        
-        /* Alertas */
-        .alerts-section {
-            margin-bottom: 2rem;
-        }
-        
-        .alerts-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-        
-        .alert-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            border-left: 4px solid;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: flex-start;
-            gap: 1rem;
-        }
-        
-        .alert-card.alert-success {
-            border-left-color: #28a745;
-            background: linear-gradient(135deg, #f8fff9, #e8f5e8);
-        }
-        
-        .alert-card.alert-warning {
-            border-left-color: #ffc107;
-            background: linear-gradient(135deg, #fffdf8, #fef9e7);
-        }
-        
-        .alert-card.alert-danger {
-            border-left-color: #dc3545;
-            background: linear-gradient(135deg, #fff8f8, #f8e8e8);
-        }
-        
-        .alert-card.alert-info {
-            border-left-color: #17a2b8;
-            background: linear-gradient(135deg, #f8fdff, #e8f4f8);
-        }
-        
-        .alert-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
-        }
-        
-        .alert-icon {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            color: white;
-            font-size: 1.2rem;
-            flex-shrink: 0;
-        }
-        
-        .alert-success .alert-icon {
-            background: #28a745;
-        }
-        
-        .alert-warning .alert-icon {
-            background: #ffc107;
-            color: #000;
-        }
-        
-        .alert-danger .alert-icon {
-            background: #dc3545;
-        }
-        
-        .alert-info .alert-icon {
-            background: #17a2b8;
-        }
-        
-        .alert-content h4 {
-            margin: 0 0 0.5rem 0;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #212529;
-        }
-        
-        .alert-content p {
-            margin: 0;
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-        
-        /* Estilos para badges na tabela */
-        .badge {
-            padding: 0.35em 0.65em;
-            font-size: 0.75em;
-            font-weight: 700;
-            line-height: 1;
-            text-align: center;
-            white-space: nowrap;
-            vertical-align: baseline;
-            border-radius: 0.375rem;
-        }
-        
-        .bg-success {
-            background-color: #198754 !important;
-            color: white;
-        }
-        
-        .bg-warning {
-            background-color: #ffc107 !important;
-            color: #000;
-        }
-        
-        .bg-danger {
-            background-color: #dc3545 !important;
-            color: white;
-        }
-        
-        .bg-info {
-            background-color: #0dcaf0 !important;
-            color: #000;
-        }
-        
-        /* Responsividade */
-        @media (max-width: 768px) {
-            .alerts-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        /* Estilos para KPIs Avançados */
-        .advanced-kpis {
-            margin-bottom: 2rem;
-        }
-        
-        .kpis-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-top: 1rem;
-        }
-        
-        .kpi-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            border: 1px solid #e9ecef;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .kpi-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, #007bff, #6610f2);
-        }
-        
-        .kpi-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        }
-        
-        .kpi-icon {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #007bff, #6610f2);
-            color: white;
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-        }
-        
-        .kpi-content h3 {
-            font-size: 1.8rem;
-            font-weight: 700;
-            margin: 0 0 0.5rem 0;
-            color: #212529;
-        }
-        
-        .kpi-content p {
-            margin: 0 0 0.5rem 0;
-            color: #6c757d;
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-        
-        .kpi-trend {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-        
-        .kpi-trend.positive {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .kpi-trend.negative {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        
-        /* Responsividade */
-        @media (max-width: 768px) {
-            .alerts-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        /* Espaçamento adicional para tabelas */
-        .table-responsive .table th,
-        .table-responsive .table td {
-            padding: 0.75rem 1rem !important;
-        }
-        
-        .table-responsive .table th {
-            padding: 1rem 1.25rem !important;
-        }
-        
-        /* Estilos para tendências */
-        .trend-up {
-            color: #28a745;
-            font-weight: 600;
-        }
-        
-        .trend-down {
-            color: #dc3545;
-            font-weight: 600;
-        }
-        
-        .trend-neutral {
-            color: #6c757d;
-            font-weight: 600;
-        }
-        
-        .trend-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.25rem;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.375rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        
-        .trend-badge.trend-up {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        
-        .trend-badge.trend-down {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        
-        .trend-badge.trend-neutral {
-            background-color: #e2e3e5;
-            color: #495057;
-        }
-        
-        /* Estilos para exportação PDF */
-        @media print {
-            .modal {
-                display: none !important;
-            }
-            
-            .sidebar {
-                display: none !important;
-            }
-            
-            .main-content {
-                margin-left: 0 !important;
-                width: 100% !important;
-            }
-            
-            .dashboard-actions {
-                display: none !important;
-            }
-            
-            .btn-restore-layout,
-            .btn-toggle-layout,
-            .btn-help {
-                display: none !important;
-            }
-        }
-        
-        /* Estilos para melhorar a captura de tela */
-        .exporting {
-            overflow: visible !important;
-        }
-        
-        .exporting .modal {
-            display: none !important;
-        }
-        
-        .exporting .sidebar {
-            display: none !important;
-        }
-        
-        .exporting .main-content {
-            margin-left: 0 !important;
-            width: 100% !important;
-        }
-        
-        .exporting .dashboard-actions {
-            display: none !important;
-        }
-        .modal .close-modal {
-            background: transparent;
-            border: none;
-            padding: 0;
-            margin: 0;
-            font: inherit;
-            line-height: 1;
-            cursor: pointer;
-            color: inherit;
-        }
-
-        /* Estilos para Modais */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 10000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            align-items: center;
-            justify-content: center;
-            animation: fadeIn 0.3s;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        @keyframes slideIn {
-            from { transform: translateY(-50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        
-        .modal-content {
-            background: var(--bg-primary);
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            animation: slideIn 0.3s;
-        }
-        
-        .modal-header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .modal-header h2 {
-            margin: 0;
-            color: var(--text-primary);
-            font-size: 1.5em;
-        }
-        
-        .close-modal {
-            font-size: 28px;
-            font-weight: bold;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: color 0.3s;
-        }
-        
-        .close-modal:hover {
-            color: var(--text-primary);
-        }
-        
-        .modal-body {
-            padding: 20px;
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: var(--text-primary);
-            font-weight: 500;
-        }
-        
-        .form-control {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            background: var(--bg-secondary);
-            color: var(--text-primary);
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-        
-        .form-control:focus {
-            outline: none;
-            border-color: var(--primary-color);
-        }
-        
-        .help-section {
-            margin-bottom: 25px;
-        }
-        
-        .help-section h3 {
-            color: var(--primary-color);
-            margin-bottom: 10px;
-            font-size: 1.2em;
-        }
-        
-        .help-section ul, .help-section ol {
-            margin-left: 20px;
-            line-height: 1.8;
-        }
-        
-        .help-section li {
-            margin-bottom: 8px;
-            color: var(--text-secondary);
-        }
-        
-        .help-section strong {
-            color: var(--text-primary);
-        }
-        
-        @media (max-width: 768px) {
-            .modal-content {
-                width: 95%;
-                margin: 20px;
-            }
-        }
-        /* Estilos para Análises Detalhadas */
-        .analysis-section {
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .analysis-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        
-        .analysis-card {
-            background: var(--bg-primary);
-            border-radius: 8px;
-            padding: 15px;
-            border-left: 4px solid var(--accent-primary);
-        }
-        
-        .analysis-card h4 {
-            margin: 0 0 10px 0;
-            color: var(--text-primary);
-            font-size: 1rem;
-        }
-        
-        .ranking-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-        
-        .ranking-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            margin-bottom: 8px;
-            background: var(--bg-secondary);
-            border-radius: 6px;
-        }
-        
-        .ranking-position {
-            font-weight: 700;
-            color: var(--accent-primary);
-            margin-right: 10px;
-        }
-        
-        .ranking-item {
-            padding: 15px !important;
-        }
-        
-        .ranking-item small {
-            line-height: 1.6;
-        }
-        
-        /* Melhorar legibilidade do metric-trend */
-        .metric-trend {
-            font-weight: 600;
-            font-size: 0.9rem;
-            margin-top: 8px;
-        }
-        
-        .metric-trend.positive {
-            color: #218838 !important;
-        }
-        
-        .metric-trend.negative {
-            color: #dc3545 !important;
-        }
-        
-        .metric-trend.info {
-            color: #6c757d !important;
-        }
-        
-        /* Específico para o card de Lucro Líquido com fundo verde claro */
-        .dashboard-card[style*="background: #e6f9ed"] .metric-trend {
-            color: #155724 !important;
-            font-weight: 700;
-        }
-
-        /* Reordenar blocos da página (sempre ativo — moderno e clássico) */
-        .lucra-dashboard-stack {
-            display: flex;
-            flex-direction: column;
-            gap: 0.35rem;
-        }
-        .lucra-dash-block {
-            position: relative;
-        }
-        .lucra-dash-block__body {
-            position: relative;
-        }
-        /* Sortable.js — mesmo padrão do index.php (dashboard) */
-        .sortable-ghost {
-            opacity: 0.45;
-        }
-        #lucraKpiGrid .dashboard-card {
-            cursor: grab;
-        }
-        #lucraKpiGrid .dashboard-card:active {
-            cursor: grabbing;
-        }
-        .lucra-dash-block {
-            cursor: grab;
-        }
-        .lucra-dash-block:active {
-            cursor: grabbing;
-        }
-
-        <?php if ($is_modern): ?>
-        body.lucratividade-modern .dashboard-content.fornc-page {
-            padding-top: 8px;
-        }
-        body.lucratividade-modern .dashboard-header {
-            display: none;
-        }
-        body.lucratividade-modern .dashboard-grid {
-            gap: 0.65rem;
-        }
-        body.lucratividade-modern .sortable-ghost {
-            opacity: 0.45;
-        }
-        body.lucratividade-modern .dashboard-card {
-            border-radius: 10px;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-            border: 1px solid var(--border-color);
-        }
-        body.lucratividade-modern .analytics-section {
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-        }
-        body.lucratividade-modern .analytics-card {
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-        }
-        body.lucratividade-modern .card.mb-4.fornc-resumo-shell {
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-            background: var(--card-bg, var(--bg-secondary));
-        }
-        body.lucratividade-modern .fornc-table tbody td {
-            text-transform: none;
-            letter-spacing: normal;
-        }
-        body.lucratividade-modern .fornc-table tr.table-success td {
-            background: rgba(25, 135, 84, 0.1);
-            font-weight: 600;
-        }
-        body.lucratividade-modern .fornc-table tr.table-primary td {
-            background: rgba(13, 110, 253, 0.08);
-            font-weight: 600;
-        }
-        body.lucratividade-modern .exporting .fornc-toolbar,
-        body.lucratividade-modern .exporting .fornc-kpi-strip,
-        body.lucratividade-modern .exporting .lucra-period-nav {
-            display: none !important;
-        }
-        @media print {
-            body.lucratividade-modern .fornc-toolbar,
-            body.lucratividade-modern .fornc-kpi-strip,
-            body.lucratividade-modern .lucra-period-nav {
-                display: none !important;
-            }
-        }
-        body.lucratividade-modern .lucra-period-nav {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.35rem;
-            align-items: center;
-        }
-        body.lucratividade-modern .dashboard-card--highlight {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04)) !important;
-            border: 1px solid rgba(16, 185, 129, 0.45) !important;
-        }
-        body.lucratividade-modern .dashboard-card--highlight .card-header h3 {
-            color: #15803d;
-        }
-        body.lucratividade-modern #lucraKpiGrid .dashboard-card .card-header {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            min-width: 0;
-        }
-        body.lucratividade-modern #lucraKpiGrid .dashboard-card .card-header .kpi-card-icon {
-            flex-shrink: 0;
-            font-size: 0.85rem;
-            color: var(--accent-primary);
-            opacity: 0.92;
-        }
-        body.lucratividade-modern .dashboard-card--highlight .card-header .kpi-card-icon {
-            color: #15803d;
-        }
-        <?php endif; ?>
-    </style>
+    <link rel="stylesheet" href="../css/lucratividade-page.css">
+    <?php if ($is_modern): ?>
+    <link rel="stylesheet" href="../css/lucratividade-modern.css">
+    <?php endif; ?>
     <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'lucratividade-modern' : ''; ?>">
@@ -970,14 +286,15 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
                     <label for="lucraMesAnoDisplay">Período analisado</label>
                     <div class="fornc-search-inner">
                         <i class="fas fa-calendar-alt" aria-hidden="true"></i>
-                        <input type="text" id="lucraMesAnoDisplay" readonly value="<?php echo htmlspecialchars($lucra_periodo_label); ?>" style="cursor: pointer;" title="Clique para alterar o período" role="button" tabindex="0" aria-label="Abrir filtros de período. Período atual: <?php echo htmlspecialchars($lucra_periodo_label); ?>">
+                        <input type="text" id="lucraMesAnoDisplay" readonly value="<?php echo htmlspecialchars($lucra_periodo_label); ?>" style="cursor: pointer;" title="Clique para alterar o período" role="button" tabindex="0" data-sf-periodo data-sf-periodo-onapply="lucraApplyPeriodo" aria-label="Abrir filtros de período. Período atual: <?php echo htmlspecialchars($lucra_periodo_label); ?>">
                     </div>
+                    <input type="hidden" id="lucraPeriodoHidden" data-sf-periodo-month value="<?php echo htmlspecialchars(sprintf('%04d-%02d', (int)$ano, (int)$mes)); ?>">
                 </div>
                 <div class="fornc-btn-row lucra-period-nav" aria-label="Navegar período">
                     <a href="<?php echo htmlspecialchars($lucra_href_prev); ?>" class="fornc-btn fornc-btn--ghost" title="Mês anterior"><i class="fas fa-chevron-left" aria-hidden="true"></i> Anterior</a>
                     <a href="<?php echo htmlspecialchars($lucra_href_next); ?>" class="fornc-btn fornc-btn--ghost" title="Próximo mês">Próximo <i class="fas fa-chevron-right" aria-hidden="true"></i></a>
-                    <button type="button" id="filterBtn" class="fornc-btn fornc-btn--accent" title="Filtros">
-                        <i class="fas fa-filter" aria-hidden="true"></i> Filtros
+                    <button type="button" data-sf-periodo data-sf-periodo-onapply="lucraApplyPeriodo" class="fornc-btn fornc-btn--accent" title="Filtrar por período">
+                        <i class="fas fa-calendar-alt" aria-hidden="true"></i> Período
                     </button>
                     <button type="button" id="exportBtn" class="fornc-btn fornc-btn--muted" title="Exportar">
                         <i class="fas fa-file-export" aria-hidden="true"></i> Exportar
@@ -1835,6 +1152,7 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
     </div>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <script src="../js/sf-periodo.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
     <script>
     window.LUCRA_EMPRESA_ID = <?php echo (int) $empresa_id; ?>;
@@ -1933,7 +1251,8 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
         });
     })();
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     
     <!-- Bibliotecas para exportar PDF -->
@@ -2002,6 +1321,18 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
         el.classList.remove('active');
     }
 
+    // Aplicar período escolhido no widget padrão (Período) -> recarrega com ?mes&ano
+    function lucraApplyPeriodo(p) {
+        var v = (p && p.mes) || '';
+        var qs = (typeof lucraClassicQs !== 'undefined') ? lucraClassicQs : '';
+        if (v) {
+            var parts = v.split('-');
+            window.location.href = '?mes=' + parts[1] + '&ano=' + parts[0] + qs;
+        } else {
+            window.location.href = (typeof lucraClassic !== 'undefined' && lucraClassic) ? (window.location.pathname + '?classic=1') : window.location.pathname;
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         const filterBtn = document.getElementById('filterBtn');
         const filterModal = document.getElementById('filterModal');
@@ -2026,10 +1357,12 @@ $lucra_ticket_kpi = isset($advanced_kpis['ticket_medio']) ? floatval($advanced_k
             }
         }
 
-        if (filterBtn && filterModal) {
+        // No layout moderno o período usa o widget padrão (SFPeriodo). O modal
+        // antigo (filterModal) só é usado no layout clássico.
+        if (lucraClassic && filterBtn && filterModal) {
             filterBtn.addEventListener('click', function() { lucraOpenModal(filterModal); });
         }
-        if (lucraPeriodField && filterModal) {
+        if (lucraClassic && lucraPeriodField && filterModal) {
             lucraPeriodField.addEventListener('click', function() { lucraOpenModal(filterModal); });
             lucraPeriodField.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter' || e.key === ' ') {

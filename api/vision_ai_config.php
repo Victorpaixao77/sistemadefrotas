@@ -18,6 +18,7 @@ session_start();
 
 header('Content-Type: application/json');
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 require_permission('manage_system_settings');
 api_require_csrf_json();
 
@@ -25,6 +26,7 @@ $empresa_id = (int) $_SESSION['empresa_id'];
 $conn = getConnection();
 sf_vision_ai_ensure_schema($conn);
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
+$purpose = sf_vision_ai_purpose_norm((string) ($_POST['purpose'] ?? $_GET['purpose'] ?? 'vision'));
 
 function sf_vision_mask_key(string $k): string
 {
@@ -38,12 +40,13 @@ function sf_vision_mask_key(string $k): string
 try {
     switch ($action) {
         case 'get':
-            $row = sf_vision_ai_get($conn, $empresa_id) ?: [];
+            $row = sf_vision_ai_get($conn, $empresa_id, $purpose) ?: [];
             $key = trim((string) ($row['api_key'] ?? ''));
             echo json_encode([
                 'success' => true,
                 'data' => [
-                    'provider' => $row['provider'] ?? 'gemini',
+                    'purpose' => $purpose,
+                    'provider' => $row['provider'] ?? ($purpose === 'text' ? 'deepseek' : 'gemini'),
                     'model' => $row['model'] ?? '',
                     'base_url' => $row['base_url'] ?? '',
                     'has_key' => $key !== '',
@@ -67,8 +70,11 @@ try {
             if ($provider === 'custom' && $base_url === '') {
                 api_json_error('Para "Personalizado" informe a Base URL (compatível com OpenAI).', 422);
             }
+            if ($purpose === 'vision' && empty($providers[$provider]['vision'])) {
+                api_json_error($providers[$provider]['label'] . ' não lê imagens; escolha outro provedor para a IA de Visão.', 422);
+            }
 
-            $existing = sf_vision_ai_get($conn, $empresa_id);
+            $existing = sf_vision_ai_get($conn, $empresa_id, $purpose);
             $keyToStore = $existing['api_key'] ?? '';
             if ($clear) {
                 $keyToStore = '';
@@ -77,13 +83,14 @@ try {
             }
 
             $stmt = $conn->prepare(
-                'INSERT INTO empresa_vision_ai (empresa_id, provider, api_key, model, base_url)
-                 VALUES (:e, :p, :k, :m, :b)
+                'INSERT INTO empresa_vision_ai (empresa_id, purpose, provider, api_key, model, base_url)
+                 VALUES (:e, :pu, :p, :k, :m, :b)
                  ON DUPLICATE KEY UPDATE provider = VALUES(provider), api_key = VALUES(api_key),
                     model = VALUES(model), base_url = VALUES(base_url)'
             );
             $stmt->execute([
                 ':e' => $empresa_id,
+                ':pu' => $purpose,
                 ':p' => $provider,
                 ':k' => $keyToStore !== '' ? $keyToStore : null,
                 ':m' => $model !== '' ? $model : null,
@@ -102,7 +109,7 @@ try {
             $def = $providers[$provider];
             $key = trim((string) ($_POST['api_key'] ?? ''));
             if ($key === '') {
-                $saved = sf_vision_ai_get($conn, $empresa_id);
+                $saved = sf_vision_ai_get($conn, $empresa_id, $purpose);
                 $key = trim((string) ($saved['api_key'] ?? ''));
             }
             if ($key === '') {

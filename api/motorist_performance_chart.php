@@ -16,6 +16,7 @@ header('Content-Type: application/json');
 
 // Garante que a requisição está autenticada
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Obtém o ID do motorista da requisição
 $motoristId = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -154,13 +155,13 @@ try {
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'error' => 'Erro ao buscar dados de desempenho: ' . $e->getMessage()
+        'error' => 'Erro ao buscar dados de desempenho: '
     ]);
 } catch(Exception $e) {
     error_log("General error in motorist_performance_chart: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'error' => 'Erro ao buscar dados de desempenho: ' . $e->getMessage()
+        'error' => 'Erro ao buscar dados de desempenho: '
     ]);
 } 

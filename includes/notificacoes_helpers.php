@@ -10,7 +10,7 @@ const SF_NOTIF_DIAS_JANELA = 14;
 /** Tipos operacionais (sininho regular): pendências e compliance acionável. */
 function sf_notif_tipos_operacional(): array
 {
-    return ['rota', 'abastecimento', 'documento', 'cnh', 'financeiro', 'despesa', 'multa', 'comissao', 'fiscal', 'fornecedor', 'checklist', 'seguranca'];
+    return ['rota', 'abastecimento', 'documento', 'cnh', 'financeiro', 'despesa', 'multa', 'comissao', 'fiscal', 'fornecedor', 'checklist', 'seguranca', 'plataforma'];
 }
 
 /** Tipos IA / insights analíticos. */
@@ -41,6 +41,7 @@ function sf_notif_tipo_labels(): array
         'fornecedor' => 'Fornecedores',
         'checklist' => 'Checklists com problemas',
         'seguranca' => 'Segurança (login / IP novo)',
+        'plataforma' => 'Comunicados da plataforma Frotec',
         'manutencao' => 'Manutenções preventivas',
         'alerta' => 'Alertas gerais de frota',
         'pneu' => 'Pneus e desgaste',
@@ -82,15 +83,23 @@ function sf_notif_ensure_schema(PDO $conn): void
     }
     $done = true;
     try {
-        $cols = $conn->query('SHOW COLUMNS FROM notificacoes')->fetchAll(PDO::FETCH_COLUMN);
-        if (!in_array('severidade', $cols, true)) {
+        $cols = $conn->query('SHOW COLUMNS FROM notificacoes')->fetchAll(PDO::FETCH_ASSOC);
+        $colMap = [];
+        foreach ($cols as $c) {
+            $colMap[$c['Field']] = $c;
+        }
+        if (!isset($colMap['severidade'])) {
             $conn->exec("ALTER TABLE notificacoes ADD COLUMN severidade VARCHAR(20) NOT NULL DEFAULT 'info' AFTER tipo");
         }
-        if (!in_array('grupo_chave', $cols, true)) {
+        if (!isset($colMap['grupo_chave'])) {
             $conn->exec('ALTER TABLE notificacoes ADD COLUMN grupo_chave VARCHAR(120) NULL AFTER severidade');
         }
-        if (!in_array('meta_json', $cols, true)) {
+        if (!isset($colMap['meta_json'])) {
             $conn->exec('ALTER TABLE notificacoes ADD COLUMN meta_json TEXT NULL AFTER ia_mensagem');
+        }
+        $tipoCol = $colMap['tipo'] ?? null;
+        if ($tipoCol && stripos((string) ($tipoCol['Type'] ?? ''), 'enum') !== false) {
+            $conn->exec("ALTER TABLE notificacoes MODIFY COLUMN tipo VARCHAR(64) NOT NULL DEFAULT 'alerta'");
         }
         $conn->exec("CREATE TABLE IF NOT EXISTS notificacoes_preferencias (
             usuario_id INT NOT NULL, empresa_id INT NOT NULL,
@@ -303,7 +312,9 @@ function sf_notif_url(string $tipo, ?int $referencia_id = null): ?string
         case 'gps':
             return $base('pages/mapa_frota.php');
         case 'alerta':
-            return $base('pages/gestao_interativa.php');
+            return $base('pages/gestao_interativa_pro.php');
+        case 'plataforma':
+            return $base('pages/notificacoes.php');
         default:
             return null;
     }

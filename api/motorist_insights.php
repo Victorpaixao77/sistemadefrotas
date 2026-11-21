@@ -15,6 +15,7 @@ configure_session();
 session_start();
 
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 $empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
 if (!$empresa_id) {

@@ -1,5 +1,6 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -50,11 +51,20 @@ fun PedagiosScreen(
     val vm: PedagiosViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository) { PedagiosViewModel(it) }
     )
-    val list by vm.list.collectAsState()
-    val total30d by vm.total30d.collectAsState()
-    val refreshing by vm.refreshing.collectAsState()
-    val error by vm.error.collectAsState()
+    val list by vm.list.collectAsStateWithLifecycle()
+    val total30d by vm.total30d.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
     var showForm by remember { mutableStateOf(false) }
+    var ocrPrefill by remember { mutableStateOf<com.sistemafrotas.motorista.data.api.OcrCampos?>(null) }
+
+    LaunchedEffect(Unit) {
+        val (_, campos) = com.sistemafrotas.motorista.feature.viagem.TripFeatureBridge.consumeOcr()
+        if (campos != null) {
+            ocrPrefill = campos
+            showForm = true
+        }
+    }
 
     LaunchedEffect(Unit) { vm.carregarSeNecessario() }
 
@@ -62,8 +72,9 @@ fun PedagiosScreen(
         LaunchedEffect(Unit) { onSubScreenChange("Novo pedágio") { showForm = false } }
         NovoPedagioScreen(
             authRepository = authRepository,
-            onBack = { showForm = false },
-            onSuccess = { showForm = false; vm.refresh() },
+            onBack = { showForm = false; ocrPrefill = null },
+            onSuccess = { showForm = false; ocrPrefill = null; vm.refresh() },
+            ocrPrefill = ocrPrefill,
             modifier = modifier,
         )
         return
@@ -126,7 +137,7 @@ fun PedagiosScreen(
                             }
                             Spacer(Modifier.height(4.dp))
                         }
-                        items(list) { p ->
+                        items(list, key = { it.id }) { p ->
                             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
                                 Row(
                                     Modifier.fillMaxWidth().padding(14.dp),
@@ -159,6 +170,7 @@ private fun NovoPedagioScreen(
     authRepository: AuthRepository,
     onBack: () -> Unit,
     onSuccess: () -> Unit,
+    ocrPrefill: com.sistemafrotas.motorista.data.api.OcrCampos? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -172,6 +184,12 @@ private fun NovoPedagioScreen(
 
     LaunchedEffect(Unit) {
         LocationHelper(context).takeIf { it.hasLocationPermission() }?.getLastLocation()?.let { gpsLocation = it }
+    }
+
+    LaunchedEffect(ocrPrefill) {
+        val c = ocrPrefill ?: return@LaunchedEffect
+        c.valor?.let { if (it > 0) valor = it.toString() }
+        c.praca?.let { if (it.isNotBlank()) praca = it }
     }
 
     Column(

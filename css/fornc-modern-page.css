@@ -386,10 +386,102 @@
         .fornc-table tbody td.actions {
             white-space: nowrap;
         }
-        .fornc-table .btn-icon {
-            padding: 0.15rem 0.28rem;
-            font-size: 0.75rem;
-            margin: 0 0.05rem;
+        /* ===== Botões de ação no padrão premium (igual ao routes.php) =====
+           Cobre os 3 padrões de marcação do sistema:
+           - td.actions .btn-icon            (rotas, veículos, abastecimentos, motoristas…)
+           - .table-actions .btn-icon        (contas a pagar, financiamento)
+           - .action-buttons .btn-action     (pneus) */
+        .fornc-table td.actions .btn-icon,
+        .fornc-table td.actions a.btn-icon,
+        .data-table td.actions .btn-icon,
+        .data-table td.actions a.btn-icon,
+        .table-actions .btn-icon,
+        .table-actions a.btn-icon,
+        .action-buttons .btn-action,
+        .action-buttons a.btn-action {
+            width: 24px;
+            height: 24px;
+            min-width: 24px;
+            min-height: 24px;
+            padding: 0;
+            margin: 0 3px 0 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.68rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-tertiary, var(--bg-secondary));
+            color: var(--text-secondary, var(--text-primary));
+            cursor: pointer;
+            vertical-align: middle;
+            box-shadow: none;
+            transition: transform 0.12s ease, color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+        }
+        .fornc-table td.actions .btn-icon i,
+        .data-table td.actions .btn-icon i,
+        .table-actions .btn-icon i,
+        .action-buttons .btn-action i {
+            font-size: inherit;
+            line-height: 1;
+        }
+        .fornc-table td.actions .btn-icon:hover,
+        .data-table td.actions .btn-icon:hover,
+        .table-actions .btn-icon:hover,
+        .action-buttons .btn-action:hover {
+            transform: translateY(-1px);
+        }
+        /* Cores por tipo de ação no hover */
+        .fornc-table td.actions .view-btn:hover,
+        .fornc-table td.actions .view-comprovante-btn:hover,
+        .fornc-table td.actions .btn-pos-fin:hover,
+        .data-table td.actions .view-btn:hover,
+        .data-table td.actions .view-comprovante-btn:hover,
+        .table-actions .view-btn:hover,
+        .table-actions .view-receipt-btn:hover,
+        .table-actions .view-comprovante-btn:hover,
+        .action-buttons .btn-action.view:hover {
+            color: #3b82f6;
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.12);
+        }
+        .fornc-table td.actions .edit-btn:hover,
+        .data-table td.actions .edit-btn:hover,
+        .table-actions .edit-btn:hover,
+        .action-buttons .btn-action.edit:hover {
+            color: #f59e0b;
+            border-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.12);
+        }
+        .fornc-table td.actions .expenses-btn:hover,
+        .fornc-table td.actions .btn-pos-fisc:hover,
+        .data-table td.actions .expenses-btn:hover,
+        .table-actions .payment-btn:hover {
+            color: #22c55e;
+            border-color: #22c55e;
+            background: rgba(34, 197, 94, 0.12);
+        }
+        .fornc-table td.actions .duplicate-btn:hover,
+        .data-table td.actions .duplicate-btn:hover {
+            color: #06b6d4;
+            border-color: #06b6d4;
+            background: rgba(6, 182, 212, 0.12);
+        }
+        .fornc-table td.actions .delete-btn:hover,
+        .fornc-table td.actions .btn-del-forn:hover,
+        .data-table td.actions .delete-btn:hover,
+        .table-actions .delete-btn:hover,
+        .action-buttons .btn-action.delete:hover {
+            color: #ef4444;
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.12);
+        }
+        .fornc-table td.actions .btn-icon:focus-visible,
+        .data-table td.actions .btn-icon:focus-visible,
+        .table-actions .btn-icon:focus-visible,
+        .action-buttons .btn-action:focus-visible {
+            outline: 2px solid var(--accent-primary, #3b82f6);
+            outline-offset: 1px;
         }
         .fornc-table .status-badge {
             font-size: 0.65rem;

@@ -4,6 +4,7 @@ require_once '../includes/functions.php';
 
 configure_session();
 session_start();
+require_authentication();
 
 if (!isset($_SESSION['empresa_id'])) {
     header('Location: ../login.php');
@@ -171,12 +172,10 @@ $empresa_id = $_SESSION['empresa_id'];
                     </select>
                 </div>
                 <div>
-                    <label style="color: #b0b8c9; display: block; margin-bottom: 5px;">Data Início</label>
-                    <input type="date" id="dataInicio" class="form-control">
-                </div>
-                <div>
-                    <label style="color: #b0b8c9; display: block; margin-bottom: 5px;">Data Fim</label>
-                    <input type="date" id="dataFim" class="form-control">
+                    <label style="color: #b0b8c9; display: block; margin-bottom: 5px;">Período</label>
+                    <button type="button" class="btn btn-secondary" data-sf-periodo data-sf-periodo-onapply="aplicarFiltros" title="Filtrar por período"><i class="fas fa-calendar-alt"></i> Selecionar</button>
+                    <input type="hidden" id="dataInicio" data-sf-periodo-from>
+                    <input type="hidden" id="dataFim" data-sf-periodo-to>
                 </div>
             </div>
             <div style="margin-top: 15px;">
@@ -213,7 +212,8 @@ $empresa_id = $_SESSION['empresa_id'];
         
         <div class="pagination" id="pagination"></div>
     </div>
-    
+
+    <script src="../js/sf-periodo.js"></script>
     <script>
         let currentPage = 1;
         let currentFilters = {};

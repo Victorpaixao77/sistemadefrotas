@@ -170,6 +170,71 @@ return [
         'Veículos com configuração especial (bitrem, rodotrem) devem usar o modo flexível.',
     ]),
 ],
+'gestao_interativa_pro' => [
+    'title' => 'Gestão Interativa',
+    'visao_geral' => '<p>Versão premium da gestão de pneus: desenho técnico do veículo em vista superior (cavalo + carreta) com cada pneu clicável, colorido por saúde (sulco/vida). Permite montar os eixos arrastando, alocar pneus do estoque por posição, medir sulco, registrar calibragem, mover/remover/descartar/recapar, além de KPIs, filtros, alertas e histórico — tudo numa só tela.</p>',
+    'funcionalidades' => sf_hlp_ul([
+        '<strong>Estágio premium:</strong> veículo em vista superior com pneus coloridos por saúde e % de vida útil.',
+        '<strong>Visões:</strong> alterne entre <em>Tudo</em>, <em>Cavalo</em> e <em>Carreta</em> (a visão é lembrada).',
+        '<strong>Montar eixos:</strong> arraste eixos e o tanque para posicionar; salve o layout do veículo.',
+        '<strong>Menu Eixos:</strong> adicionar/excluir eixo (simples ou duplo) no caminhão ou carreta.',
+        '<strong>Alocar em 2 passos:</strong> escolha o pneu do estoque e a posição (com sugestão de lado).',
+        '<strong>Ações do pneu:</strong> medição de sulco, calibragem, trocar posição, recapagem, remover, descartar.',
+        '<strong>KPIs clicáveis:</strong> clique num indicador para filtrar os pneus no estágio.',
+        '<strong>Alertas:</strong> clique num alerta para focar e selecionar o pneu correspondente.',
+    ]),
+    'como_usar' => sf_hlp_ol([
+        ['text' => 'Selecionar veículo', 'sub' => [
+            'Escolha no seletor — o último veículo é lembrado ao reabrir.',
+            'O veículo marcado com ★ já tem montagem (posições) salva.',
+        ]],
+        ['text' => 'Montar / ajustar eixos', 'sub' => [
+            'Use o menu <strong>Eixos</strong> para adicionar ou excluir eixos.',
+            'Clique em <strong>Montar eixos</strong> e arraste eixos/tanque; depois <strong>Salvar layout</strong>.',
+        ]],
+        ['text' => 'Alocar um pneu', 'sub' => [
+            'Clique numa posição vazia (+) e escolha o pneu do estoque.',
+            'Selecione a posição de montagem (a sugerida vem destacada).',
+        ]],
+        ['text' => 'Gerenciar um pneu instalado', 'sub' => [
+            'Clique no pneu para abrir o painel lateral.',
+            'Registre <strong>sulco</strong> e <strong>calibragem</strong>, ou use Trocar posição / Recapagem / Remover / Descartar.',
+            'Arraste um pneu para uma posição vazia para trocar rapidamente.',
+        ]],
+        ['text' => 'Filtrar e priorizar', 'sub' => [
+            'Use os filtros (status, vida, mais filtros) ou clique num KPI.',
+            'Clique num alerta para ir direto ao pneu no estágio.',
+        ]],
+    ]),
+    'fluxo' => sf_hlp_ol([
+        '<strong>Estoque</strong> — o pneu entra pelo <em>Estoque / Inventário de pneus</em> (série, medida, valor de compra).',
+        '<strong>Gestão Interativa (aqui)</strong> — você monta os eixos e aloca o pneu do estoque na posição do veículo.',
+        '<strong>Operação</strong> — o pneu roda; você registra <em>sulco</em> e <em>calibragem</em> aqui, e o motorista também alimenta pela inspeção por QR no app.',
+        '<strong>Monitoramento</strong> — sulco baixo vira alerta nesta tela e no <em>Dashboard de Pneus</em>; custo/km alimenta o <em>BI</em>.',
+        '<strong>Fim de vida</strong> — recapagem (volta ao ciclo, +1 vida) ou descarte; a <em>Manutenção de Pneus</em> registra a OS (conserto/recapagem).',
+    ]),
+    'kpis' => sf_hlp_ul([
+        '<strong>Total de pneus</strong> da empresa.',
+        '<strong>Em uso</strong> — instalados em veículos.',
+        '<strong>Em alerta / Críticos</strong> — por sulco baixo.',
+        '<strong>Vida média</strong> — recapagens + 1.',
+        '<strong>Custo total</strong> e <strong>Custo / km</strong> (depende do valor de compra cadastrado).',
+        '<strong>Sem medição</strong> — pneus sem sulco aferido recentemente.',
+    ]),
+    'legenda' => sf_hlp_legenda([
+        ['color' => '#94a3b8', 'label' => 'Cinza', 'desc' => 'Posição sem pneu'],
+        ['color' => '#22c55e', 'label' => 'Verde', 'desc' => 'Bom / novo'],
+        ['color' => '#f59e0b', 'label' => 'Amarelo', 'desc' => 'Atenção — planejar troca'],
+        ['color' => '#ef4444', 'label' => 'Vermelho', 'desc' => 'Crítico — troca urgente'],
+        ['color' => '#3b82f6', 'label' => 'Azul', 'desc' => 'Em recapagem'],
+    ]),
+    'dicas' => sf_hlp_ul([
+        'O anel colorido em volta do pneu indica a saúde; o chip mostra o número e a % de vida.',
+        'Cadastre o valor de compra dos pneus para os KPIs de custo deixarem de exibir “—”.',
+        'Salve a montagem do veículo para reabrir sempre com os eixos posicionados.',
+        'Registre o sulco periodicamente — pneus “sem medição” entram em alerta.',
+    ]),
+],
 'manutencao_pneus' => [
     'title' => 'Manutenção de Pneus',
     'visao_geral' => '<p>Ordens de serviço específicas de pneus: recapagem, conserto, balanceamento, alinhamento, troca de válvula. Controle de envio e retorno do borracheiro com custos.</p>',

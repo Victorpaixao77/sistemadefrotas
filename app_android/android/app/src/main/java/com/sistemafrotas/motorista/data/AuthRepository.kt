@@ -7,6 +7,8 @@ import com.sistemafrotas.motorista.data.local.LocalCache
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -22,15 +24,21 @@ class AuthRepository(
     val isLoggedIn: Flow<Boolean> = dataStore.token.map { !it.isNullOrBlank() }
     val nome: Flow<String?> = dataStore.nome
 
-    suspend fun login(nome: String, senha: String): Result<Unit> {
+    enum class LoginOutcome { SUCCESS, NEEDS_2FA }
+
+    suspend fun login(nome: String, senha: String, totpCode: String? = null): Result<LoginOutcome> {
         return try {
-            val res = Api.service.login(LoginRequest(nome.trim(), senha))
+            val res = Api.service.login(LoginRequest(nome.trim(), senha, totpCode = totpCode))
             val body = res.body()
             if (res.isSuccessful && body != null && body.success && body.data != null) {
                 val d = body.data
-                dataStore.saveLogin(d.token, d.motoristaId, d.empresaId, d.nome, d.refreshToken)
-                Api.setToken(d.token)
-                Result.success(Unit)
+                if (d.requires2fa == true && d.token.isNullOrBlank()) {
+                    return Result.success(LoginOutcome.NEEDS_2FA)
+                }
+                val token = d.token ?: return Result.failure(Exception(body.message ?: "Token não recebido."))
+                dataStore.saveLogin(token, d.motoristaId ?: 0, d.empresaId ?: 0, d.nome ?: nome, d.refreshToken)
+                Api.setToken(token)
+                Result.success(LoginOutcome.SUCCESS)
             } else {
                 val msg = body?.message ?: parseError(res)
                 Result.failure(Exception(msg))
@@ -43,7 +51,9 @@ class AuthRepository(
     suspend fun logout() {
         try {
             Api.service.logout(mapOf("action" to "logout"))
-        } catch (_: Exception) { }
+        } catch (e: Exception) {
+            android.util.Log.w("AuthRepository", "logout remoto falhou (ignorado)", e)
+        }
         dataStore.clear()
         Api.setToken(null)
     }
@@ -72,8 +82,9 @@ class AuthRepository(
             val body = res.body()
             if (res.isSuccessful && body != null && body.success && body.data != null) {
                 val d = body.data
-                dataStore.saveLogin(d.token, d.motoristaId, d.empresaId, d.nome, d.refreshToken)
-                Api.setToken(d.token)
+                val token = d.token ?: return Result.failure(Exception("Token não recebido."))
+                dataStore.saveLogin(token, d.motoristaId ?: 0, d.empresaId ?: 0, d.nome ?: "", d.refreshToken)
+                Api.setToken(token)
                 Result.success(Unit)
             } else {
                 Result.failure(Exception(body?.message ?: "Falha ao renovar token"))
@@ -121,7 +132,32 @@ class AuthRepository(
         }
     }
 
-    suspend fun loadDashboardResult() = safeApiCall { Api.service.dashboard() }
+    // Cache offline do painel (JSON em arquivo — sem alterar o schema Room).
+    private val dashboardCacheFile: File get() = File(appContext.filesDir, "dashboard_cache.json")
+    private val cacheGson by lazy { com.google.gson.Gson() }
+
+    private suspend fun saveDashboardCache(data: DashboardData) {
+        withContext(Dispatchers.IO) {
+            runCatching { dashboardCacheFile.writeText(cacheGson.toJson(data)) }
+        }
+    }
+
+    private suspend fun loadDashboardCache(): DashboardData? = withContext(Dispatchers.IO) {
+        runCatching {
+            val f = dashboardCacheFile
+            if (f.exists()) cacheGson.fromJson(f.readText(), DashboardData::class.java) else null
+        }.getOrNull()
+    }
+
+    suspend fun loadDashboardResult(): Result<DashboardData> {
+        val result = safeApiCall { Api.service.dashboard() }
+        result.onSuccess { saveDashboardCache(it) }
+        // Sem internet? Mostra o último painel salvo (leitura), como já é feito em Rotas.
+        if (result.isFailure) {
+            loadDashboardCache()?.let { return Result.success(it) }
+        }
+        return result
+    }
 
     suspend fun loadMe(): Result<MeData> = safeApiCall { Api.service.me() }
     
@@ -246,33 +282,41 @@ class AuthRepository(
         body: Map<String, Any?>,
         context: Context? = null,
         fotoUri: Uri? = null,
+        videoUri: Uri? = null,
+        assinaturaUri: Uri? = null,
     ): Result<Int> {
+        val payload = body.toMutableMap()
+        assinaturaUri?.let { /* assinatura salva como foto anexa */ }
         if (!NetworkConnectivity.isOnline(appContext) && localCache != null && context != null) {
-            return if (fotoUri != null) {
+            val payload = body.toMutableMap()
+            fun stash(uri: Uri?, key: String, defaultExt: String) {
+                if (uri == null) return
                 val dir = File(context.filesDir, "outbox_ocorrencias").apply { mkdirs() }
-                val dest = File(dir, "oc_${System.currentTimeMillis()}.jpg")
-                context.contentResolver.openInputStream(fotoUri)?.use { input ->
+                val dest = File(dir, "oc_${key}_${System.currentTimeMillis()}.$defaultExt")
+                context.contentResolver.openInputStream(uri)?.use { input ->
                     dest.outputStream().use { out -> input.copyTo(out) }
-                } ?: return Result.failure(Exception("Não foi possível ler a foto."))
-                if (!dest.exists() || dest.length() == 0L) {
-                    return Result.failure(Exception("Foto vazia."))
                 }
-                val payload = body.toMutableMap()
-                payload["foto_abs_path"] = dest.absolutePath
-                val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_OCORRENCIA_MULTIPART, payload)
-                Result.success(OfflineId.fromPendingRow(rowId))
-            } else {
-                val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_OCORRENCIA_JSON, body)
-                Result.success(OfflineId.fromPendingRow(rowId))
+                if (dest.exists() && dest.length() > 0L) payload[key] = dest.absolutePath
             }
+            stash(fotoUri, "foto_abs_path", "jpg")
+            stash(videoUri, "video_abs_path", "mp4")
+            stash(assinaturaUri, "assinatura_abs_path", "png")
+            if (payload.containsKey("foto_abs_path") || payload.containsKey("video_abs_path") || payload.containsKey("assinatura_abs_path")) {
+                val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_OCORRENCIA_MULTIPART, payload)
+                return Result.success(OfflineId.fromPendingRow(rowId))
+            }
+            val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_OCORRENCIA_JSON, body)
+            return Result.success(OfflineId.fromPendingRow(rowId))
         }
-        if (fotoUri != null && context != null) {
-            val filePart = fotoMultipartPart(context, fotoUri, "foto")
-            if (filePart != null) {
+        if ((fotoUri != null || videoUri != null || assinaturaUri != null) && context != null) {
+            val fotoPart = fotoUri?.let { fotoMultipartPart(context, it, "foto") }
+                ?: assinaturaUri?.let { fotoMultipartPart(context, it, "foto") }
+            val videoPart = videoUri?.let { videoMultipartPart(context, it, "video") }
+            if (fotoPart != null || videoPart != null) {
                 return try {
                     if (Api.getToken().isNullOrBlank()) restoreToken()
                     val text = "text/plain; charset=utf-8".toMediaType()
-                    val parts = body.mapNotNull { (k, v) ->
+                    val parts = payload.mapNotNull { (k, v) ->
                         if (v == null) null else k to (
                             when (v) {
                                 is Number -> v.toString()
@@ -281,7 +325,7 @@ class AuthRepository(
                             }
                         ).toRequestBody(text)
                     }.toMap()
-                    val res = Api.service.criarOcorrenciaMultipart(parts, filePart)
+                    val res = Api.service.criarOcorrenciaMultipart(parts, fotoPart, videoPart)
                     val resBody = res.body()
                     when {
                         res.isSuccessful && resBody != null && resBody.success && resBody.data != null ->
@@ -298,11 +342,76 @@ class AuthRepository(
                 }
             }
         }
-        return safeCreateCall { Api.service.criarOcorrencia(body) }
+        return safeCreateCall { Api.service.criarOcorrencia(payload) }
+    }
+
+    suspend fun loadViagemContext(rotaId: Int): Result<ViagemContextData> =
+        safeApiCall { Api.service.viagemContext(rotaId) }
+
+    suspend fun syncTripTimeline(events: List<com.sistemafrotas.motorista.feature.viagem.domain.TripEvent>): Result<Int> {
+        if (events.isEmpty()) return Result.success(0)
+        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        val payload = mapOf(
+            "eventos" to events.map { ev ->
+                mapOf(
+                    "event_uuid" to ev.id,
+                    "rota_id" to ev.rotaId,
+                    "tipo" to ev.tipo,
+                    "titulo" to ev.titulo,
+                    "detalhe" to ev.detalhe,
+                    "latitude" to ev.lat,
+                    "longitude" to ev.lng,
+                    "evento_em" to fmt.format(java.util.Date(ev.timestampMs)),
+                )
+            },
+        )
+        return try {
+            if (Api.getToken().isNullOrBlank()) restoreToken()
+            val res = Api.service.syncTripTimeline(payload)
+            val body = res.body()
+            when {
+                res.isSuccessful && body != null && body.success ->
+                    Result.success(body.data?.sincronizados ?: 0)
+                else -> Result.failure(Exception(body?.message ?: parseError(res)))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(NetworkErrors.message(e)))
+        }
+    }
+
+    suspend fun askMotoristaAssistente(pergunta: String, rotaId: Int? = null): Result<String> =
+        safeApiCall {
+            val body = mutableMapOf<String, Any?>("pergunta" to pergunta)
+            rotaId?.let { body["rota_id"] = it }
+            Api.service.motoristaAssistente(body)
+        }.map { it.resposta ?: "Sem resposta." }
+
+    suspend fun loadMotoristaDocumentos(): Result<MotoristaDocumentosData> =
+        safeApiCall { Api.service.motoristaDocumentos() }
+
+    suspend fun loadGpsTrajeto(horas: Int = 24): Result<GpsTrajetoResponse> =
+        safeApiCall { Api.service.gpsTrajeto(horas = horas) }
+
+    private fun videoMultipartPart(context: Context, uri: Uri, field: String): MultipartBody.Part? {
+        val cr = context.contentResolver
+        val mime = cr.getType(uri) ?: "video/mp4"
+        val ext = when {
+            mime.contains("3gp") -> "3gp"
+            mime.contains("webm") -> "webm"
+            else -> "mp4"
+        }
+        val stream = cr.openInputStream(uri) ?: return null
+        val bytes = stream.use { it.readBytes() }
+        if (bytes.isEmpty()) return null
+        val body = bytes.toRequestBody(mime.toMediaType())
+        return MultipartBody.Part.createFormData(field, "video.$ext", body)
     }
 
     suspend fun loadAbastecimentoInsights(dias: Int = 90): Result<AbastecimentoInsightsResponse> =
         safeApiCall { Api.service.abastecimentoInsights(dias = dias) }
+
+    suspend fun loadAvisos(): Result<AvisosResponse> =
+        safeApiCall { Api.service.avisos() }
 
     suspend fun loadConferencias(): Result<ConferenciasResponse> =
         safeApiCall { Api.service.conferencias(limite = 50) }
@@ -438,7 +547,15 @@ class AuthRepository(
      * Lê um documento por IA de visão (tipo = abastecimento|painel|pedagio) e devolve os
      * campos para o app pré-preencher o formulário. Exige internet; o motorista revisa antes de salvar.
      */
-    suspend fun lerDocumentoOcr(context: Context, fotoUri: Uri, tipo: String): Result<OcrCampos> {
+    suspend fun lerDocumentoOcr(context: Context, fotoUri: Uri, tipo: String): Result<OcrCampos> =
+        lerDocumentoOcrCompleto(context, fotoUri, tipo).map { it.campos }
+
+    /** OCR com tipo automático (servidor classifica: abastecimento, pedágio, nota, etc.). */
+    suspend fun lerDocumentoOcrCompleto(
+        context: Context,
+        fotoUri: Uri,
+        tipo: String = "auto",
+    ): Result<OcrLeituraResult> {
         if (!NetworkConnectivity.isOnline(appContext)) {
             return Result.failure(Exception("Leitura por IA precisa de internet. Preencha manualmente."))
         }
@@ -450,8 +567,11 @@ class AuthRepository(
             val res = Api.service.ocrDocumento(tipoBody, filePart)
             val resBody = res.body()
             when {
-                res.isSuccessful && resBody != null && resBody.success && resBody.data?.campos != null ->
-                    Result.success(resBody.data.campos)
+                res.isSuccessful && resBody != null && resBody.success && resBody.data != null -> {
+                    val t = resBody.data.tipo ?: tipo
+                    val campos = resBody.data.campos ?: OcrCampos()
+                    Result.success(OcrLeituraResult(tipo = t, campos = campos))
+                }
                 res.code() == 401 -> {
                     val msg = resBody?.message ?: parseError(res)
                     if (!msg.contains("não informado", ignoreCase = true)) clearTokenLocally()
@@ -672,10 +792,57 @@ class AuthRepository(
         return MultipartBody.Part.createFormData("comprovante", "comprovante.$ext", body)
     }
 
-    suspend fun criarChecklist(body: Map<String, Any?>): Result<Int> {
+    suspend fun criarChecklist(
+        body: Map<String, Any?>,
+        context: Context? = null,
+        assinaturaUri: Uri? = null,
+    ): Result<Int> {
         if (!NetworkConnectivity.isOnline(appContext) && localCache != null) {
+            val payload = body.toMutableMap()
+            if (context != null && assinaturaUri != null) {
+                val dir = File(context.filesDir, "outbox_checklists").apply { mkdirs() }
+                val dest = File(dir, "assin_${System.currentTimeMillis()}.png")
+                context.contentResolver.openInputStream(assinaturaUri)?.use { input ->
+                    dest.outputStream().use { out -> input.copyTo(out) }
+                }
+                if (dest.exists() && dest.length() > 0L) {
+                    payload["assinatura_abs_path"] = dest.absolutePath
+                    val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_CHECKLIST_MULTIPART, payload)
+                    return Result.success(OfflineId.fromPendingRow(rowId))
+                }
+            }
             val rowId = localCache.enqueuePending(PendingSyncOperation.CREATE_CHECKLIST, body)
             return Result.success(OfflineId.fromPendingRow(rowId))
+        }
+        if (assinaturaUri != null && context != null) {
+            return try {
+                if (Api.getToken().isNullOrBlank()) restoreToken()
+                val text = "text/plain; charset=utf-8".toMediaType()
+                val parts = body.mapNotNull { (k, v) ->
+                    if (v == null) null else k to (
+                        when (v) {
+                            is Number -> v.toString()
+                            is Boolean -> if (v) "1" else "0"
+                            else -> v.toString()
+                        }
+                    ).toRequestBody(text)
+                }.toMap()
+                val assinPart = fotoMultipartPart(context, assinaturaUri, "assinatura")
+                val res = Api.service.criarChecklistMultipart(parts, assinPart)
+                val resBody = res.body()
+                when {
+                    res.isSuccessful && resBody != null && resBody.success && resBody.data != null ->
+                        Result.success(resBody.data.id)
+                    res.code() == 401 -> {
+                        val msg = resBody?.message ?: parseError(res)
+                        if (!msg.contains("não informado", ignoreCase = true)) clearTokenLocally()
+                        Result.failure(Exception(msg))
+                    }
+                    else -> Result.failure(Exception(resBody?.message ?: parseError(res)))
+                }
+            } catch (e: Exception) {
+                Result.failure(Exception(NetworkErrors.message(e)))
+            }
         }
         return safeCreateCall { Api.service.criarChecklist(body) }
     }

@@ -1,3 +1,4 @@
+
 <?php
 // Include configuration and functions first
 require_once '../includes/config.php';
@@ -396,7 +397,8 @@ error_log("Chart Data: " . print_r($chart_data, true));
     <link rel="icon" type="image/png" href="../logo.png">
     
     <!-- Chart.js for analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
     <style>
         body.financiamento-modern .dashboard-header { display: none; }
         body.financiamento-modern .dashboard-content.fornc-page { overflow-x: auto; }
@@ -500,7 +502,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
                     <div class="fornc-btn-row">
                         <button type="button" id="addFinanciamentoBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Novo financiamento</button>
                         <button type="button" class="fornc-btn fornc-btn--accent" id="applyFinancingFilters" title="Aplicar filtros"><i class="fas fa-search"></i> Pesquisar</button>
-                        <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn" title="Filtros (período)"><i class="fas fa-sliders-h"></i> Opções</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" data-sf-periodo data-sf-periodo-onapply="sfPeriodoNavMesAno" title="Filtrar por período"><i class="fas fa-calendar-alt"></i> Período</button>
                         <button type="button" class="fornc-btn fornc-btn--ghost" id="clearFinancingFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
                         <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar"><i class="fas fa-file-export"></i> Exportar</button>
                         <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
@@ -1086,7 +1088,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="filterMonth">Mês/Ano</label>
-                        <input type="month" id="filterMonth" class="form-control">
+                        <input type="month" id="filterMonth" class="form-control" data-sf-periodo-month>
                     </div>
                 </div>
             </div>
@@ -1100,6 +1102,7 @@ error_log("Chart Data: " . print_r($chart_data, true));
     <!-- JavaScript Files -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <script src="../js/sf-periodo.js"></script>
     <?php sf_render_api_scripts(); ?>
     <style>
         body.financiamento-modern #financiamentosTable.fornc-table th.sortable .th-sort-link {
@@ -1374,8 +1377,9 @@ error_log("Chart Data: " . print_r($chart_data, true));
                 });
             });
             
-            // Add filter button click handler
-            document.getElementById('filterBtn').addEventListener('click', function() {
+            // Add filter button click handler (modal legado — só no layout clássico)
+            var _fbFin = document.getElementById('filterBtn');
+            if (_fbFin) _fbFin.addEventListener('click', function() {
                 document.getElementById('filterModal').classList.add('active');
             });
             

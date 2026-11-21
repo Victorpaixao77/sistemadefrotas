@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/sf_api_guard_debug.php';
 /**
  * Debug e listagem de pneu_movimentacoes.
  * action=status  → tabela existe?, total de registros (por empresa)
@@ -33,7 +34,7 @@ $action = $_GET['action'] ?? '';
 try {
     $pdo = getConnection();
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => 'Erro de conexão', 'detail' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Erro de conexão', 'detail' => 'Erro interno.']);
     exit;
 }
 

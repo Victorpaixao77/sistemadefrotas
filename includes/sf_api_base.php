@@ -12,12 +12,10 @@ function sf_render_api_scripts(): void
     global $__sf_api_base;
     $app_base = sf_app_web_base();
     $csrf = '';
-    if (session_status() === PHP_SESSION_ACTIVE) {
-        if (!function_exists('csrf_token_get')) {
-            require_once __DIR__ . '/csrf.php';
-        }
-        $csrf = csrf_token_get();
+    if (!function_exists('csrf_token_get')) {
+        require_once __DIR__ . '/csrf.php';
     }
+    $csrf = csrf_token_get();
     $refuel_ai_ocr = false;
     $deepseekKey = function_exists('sf_deepseek_api_key') ? sf_deepseek_api_key() : '';
     $openaiKeyEnv = function_exists('sf_openai_api_key') ? sf_openai_api_key() : '';
@@ -105,6 +103,20 @@ function sfSafeErrorMessage(err, fallback) {
     }
     return msg;
 }
+/**
+ * Anti-flash de paginação: mantém as linhas atuais visíveis ao paginar e só
+ * esmaece a tabela (sem limpar) se a resposta demorar mais que `delay` ms.
+ * Retorna uma função para chamar quando os dados chegarem (ou em erro), que
+ * restaura a opacidade. Uso:
+ *   var done = sfDeferTableFlash(tabela);
+ *   fetch(...).then(...).catch(...).finally(done);  // ou chame done() nos callbacks
+ */
+function sfDeferTableFlash(el, delay) {
+    if (typeof delay !== 'number') delay = 180;
+    if (el) { el.style.transition = 'opacity 0.15s ease'; }
+    var t = setTimeout(function () { if (el) el.style.opacity = '0.55'; }, delay);
+    return function () { clearTimeout(t); if (el) el.style.opacity = ''; };
+}
 /** Headers para mutações na API (X-CSRF-Token). Mescla com extra (ex.: Content-Type). */
 function sfMutationHeaders(extra) {
     var h = {};
@@ -158,5 +170,6 @@ function sfMutationHeaders(extra) {
     };
 })();
 </script>
+<script src="<?php echo htmlspecialchars(sf_app_url('js/sf-core.js')); ?>?v=<?php echo htmlspecialchars(sf_asset_v()); ?>" defer></script>
     <?php
 }

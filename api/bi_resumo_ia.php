@@ -12,12 +12,14 @@ require_once '../includes/permissions.php';
 require_once '../includes/csrf.php';
 require_once '../includes/api_json.php';
 require_once '../includes/sf_vision_ai.php';
+require_once '../includes/bi_api_helpers.php';
 
 configure_session();
 session_start();
 
 header('Content-Type: application/json');
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 if (function_exists('require_permission')) {
     require_permission('access_advanced_reports');
 }
@@ -28,8 +30,13 @@ if (!$empresa_id) {
     api_json_error('Não autorizado.', 401);
 }
 
+$force = !empty($body['force']);
+if (!$force) {
+    bi_resumo_ia_rate_limit($empresa_id);
+}
+
 $conn = getConnection();
-$cfg = function_exists('sf_vision_ai_resolve') ? sf_vision_ai_resolve($conn, $empresa_id) : null;
+$cfg = function_exists('sf_vision_ai_resolve') ? sf_vision_ai_resolve($conn, $empresa_id, 'text') : null;
 if ($cfg === null) {
     api_json_error('Nenhuma IA configurada. Vá em Configurações → IA de Visão e cadastre uma chave (ex.: Gemini, gratuito).', 422, 'ia_nao_configurada');
 }
@@ -43,14 +50,12 @@ $visao = preg_replace('/[^a-z_]/', '', strtolower((string) ($body['visao'] ?? 'g
 $ano = preg_replace('/[^0-9]/', '', (string) ($body['ano'] ?? ''));
 $mes = preg_replace('/[^0-9]/', '', (string) ($body['mes'] ?? ''));
 
-// Os dados que o front já tem; serializa e limita o tamanho (controle de tokens/custo).
-$dados = $body['dados'] ?? [];
-$dadosJson = json_encode($dados, JSON_UNESCAPED_UNICODE);
+// DTO compacto (não confia em campos arbitrários do cliente).
+$dadosRaw = is_array($body['dados'] ?? null) ? $body['dados'] : [];
+$dadosDto = bi_ia_dto_from_payload($dadosRaw);
+$dadosJson = json_encode($dadosDto, JSON_UNESCAPED_UNICODE);
 if (!is_string($dadosJson)) {
     $dadosJson = '{}';
-}
-if (strlen($dadosJson) > 12000) {
-    $dadosJson = substr($dadosJson, 0, 12000) . ' …(truncado)';
 }
 
 $contexto = 'Visão: ' . ($visao ?: 'geral')
@@ -95,8 +100,29 @@ try {
     if ($http < 200 || $http >= 300) {
         $errObj = $resp['error'] ?? ($resp[0]['error'] ?? null);
         $msg = is_array($errObj) ? (string) ($errObj['message'] ?? '') : '';
-        $code = ($http === 429) ? 402 : 502;
-        api_json_error($cfg['label'] . ' retornou HTTP ' . $http . ($msg !== '' ? ': ' . $msg : '.'), $code);
+        $detail = $msg !== '' ? ': ' . $msg : '.';
+        if ($http === 429) {
+            api_json_error(
+                'Limite de requisições da IA atingido' . $detail . ' Aguarde alguns minutos ou revise o plano em Configurações → IA de Visão.',
+                429,
+                'ia_rate_limit'
+            );
+        }
+        if ($http === 402) {
+            api_json_error(
+                'Créditos da IA insuficientes' . $detail . ' Verifique o saldo do provedor em Configurações → IA de Visão.',
+                402,
+                'ia_payment_required'
+            );
+        }
+        if ($http === 401 || $http === 403) {
+            api_json_error(
+                'Chave de API da IA inválida ou sem permissão' . $detail . ' Atualize em Configurações → IA de Visão.',
+                401,
+                'ia_auth'
+            );
+        }
+        api_json_error($cfg['label'] . ' retornou HTTP ' . $http . $detail, 502, 'ia_upstream');
     }
 
     $texto = trim((string) ($resp['choices'][0]['message']['content'] ?? ''));

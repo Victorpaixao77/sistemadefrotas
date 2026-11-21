@@ -1,12 +1,11 @@
 <?php
-require_once '../includes/conexao.php';
-session_start();
+require_once __DIR__ . '/includes/adm_auth.php';
+require_once __DIR__ . '/includes/adm_post_guard.php';
+require_once __DIR__ . '/lib/adm_events.php';
 
-// Verificar se o usuário está logado
-if (!isset($_SESSION['admin_id'])) {
-    header('Location: login.php');
-    exit;
-}
+$page_title = 'Planos';
+
+// Visual via adm-pages.css — sem Bootstrap CDN global (conflitava com o menu lateral).
 
 // Criar tabela se não existir
 try {
@@ -35,7 +34,10 @@ $tipo_mensagem = '';
 
 // Processar ações
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['action'])) {
+    if (!adm_csrf_valid_post()) {
+        $mensagem = 'Sessão expirada. Recarregue a página.';
+        $tipo_mensagem = 'error';
+    } elseif (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'add':
                 try {
@@ -51,10 +53,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $stmt = $pdo->prepare("INSERT INTO adm_planos (nome, descricao, tipo, limite_veiculos, valor_por_veiculo, valor_maximo, ordem, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
                     $stmt->execute([$nome, $descricao, $tipo, $limite_veiculos, $valor_por_veiculo, $valor_maximo, $ordem, $status]);
                     
+                    adm_event_log($pdo, 'planos', 'criar', 'Plano criado: ' . $nome, 'info');
                     $mensagem = "Plano cadastrado com sucesso!";
                     $tipo_mensagem = "success";
                 } catch (Exception $e) {
-                    $mensagem = "Erro ao cadastrar plano: " . $e->getMessage();
+                    error_log('planos add: ' . $e->getMessage());
+                    $mensagem = "Erro ao cadastrar plano. Tente novamente.";
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -74,10 +78,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $stmt = $pdo->prepare("UPDATE adm_planos SET nome = ?, descricao = ?, tipo = ?, limite_veiculos = ?, valor_por_veiculo = ?, valor_maximo = ?, ordem = ?, status = ? WHERE id = ?");
                     $stmt->execute([$nome, $descricao, $tipo, $limite_veiculos, $valor_por_veiculo, $valor_maximo, $ordem, $status, $id]);
                     
+                    adm_event_log($pdo, 'planos', 'atualizar', 'Plano atualizado: ' . $nome, 'info');
                     $mensagem = "Plano atualizado com sucesso!";
                     $tipo_mensagem = "success";
                 } catch (Exception $e) {
-                    $mensagem = "Erro ao atualizar plano: " . $e->getMessage();
+                    error_log('planos edit: ' . $e->getMessage());
+                    $mensagem = "Erro ao atualizar plano. Tente novamente.";
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -98,10 +104,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $stmt = $pdo->prepare("DELETE FROM adm_planos WHERE id = ?");
                     $stmt->execute([$id]);
                     
+                    adm_event_log($pdo, 'planos', 'excluir', 'Plano excluído ID ' . $id, 'aviso');
                     $mensagem = "Plano excluído com sucesso!";
                     $tipo_mensagem = "success";
+                } catch (PDOException $e) {
+                    error_log('planos delete: ' . $e->getMessage());
+                    $mensagem = "Erro ao excluir plano. Tente novamente.";
+                    $tipo_mensagem = "error";
                 } catch (Exception $e) {
-                    $mensagem = "Erro ao excluir plano: " . $e->getMessage();
+                    $mensagem = $e->getMessage();
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -114,98 +125,19 @@ try {
     $stmt = $pdo->query("SELECT * FROM adm_planos ORDER BY ordem ASC, nome ASC");
     $planos = $stmt->fetchAll();
 } catch (PDOException $e) {
-    $mensagem = "Erro ao carregar planos: " . $e->getMessage();
+    error_log('planos load: ' . $e->getMessage());
+    $mensagem = "Erro ao carregar planos.";
     $tipo_mensagem = "error";
     $planos = [];
 }
+require_once __DIR__ . '/includes/layout_start.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciar Planos - Sistema de Frotas</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: #f8f9fa;
-        }
-        .sidebar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 250px;
-            height: 100vh;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            z-index: 1000;
-            overflow-y: auto;
-        }
-        .main-content {
-            margin-left: 250px;
-            padding: 20px;
-            min-height: 100vh;
-        }
-        .header {
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 30px;
-            background: white;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-        }
-        .card {
-            border: none;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-        }
-        .table-container {
-            border-radius: 15px;
-            padding: 20px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-            background: white;
-        }
-        .badge-avulso {
-            background: #ffc107;
-            color: #212529;
-        }
-        .badge-pacote {
-            background: #28a745;
-            color: white;
-        }
-        .badge-ativo {
-            background: #28a745;
-        }
-        .badge-inativo {
-            background: #6c757d;
-        }
-        @media (max-width: 768px) {
-            .main-content {
-                margin-left: 0;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Sidebar -->
-    <?php include 'includes/sidebar.php'; ?>
 
-    <!-- Main Content -->
-    <div class="main-content">
-        <div class="header">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <h2 class="mb-1">
-                        <i class="fas fa-tags me-2"></i>
-                        Gerenciar Planos
-                    </h2>
-                    <p class="text-muted mb-0">Configure os planos de cobrança por quantidade de veículos</p>
-                </div>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoPlano">
-                    <i class="fas fa-plus me-1"></i> Novo Plano
-                </button>
-            </div>
+        <div class="adm-toolbar">
+            <p class="text-muted mb-0" style="margin:0">Configure os planos de cobrança por quantidade de veículos</p>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoPlano">
+                <i class="fas fa-plus me-1"></i> Novo Plano
+            </button>
         </div>
 
         <?php if ($mensagem): ?>
@@ -245,7 +177,7 @@ try {
                                     <td><?php echo $plano['ordem']; ?></td>
                                     <td><strong><?php echo htmlspecialchars($plano['nome']); ?></strong></td>
                                     <td>
-                                        <span class="badge badge-<?php echo $plano['tipo']; ?>">
+                                        <span class="badge bg-<?php echo $plano['tipo'] === 'pacote' ? 'info' : 'warning'; ?>">
                                             <?php echo ucfirst($plano['tipo']); ?>
                                         </span>
                                     </td>
@@ -257,17 +189,19 @@ try {
                                         <?php echo $plano['valor_maximo'] ? 'R$ ' . number_format($plano['valor_maximo'], 2, ',', '.') : 'Sem limite'; ?>
                                     </td>
                                     <td>
-                                        <span class="badge badge-<?php echo $plano['status']; ?>">
+                                        <span class="badge bg-<?php echo $plano['status'] === 'ativo' ? 'success' : 'secondary'; ?>">
                                             <?php echo ucfirst($plano['status']); ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <button class="btn btn-sm btn-warning" onclick="abrirEditar(<?php echo htmlspecialchars(json_encode($plano)); ?>)" title="Editar">
-                                            <i class="fas fa-edit"></i>
-                                        </button>
-                                        <button class="btn btn-sm btn-danger" onclick="excluirPlano(<?php echo $plano['id']; ?>)" title="Excluir">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
+                                        <div class="action-icons">
+                                            <div class="action-icon icon-edit" title="Editar" onclick="abrirEditar(<?php echo htmlspecialchars(json_encode($plano)); ?>)">
+                                                <i class="fas fa-edit"></i>
+                                            </div>
+                                            <div class="action-icon icon-delete" title="Excluir" onclick="excluirPlano(<?php echo (int) $plano['id']; ?>)">
+                                                <i class="fas fa-trash"></i>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -276,24 +210,24 @@ try {
                 </table>
             </div>
         </div>
-    </div>
 
     <!-- Modal Novo Plano -->
     <div class="modal fade" id="modalNovoPlano" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered adm-modal-dialog adm-modal-dialog--form">
             <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Novo Plano</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST">
-                    <div class="modal-body">
+                    <div class="modal-body adm-modal-form-grid">
                         <input type="hidden" name="action" value="add">
+                        <?php echo adm_csrf_field(); ?>
                         <div class="mb-3">
                             <label for="nome" class="form-label">Nome do Plano *</label>
                             <input type="text" class="form-control" id="nome" name="nome" required placeholder="Ex: Básico, Profissional">
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-3 adm-modal-field--full">
                             <label for="descricao" class="form-label">Descrição</label>
                             <textarea class="form-control" id="descricao" name="descricao" rows="2" placeholder="Descrição do plano"></textarea>
                         </div>
@@ -342,21 +276,22 @@ try {
 
     <!-- Modal Editar Plano -->
     <div class="modal fade" id="modalEditarPlano" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-dialog-centered adm-modal-dialog adm-modal-dialog--form">
             <div class="modal-content">
-                <div class="modal-header bg-warning">
+                <div class="modal-header">
                     <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Editar Plano</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <form method="POST">
-                    <div class="modal-body">
+                    <div class="modal-body adm-modal-form-grid">
                         <input type="hidden" name="action" value="edit">
+                        <?php echo adm_csrf_field(); ?>
                         <input type="hidden" name="id" id="edit_id">
                         <div class="mb-3">
                             <label for="edit_nome" class="form-label">Nome do Plano *</label>
                             <input type="text" class="form-control" id="edit_nome" name="nome" required>
                         </div>
-                        <div class="mb-3">
+                        <div class="mb-3 adm-modal-field--full">
                             <label for="edit_descricao" class="form-label">Descrição</label>
                             <textarea class="form-control" id="edit_descricao" name="descricao" rows="2"></textarea>
                         </div>
@@ -405,9 +340,12 @@ try {
     <!-- Formulário de Exclusão -->
     <form id="deleteForm" method="POST" style="display: none;">
         <input type="hidden" name="action" value="delete">
+        <?php echo adm_csrf_field(); ?>
         <input type="hidden" name="id" id="delete_id">
     </form>
 
+<?php
+$adm_extra_scripts = <<<'HTML'
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function abrirEditar(plano) {
@@ -430,6 +368,6 @@ try {
             }
         }
     </script>
-</body>
-</html>
+HTML;
+require_once __DIR__ . '/includes/layout_end.php';
 

@@ -85,7 +85,7 @@ function initDashboard() {
     // Drag-and-drop por seção (Operação / Custos / Financeiro). Cada grade é
     // independente: reordenar só acontece dentro da própria seção.
     const dashboardGrids = document.querySelectorAll('.dashboard-grid[data-dash-section]');
-    if (dashboardGrids.length) {
+    if (dashboardGrids.length && !isHomeDashboard && typeof Sortable !== 'undefined') {
         // Restaura a ordem salva (por seção) antes de ligar o Sortable.
         let savedLayout = null;
         try { savedLayout = JSON.parse(localStorage.getItem('dashboardLayoutV2') || 'null'); }

@@ -47,7 +47,7 @@ if ($eid_mapa > 0) {
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="stylesheet" href="../css/fornc-modern-page.css">
     <link rel="stylesheet" href="../css/routes.css?v=1.0.1">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous">
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
     <?php sf_page_help_css('..'); ?>
@@ -517,7 +517,7 @@ if ($eid_mapa > 0) {
         <?php include dirname(__DIR__) . '/includes/footer.php'; ?>
     </div>
 </div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="../google-maps/maps.js"></script>
 <script src="../js/mapa-frota.js?v=17"></script>

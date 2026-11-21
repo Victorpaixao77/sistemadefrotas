@@ -4,8 +4,9 @@
  * Controla acesso baseado em tipo de usuário
  */
 
-// Iniciar sessão se ainda não estiver iniciada
-if (session_status() === PHP_SESSION_NONE) {
+// Sessão já iniciada pela página; não reabrir após session_write_close() (relock serializa navegação).
+if (session_status() === PHP_SESSION_NONE && !isset($_SESSION['loggedin'])) {
+    configure_session();
     session_start();
 }
 
@@ -48,31 +49,39 @@ function get_user_granular_permissions() {
     if (!isset($_SESSION['id'])) {
         return [];
     }
-    
+
+    // Memoização por request: cada can_*() chama esta função; a sidebar/header
+    // dispara ~8-10 checagens por página. Sem isso seriam 8-10 queries idênticas.
+    static $cache = [];
+    $uid = (int) $_SESSION['id'];
+    if (isset($cache[$uid])) {
+        return $cache[$uid];
+    }
+
     try {
         require_once 'config.php';
         $conn = getConnection();
-        
+
         $stmt = $conn->prepare('
             SELECT pode_editar_usuarios_sistema, pode_criar_usuarios_sistema, pode_acessar_lucratividade,
                    pode_acessar_relatorios_avancados, pode_gerenciar_configuracoes, pode_aprovar_abastecimentos,
-                   pode_ver_dados_financeiros, pode_acessar_sistema_fiscal, pode_acessar_gestao_pneus, 
+                   pode_ver_dados_financeiros, pode_acessar_sistema_fiscal, pode_acessar_gestao_pneus,
                    tipo_usuario, is_admin
-            FROM usuarios 
+            FROM usuarios
             WHERE id = :user_id
         ');
-        $stmt->bindParam(':user_id', $_SESSION['id'], PDO::PARAM_INT);
+        $stmt->bindValue(':user_id', $uid, PDO::PARAM_INT);
         $stmt->execute();
-        
+
         $permissions = $stmt->fetch(PDO::FETCH_ASSOC);
-        
+
         if (!$permissions) {
             // Fallback para permissões padrão baseadas no tipo
-            return get_default_permissions();
+            return $cache[$uid] = get_default_permissions();
         }
-        
-        return $permissions;
-        
+
+        return $cache[$uid] = $permissions;
+
     } catch (Exception $e) {
         error_log("Erro ao obter permissões granulares: " . $e->getMessage());
         return get_default_permissions();
@@ -316,6 +325,37 @@ function get_user_permission_level() {
     } else {
         return 'motorista';
     }
+}
+
+/**
+ * Rótulo amigável do perfil do usuário (ex.: Administrador, Gestor).
+ * @return string
+ */
+function get_user_role_label(): string
+{
+    static $labels = [
+        'admin' => 'Administrador',
+        'gestor' => 'Gestor',
+        'motorista' => 'Motorista',
+        'operador' => 'Operador',
+        'financeiro' => 'Financeiro',
+    ];
+
+    $tipo = strtolower(trim((string) ($_SESSION['tipo_usuario'] ?? '')));
+
+    if ($tipo !== '' && isset($labels[$tipo])) {
+        return $labels[$tipo];
+    }
+    if (is_admin()) {
+        return 'Administrador';
+    }
+    if (is_gestor()) {
+        return 'Gestor';
+    }
+    if ($tipo !== '') {
+        return mb_convert_case($tipo, MB_CASE_TITLE, 'UTF-8');
+    }
+    return 'Usuário';
 }
 
 /**

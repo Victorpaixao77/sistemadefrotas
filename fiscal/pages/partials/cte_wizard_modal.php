@@ -13,6 +13,12 @@
 
                 <div class="row g-3">
                     <div class="col-12">
+                        <label for="cteWizardOtSel" class="form-label fw-semibold"><i class="fas fa-file-signature"></i> Puxar de uma Ordem de Transporte <span class="text-muted small">(opcional — pré-preenche veículo, motorista, origem/destino, frete e peso)</span></label>
+                        <select id="cteWizardOtSel" class="form-select">
+                            <option value="">— não usar OT —</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
                         <label class="form-label fw-semibold">NF-e vinculadas <span class="text-danger">*</span></label>
                         <div id="cteWizardNfeList" class="border rounded p-2" style="max-height:220px;overflow-y:auto;">
                             <p class="text-muted small mb-0">Carregando NF-e...</p>

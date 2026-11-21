@@ -21,10 +21,17 @@ if (!can_view_financial_data()) {
     exit;
 }
 
+$empresa_id = (int) $_SESSION['empresa_id'];
+if (function_exists('session_write_close')) { session_write_close(); }
+
 try {
     $conn = getConnection();
-    $empresa_id = (int) $_SESSION['empresa_id'];
     $ctx = sf_dashboard_analytics_context();
+
+    require_once __DIR__ . '/../includes/sf_cache.php';
+    $ckey = 'dash:net_revenue:' . $empresa_id . ':' . $ctx['d1'] . ':' . $ctx['d2'] . ':' . $ctx['bucket'];
+    if (($cached = sf_cache_get($ckey)) !== null) { echo json_encode($cached); exit; }
+
     $series = sf_dashboard_analytics_series($ctx['d1'], $ctx['d2'], $ctx['bucket']);
     $receitas = array_fill_keys($series['keys'], 0.0);
     $despesas = array_fill_keys($series['keys'], 0.0);
@@ -67,7 +74,7 @@ try {
         $lucro[] = $receitas[$k] - $despesas[$k] - $comissoes[$k];
     }
 
-    echo json_encode([
+    $payload = [
         'labels' => $series['labels'],
         'datasets' => [[
             'label' => 'Lucro líquido',
@@ -78,7 +85,9 @@ try {
             'tension' => 0.4,
         ]],
         'period_label' => $ctx['label'],
-    ]);
+    ];
+    sf_cache_set($ckey, $payload, 120);
+    echo json_encode($payload);
 } catch (Throwable $e) {
     error_log('Net Revenue Analytics API Error: ' . $e->getMessage());
     http_response_code(500);

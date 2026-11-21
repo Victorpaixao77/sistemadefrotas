@@ -7,6 +7,7 @@ require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
 require_once '../includes/csrf.php';
 require_once '../includes/api_json.php';
+require_once __DIR__ . '/../includes/motorists_list.php';
 
 // Configura a sessão antes de iniciá-la
 configure_session();
@@ -21,6 +22,7 @@ header('Content-Type: application/json');
 
 // Garante que a requisição está autenticada
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Verifica ID específico do motorista
 $motoristId = isset($_GET['id']) ? $_GET['id'] : null;
@@ -178,206 +180,26 @@ switch ($action) {
 }
 
 /**
- * Get list of motorists with filters
- * 
- * @param int $limit Maximum number of records
- * @param int $page Page number
- * @param string $status Filter by status
- * @param string $search Text search across multiple fields
- * @param string $categoria_cnh Filter by categoria_cnh_id
- * @param string $tipo_contrato Filter by tipo_contrato_id
- * @param string $sort Sort column
- * @param string $order ASC or DESC
- * @return array List of motorists and pagination info
+ * @deprecated Use motorists_fetch_list() — mantido para compatibilidade com motorist_data.php.
  */
-function getMotoristsList($limit = 10, $page = 1, $status = null, $search = null, $categoria_cnh = null, $tipo_contrato = null, $sort = 'nome', $order = 'ASC', $only_favoritos = false) {
-    try {
-        $conn = getConnection();
-        $empresa_id = $_SESSION['empresa_id'];
-        
-        // Calculate offset
-        $offset = ($page - 1) * $limit;
-        
-        // Build WHERE clause
-        $where = ['m.empresa_id = :empresa_id'];
-        $params = [':empresa_id' => $empresa_id];
-        
-        if ($status) {
-            $where[] = 'm.disponibilidade_id = :status';
-            $params[':status'] = $status;
-        }
-        if ($categoria_cnh) {
-            $where[] = 'm.categoria_cnh_id = :categoria_cnh';
-            $params[':categoria_cnh'] = $categoria_cnh;
-        }
-        if ($tipo_contrato) {
-            $where[] = 'm.tipo_contrato_id = :tipo_contrato';
-            $params[':tipo_contrato'] = $tipo_contrato;
-        }
-        
-        if ($only_favoritos) {
-            $uid = $_SESSION['usuario_id'] ?? $_SESSION['id'] ?? $_SESSION['user_id'] ?? null;
-            if ($uid) {
-                $st = $conn->prepare("SHOW TABLES LIKE 'motorista_favoritos'");
-                $st->execute();
-                if ($st->rowCount() > 0) {
-                    $st = $conn->prepare("SELECT motorista_id FROM motorista_favoritos WHERE usuario_id = ? AND empresa_id = ?");
-                    $st->execute([$uid, $empresa_id]);
-                    $fav_ids = array_column($st->fetchAll(PDO::FETCH_ASSOC), 'motorista_id');
-                    if (!empty($fav_ids)) {
-                        $where[] = 'm.id IN (' . implode(',', array_map('intval', $fav_ids)) . ')';
-                    } else {
-                        $where[] = '1=0';
-                    }
-                }
-            }
-        }
-        
-        if ($search) {
-            $search = trim($search);
-            $searchLike = '%' . $search . '%';
-            
-            $searchConditions = [];
-            $params[':search_nome'] = $searchLike;
-            $searchConditions[] = 'm.nome LIKE :search_nome';
-            
-            $params[':search_email'] = $searchLike;
-            $searchConditions[] = 'm.email LIKE :search_email';
-            
-            $params[':search_cnh'] = $searchLike;
-            $searchConditions[] = 'm.cnh LIKE :search_cnh';
-            
-            $params[':search_cpf_mask'] = $searchLike;
-            $searchConditions[] = 'm.cpf LIKE :search_cpf_mask';
-            
-            $params[':search_phone_mask'] = $searchLike;
-            $searchConditions[] = 'm.telefone LIKE :search_phone_mask';
-            
-            $searchDigits = preg_replace('/\D+/', '', $search);
-            if ($searchDigits !== '') {
-                $params[':search_cpf_digits'] = '%' . $searchDigits . '%';
-                $searchConditions[] = "REPLACE(REPLACE(REPLACE(REPLACE(m.cpf, '.', ''), '-', ''), ' ', ''), '/', '') LIKE :search_cpf_digits";
-                
-                $params[':search_phone_digits'] = '%' . $searchDigits . '%';
-                $searchConditions[] = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(m.telefone, '(', ''), ')', ''), '-', ''), ' ', ''), '+', '') LIKE :search_phone_digits";
-            }
-            
-            if (!empty($searchConditions)) {
-                $where[] = '(' . implode(' OR ', $searchConditions) . ')';
-            }
-        }
-        
-        $whereClause = implode(' AND ', $where);
-        
-        $sortMap = ['nome'=>'m.nome','cpf'=>'m.cpf','cnh'=>'m.cnh','telefone'=>'m.telefone','email'=>'m.email','porcentagem_comissao'=>'m.porcentagem_comissao','disponibilidade_nome'=>'dm.nome','categoria_cnh_nome'=>'cc.nome','tipo_contrato_nome'=>'tc.nome'];
-        $sortCol = isset($sortMap[$sort]) ? $sortMap[$sort] : 'm.nome';
-        $orderSql = $order === 'DESC' ? 'DESC' : 'ASC';
-        
-        // Get total count
-        $sql_count = "SELECT COUNT(*) as total FROM motoristas m WHERE $whereClause";
-        $stmt_count = $conn->prepare($sql_count);
-        foreach ($params as $key => $value) {
-            $stmt_count->bindValue($key, $value);
-        }
-        $stmt_count->execute();
-        $total = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
-        
-        // Get motorists with pagination
-        $sql = "SELECT m.*, 
-                dm.nome as disponibilidade_nome,
-                tc.nome as tipo_contrato_nome,
-                cc.nome as categoria_cnh_nome
-                FROM motoristas m 
-                LEFT JOIN disponibilidades_motoristas dm ON m.disponibilidade_id = dm.id 
-                LEFT JOIN tipos_contrato tc ON m.tipo_contrato_id = tc.id 
-                LEFT JOIN categorias_cnh cc ON m.categoria_cnh_id = cc.id 
-                WHERE $whereClause
-                ORDER BY $sortCol $orderSql
-                LIMIT :limit OFFSET :offset";
-                
-        $stmt = $conn->prepare($sql);
-        foreach ($params as $key => $value) {
-            $stmt->bindValue($key, $value);
-        }
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-        $stmt->execute();
-        
-        $motorists = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Marcar favoritos do usuário
-        $favoritos_ids = [];
-        try {
-            $uid = $_SESSION['usuario_id'] ?? $_SESSION['id'] ?? $_SESSION['user_id'] ?? null;
-            if ($uid) {
-                $st = $conn->prepare("SHOW TABLES LIKE 'motorista_favoritos'");
-                $st->execute();
-                if ($st->rowCount() > 0) {
-                    $st = $conn->prepare("SELECT motorista_id FROM motorista_favoritos WHERE usuario_id = ? AND empresa_id = ?");
-                    $st->execute([$uid, $empresa_id]);
-                    $favoritos_ids = array_column($st->fetchAll(PDO::FETCH_ASSOC), 'motorista_id');
-                }
-            }
-        } catch (Exception $e) {}
-        foreach ($motorists as &$m) {
-            $m['is_favorite'] = in_array((int)$m['id'], array_map('intval', $favoritos_ids));
-        }
-        unset($m);
-        
-        // Get summary data
-        $sql_summary = "SELECT 
-            COUNT(*) as total_motorists,
-            SUM(CASE WHEN disponibilidade_id = 1 THEN 1 ELSE 0 END) as motorists_ativos,
-            SUM(CASE WHEN disponibilidade_id = 2 THEN 1 ELSE 0 END) as motorists_ferias,
-            SUM(CASE WHEN disponibilidade_id = 3 THEN 1 ELSE 0 END) as motorists_licenca,
-            SUM(CASE WHEN disponibilidade_id = 4 THEN 1 ELSE 0 END) as motorists_inativos,
-            SUM(CASE WHEN disponibilidade_id = 5 THEN 1 ELSE 0 END) as motorists_afastados,
-            AVG(CASE WHEN porcentagem_comissao IS NOT NULL THEN porcentagem_comissao END) as media_comissao_pct
-            FROM motoristas
-            WHERE empresa_id = :empresa_id";
-            
-        $stmt_summary = $conn->prepare($sql_summary);
-        $stmt_summary->bindValue(':empresa_id', $empresa_id);
-        $stmt_summary->execute();
-        $summary = $stmt_summary->fetch(PDO::FETCH_ASSOC);
-        
-        // Get commission data from ROTAS table (not motoristas)
-        $sql_commission = "SELECT 
-            SUM(CASE WHEN r.comissao IS NOT NULL AND r.comissao > 0 THEN r.comissao ELSE 0 END) as total_comissao_mes,
-            COUNT(CASE WHEN r.comissao IS NOT NULL AND r.comissao > 0 THEN 1 END) as rotas_com_comissao_mes,
-            COUNT(DISTINCT r.motorista_id) as motorists_com_comissao_mes
-            FROM rotas r 
-            INNER JOIN motoristas m ON r.motorista_id = m.id 
-            WHERE r.empresa_id = :empresa_id 
-            AND r.status = 'aprovado'
-            AND MONTH(r.data_rota) = MONTH(CURRENT_DATE())
-            AND YEAR(r.data_rota) = YEAR(CURRENT_DATE())";
-            
-        $stmt_commission = $conn->prepare($sql_commission);
-        $stmt_commission->bindValue(':empresa_id', $empresa_id);
-        $stmt_commission->execute();
-        $commission = $stmt_commission->fetch(PDO::FETCH_ASSOC);
-        
-        // Merge summary and commission data
-        $summary = array_merge($summary, $commission);
-        
-        return [
-            'success' => true,
-            'motorists' => $motorists,
-            'pagination' => [
-                'page' => $page,
-                'limit' => $limit,
-                'total' => $total,
-                'total_pages' => ceil($total / $limit)
-            ],
-            'summary' => $summary
-        ];
-        
-    } catch(PDOException $e) {
-        error_log("Error in getMotoristsList: " . $e->getMessage());
+function getMotoristsList($limit = 10, $page = 1, $status = null, $search = null, $categoria_cnh = null, $tipo_contrato = null, $sort = 'nome', $order = 'ASC', $only_favoritos = false)
+{
+    $uid = $_SESSION['usuario_id'] ?? $_SESSION['id'] ?? $_SESSION['user_id'] ?? null;
+    $result = motorists_fetch_list(getConnection(), (int) $_SESSION['empresa_id'], $uid ? (int) $uid : null, [
+        'limit' => $limit,
+        'page' => $page,
+        'status' => $status,
+        'search' => $search,
+        'categoria_cnh' => $categoria_cnh,
+        'tipo_contrato' => $tipo_contrato,
+        'sort' => $sort,
+        'order' => $order,
+        'only_favoritos' => $only_favoritos,
+    ]);
+    if (empty($result['success'])) {
         http_response_code(500);
-        return ['success' => false, 'error' => 'Erro ao buscar lista de motoristas'];
     }
+    return $result;
 }
 
 /**
@@ -450,7 +272,7 @@ function getMotoristRouteHistory($motoristId) {
         error_log("Error in getMotoristRouteHistory: " . $e->getMessage());
         return [
             'success' => false,
-            'error' => 'Erro ao buscar histórico de rotas: ' . $e->getMessage()
+            'error' => 'Erro ao buscar histórico de rotas: '
         ];
     }
 }
@@ -771,7 +593,7 @@ function toggleMotoristaFavorito($motorista_id) {
         return ['success' => true, 'favorito' => true];
     } catch (PDOException $e) {
         error_log("Error in toggleMotoristaFavorito: " . $e->getMessage());
-        return ['success' => false, 'error' => $e->getMessage(), 'favorito' => false];
+        return ['success' => false, 'error' => 'Erro interno.', 'favorito' => false];
     }
 }
 
@@ -852,7 +674,7 @@ function getContractTypes() {
         
     } catch(PDOException $e) {
         error_log("Error in getContractTypes: " . $e->getMessage());
-        return ['success' => false, 'error' => 'Erro ao buscar tipos de contrato: ' . $e->getMessage()];
+        return ['success' => false, 'error' => 'Erro ao buscar tipos de contrato: '];
     }
 }
 
@@ -882,7 +704,7 @@ function getAvailabilityStatus() {
         
     } catch(PDOException $e) {
         error_log("Error in getAvailabilityStatus: " . $e->getMessage());
-        return ['success' => false, 'error' => 'Erro ao buscar status de disponibilidade: ' . $e->getMessage()];
+        return ['success' => false, 'error' => 'Erro ao buscar status de disponibilidade: '];
     }
 }
 
@@ -977,7 +799,13 @@ function addMotorist($data) {
         }
         
         // Get empresa_id from session
-        $empresa_id = $_SESSION['empresa_id'];
+        $empresa_id = (int) $_SESSION['empresa_id'];
+
+        require_once __DIR__ . '/../includes/sf_saas.php';
+        $lic = sf_licenca_pode_adicionar($conn, $empresa_id, 'motoristas');
+        if (!$lic['ok']) {
+            return ['success' => false, 'error' => $lic['message'] ?? 'Limite de motoristas atingido.'];
+        }
         
         // Process uploaded files
         $foto_motorista_path = null;
@@ -1092,7 +920,7 @@ function addMotorist($data) {
         
     } catch(PDOException $e) {
         error_log("Error in addMotorist: " . $e->getMessage());
-        return ['success' => false, 'error' => 'Erro ao adicionar motorista: ' . $e->getMessage()];
+        return ['success' => false, 'error' => 'Erro ao adicionar motorista: '];
     }
 }
 
@@ -1269,7 +1097,7 @@ function updateMotorist($id, $data) {
         
     } catch(PDOException $e) {
         error_log("Error in updateMotorist: " . $e->getMessage());
-        return ['success' => false, 'error' => 'Erro ao atualizar motorista: ' . $e->getMessage()];
+        return ['success' => false, 'error' => 'Erro ao atualizar motorista: '];
     }
 }
 
@@ -1282,6 +1110,15 @@ function updateMotorist($id, $data) {
  */
 function handleFileUpload($file, $type) {
     try {
+        $empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
+        if ($empresa_id > 0 && is_file(__DIR__ . '/../includes/sf_saas.php')) {
+            require_once __DIR__ . '/../includes/sf_saas.php';
+            $stor = sf_upload_storage_ok(getConnection(), $empresa_id, (int) ($file['size'] ?? 0));
+            if (!$stor['ok']) {
+                throw new Exception($stor['message'] ?? 'Limite de armazenamento do plano atingido.');
+            }
+        }
+
         // Validate file type
         $allowed_types = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png'];
         if (!in_array($file['type'], $allowed_types)) {
@@ -1372,7 +1209,7 @@ function deleteMotorist($id) {
         
     } catch(PDOException $e) {
         error_log("Database error in deleteMotorist: " . $e->getMessage());
-        return ['success' => false, 'error' => 'Erro ao excluir motorista: ' . $e->getMessage()];
+        return ['success' => false, 'error' => 'Erro ao excluir motorista: '];
     } catch(Exception $e) {
         error_log("General error in deleteMotorist: " . $e->getMessage());
         return ['success' => false, 'error' => 'Erro ao excluir motorista'];

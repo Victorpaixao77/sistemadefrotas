@@ -2,6 +2,7 @@
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
 require_once 'includes/csrf.php';
+require_once 'includes/sf_saas.php';
 
 configure_session();
 session_start();
@@ -30,11 +31,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Verificar se a empresa existe e está ativa
         $conn = getConnection();
-        $stmt = $conn->prepare("SELECT id, razao_social FROM empresa_clientes WHERE id = ? AND status = 'ativo'");
+        $stmt = $conn->prepare("
+            SELECT ec.id, ec.razao_social, ea.status_saas, ea.trial_ate, ea.bloqueado_motivo
+            FROM empresa_clientes ec
+            JOIN empresa_adm ea ON ea.id = ec.empresa_adm_id
+            WHERE ec.id = ? AND ec.status = 'ativo'
+        ");
         $stmt->execute([$empresa_id]);
         $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($empresa) {
+            $check = sf_saas_status_check($empresa);
+            if (!$check['ok']) {
+                $error = $check['message'] ?? 'Empresa indisponível.';
+            } else {
             $_SESSION['empresa_id'] = $empresa_id;
             $_SESSION['empresa_nome'] = $empresa['razao_social'];
 
@@ -43,17 +53,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             registrarLogAcesso($_SESSION['usuario_id'], $empresa_id, 'trocar_empresa', 'sucesso', 'Empresa alterada para: ' . $empresa['razao_social']);
 
+            $_SESSION['sf_sidebar_reset'] = 1;
             header('Location: index.php');
             exit;
+            }
         }
 
-        $error = 'Empresa não encontrada ou inativa.';
+        if ($error === '') {
+            $error = 'Empresa não encontrada ou inativa.';
+        }
     }
 }
 
 // Buscar todas as empresas ativas
 $conn = getConnection();
-$stmt = $conn->query("SELECT id, razao_social, nome_fantasia FROM empresa_clientes WHERE status = 'ativo' ORDER BY razao_social");
+$stmt = $conn->query("
+    SELECT ec.id, ec.razao_social, ec.nome_fantasia, ea.status_saas, ea.trial_ate
+    FROM empresa_clientes ec
+    JOIN empresa_adm ea ON ea.id = ec.empresa_adm_id
+    WHERE ec.status = 'ativo'
+      AND ea.status_saas IN ('ativa', 'trial')
+      AND (ea.trial_ate IS NULL OR ea.status_saas != 'trial' OR ea.trial_ate >= CURRENT_DATE())
+    ORDER BY ec.razao_social
+");
 $empresas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $page_title = 'Selecionar Empresa';

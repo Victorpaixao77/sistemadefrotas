@@ -116,8 +116,15 @@ function handleSaveVehicle() {
             'potencia_motor' => $_POST['potencia_motor'] ?? null,
             'numero_eixos' => $_POST['numero_eixos'] ?: null,
             'carroceria_id' => $_POST['carroceria_id'] ?: null,
-            'status_id' => !empty($_POST['status_id']) ? $_POST['status_id'] : 1
+            'status_id' => !empty($_POST['status_id']) ? $_POST['status_id'] : 1,
+            'capacidade_tanque' => ($_POST['capacidade_tanque'] ?? '') !== '' ? (float)$_POST['capacidade_tanque'] : null,
+            'consumo_medio' => ($_POST['consumo_medio'] ?? '') !== '' ? (float)$_POST['consumo_medio'] : null,
+            'custo_operacional_km' => ($_POST['custo_operacional_km'] ?? '') !== '' ? (float)$_POST['custo_operacional_km'] : null,
         ];
+
+        // Garante as colunas operacionais usadas na simulação de rota.
+        require_once '../includes/sf_vehicle_sim_columns.php';
+        sf_ensure_veiculos_sim_columns($conn);
 
         // Log para debug em produção
         error_log("vehicle_actions.php - Processando veículo ID: " . ($id ?? 'novo'));
@@ -223,7 +230,10 @@ function handleSaveVehicle() {
                     potencia_motor = :potencia_motor,
                     numero_eixos = :numero_eixos,
                     carroceria_id = :carroceria_id,
-                    status_id = :status_id";
+                    status_id = :status_id,
+                    capacidade_tanque = :capacidade_tanque,
+                    consumo_medio = :consumo_medio,
+                    custo_operacional_km = :custo_operacional_km";
             
             if (isset($data['foto_veiculo'])) {
                 $sql .= ", foto_veiculo = :foto_veiculo";
@@ -242,7 +252,8 @@ function handleSaveVehicle() {
                       'renavam', 'km_atual', 'observacoes', 'id_cavalo', 
                       'id_carreta', 'capacidade_carga', 'capacidade_passageiros', 
                       'numero_motor', 'proprietario', 'tipo_combustivel_id', 
-                      'potencia_motor', 'numero_eixos', 'carroceria_id', 'status_id'];
+                      'potencia_motor', 'numero_eixos', 'carroceria_id', 'status_id',
+                      'capacidade_tanque', 'consumo_medio', 'custo_operacional_km'];
             
             if (isset($data['foto_veiculo'])) {
                 $fields[] = 'foto_veiculo';

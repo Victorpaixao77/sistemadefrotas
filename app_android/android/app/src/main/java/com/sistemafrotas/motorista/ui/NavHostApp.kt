@@ -1,7 +1,7 @@
 package com.sistemafrotas.motorista.ui
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -18,7 +18,7 @@ fun NavHostApp(authRepository: AuthRepository) {
     val navController = rememberNavController()
     var showLogoutSuccessMessage by remember { mutableStateOf(false) }
 
-    val initialState by authRepository.isLoggedIn.collectAsState(initial = null)
+    val initialState by authRepository.isLoggedIn.collectAsStateWithLifecycle(initialValue = null)
 
     if (initialState == null) return
 

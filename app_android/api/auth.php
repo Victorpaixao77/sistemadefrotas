@@ -9,6 +9,11 @@
 
 require_once __DIR__ . '/../config.php';
 
+$root = dirname(__DIR__, 2);
+if (is_file($root . '/includes/security.php')) {
+    require_once $root . '/includes/security.php';
+}
+
 function api_access_token_ttl(): string
 {
     return getenv('SF_API_ACCESS_TTL') ?: '+7 days';
@@ -158,21 +163,58 @@ if ($method === 'POST') {
         try {
             $conn = getConnection();
             $login = strtolower(trim($nome));
-            $stmt = $conn->prepare('
-                SELECT um.id, um.nome, um.empresa_id, um.motorista_id, um.status, um.senha,
-                       m.nome AS nome_motorista
-                FROM usuarios_motoristas um
-                INNER JOIN motoristas m ON m.id = um.motorista_id AND m.empresa_id = um.empresa_id
-                WHERE um.status = "ativo"
-                  AND (
-                    LOWER(TRIM(um.nome)) = :login
-                    OR LOWER(TRIM(COALESCE(m.email, ""))) = :login2
-                  )
-            ');
-            $stmt->execute([':login' => $login, ':login2' => $login]);
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            $user = null;
+            try {
+                $stmt = $conn->prepare('
+                    SELECT um.id, um.nome, um.empresa_id, um.motorista_id, um.status, um.senha,
+                           m.nome AS nome_motorista,
+                           um.two_factor_enabled, um.two_factor_secret, um.two_factor_confirmed_at
+                    FROM usuarios_motoristas um
+                    INNER JOIN motoristas m ON m.id = um.motorista_id AND m.empresa_id = um.empresa_id
+                    WHERE um.status = "ativo"
+                      AND (
+                        LOWER(TRIM(um.nome)) = :login
+                        OR LOWER(TRIM(COALESCE(m.email, ""))) = :login2
+                      )
+                ');
+                $stmt->execute([':login' => $login, ':login2' => $login]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            } catch (PDOException $e) {
+                if (strpos($e->getMessage(), 'two_factor') === false && strpos($e->getMessage(), 'Unknown column') === false) {
+                    throw $e;
+                }
+                $stmt = $conn->prepare('
+                    SELECT um.id, um.nome, um.empresa_id, um.motorista_id, um.status, um.senha,
+                           m.nome AS nome_motorista
+                    FROM usuarios_motoristas um
+                    INNER JOIN motoristas m ON m.id = um.motorista_id AND m.empresa_id = um.empresa_id
+                    WHERE um.status = "ativo"
+                      AND (
+                        LOWER(TRIM(um.nome)) = :login
+                        OR LOWER(TRIM(COALESCE(m.email, ""))) = :login2
+                      )
+                ');
+                $stmt->execute([':login' => $login, ':login2' => $login]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            }
             if (!$user || !password_verify($senha, $user['senha'])) {
                 api_error('Usuário ou senha inválidos.', 401);
+            }
+
+            $totpCode = trim((string) ($input['totp_code'] ?? $input['codigo_2fa'] ?? ''));
+            $needs2fa = !empty($user['two_factor_enabled'])
+                && !empty($user['two_factor_secret'])
+                && !empty($user['two_factor_confirmed_at']);
+            if ($needs2fa) {
+                if ($totpCode === '') {
+                    api_success([
+                        'requires_2fa' => true,
+                        'motorista_id' => (int) $user['motorista_id'],
+                    ], 'Informe o código do autenticador.');
+                }
+                if (!function_exists('sf_totp_verify') || !sf_totp_verify($user['two_factor_secret'], $totpCode)) {
+                    api_error('Código 2FA inválido.', 401);
+                }
             }
             $motorista_id = (int) $user['motorista_id'];
             $empresa_id = (int) $user['empresa_id'];

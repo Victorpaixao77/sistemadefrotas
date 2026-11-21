@@ -34,10 +34,30 @@ try {
     }
 
     if ($method === 'POST') {
-        $raw = file_get_contents('php://input');
-        $d = json_decode($raw, true);
-        if (!is_array($d)) {
+        $assinatura_path = null;
+        $ct = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
+        if (stripos($ct, 'multipart/form-data') !== false) {
             $d = $_POST;
+            $uploadRoot = dirname(__DIR__, 2);
+            $uploadInc = $uploadRoot . '/includes/upload_comprovante.php';
+            if (isset($_FILES['assinatura']) && $_FILES['assinatura']['error'] === UPLOAD_ERR_OK && is_file($uploadInc)) {
+                require_once $uploadInc;
+                $uploadAbs = $uploadRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'checklists';
+                if (!is_dir($uploadAbs)) {
+                    mkdir($uploadAbs, 0775, true);
+                }
+                try {
+                    $assinatura_path = sf_save_comprovante_upload($_FILES['assinatura'], $uploadAbs, 'uploads/checklists', false);
+                } catch (Exception $ex) {
+                    api_error($ex->getMessage(), 400);
+                }
+            }
+        } else {
+            $raw = file_get_contents('php://input');
+            $d = json_decode($raw, true);
+            if (!is_array($d)) {
+                $d = $_POST;
+            }
         }
 
         $rota_id = (int)($d['rota_id'] ?? 0);
@@ -69,7 +89,6 @@ try {
             'cintas', 'primeiros_socorros', 'doc_veiculo', 'cnh', 'licenciamento',
             'seguro', 'manifesto_carga', 'doc_empresa', 'carga_amarrada', 'peso_correto',
             'motorista_descansado', 'motorista_sobrio', 'celular_carregado', 'epi',
-            // Itens de carreta/conjunto (Checklist Inteligente)
             'quinta_roda', 'mangueiras', 'travas', 'lona_carga',
         ];
         $bind = [
@@ -83,17 +102,22 @@ try {
             $bind[$k] = !empty($d[$k]) ? 1 : 0;
         }
         $bind['observacoes'] = $d['observacoes'] ?? null;
+        if ($assinatura_path !== null) {
+            $bind['assinatura_path'] = $assinatura_path;
+        }
 
-        $cols = implode(', ', array_merge(
-            ['empresa_id', 'veiculo_id', 'motorista_id', 'rota_id', 'data_checklist'],
-            $bools,
-            ['observacoes', 'fonte']
-        ));
-        $placeholders = ':' . implode(', :', array_merge(
-            ['empresa_id', 'veiculo_id', 'motorista_id', 'rota_id', 'data_checklist'],
-            $bools,
-            ['observacoes']
-        ));
+        $baseCols = ['empresa_id', 'veiculo_id', 'motorista_id', 'rota_id', 'data_checklist'];
+        $tailCols = ['observacoes'];
+        if ($assinatura_path !== null) {
+            $tailCols[] = 'assinatura_path';
+        }
+        $tailCols[] = 'fonte';
+
+        $cols = implode(', ', array_merge($baseCols, $bools, $tailCols));
+        $placeholders = ':' . implode(', :', array_merge($baseCols, $bools, ['observacoes']));
+        if ($assinatura_path !== null) {
+            $placeholders .= ', :assinatura_path';
+        }
         $placeholders .= ", 'motorista'";
 
         $sql = "INSERT INTO checklist_viagem ($cols) VALUES ($placeholders)";

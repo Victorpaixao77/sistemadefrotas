@@ -19,14 +19,21 @@ if (!can_access_lucratividade()) {
     exit;
 }
 
+$empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
+if (function_exists('session_write_close')) { session_write_close(); }
+
 try {
     $conn = getConnection();
-    $empresa_id = $_SESSION['empresa_id'];
-    
+
     // Get month and year from URL parameters or use current date
     $current_month = isset($_GET['mes']) ? $_GET['mes'] : date('m');
     $current_year = isset($_GET['ano']) ? $_GET['ano'] : date('Y');
-    
+
+    // Dashboard cacheado (APCu/arquivo) por 300s, por empresa+mês+ano.
+    require_once __DIR__ . '/../includes/sf_cache.php';
+    $ckey = 'dash:cost_km:' . $empresa_id . ':' . $current_year . ':' . $current_month;
+    if (($cached = sf_cache_get($ckey)) !== null) { echo json_encode($cached); exit; }
+
     // Query para buscar despesas por dia
     $query_despesas = "
         SELECT 
@@ -187,7 +194,7 @@ try {
     }
     
     // Retornar os dados no formato esperado pelo Chart.js
-    echo json_encode([
+    $payload = [
         'labels' => $labels,
         'datasets' => [
             [
@@ -199,11 +206,13 @@ try {
                 'tension' => 0.4
             ]
         ]
-    ]);
-    
+    ];
+    sf_cache_set($ckey, $payload, 300);
+    echo json_encode($payload);
+
 } catch (Exception $e) {
     error_log("Cost per KM Analytics API Error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['error' => 'Erro ao buscar dados de custo por KM: ' . $e->getMessage()]);
+    echo json_encode(['error' => 'Erro ao buscar dados de custo por KM: ']);
     exit;
 } 

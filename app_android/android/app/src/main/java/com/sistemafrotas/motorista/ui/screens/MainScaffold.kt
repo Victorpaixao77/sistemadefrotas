@@ -1,11 +1,14 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Dashboard
@@ -17,21 +20,28 @@ import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TireRepair
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.sistemafrotas.motorista.GpsForegroundService
 import com.sistemafrotas.motorista.GpsPendingSyncWorker
 import com.sistemafrotas.motorista.data.AuthRepository
 import com.sistemafrotas.motorista.data.GpsPreferencesStore
 import com.sistemafrotas.motorista.ui.LocalAppSnackbar
+import com.sistemafrotas.motorista.feature.viagem.ui.TripModeScreen
 import com.sistemafrotas.motorista.ui.components.ConnectivityStatusBanner
 import kotlinx.coroutines.launch
+
+// Topo navy da identidade do sistema web (bg-sidebar #0f172a); azul fica só de acento.
+private val ScaffoldNavyTop = Color(0xFF0F172A)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,7 +51,7 @@ fun MainScaffold(
     onSessionExpired: () -> Unit = {},
 ) {
     val appContext = LocalContext.current.applicationContext
-    val loggedIn by authRepository.isLoggedIn.collectAsState(initial = false)
+    val loggedIn by authRepository.isLoggedIn.collectAsStateWithLifecycle(initialValue = false)
 
     LaunchedEffect(loggedIn) {
         if (!loggedIn) {
@@ -53,16 +63,15 @@ fun MainScaffold(
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var showConfig by remember { mutableStateOf(false) }
+    var showTripMode by remember { mutableStateOf(false) }
     var maisInicial by remember { mutableStateOf<String?>(null) }
     var subScreenTitle by remember { mutableStateOf<String?>(null) }
     var subScreenOnBack by remember { mutableStateOf<(() -> Unit)?>(null) }
     val tabs = listOf(
         "Início" to Icons.Filled.Dashboard,
-        "Rotas" to Icons.Filled.Route,
-        "Abastec." to Icons.Filled.LocalGasStation,
-        "Checklist" to Icons.Outlined.Checklist,
-        "Despesas" to Icons.Filled.Receipt,
-        "Pneus" to Icons.Filled.TireRepair,
+        "Fretes" to Icons.Filled.LocalShipping,
+        "Financeiro" to Icons.Filled.Payments,
+        "Documentos" to Icons.Filled.Description,
         "Mais" to Icons.Filled.Apps,
     )
 
@@ -80,13 +89,13 @@ fun MainScaffold(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = ScaffoldNavyTop,
+                        titleContentColor = Color.White,
                         actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                 )
             } else if (selectedTab != 0) {
-                val tabTitles = listOf("", "Rotas", "Abastecimentos", "Checklists", "Despesas", "Pneus", "Mais")
+                val tabTitles = listOf("", "Fretes", "Financeiro", "Documentos", "Mais")
                 val title = tabTitles.getOrElse(selectedTab) { "Portal do Motorista" }
                 TopAppBar(
                     title = { Text(title) },
@@ -96,67 +105,14 @@ fun MainScaffold(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                        containerColor = ScaffoldNavyTop,
+                        titleContentColor = Color.White,
                         actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                 )
             } else {
-                TopAppBar(
-                    title = { Text("Portal do Motorista") },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                        actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    ),
-                    actions = {
-                    var showMenu by remember { mutableStateOf(false) }
-                    val scope = rememberCoroutineScope()
-                    Box {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(
-                                Icons.Filled.MoreVert,
-                                contentDescription = "Menu",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Filled.Settings, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                                        Text("Configurações")
-                                    }
-                                },
-                                onClick = {
-                                    showMenu = false
-                                    showConfig = true
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Filled.Logout, contentDescription = null, modifier = Modifier.padding(end = 8.dp))
-                                        Text("Sair")
-                                    }
-                                },
-                                onClick = {
-                                    showMenu = false
-                                    scope.launch {
-                                        GpsForegroundService.stop(appContext)
-                                        GpsPendingSyncWorker.cancel(appContext)
-                                        authRepository.logout()
-                                        onLogout()
-                                    }
-                                },
-                            )
-                        }
-                    }
-                }
-                )
+                // Início: header azul (saudação + sino + avatar/menu) é renderizado
+                // pelo próprio DashboardScreen para o visual do Portal do Motorista.
             }
         },
         bottomBar = {
@@ -170,11 +126,11 @@ fun MainScaffold(
                 )
                 tabs.forEachIndexed { index, (label, icon) ->
                     NavigationBarItem(
-                        icon = { Icon(icon, contentDescription = label) },
-                        label = { Text(label) },
+                        icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(22.dp)) },
+                        label = { Text(label, fontSize = 11.sp, maxLines = 1) },
                         selected = selectedTab == index,
                         onClick = { selectedTab = index },
-                        alwaysShowLabel = false,
+                        alwaysShowLabel = true,
                         colors = itemColors,
                     )
                 }
@@ -200,7 +156,9 @@ fun MainScaffold(
                         authRepository = authRepository,
                         onSessionExpired = onSessionExpired,
                         onNavigateToTab = { selectedTab = it },
-                        onAbrirMais = { feature -> maisInicial = feature; selectedTab = 6 },
+                        onAbrirMais = { feature -> maisInicial = feature; selectedTab = 4 },
+                        onOpenTripMode = { showTripMode = true },
+                        onOpenConfig = { showConfig = true },
                         onLogout = onLogout,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -212,7 +170,7 @@ fun MainScaffold(
                             subScreenOnBack = onBack
                         },
                     )
-                    2 -> AbastecimentosScreen(
+                    2 -> DespesasScreen(
                         authRepository = authRepository,
                         modifier = Modifier.fillMaxSize(),
                         onSubScreenChange = { title, onBack ->
@@ -220,27 +178,11 @@ fun MainScaffold(
                             subScreenOnBack = onBack
                         },
                     )
-                    3 -> ChecklistsScreen(
-                        authRepository = authRepository,
-                        modifier = Modifier.fillMaxSize(),
-                        onSubScreenChange = { title, onBack ->
-                            subScreenTitle = title
-                            subScreenOnBack = onBack
-                        },
-                    )
-                    4 -> DespesasScreen(
-                        authRepository = authRepository,
-                        modifier = Modifier.fillMaxSize(),
-                        onSubScreenChange = { title, onBack ->
-                            subScreenTitle = title
-                            subScreenOnBack = onBack
-                        },
-                    )
-                    5 -> PneusScreen(
+                    3 -> PodScreen(
                         authRepository = authRepository,
                         modifier = Modifier.fillMaxSize(),
                     )
-                    6 -> MaisScreen(
+                    4 -> MaisScreen(
                         authRepository = authRepository,
                         modifier = Modifier.fillMaxSize(),
                         onSubScreenChange = { title, onBack ->
@@ -249,11 +191,29 @@ fun MainScaffold(
                         },
                         inicial = maisInicial,
                         onInicialConsumed = { maisInicial = null },
+                        onExitToHome = {
+                            subScreenTitle = null
+                            subScreenOnBack = null
+                            selectedTab = 0
+                        },
+                        onOpenTripMode = { showTripMode = true },
                     )
                 }
             }
             Column(Modifier.fillMaxWidth().align(Alignment.TopCenter)) {
                 ConnectivityStatusBanner()
+            }
+            if (showTripMode) {
+                TripModeScreen(
+                    authRepository = authRepository,
+                    onClose = { showTripMode = false },
+                    onOpenFeature = { key ->
+                        showTripMode = false
+                        maisInicial = key
+                        selectedTab = 4
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }

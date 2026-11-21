@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
+// CORS wildcard removido (consumido same-origin pelo próprio front).
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
 header('Access-Control-Allow-Headers: Content-Type');
 
@@ -16,6 +16,7 @@ session_start();
 
 // Check authentication
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Protege mutações (POST/PUT/PATCH/DELETE) com CSRF e retorno JSON padronizado.
 api_require_csrf_json();

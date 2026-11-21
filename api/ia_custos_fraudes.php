@@ -211,19 +211,20 @@ function detectarFraude($conn, $empresa_id, $abastecimento_id) {
     
     try {
         // Buscar dados do abastecimento
-        $sql = "SELECT 
+        // tipo_combustivel vem de abastecimentos (veiculos guarda só tipo_combustivel_id);
+        // veiculos não tem coluna de "tipo" textual, então o consumo usa um padrão adiante.
+        $sql = "SELECT
                     a.*,
                     r.distancia_km,
                     v.placa,
-                    v.tipo,
-                    v.tipo_combustivel,
+                    a.tipo_combustivel,
                     m.nome as motorista_nome
                 FROM abastecimentos a
                 JOIN rotas r ON a.rota_id = r.id
                 JOIN veiculos v ON r.veiculo_id = v.id
                 JOIN motoristas m ON r.motorista_id = m.id
                 WHERE a.id = :abastecimento_id AND a.empresa_id = :empresa_id";
-        
+
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':abastecimento_id', $abastecimento_id);
         $stmt->bindParam(':empresa_id', $empresa_id);
@@ -240,9 +241,11 @@ function detectarFraude($conn, $empresa_id, $abastecimento_id) {
         $fraudes_detectadas = [];
         $score_risco = 0;
         
-        // 1. Verificar consumo excessivo
-        $consumo_por_km = $abastecimento['litros'] / $abastecimento['distancia_km'];
-        $consumo_esperado = obterConsumoMedio($abastecimento['tipo'], $abastecimento['tipo_combustivel']);
+        // 1. Verificar consumo excessivo (evita divisão por zero se rota sem distância)
+        $distancia_km = (float) ($abastecimento['distancia_km'] ?? 0);
+        $consumo_por_km = $distancia_km > 0 ? ($abastecimento['litros'] / $distancia_km) : 0;
+        // veiculos não tem tipo textual → usa padrão ('Caminhão') para a referência de consumo.
+        $consumo_esperado = obterConsumoMedio('Caminhão', $abastecimento['tipo_combustivel']);
         
         if ($consumo_por_km > $consumo_esperado * 1.5) {
             $fraudes_detectadas[] = [
@@ -314,7 +317,10 @@ function obterPrecoCombustivel($tipo_combustivel) {
  */
 function getRankingRisco($conn, $empresa_id) {
     try {
-        $sql = "SELECT 
+        // EMULATE_PREPARES=false: um placeholder por ocorrência de :empresa_id.
+        // A ordenação por risco é feita no PHP (não dá para usar alias de agregado
+        // dentro de expressão no ORDER BY — gera "reference to group function").
+        $sql = "SELECT
                     m.id,
                     m.nome,
                     COUNT(r.id) as total_rotas,
@@ -323,36 +329,47 @@ function getRankingRisco($conn, $empresa_id) {
                     COUNT(a.id) as total_abastecimentos,
                     AVG(a.valor_total / NULLIF(r.distancia_km, 0)) as custo_medio_km
                 FROM motoristas m
-                LEFT JOIN rotas r ON m.id = r.motorista_id AND r.empresa_id = :empresa_id
-                LEFT JOIN multas mult ON m.id = mult.motorista_id AND mult.empresa_id = :empresa_id
+                LEFT JOIN rotas r ON m.id = r.motorista_id AND r.empresa_id = :empresa_id_r
+                LEFT JOIN multas mult ON m.id = mult.motorista_id AND mult.empresa_id = :empresa_id_m
                 LEFT JOIN abastecimentos a ON r.id = a.rota_id
-                WHERE m.empresa_id = :empresa_id
+                WHERE m.empresa_id = :empresa_id_w
                 GROUP BY m.id, m.nome
-                HAVING total_rotas > 0
-                ORDER BY (taxa_atraso * 100 + total_multas * 10 + custo_medio_km * 5) DESC";
-        
+                HAVING total_rotas > 0";
+
         $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':empresa_id', $empresa_id);
-        $stmt->execute();
-        
+        $stmt->execute([
+            ':empresa_id_r' => $empresa_id,
+            ':empresa_id_m' => $empresa_id,
+            ':empresa_id_w' => $empresa_id,
+        ]);
+
         $motoristas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
         $ranking = [];
-        foreach ($motoristas as $index => $motorista) {
+        foreach ($motoristas as $motorista) {
             $score_risco = calcularScoreRisco($motorista);
-            
+
             $ranking[] = [
                 'motorista_id' => $motorista['id'],
                 'motorista_nome' => $motorista['nome'],
-                'posicao' => $index + 1,
+                'posicao' => 0,
                 'score_risco' => $score_risco,
                 'categoria_risco' => $score_risco > 70 ? 'Alto Risco' : ($score_risco > 40 ? 'Médio Risco' : 'Baixo Risco'),
                 'total_rotas' => $motorista['total_rotas'],
-                'taxa_atraso' => round($motorista['taxa_atraso'] * 100, 1),
+                'taxa_atraso' => round((float) $motorista['taxa_atraso'] * 100, 1),
                 'total_multas' => $motorista['total_multas'],
-                'custo_medio_km' => round($motorista['custo_medio_km'], 2)
+                'custo_medio_km' => round((float) $motorista['custo_medio_km'], 2)
             ];
         }
+
+        // Ordena por risco (desc) e numera a posição.
+        usort($ranking, static function ($a, $b) {
+            return $b['score_risco'] <=> $a['score_risco'];
+        });
+        foreach ($ranking as $i => &$item) {
+            $item['posicao'] = $i + 1;
+        }
+        unset($item);
         
         echo json_encode([
             'success' => true,
@@ -394,41 +411,44 @@ function getAnaliseCustos($conn, $empresa_id) {
         $periodo_inicio = isset($_GET['periodo_inicio']) ? $_GET['periodo_inicio'] : date('Y-m-01');
         $periodo_fim = isset($_GET['periodo_fim']) ? $_GET['periodo_fim'] : date('Y-m-d');
         
-        // Análise de custos por categoria
-        $sql = "SELECT 
+        // Análise de custos por categoria.
+        // manutencoes usa custo_total (não existe valor_total). EMULATE_PREPARES=false:
+        // um placeholder por ocorrência em cada parte do UNION.
+        $sql = "SELECT
                     'Combustível' as categoria,
                     SUM(a.valor_total) as total,
                     COUNT(*) as quantidade
                 FROM abastecimentos a
                 JOIN rotas r ON a.rota_id = r.id
-                WHERE r.empresa_id = :empresa_id
-                AND r.data_rota BETWEEN :periodo_inicio AND :periodo_fim
-                
+                WHERE r.empresa_id = :empresa_id_1
+                AND r.data_rota BETWEEN :pi_1 AND :pf_1
+
                 UNION ALL
-                
-                SELECT 
+
+                SELECT
                     'Comissões' as categoria,
                     SUM(r.comissao) as total,
                     COUNT(*) as quantidade
                 FROM rotas r
-                WHERE r.empresa_id = :empresa_id
-                AND r.data_rota BETWEEN :periodo_inicio AND :periodo_fim
-                
+                WHERE r.empresa_id = :empresa_id_2
+                AND r.data_rota BETWEEN :pi_2 AND :pf_2
+
                 UNION ALL
-                
-                SELECT 
+
+                SELECT
                     'Manutenções' as categoria,
-                    SUM(m.valor_total) as total,
+                    SUM(m.custo_total) as total,
                     COUNT(*) as quantidade
                 FROM manutencoes m
-                WHERE m.empresa_id = :empresa_id
-                AND m.data_manutencao BETWEEN :periodo_inicio AND :periodo_fim";
-        
+                WHERE m.empresa_id = :empresa_id_3
+                AND m.data_manutencao BETWEEN :pi_3 AND :pf_3";
+
         $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':empresa_id', $empresa_id);
-        $stmt->bindParam(':periodo_inicio', $periodo_inicio);
-        $stmt->bindParam(':periodo_fim', $periodo_fim);
-        $stmt->execute();
+        $stmt->execute([
+            ':empresa_id_1' => $empresa_id, ':pi_1' => $periodo_inicio, ':pf_1' => $periodo_fim,
+            ':empresa_id_2' => $empresa_id, ':pi_2' => $periodo_inicio, ':pf_2' => $periodo_fim,
+            ':empresa_id_3' => $empresa_id, ':pi_3' => $periodo_inicio, ':pf_3' => $periodo_fim,
+        ]);
         
         $custos = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
@@ -458,16 +478,22 @@ function getAnaliseCustos($conn, $empresa_id) {
  */
 function getDashboardIA($conn, $empresa_id) {
     try {
-        // Estatísticas gerais
-        $sql_stats = "SELECT 
-                        (SELECT COUNT(*) FROM rotas WHERE empresa_id = :empresa_id AND status = 'aprovado') as total_rotas,
-                        (SELECT COUNT(*) FROM abastecimentos a JOIN rotas r ON a.rota_id = r.id WHERE r.empresa_id = :empresa_id) as total_abastecimentos,
-                        (SELECT COUNT(*) FROM motoristas WHERE empresa_id = :empresa_id) as total_motoristas,
-                        (SELECT COUNT(*) FROM notificacoes WHERE empresa_id = :empresa_id AND data_criacao >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as alertas_recentes";
-        
+        // Estatísticas gerais.
+        // EMULATE_PREPARES=false: cada placeholder nomeado é único — não dá para reusar
+        // o mesmo :empresa_id em vários pontos. Usamos um nome por ocorrência.
+        $sql_stats = "SELECT
+                        (SELECT COUNT(*) FROM rotas WHERE empresa_id = :empresa_id_1 AND status = 'aprovado') as total_rotas,
+                        (SELECT COUNT(*) FROM abastecimentos a JOIN rotas r ON a.rota_id = r.id WHERE r.empresa_id = :empresa_id_2) as total_abastecimentos,
+                        (SELECT COUNT(*) FROM motoristas WHERE empresa_id = :empresa_id_3) as total_motoristas,
+                        (SELECT COUNT(*) FROM notificacoes WHERE empresa_id = :empresa_id_4 AND data_criacao >= DATE_SUB(NOW(), INTERVAL 7 DAY)) as alertas_recentes";
+
         $stmt_stats = $conn->prepare($sql_stats);
-        $stmt_stats->bindParam(':empresa_id', $empresa_id);
-        $stmt_stats->execute();
+        $stmt_stats->execute([
+            ':empresa_id_1' => $empresa_id,
+            ':empresa_id_2' => $empresa_id,
+            ':empresa_id_3' => $empresa_id,
+            ':empresa_id_4' => $empresa_id,
+        ]);
         
         $stats = $stmt_stats->fetch(PDO::FETCH_ASSOC);
         

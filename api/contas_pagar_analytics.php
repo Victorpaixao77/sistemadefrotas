@@ -54,9 +54,15 @@ if ($mes) {
 }
 
 $where_clause = implode(' AND ', $where_conditions);
-error_log("Where clause gerada: " . $where_clause);
-error_log("Parâmetros da query: " . print_r($params, true));
 
+// Cache de leitura por ação+filtros (APCu/arquivo, TTL 120s). Captura via buffer.
+require_once __DIR__ . '/../includes/sf_cache.php';
+$ckey = 'dash:contas_pagar:' . (int) ($_SESSION['empresa_id'] ?? 0) . ':' . md5(serialize($_GET));
+if (function_exists('session_write_close')) { session_write_close(); }
+if (($cached = sf_cache_get($ckey)) !== null) { echo $cached; exit; }
+
+ob_start();
+$ok = false;
 try {
     if ($action === 'kpis') {
         error_log("Iniciando busca de KPIs");
@@ -177,11 +183,14 @@ try {
     } else {
         throw new Exception('Ação inválida');
     }
+    $ok = true;
 } catch (Exception $e) {
     error_log("Erro: " . $e->getMessage());
-    error_log("Stack trace: " . $e->getTraceAsString());
     echo json_encode([
         'success' => false,
         'message' => 'Não foi possível carregar os dados analíticos.'
     ]);
-} 
+}
+$out = ob_get_clean();
+if ($ok) { sf_cache_set($ckey, $out, 120); }
+echo $out;

@@ -5,6 +5,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
+require_once '../includes/routes_list.php';
 
 // Configura a sessão antes de iniciá-la
 configure_session();
@@ -19,6 +20,7 @@ header('Content-Type: application/json');
 
 // Garante que a requisição está autenticada
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Obtém o empresa_id da sessão
 $empresa_id = isset($_SESSION["empresa_id"]) ? $_SESSION["empresa_id"] : null;
@@ -40,104 +42,6 @@ try {
     
     switch ($action) {
         case 'list':
-            // Parâmetros de paginação (por página: 5, 10, 25, 50, 100; padrão 10)
-            $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-            $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
-            if (!in_array($limit, [5, 10, 25, 50, 100], true)) {
-                $limit = 10;
-            }
-            $offset = ($page - 1) * $limit;
-            
-            // Count total records first
-            $count_sql = "SELECT COUNT(*) as total 
-                        FROM rotas r
-                        LEFT JOIN motoristas m ON r.motorista_id = m.id
-                        LEFT JOIN veiculos v ON r.veiculo_id = v.id
-                        LEFT JOIN cidades co ON r.cidade_origem_id = co.id
-                        LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-                        WHERE r.empresa_id = :empresa_id
-                        AND r.status = 'aprovado'";
-            
-            // Prepara a consulta base
-            $sql = "SELECT 
-                    r.*,
-                    m.nome as motorista_nome,
-                    v.placa as veiculo_placa,
-                    co.nome as cidade_origem_nome,
-                    cd.nome as cidade_destino_nome
-                FROM rotas r
-                LEFT JOIN motoristas m ON r.motorista_id = m.id
-                LEFT JOIN veiculos v ON r.veiculo_id = v.id
-                LEFT JOIN cidades co ON r.cidade_origem_id = co.id
-                LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-                WHERE r.empresa_id = :empresa_id
-                AND r.status = 'aprovado'";
-            
-            // Adiciona filtros se fornecidos
-            $params = [':empresa_id' => $empresa_id];
-            
-            if (!empty($_GET['search'])) {
-                $rawSearch = trim($_GET['search']);
-                $normalizedSearch = function_exists('mb_strtolower')
-                    ? mb_strtolower($rawSearch, 'UTF-8')
-                    : strtolower($rawSearch);
-                $searchConditions = [];
-
-                $searchLike = '%' . $normalizedSearch . '%';
-
-                $params[':search_origin'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(co.nome, "")) LIKE :search_origin';
-
-                $params[':search_destination'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(cd.nome, "")) LIKE :search_destination';
-
-                $params[':search_driver_name'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(m.nome, "")) LIKE :search_driver_name';
-
-                $params[':search_vehicle_plate'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(v.placa, "")) LIKE :search_vehicle_plate';
-
-                $params[':search_vehicle_model'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(v.modelo, "")) LIKE :search_vehicle_model';
-
-                $params[':search_combined_route'] = $searchLike;
-                $searchConditions[] = 'LOWER(CONCAT_WS(" ", COALESCE(co.nome, ""), COALESCE(cd.nome, ""))) LIKE :search_combined_route';
-
-                $rawLike = '%' . $rawSearch . '%';
-                $params[':search_route_id'] = $rawLike;
-                $searchConditions[] = 'CAST(r.id AS CHAR) LIKE :search_route_id';
-
-                $params[':search_driver_cpf_mask'] = $rawLike;
-                $searchConditions[] = 'm.cpf LIKE :search_driver_cpf_mask';
-
-                $params[':search_date_br'] = $rawLike;
-                $searchConditions[] = "DATE_FORMAT(r.data_rota, '%d/%m/%Y') LIKE :search_date_br";
-
-                $params[':search_date_iso'] = $rawLike;
-                $searchConditions[] = "DATE_FORMAT(r.data_rota, '%Y-%m-%d') LIKE :search_date_iso";
-
-                $searchDigits = preg_replace('/\D+/', '', $rawSearch);
-                if ($searchDigits !== '') {
-                    $digitsLike = '%' . $searchDigits . '%';
-
-                    $params[':search_driver_cpf_digits'] = $digitsLike;
-                    $searchConditions[] = "REPLACE(REPLACE(REPLACE(m.cpf, '.', ''), '-', ''), ' ', '') LIKE :search_driver_cpf_digits";
-
-                    $params[':search_plate_digits'] = $digitsLike;
-                    $searchConditions[] = "REPLACE(REPLACE(REPLACE(REPLACE(v.placa, '-', ''), ' ', ''), '.', ''), '/', '') LIKE :search_plate_digits";
-
-                    $params[':search_route_id_digits'] = $digitsLike;
-                    $searchConditions[] = 'CAST(r.id AS CHAR) LIKE :search_route_id_digits';
-                }
-
-                if (!empty($searchConditions)) {
-                    $searchClause = '(' . implode(' OR ', $searchConditions) . ')';
-                    $sql .= " AND $searchClause";
-                    $count_sql .= " AND $searchClause";
-                }
-            }
-            
-            // Filtro por entrega no prazo / atrasado (parâmetro delivery; status legado)
             $delivery = isset($_GET['delivery']) ? trim((string) $_GET['delivery']) : '';
             if ($delivery === '' && !empty($_GET['status'])) {
                 $legacy = trim((string) $_GET['status']);
@@ -147,91 +51,19 @@ try {
                     $delivery = 'atrasado';
                 }
             }
-            if ($delivery === 'no_prazo') {
-                $sql .= ' AND r.no_prazo = 1';
-                $count_sql .= ' AND r.no_prazo = 1';
-            } elseif ($delivery === 'atrasado') {
-                $sql .= ' AND r.no_prazo = 0';
-                $count_sql .= ' AND r.no_prazo = 0';
-            }
-            
-            if (!empty($_GET['driver'])) {
-                $sql .= " AND r.motorista_id = :driver";
-                $count_sql .= " AND r.motorista_id = :driver";
-                $params[':driver'] = $_GET['driver'];
-            }
-            
-            if (!empty($_GET['date'])) {
-                $sql .= " AND DATE(r.data_rota) = :date";
-                $count_sql .= " AND DATE(r.data_rota) = :date";
-                $params[':date'] = $_GET['date'];
-            }
-            
-            if (!empty($_GET['date_from'])) {
-                $sql .= " AND DATE(r.data_rota) >= :date_from";
-                $count_sql .= " AND DATE(r.data_rota) >= :date_from";
-                $params[':date_from'] = $_GET['date_from'];
-            }
-            
-            if (!empty($_GET['date_to'])) {
-                $sql .= " AND DATE(r.data_rota) <= :date_to";
-                $count_sql .= " AND DATE(r.data_rota) <= :date_to";
-                $params[':date_to'] = $_GET['date_to'];
-            }
-            
-            // Get total count
-            $stmt_count = $conn->prepare($count_sql);
-            foreach ($params as $key => &$val) {
-                $stmt_count->bindValue($key, $val);
-            }
-            $stmt_count->execute();
-            $total = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
-            
-            $sortKey = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'data_rota';
-            $allowedSort = [
-                'data_rota' => 'r.data_rota',
-                'motorista_nome' => 'm.nome',
-                'veiculo_placa' => 'v.placa',
-                'rota' => 'CONCAT(COALESCE(co.nome, ""), " ", COALESCE(cd.nome, ""))',
-                'distancia_km' => 'r.distancia_km',
-                'frete' => 'r.frete',
-                'id' => 'r.id',
-                'data_saida' => 'r.data_saida',
-                'data_chegada' => 'r.data_chegada',
-                'km_saida' => 'r.km_saida',
-                'km_chegada' => 'r.km_chegada',
-                'km_vazio' => 'r.km_vazio',
-                'total_km' => 'r.total_km',
-                'comissao' => 'r.comissao',
-                'eficiencia_viagem' => 'r.eficiencia_viagem',
-                'percentual_vazio' => 'r.percentual_vazio',
-                'peso_carga' => 'r.peso_carga',
-                'descricao_carga' => 'r.descricao_carga',
-                'no_prazo' => 'r.no_prazo',
-            ];
-            $orderCol = $allowedSort[$sortKey] ?? 'r.data_rota';
-            $dir = (isset($_GET['dir']) && strtoupper(trim((string) $_GET['dir'])) === 'ASC') ? 'ASC' : 'DESC';
-
-            $sql .= ' ORDER BY ' . $orderCol . ' ' . $dir . ', r.id DESC LIMIT :limit OFFSET :offset';
-            
-            $stmt = $conn->prepare($sql);
-            foreach ($params as $key => &$val) {
-                $stmt->bindValue($key, $val);
-            }
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-            $stmt->execute();
-            
-            echo json_encode([
-                'success' => true,
-                'data' => $stmt->fetchAll(PDO::FETCH_ASSOC),
-                'pagination' => [
-                    'page' => $page,
-                    'limit' => $limit,
-                    'total' => $total,
-                    'total_pages' => ceil($total / $limit)
-                ]
+            $result = routes_fetch_list($conn, (int) $empresa_id, [
+                'page' => isset($_GET['page']) ? (int) $_GET['page'] : 1,
+                'limit' => isset($_GET['limit']) ? (int) $_GET['limit'] : 10,
+                'search' => $_GET['search'] ?? '',
+                'delivery' => $delivery,
+                'driver' => $_GET['driver'] ?? '',
+                'date' => $_GET['date'] ?? '',
+                'date_from' => $_GET['date_from'] ?? '',
+                'date_to' => $_GET['date_to'] ?? '',
+                'sort' => $_GET['sort'] ?? 'data_rota',
+                'dir' => $_GET['dir'] ?? 'DESC',
             ]);
+            echo json_encode($result);
             break;
             
         case 'view':
@@ -365,7 +197,7 @@ try {
             } catch (Exception $e) {
                 echo json_encode([
                     'success' => false, 
-                    'error' => 'Erro ao buscar despesas: ' . $e->getMessage()
+                    'error' => 'Erro ao buscar despesas: '
                 ]);
             }
             break;

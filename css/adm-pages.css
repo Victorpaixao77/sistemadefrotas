@@ -1,0 +1,1408 @@
+/**
+ * Painel administrativo (pages_adm) — alinhado ao layout do sistema principal.
+ */
+
+body.adm-app {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+body.adm-app .adm-page-content {
+    padding-bottom: 1.5rem;
+}
+
+/* KPIs do dashboard ADM */
+.adm-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 1.25rem;
+}
+
+.adm-kpi {
+    display: block;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.adm-kpi:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--accent-primary, #3b82f6) 45%, var(--border-color));
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.adm-kpi__head {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 0.45rem;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.adm-kpi__head i {
+    color: var(--accent-primary, #3b82f6);
+}
+
+.adm-kpi__value {
+    font-size: 1.85rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--text-primary);
+}
+
+/* Painéis e tabelas */
+.adm-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 0;
+}
+
+.adm-page-content > .adm-panel:not(.adm-cc-page-stack .adm-panel) {
+    margin-bottom: 1.25rem;
+}
+
+.adm-panel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.9rem 1.1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.adm-panel__head h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.adm-panel__body {
+    padding: 0.75rem 1rem 1rem;
+}
+
+.adm-table-wrap {
+    overflow-x: auto;
+}
+
+.adm-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+}
+
+.adm-table th,
+.adm-table td {
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.adm-table th {
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary);
+    white-space: nowrap;
+}
+
+.adm-table tbody tr:hover {
+    background: color-mix(in srgb, var(--accent-primary, #3b82f6) 6%, transparent);
+}
+
+/* Alertas e formulários */
+.adm-alert {
+    padding: 0.75rem 0.9rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    border: 1px solid transparent;
+}
+
+.adm-alert.success {
+    background: color-mix(in srgb, #22c55e 14%, var(--bg-secondary));
+    border-color: color-mix(in srgb, #22c55e 35%, transparent);
+    color: var(--text-primary);
+}
+
+.adm-alert.error {
+    background: color-mix(in srgb, #ef4444 14%, var(--bg-secondary));
+    border-color: color-mix(in srgb, #ef4444 35%, transparent);
+    color: var(--text-primary);
+}
+
+.adm-form-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem 1.35rem;
+    max-width: 760px;
+}
+
+.adm-form-card h2 {
+    margin: 0 0 0.35rem;
+    font-size: 1.15rem;
+}
+
+.adm-form-card .lead {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin: 0 0 1rem;
+    line-height: 1.5;
+}
+
+.adm-form-card .form-group {
+    margin-bottom: 1rem;
+}
+
+.adm-form-card label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+    font-size: 0.88rem;
+}
+
+.adm-form-card input[type="text"],
+.adm-form-card input[type="email"],
+.adm-form-card input[type="password"],
+.adm-form-card input[type="number"],
+.adm-form-card select,
+.adm-form-card textarea {
+    width: 100%;
+    max-width: 100%;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 0.92rem;
+}
+
+.adm-form-card .form-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.adm-form-card .form-hint {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-top: 0.35rem;
+    line-height: 1.45;
+}
+
+.adm-form-card .form-hint.warn {
+    background: color-mix(in srgb, #f59e0b 12%, var(--bg-secondary));
+    border: 1px solid color-mix(in srgb, #f59e0b 35%, transparent);
+    padding: 0.65rem 0.75rem;
+    border-radius: 8px;
+}
+
+.adm-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+/* Modo iframe (modais embutidos) */
+body.adm-iframe-mode {
+    background: var(--bg-primary);
+    margin: 0;
+    padding: 0;
+}
+
+body.adm-iframe-mode .adm-iframe-content {
+    padding: 0.75rem;
+}
+
+body.adm-iframe-mode .adm-panel,
+body.adm-iframe-mode .adm-kpi-grid {
+    margin-bottom: 0.75rem;
+}
+
+/* Compatibilidade com páginas legadas que ainda usam bootstrap dentro do ADM */
+body.adm-app .main-content .card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+body.adm-app .main-content .text-muted {
+    color: var(--text-secondary) !important;
+}
+
+/* Páginas ADM com Bootstrap (empresas, planos, etc.) */
+body.adm-app .adm-page-content .table-container {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    overflow-x: auto;
+}
+
+body.adm-app .adm-page-content .table {
+    --bs-table-color: var(--text-primary);
+    --bs-table-bg: transparent;
+    --bs-table-striped-color: var(--text-primary);
+    --bs-table-striped-bg: color-mix(in srgb, var(--text-primary) 4%, transparent);
+    --bs-table-hover-color: var(--text-primary);
+    --bs-table-hover-bg: color-mix(in srgb, var(--accent-primary, #3b82f6) 10%, transparent);
+    --bs-table-border-color: var(--border-color);
+    color: var(--text-primary);
+    margin-bottom: 0;
+}
+
+body.adm-app .adm-page-content .table thead.table-light,
+body.adm-app .adm-page-content .table thead {
+    --bs-table-bg: var(--bg-tertiary);
+    --bs-table-color: var(--text-secondary);
+}
+
+body.adm-app .adm-page-content .table td,
+body.adm-app .adm-page-content .table th {
+    border-color: var(--border-color);
+}
+
+body.adm-app .adm-page-content .table strong {
+    color: var(--text-primary);
+}
+
+/* ── Shim Bootstrap (empresas/planos — sem CDN global) ── */
+body.adm-app .adm-page-content .table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+body.adm-app .adm-page-content .table th,
+body.adm-app .adm-page-content .table td {
+    padding: 0.65rem 0.75rem;
+    vertical-align: middle;
+}
+
+body.adm-app .adm-page-content .table thead.table-light th,
+body.adm-app .adm-page-content .table thead th {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    border-bottom: 1px solid var(--border-color);
+}
+
+body.adm-app .adm-page-content .table tbody tr {
+    border-bottom: 1px solid var(--border-color);
+}
+
+body.adm-app .adm-page-content .text-muted {
+    color: var(--text-secondary) !important;
+}
+
+body.adm-app .adm-page-content .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+body.adm-app .adm-page-content .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    vertical-align: middle;
+    color: #fff;
+    transition: filter 0.15s ease, background 0.15s ease;
+}
+
+body.adm-app .adm-page-content .btn:hover {
+    filter: brightness(1.06);
+}
+
+body.adm-app .adm-page-content .btn-sm {
+    padding: 0.38rem 0.55rem;
+    font-size: 0.8rem;
+    min-width: 2rem;
+    min-height: 2rem;
+}
+
+body.adm-app .adm-page-content .btn-primary {
+    background: var(--accent-primary, #3b82f6);
+    border-color: var(--accent-primary, #3b82f6);
+}
+
+body.adm-app .adm-page-content .btn-secondary {
+    background: #64748b;
+    border-color: #64748b;
+    color: #fff;
+}
+
+body.adm-app .adm-page-content .btn-warning {
+    background: #f59e0b;
+    border-color: #f59e0b;
+    color: #1e293b;
+}
+
+body.adm-app .adm-page-content .btn-danger {
+    background: #ef4444;
+    border-color: #ef4444;
+}
+
+body.adm-app .adm-page-content .btn-success {
+    background: #22c55e;
+    border-color: #22c55e;
+}
+
+body.adm-app .adm-page-content .badge {
+    display: inline-block;
+    padding: 0.28rem 0.55rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.2;
+    border-radius: 999px;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+body.adm-app .adm-page-content .badge.bg-success,
+body.adm-app .adm-page-content .badge.badge-ativo { background: #22c55e; color: #fff; }
+body.adm-app .adm-page-content .badge.bg-info,
+body.adm-app .adm-page-content .badge.badge-pacote { background: #0ea5e9; color: #fff; }
+body.adm-app .adm-page-content .badge.bg-secondary,
+body.adm-app .adm-page-content .badge.badge-inativo { background: #64748b; color: #fff; }
+body.adm-app .adm-page-content .badge.bg-warning,
+body.adm-app .adm-page-content .badge.badge-avulso { background: #f59e0b; color: #1e293b; }
+body.adm-app .adm-page-content .badge.bg-danger { background: #ef4444; color: #fff; }
+
+body.adm-app .adm-page-content .alert {
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+body.adm-app .adm-page-content .alert-success {
+    background: color-mix(in srgb, #22c55e 14%, var(--bg-secondary));
+    border-color: color-mix(in srgb, #22c55e 35%, transparent);
+    color: var(--text-primary);
+}
+
+body.adm-app .adm-page-content .alert-danger {
+    background: color-mix(in srgb, #ef4444 14%, var(--bg-secondary));
+    border-color: color-mix(in srgb, #ef4444 35%, transparent);
+    color: var(--text-primary);
+}
+
+body.adm-app .adm-page-content .btn-close {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    opacity: 0.65;
+    cursor: pointer;
+    position: relative;
+}
+
+body.adm-app .adm-page-content .btn-close::before,
+body.adm-app .adm-page-content .btn-close::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 2px;
+    background: currentColor;
+    transform: translate(-50%, -50%) rotate(45deg);
+}
+
+body.adm-app .adm-page-content .btn-close::after {
+    transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+body.adm-app .adm-page-content .mb-0 { margin-bottom: 0 !important; }
+body.adm-app .adm-page-content .mb-3 { margin-bottom: 1rem; }
+body.adm-app .adm-page-content .me-1 { margin-right: 0.25rem; }
+body.adm-app .adm-page-content .me-2 { margin-right: 0.5rem; }
+body.adm-app .adm-page-content .d-block { display: block; }
+body.adm-app .adm-page-content .text-center { text-align: center; }
+body.adm-app .adm-page-content .py-5 { padding-top: 2rem; padding-bottom: 2rem; }
+
+body.adm-app .adm-page-content .form-label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+body.adm-app .adm-page-content .form-control,
+body.adm-app .adm-page-content .form-select {
+    display: block;
+    width: 100%;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+body.adm-app .adm-page-content .form-control:focus,
+body.adm-app .adm-page-content .form-select:focus {
+    outline: none;
+    border-color: var(--accent-primary, #3b82f6);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary, #3b82f6) 18%, transparent);
+}
+
+/* ── Modais ADM (Bootstrap + legado) — maiores e minimalistas ── */
+body.adm-app .modal-backdrop.show {
+    --bs-backdrop-opacity: 0.42;
+}
+
+body.adm-app .modal.fade .modal-dialog {
+    margin: 1.25rem auto;
+}
+
+/* Posição Financeira — modal landscape grande (não fullscreen).
+   Usa o ID para vencer a regra base .adm-modal-dialog (max-width 720px). */
+body.adm-app #modalPosicaoFinanceira .adm-modal-dialog--finance {
+    max-width: min(1400px, 96vw);
+    width: 100%;
+    height: 90vh;
+    margin: 2.5vh auto;
+}
+
+body.adm-app .adm-modal-dialog {
+    max-width: min(720px, 94vw);
+}
+
+body.adm-app .adm-modal-dialog--form {
+    max-width: min(1080px, 98vw);
+}
+
+body.adm-app .adm-modal-dialog--lg,
+body.adm-app .adm-modal-dialog.modal-lg {
+    max-width: min(1000px, 97vw);
+}
+
+body.adm-app .adm-modal-dialog--xl,
+body.adm-app .adm-modal-dialog.modal-xl {
+    max-width: min(1440px, 99vw);
+}
+
+body.adm-app #modalPosicaoFinanceira.modal {
+    z-index: 1065;
+}
+
+body.adm-app #modalPosicaoFinanceira .adm-modal-finance {
+    height: 90vh;
+    max-height: 90vh;
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+body.adm-app #modalPosicaoFinanceira .modal-header {
+    flex-shrink: 0;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+body.adm-app #modalPosicaoFinanceira .modal-body--flush {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+body.adm-app #modalPosicaoFinanceira .modal-body--flush iframe {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border: 0;
+    display: block;
+}
+
+/* Formulários em 2 colunas — menos rolagem horizontal */
+body.adm-app .adm-modal-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1.25rem;
+    row-gap: 0;
+    align-items: start;
+}
+
+@media (max-width: 768px) {
+    body.adm-app .adm-modal-form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+body.adm-app .adm-modal-form-grid > input[type="hidden"] {
+    display: none;
+}
+
+body.adm-app .adm-modal-field--full {
+    grid-column: 1 / -1;
+}
+
+body.adm-app .adm-modal-form-grid > .adm-modal-actions {
+    grid-column: 1 / -1;
+}
+
+body.adm-app .adm-modal-form-grid > .form-group {
+    margin-bottom: 1rem;
+}
+
+/* Tabelas dentro de modais */
+body.adm-app .adm-modal-table {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+body.adm-app .adm-modal-table .table {
+    font-size: 0.8125rem;
+    margin-bottom: 0;
+    width: 100%;
+    table-layout: auto;
+}
+
+body.adm-app .adm-modal-table .table th,
+body.adm-app .adm-modal-table .table td {
+    padding: 0.55rem 0.65rem;
+    vertical-align: middle;
+    white-space: normal;
+    word-break: break-word;
+}
+
+body.adm-app .adm-modal-table .table th:last-child,
+body.adm-app .adm-modal-table .table td:last-child {
+    white-space: nowrap;
+    width: 1%;
+}
+
+body.adm-app .adm-modal-dialog--xl .modal-body {
+    padding: 1.1rem 1.35rem 1.25rem;
+}
+
+body.adm-app .modal-content {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+}
+
+body.adm-app .modal-header {
+    background: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border-color);
+    padding: 1.2rem 1.5rem 1rem;
+    align-items: center;
+}
+
+body.adm-app .modal-header .btn-close {
+    filter: none;
+    opacity: 0.55;
+    margin: 0;
+    padding: 0.65rem;
+}
+
+body.adm-app .modal-header .btn-close:hover {
+    opacity: 1;
+}
+
+.light-theme body.adm-app .modal-header .btn-close {
+    filter: invert(0.35);
+}
+
+body.adm-app .modal-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.35;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0;
+}
+
+body.adm-app .modal-title i {
+    color: var(--accent-primary, #3b82f6);
+    font-size: 0.95rem;
+}
+
+body.adm-app .modal-body {
+    padding: 1.25rem 1.5rem 1.35rem;
+}
+
+body.adm-app .modal-body--flush {
+    padding: 0;
+    overflow: hidden;
+}
+
+body.adm-app .modal-body--flush iframe {
+    display: block;
+    width: 100%;
+    min-height: 72vh;
+    height: 72vh;
+    border: 0;
+}
+
+body.adm-app .adm-modal-iframe-bar {
+    padding: 0.65rem 1.25rem;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--bg-tertiary) 40%, var(--bg-secondary));
+}
+
+body.adm-app .modal-footer {
+    border-top: 1px solid var(--border-color);
+    padding: 0.9rem 1.5rem 1.2rem;
+    gap: 0.55rem;
+    background: color-mix(in srgb, var(--bg-tertiary) 35%, var(--bg-secondary));
+}
+
+body.adm-app .modal-body .form-label,
+body.adm-app .modal-body label:not(.form-check-label) {
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+}
+
+body.adm-app .modal-body .form-control,
+body.adm-app .modal-body .form-select,
+body.adm-app .modal-body textarea {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 10px;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9375rem;
+}
+
+body.adm-app .modal-body .form-control:focus,
+body.adm-app .modal-body .form-select:focus,
+body.adm-app .modal-body textarea:focus {
+    background: var(--bg-tertiary);
+    border-color: var(--accent-primary, #3b82f6);
+    color: var(--text-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary, #3b82f6) 18%, transparent);
+}
+
+body.adm-app .modal-body .mb-3 {
+    margin-bottom: 1rem !important;
+}
+
+body.adm-app .modal-body .text-muted,
+body.adm-app .modal-body small.text-muted {
+    font-size: 0.8rem;
+}
+
+body.adm-app .modal-footer .btn {
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 0.5rem 1.15rem;
+}
+
+body.adm-app .modal-footer .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+body.adm-app .modal-footer .btn-secondary:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    color: var(--text-primary);
+}
+
+body.adm-app .modal-footer .btn-primary {
+    background: var(--accent-primary, #3b82f6);
+    border: none;
+}
+
+body.adm-app .modal-footer .btn-warning {
+    background: #f59e0b;
+    border: none;
+    color: #1e293b;
+}
+
+body.adm-app .modal-footer .btn-success {
+    background: #22c55e;
+    border: none;
+}
+
+/* Modais legados (usuários, financeiro) */
+body.adm-app .adm-modal-legacy {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 2055;
+    padding: 1.25rem;
+    overflow-y: auto;
+    background: rgba(15, 23, 42, 0.42);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+body.adm-app .adm-modal-legacy .modal-content {
+    width: 100%;
+    max-width: min(920px, 100%);
+    margin: 2.5vh auto 1.5rem;
+    padding: 0;
+    position: relative;
+}
+
+body.adm-app .adm-modal-legacy--wide .modal-content {
+    max-width: min(1080px, 100%);
+}
+
+body.adm-app .adm-modal-legacy .modal-content > h2 {
+    margin: 0;
+    padding: 1.2rem 3.25rem 1rem 1.5rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.35;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+body.adm-app .adm-modal-legacy .modal-content > h2 i {
+    color: var(--accent-primary, #3b82f6);
+    font-size: 0.95rem;
+}
+
+body.adm-app .adm-modal-legacy .close {
+    position: absolute;
+    top: 0.85rem;
+    right: 0.85rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+body.adm-app .adm-modal-legacy .close:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+body.adm-app .adm-modal-iframe-bar .alert {
+    margin: 0;
+    padding: 0.5rem 0.85rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+}
+
+body.adm-app #campo_valor_individual,
+body.adm-app #campos_lote {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1.25rem;
+    align-items: start;
+}
+
+@media (max-width: 768px) {
+    body.adm-app #campo_valor_individual,
+    body.adm-app #campos_lote {
+        grid-template-columns: 1fr;
+    }
+}
+
+body.adm-app .adm-modal-legacy .adm-modal-form-grid {
+    padding: 1.25rem 1.5rem 1.5rem;
+}
+
+body.adm-app .adm-modal-legacy .modal-content > form.adm-modal-form-grid {
+    padding: 1.25rem 1.5rem 1.5rem;
+}
+
+body.adm-app .adm-modal-legacy .modal-content > form:not(.adm-modal-form-grid),
+body.adm-app .adm-modal-legacy .modal-content > #detalhesContent {
+    padding: 1.25rem 1.5rem 1.5rem;
+}
+
+body.adm-app .adm-modal-legacy .form-group {
+    margin-bottom: 1rem;
+}
+
+body.adm-app .adm-modal-legacy .form-group label {
+    display: block;
+    margin-bottom: 0.35rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+body.adm-app .adm-modal-legacy .form-group input,
+body.adm-app .adm-modal-legacy .form-group select,
+body.adm-app .adm-modal-legacy .form-group textarea {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 0.9375rem;
+}
+
+body.adm-app .adm-modal-legacy .form-group input:focus,
+body.adm-app .adm-modal-legacy .form-group select:focus,
+body.adm-app .adm-modal-legacy .form-group textarea:focus {
+    outline: none;
+    border-color: var(--accent-primary, #3b82f6);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary, #3b82f6) 18%, transparent);
+}
+
+body.adm-app .adm-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 0.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+body.adm-app .adm-modal-actions .btn {
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 0.5rem 1.15rem;
+}
+
+body.adm-app .adm-modal-actions .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+body.adm-app .adm-modal-actions .btn-success {
+    background: #22c55e;
+    border: none;
+    color: #fff;
+}
+
+body.adm-app .adm-modal-legacy .modal-content > form > .btn:not(.btn-secondary):not(.btn-danger):not(.btn-success) {
+    background: var(--accent-primary, #3b82f6);
+    border: none;
+    color: #fff;
+}
+
+body.adm-app .adm-modal-legacy .form-group input[readonly] {
+    opacity: 0.9;
+    cursor: default;
+}
+
+body.adm-app .adm-page-content .alert {
+    border-radius: 8px;
+}
+
+/* ── Menu lateral ADM (reforço vs Bootstrap e páginas legadas) ── */
+body.adm-app .app-container > .sidebar {
+    display: flex;
+    flex-direction: column;
+}
+
+body.adm-app .sidebar .sidebar-header {
+    flex-shrink: 0;
+}
+
+body.adm-app .sidebar .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    overflow: hidden;
+}
+
+body.adm-app .sidebar .logo-image {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+body.adm-app .sidebar .logo-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+body.adm-app .sidebar .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: 8px 0 4px;
+}
+
+body.adm-app .sidebar .sidebar-nav {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+body.adm-app .sidebar .sidebar-nav-list {
+    list-style: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+}
+
+body.adm-app .sidebar .sidebar-nav-item {
+    margin: 0 !important;
+    padding: 0 !important;
+    display: block;
+}
+
+body.adm-app .sidebar .sidebar-link {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    padding: 9px 12px !important;
+    margin: 0 8px !important;
+    text-decoration: none !important;
+    color: var(--text-secondary) !important;
+    border-radius: 10px;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+body.adm-app .sidebar .sidebar-link:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary) !important;
+}
+
+body.adm-app:not(.light-theme) .sidebar .sidebar-link.active {
+    background: var(--sidebar-active-bg) !important;
+    color: #e8f0fe !important;
+    box-shadow: inset 3px 0 0 var(--accent-primary), 0 0 0 1px rgba(59, 130, 246, 0.12);
+}
+
+body.adm-app:not(.light-theme) .sidebar .sidebar-link.active .sidebar-link-icon {
+    color: var(--accent-primary) !important;
+}
+
+/* Tema claro — respeitar paleta do theme.css (evitar texto claro no fundo branco) */
+.light-theme body.adm-app .sidebar {
+    background-color: var(--bg-sidebar) !important;
+    color: var(--text-primary) !important;
+    border-right-color: var(--border-color) !important;
+}
+
+.light-theme body.adm-app .sidebar .app-name {
+    color: var(--text-primary) !important;
+}
+
+.light-theme body.adm-app .sidebar .sidebar-toggle {
+    color: var(--text-secondary) !important;
+}
+
+.light-theme body.adm-app .sidebar .sidebar-link {
+    color: var(--text-secondary) !important;
+}
+
+.light-theme body.adm-app .sidebar .sidebar-link:hover {
+    color: var(--text-primary) !important;
+    background-color: var(--bg-tertiary) !important;
+}
+
+.light-theme body.adm-app .sidebar .sidebar-link.active {
+    color: var(--accent-primary) !important;
+    background: rgba(59, 130, 246, 0.12) !important;
+    box-shadow: inset 3px 0 0 var(--accent-primary) !important;
+}
+
+.light-theme body.adm-app .sidebar .sidebar-link.active .sidebar-link-icon,
+.light-theme body.adm-app .sidebar .sidebar-link-icon {
+    color: var(--accent-primary) !important;
+}
+
+.light-theme body.adm-app .sidebar .sidebar-link:not(.active) .sidebar-link-icon {
+    color: var(--text-secondary) !important;
+}
+
+.light-theme body.adm-app .sidebar .sidebar-header {
+    border-bottom-color: var(--border-color) !important;
+}
+
+.light-theme body.adm-app .sidebar .sidebar-support__card {
+    background: var(--bg-secondary) !important;
+    border-color: var(--border-color) !important;
+}
+
+.light-theme body.adm-app .sidebar .sidebar-support__title,
+.light-theme body.adm-app .sidebar .sidebar-support__text {
+    color: var(--text-secondary) !important;
+}
+
+body.adm-app .sidebar .sidebar-link-icon {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    width: 20px;
+    margin-right: 10px;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+body.adm-app .sidebar .sidebar-link-text {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+body.adm-app .sidebar .sidebar-support {
+    flex-shrink: 0;
+    margin-top: auto;
+    /* Folga da borda inferior — no notebook o card encostava/cortava embaixo. */
+    padding: 8px 10px 16px;
+}
+
+body.adm-app .sidebar .sidebar-support__card {
+    padding: 10px 12px;
+    border-radius: 12px;
+}
+
+/* Título mais compacto e botão com identidade de suporte (verde WhatsApp). */
+body.adm-app .sidebar .sidebar-support__title {
+    font-size: 0.78rem;
+    margin-bottom: 2px;
+}
+
+body.adm-app .sidebar .sidebar-support__text {
+    margin-bottom: 8px;
+}
+
+body.adm-app .sidebar .sidebar-support__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border-color: rgba(37, 211, 102, 0.55);
+    color: #25d366;
+}
+
+body.adm-app .sidebar .sidebar-support__btn::before {
+    font-family: "Font Awesome 6 Brands";
+    content: "\f232"; /* whatsapp */
+    font-weight: 400;
+}
+
+body.adm-app .sidebar .sidebar-support__btn:hover {
+    background: rgba(37, 211, 102, 0.14);
+    color: #25d366;
+}
+
+body.sidebar-collapsed.adm-app .sidebar .sidebar-support {
+    padding-bottom: 12px;
+}
+
+/* Bootstrap (empresas/planos) não deve sublinhar links do menu lateral */
+body.adm-app .sidebar a,
+body.adm-app .sidebar .sidebar-link,
+body.adm-app .sidebar .sidebar-dropdown-link,
+body.adm-app .sidebar .sidebar-dropdown-toggle {
+    text-decoration: none !important;
+    border-bottom: none !important;
+}
+
+body.adm-app .sidebar .sidebar-nav-list,
+body.adm-app .sidebar .sidebar-dropdown {
+    list-style: none !important;
+    margin-bottom: 0;
+}
+
+/* Esconde apenas modais Bootstrap fechados. Os modais legados (.adm-modal-legacy)
+   e o modal de ajuda (#helpModal, classe .active) são controlados pelo JS próprio. */
+body.adm-app .modal:not(.show):not(.adm-modal-legacy):not(#helpModal) {
+    display: none !important;
+    pointer-events: none !important;
+}
+
+body.adm-app .modal#helpModal {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 20px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+body.adm-app .modal#helpModal.active,
+body.adm-app .modal.sf-help-modal-adm.active {
+    display: flex !important;
+    pointer-events: auto !important;
+}
+
+body.adm-app.sf-help-modal-adm-open,
+body.adm-app.adm-help-open {
+    overflow: hidden;
+}
+
+body.adm-app .adm-page-content {
+    position: relative;
+    z-index: 1;
+}
+
+.adm-action-icons,
+.action-icons {
+    display: flex;
+    gap: 4px;
+    flex-wrap: nowrap;
+    justify-content: center;
+}
+
+.adm-action-icons .action-icon,
+.action-icons .action-icon {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    cursor: pointer;
+    border: none;
+    font-size: 0.85rem;
+    color: #fff;
+}
+
+.adm-action-icons .icon-view,
+.action-icons .icon-view { background: #17a2b8; }
+.adm-action-icons .icon-edit,
+.action-icons .icon-edit { background: #f59e0b; color: #1e293b; }
+.adm-action-icons .icon-money,
+.action-icons .icon-money { background: #22c55e; }
+.adm-action-icons .icon-log,
+.action-icons .icon-log { background: #64748b; }
+.adm-action-icons .icon-user,
+.action-icons .icon-user { background: #3b82f6; }
+.adm-action-icons .icon-delete,
+.action-icons .icon-delete { background: #ef4444; }
+
+/* =========================================================================
+   Modais Bootstrap do ADM no MESMO estilo do "Adicionar Abastecimento"
+   (design system fornc-modal). Escopado a .modal.fade para não afetar os
+   modais legados (.adm-modal-legacy). O modal financeiro (iframe) é protegido
+   pelas exceções abaixo (mantém tamanho landscape e corpo sem padding).
+   ========================================================================= */
+
+/* Tamanho — igual ao modal-lg do fornc (Adicionar Abastecimento = ~920px). */
+body.adm-app .modal.fade .adm-modal-dialog--form,
+body.adm-app .modal.fade .adm-modal-dialog--lg {
+    max-width: min(920px, 96vw);
+}
+
+/* Cartão, cabeçalho e rodapé no padrão fornc.
+   width/max-width:100% neutralizam o cap de 500px do styles.css — a largura
+   real passa a ser controlada pelo .modal-dialog (920px nos forms). */
+body.adm-app .modal.fade .modal-content {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+body.adm-app .modal.fade .modal-header {
+    padding: 12px 16px !important;
+    background: var(--bg-tertiary) !important;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 12px 12px 0 0;
+    gap: 12px;
+}
+
+body.adm-app .modal.fade .modal-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+body.adm-app .modal.fade .modal-title i {
+    font-size: 0.9rem;
+}
+
+/* Corpo com o mesmo respiro do fornc — exceto os modais com iframe (flush). */
+body.adm-app .modal.fade .modal-body:not(.modal-body--flush) {
+    padding: 14px 16px 16px;
+}
+
+body.adm-app .modal.fade .modal-footer {
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border-top: 1px solid var(--border-color);
+    border-radius: 0 0 12px 12px;
+    gap: 10px;
+}
+
+/* Grid de formulário — mesmas colunas/gaps do fornc. */
+body.adm-app .modal.fade .adm-modal-form-grid {
+    column-gap: 14px;
+    row-gap: 2px;
+}
+
+/* Cada campo empilha rótulo em cima do input (flex column), como no fornc. */
+body.adm-app .modal.fade .modal-body .mb-3,
+body.adm-app .modal.fade .modal-body .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 0.75rem !important;
+}
+
+/* Rótulos em maiúsculas suaves + inputs compactos e 100% de largura. */
+body.adm-app .modal.fade .form-label {
+    display: block;
+    width: 100%;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0;
+}
+
+body.adm-app .modal.fade .form-control,
+body.adm-app .modal.fade .form-select {
+    width: 100%;
+    padding: 7px 10px;
+    font-size: 0.8125rem;
+    border-radius: 5px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+body.adm-app .modal.fade .form-control:focus,
+body.adm-app .modal.fade .form-select:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+body.adm-app .modal.fade .form-text,
+body.adm-app .modal.fade .modal-body small.text-muted {
+    font-size: 0.72rem;
+}
+
+/* Botões compactos do rodapé, como no fornc. */
+body.adm-app .modal.fade .modal-footer .btn {
+    min-height: 32px;
+    padding: 6px 12px;
+    font-size: 0.78rem;
+    border-radius: 6px;
+}
+
+/* Checkbox alinhado (sem Bootstrap CSS o input renderiza cru). */
+body.adm-app .modal.fade .form-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+}
+
+body.adm-app .modal.fade .form-check-input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: var(--accent-primary, #3b82f6);
+}
+
+body.adm-app .modal.fade .form-check-label {
+    margin: 0;
+    font-size: 0.85rem;
+}
+
+/* Botão Ajuda no header ADM */
+body.adm-app .adm-header-help-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-right: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+body.adm-app .adm-header-help-btn:hover,
+body.adm-app .adm-header-help-btn:focus-visible {
+    color: var(--accent-primary, #3b82f6);
+    border-color: var(--accent-primary, #3b82f6);
+    background: var(--bg-tertiary, var(--bg-secondary));
+    outline: none;
+}
+
+body.adm-app .adm-header-help-btn i {
+    font-size: 1.1rem;
+}

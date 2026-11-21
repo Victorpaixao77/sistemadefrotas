@@ -1,22 +1,18 @@
 <?php
 // Save dashboard layout API
 
-// Initialize session and include necessary files
-session_start();
-require_once '../includes/config.php';
-require_once '../includes/functions.php';
-require_once '../includes/csrf.php';
-require_once '../includes/api_json.php';
+require_once __DIR__ . '/../includes/config.php';
+require_once __DIR__ . '/../includes/functions.php';
+require_once __DIR__ . '/../includes/csrf.php';
+require_once __DIR__ . '/../includes/api_json.php';
 
-// Set content type to JSON
-header('Content-Type: application/json');
+configure_session();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Check if user is authenticated (commented out for development)
-// if (!isLoggedIn()) {
-//     http_response_code(401);
-//     echo json_encode(['error' => 'Unauthorized access']);
-//     exit;
-// }
+header('Content-Type: application/json; charset=utf-8');
+require_authentication();
 
 // Check if it's a POST request
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

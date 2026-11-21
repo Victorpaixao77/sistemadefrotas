@@ -40,5 +40,5 @@ try {
     bi_cache_invalidate_empresa($conn, (int) $empresa_id);
     echo json_encode(['success' => true]);
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Erro interno.']);
 } 

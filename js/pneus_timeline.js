@@ -154,6 +154,10 @@
     }
 
     function wireMercadoActions(pneuId, opts) {
+        opts = opts || {};
+        var refresh = typeof opts.onRefresh === 'function'
+            ? opts.onRefresh
+            : function () { openFichaModal(pneuId, opts); };
         const uploadBtn = document.getElementById('btnUploadFoto');
         const fotoInput = document.getElementById('pneuFotoInput');
         const fotoTipo = document.getElementById('pneuFotoTipo');
@@ -172,7 +176,7 @@
                 fetch('../api/pneus_mercado.php?action=upload_foto', {
                     method: 'POST', credentials: 'same-origin', headers: h, body: fd
                 }).then(function (r) { return r.json(); }).then(function (j) {
-                    if (j.success) openFichaModal(pneuId, opts);
+                    if (j.success) refresh();
                     else alert(j.error || 'Erro no upload');
                 });
             };
@@ -190,7 +194,7 @@
                     method: 'POST', credentials: 'same-origin', headers: csrfHeaders(),
                     body: JSON.stringify(payload)
                 }).then(function (r) { return r.json(); }).then(function (j) {
-                    if (j.success) openFichaModal(pneuId, opts);
+                    if (j.success) refresh();
                     else alert(j.error || 'Erro');
                 });
             };
@@ -212,7 +216,7 @@
                 }).then(function (r) { return r.json(); }).then(function (j) {
                     if (j.success) {
                         alert('Sucata registrada.');
-                        openFichaModal(pneuId, opts);
+                        refresh();
                     } else alert(j.error || 'Erro');
                 });
             };
@@ -226,7 +230,7 @@
                     method: 'POST', credentials: 'same-origin', headers: csrfHeaders(),
                     body: JSON.stringify({ pneu_id: pneuId, filial_id: parseInt(fid, 10) })
                 }).then(function (r) { return r.json(); }).then(function (j) {
-                    if (j.success) openFichaModal(pneuId, opts);
+                    if (j.success) refresh();
                     else alert(j.error || 'Erro');
                 });
             };
@@ -423,6 +427,11 @@
     global.PneuTimeline = {
         render: renderTimeline,
         renderSulcoChart: renderSulcoChart,
+        renderAnexosGrid: renderAnexosGrid,
+        renderGarantiasList: renderGarantiasList,
+        buildMercadoHtml: buildMercadoHtml,
+        loadMercadoCatalogos: loadMercadoCatalogos,
+        wireMercadoActions: wireMercadoActions,
         openFichaModal: openFichaModal,
         TIPO_LABELS: TIPO_LABELS
     };

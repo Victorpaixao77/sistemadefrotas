@@ -11,6 +11,7 @@ session_start();
 
 // Require authentication
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Create database connection
 $conn = getConnection();
@@ -18,14 +19,12 @@ $conn = getConnection();
 // Set content type to JSON
 header('Content-Type: application/json');
 
-// Enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('log_errors', 1);
-ini_set('error_log', __DIR__ . '/../logs/php_error.log');
-
-// Debug session state
-error_log("Session state in vehicles.php: " . print_r($_SESSION, true));
+if (defined('DEBUG_MODE') && DEBUG_MODE) {
+    error_reporting(E_ALL);
+    ini_set('display_errors', '1');
+    ini_set('log_errors', '1');
+    ini_set('error_log', __DIR__ . '/../logs/php_error.log');
+}
 
 // Get the action from the request
 $action = isset($_GET['action']) ? $_GET['action'] : '';
@@ -44,15 +43,11 @@ try {
                    WHERE v.empresa_id = :empresa_id 
                    ORDER BY v.placa";
             
-            error_log("SQL Query: " . $sql);
-            error_log("empresa_id: " . $_SESSION['empresa_id']);
-            
             $stmt = $conn->prepare($sql);
             $stmt->bindValue(':empresa_id', $_SESSION['empresa_id']);
             $stmt->execute();
             
             $vehicles = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            error_log("Found vehicles: " . print_r($vehicles, true));
             
             if (empty($vehicles)) {
                 echo json_encode([]);
@@ -67,5 +62,5 @@ try {
 } catch (Exception $e) {
     error_log('Error in vehicles.php: ' . $e->getMessage());
     http_response_code(400);
-    echo json_encode(['error' => $e->getMessage()]);
-} 
+    echo json_encode(['error' => 'Não foi possível processar a requisição.']);
+}

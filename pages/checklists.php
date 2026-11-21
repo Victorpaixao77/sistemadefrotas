@@ -1,3 +1,4 @@
+
 <?php
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
@@ -101,7 +102,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         setFlashMessage('success', $message);
     } catch (Exception $e) {
-        setFlashMessage('error', 'Erro ao processar checklist: ' . $e->getMessage());
+        setFlashMessage('error', 'Erro ao processar checklist: ');
     }
     
     header('Location: checklists.php');
@@ -357,7 +358,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.7.32/dist/sweetalert2.all.min.js"></script>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
     
     <script>
     // Confirmação antes de aprovar/rejeitar

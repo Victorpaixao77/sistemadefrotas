@@ -44,6 +44,11 @@ function vehNotify(message, type) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    const hasInitial = !!(window.__VEH_INITIAL__ && window.__VEH_INITIAL__.success);
+    if (hasInitial) {
+        applyVehiclesInitialPayload(window.__VEH_INITIAL__, false);
+    }
+
     wireVehicleSortHeaders();
     if (document.body.classList.contains('vehicles-modern') && typeof window.initForncTableColumns === 'function') {
         window.initForncTableColumns({
@@ -56,7 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     // Initialize page
-    initializePage();
+    initializePage(hasInitial);
     
     // Setup modal events
     setupModals();
@@ -64,9 +69,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Setup filters
     setupFilters();
     
-    // Initialize charts
-    initializeCharts();
-    
+    // Initialize charts (lazy — só quando a seção entra na viewport)
+    scheduleVehicleChartsLoad();
+
     // Setup form submission
     var saveBtn = document.getElementById('saveVehicleBtn');
     if (saveBtn) saveBtn.addEventListener('click', saveVehicle);
@@ -201,7 +206,7 @@ function wireVehicleSortHeaders() {
     });
 }
 
-function initializePage() {
+function initializePage(skipInitialLoad) {
     restoreVehicleFiltersFromUrl();
     // Get current page and per_page from URL or use default
     const urlParams = new URLSearchParams(window.location.search);
@@ -217,8 +222,14 @@ function initializePage() {
         perPageEl.value = String(perPageFromUrl);
     }
     
-    // Load vehicle data from API (fonte única)
-    loadVehicleData(page);
+    if (!skipInitialLoad) {
+        loadVehicleData(page);
+    } else {
+        currentPage = page;
+        if (window.__VEH_INITIAL__ && window.__VEH_INITIAL__.pagination) {
+            totalPages = window.__VEH_INITIAL__.pagination.totalPages || 1;
+        }
+    }
     
     // Setup button events
     const addVeh = document.getElementById('addVehicleBtn');
@@ -441,6 +452,67 @@ function loadSelectOptions() {
         });
 }
 
+function applyVehiclesInitialPayload(data, rerenderTable) {
+    if (!data || !data.success) return;
+    if (data.summary) {
+        document.getElementById('totalVehicles').textContent = data.summary.totalVehicles ?? 0;
+        document.getElementById('activeVehicles').textContent = data.summary.activeVehicles ?? 0;
+        document.getElementById('maintenanceVehicles').textContent = data.summary.maintenanceVehicles ?? 0;
+        const km = data.summary.totalMileage ?? 0;
+        document.getElementById('totalMileage').textContent = formatKm(km);
+    }
+    if (data.pagination) {
+        currentPage = data.pagination.page || 1;
+        totalPages = data.pagination.totalPages || 1;
+        document.getElementById('currentPage').textContent = currentPage;
+        document.getElementById('totalPages').textContent = totalPages;
+        updatePaginationButtons(data.pagination);
+    }
+    if (rerenderTable !== false && data.data) {
+        const tbody = document.querySelector('#vehiclesTable tbody');
+        if (tbody) {
+            tbody.innerHTML = '';
+            if (data.data.length > 0) {
+                data.data.forEach(vehicle => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = buildVehicleRowHtml(vehicle);
+                    tbody.appendChild(row);
+                });
+            }
+        }
+    }
+}
+
+function buildVehicleRowHtml(vehicle) {
+    return `
+                        <td data-col="placa">${escapeHtml(vehicle.placa) || '-'}</td>
+                        <td data-col="modelo">${escapeHtml(vehicle.modelo) || '-'}</td>
+                        <td data-col="marca">${escapeHtml(vehicle.marca) || '-'}</td>
+                        <td data-col="ano">${escapeHtml(vehicle.ano) || '-'}</td>
+                        <td data-col="status"><span class="status-badge status-${encodeURIComponent(vehicle.status_id || 1)}">${escapeHtml(vehicle.status_nome) || 'Ativo'}</span></td>
+                        <td data-col="cavalo">${vehicle.cavalo_nome ?
+                            `${escapeHtml(vehicle.cavalo_nome)} (${escapeHtml(vehicle.cavalo_eixos)} eixos)` :
+                            '-'}</td>
+                        <td data-col="carreta">${vehicle.carreta_nome ?
+                            `${escapeHtml(vehicle.carreta_nome)} (${escapeHtml(vehicle.carreta_capacidade)} ton)` :
+                            '-'}</td>
+                        <td data-col="km">${escapeHtml(formatKm(vehicle.km_atual))}</td>
+                        <td class="actions" data-col="acoes">
+                            <div class="table-actions">
+                                <button class="btn-icon view-btn" data-id="${vehicle.id}" title="Ver detalhes">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button class="btn-icon edit-btn" data-id="${vehicle.id}" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn-icon delete-btn" data-id="${vehicle.id}" title="Excluir">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    `;
+}
+
 function loadVehicleData(page = 1) {
     currentPage = page;
     const perPageSelect = document.getElementById('perPageVehicles');
@@ -510,33 +582,7 @@ function loadVehicleData(page = 1) {
             if (data.data && data.data.length > 0) {
                 data.data.forEach(vehicle => {
                     const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td data-col="placa">${escapeHtml(vehicle.placa) || '-'}</td>
-                        <td data-col="modelo">${escapeHtml(vehicle.modelo) || '-'}</td>
-                        <td data-col="marca">${escapeHtml(vehicle.marca) || '-'}</td>
-                        <td data-col="ano">${escapeHtml(vehicle.ano) || '-'}</td>
-                        <td data-col="status"><span class="status-badge status-${encodeURIComponent(vehicle.status_id || 1)}">${escapeHtml(vehicle.status_nome) || 'Ativo'}</span></td>
-                        <td data-col="cavalo">${vehicle.cavalo_nome ?
-                            `${escapeHtml(vehicle.cavalo_nome)} (${escapeHtml(vehicle.cavalo_eixos)} eixos, ${escapeHtml(vehicle.cavalo_tracao)})` :
-                            '-'}</td>
-                        <td data-col="carreta">${vehicle.carreta_nome ?
-                            `${escapeHtml(vehicle.carreta_nome)} (${escapeHtml(vehicle.carreta_capacidade)} ton)` :
-                            '-'}</td>
-                        <td data-col="km">${escapeHtml(formatKm(vehicle.km_atual))}</td>
-                        <td class="actions" data-col="acoes">
-                            <div class="table-actions">
-                                <button class="btn-icon view-btn" data-id="${vehicle.id}" title="Ver detalhes">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button class="btn-icon edit-btn" data-id="${vehicle.id}" title="Editar">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn-icon delete-btn" data-id="${vehicle.id}" title="Excluir">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        </td>
-                    `;
+                    row.innerHTML = buildVehicleRowHtml(vehicle);
                     tbody.appendChild(row);
                 });
             } else if (!useModernEmpty) {
@@ -643,8 +689,8 @@ function showVehicleDetails(vehicleId) {
                 if (detailRenavam) detailRenavam.textContent = vehicle.renavam || '-';
                 if (detailMileage) detailMileage.textContent = formatKm(vehicle.km_atual);
                 if (detailFuelType) detailFuelType.textContent = vehicle.tipo_combustivel_nome || '-';
-                if (detailCavalo) detailCavalo.textContent = vehicle.cavalo_nome ? 
-                    `${vehicle.cavalo_nome} (${vehicle.cavalo_eixos} eixos, ${vehicle.cavalo_tracao})` : '-';
+                if (detailCavalo) detailCavalo.textContent = vehicle.cavalo_nome ?
+                    `${vehicle.cavalo_nome} (${vehicle.cavalo_eixos} eixos)` : '-';
                 if (detailCarreta) detailCarreta.textContent = vehicle.carreta_nome ? 
                     `${vehicle.carreta_nome} (${vehicle.carreta_capacidade} ton)` : '-';
                 if (detailNotes) detailNotes.textContent = vehicle.observacoes || 'Sem observações';
@@ -855,6 +901,12 @@ function showEditVehicleModal(vehicleId) {
             document.getElementById('potencia_motor').value = vehicle.potencia_motor || '';
             document.getElementById('numero_eixos').value = vehicle.numero_eixos || '';
             document.getElementById('carroceria_id').value = vehicle.carroceria_id || '';
+            const capTanqueEl = document.getElementById('capacidade_tanque');
+            if (capTanqueEl) capTanqueEl.value = vehicle.capacidade_tanque || '';
+            const consMedioEl = document.getElementById('consumo_medio');
+            if (consMedioEl) consMedioEl.value = vehicle.consumo_medio || '';
+            const custoOpEl = document.getElementById('custo_operacional_km');
+            if (custoOpEl) custoOpEl.value = vehicle.custo_operacional_km || '';
             document.getElementById('observacoes').value = vehicle.observacoes || '';
             
             document.getElementById('vehicleModal').classList.add('active');
@@ -1031,6 +1083,28 @@ function initializeCharts() {
             showFleetChartEmpty('fuelEfficiencyChart', 'Erro ao carregar consumo médio.');
             showFleetChartEmpty('maintenanceCostChart', 'Erro ao carregar custos de manutenção.');
         });
+}
+
+let vehicleChartsLoaded = false;
+function scheduleVehicleChartsLoad() {
+    const section = document.querySelector('.analytics-section');
+    if (!section) return;
+    const load = function () {
+        if (vehicleChartsLoaded) return;
+        vehicleChartsLoaded = true;
+        initializeCharts();
+    };
+    if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver(function (entries) {
+            if (entries.some(function (e) { return e.isIntersecting; })) {
+                load();
+                io.disconnect();
+            }
+        }, { rootMargin: '160px' });
+        io.observe(section);
+    } else {
+        setTimeout(load, 600);
+    }
 }
 
 function showFleetChartEmpty(canvasId, message) {

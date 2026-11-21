@@ -217,20 +217,32 @@ if ($row && !empty($row['certificado_a1_id'])) {
 
                     <div data-aba="ia" class="dashboard-card" id="config-vision-ai">
                         <div class="card-header">
-                            <h3><i class="fas fa-eye"></i> IA de Visão (leitura de fichas)</h3>
+                            <h3><i class="fas fa-robot"></i> Provedores de IA</h3>
                         </div>
                         <div class="card-body">
-                            <p class="form-text config-card-lead">Provedor de IA usado para ler fotos/PDF de fichas de abastecimento na importação. O <strong>Google Gemini</strong> tem cota gratuita e lê manuscrito bem.</p>
+                            <p class="form-text config-card-lead">Escolha o provedor de IA e a chave para cada finalidade. <strong>IA de Visão</strong> lê fotos/PDF de fichas de abastecimento e notas (precisa de provedor com visão). <strong>Resumos &amp; textos do sistema</strong> alimenta os resumos executivos de BI, lucratividade, comissões, veículos, etc. <strong>Classificação (Copiloto)</strong> usa modelo econômico para entender perguntas no Centro de Inteligência.</p>
                             <div id="visionAiStatusLine" class="config-openai-status" aria-live="polite"></div>
                             <form id="visionAiForm" autocomplete="off">
                                 <div class="form-group">
+                                    <label for="vai_purpose">Usar para</label>
+                                    <select id="vai_purpose" name="purpose">
+                                        <option value="vision">IA de Visão (leitura de fichas/notas)</option>
+                                        <option value="text">Resumos &amp; textos do sistema (BI, lucratividade, etc.)</option>
+                                        <option value="narrate">Narrativa do Copiloto (reescrever respostas)</option>
+                                        <option value="classify">Classificação do Copiloto (modelo econômico)</option>
+                                    </select>
+                                    <small class="form-text">Cada finalidade guarda seu próprio provedor e chave. Se a de textos ou classificação ficar em branco, o sistema usa a cadeia de fallback do roteador.</small>
+                                </div>
+                                <div class="form-group">
                                     <label for="vai_provider">Provedor</label>
                                     <select id="vai_provider" name="provider">
-                                        <option value="gemini">Google Gemini (gratuito)</option>
-                                        <option value="openai">OpenAI</option>
-                                        <option value="openrouter">OpenRouter</option>
-                                        <option value="custom">Personalizado (compatível com OpenAI)</option>
+                                        <option value="gemini" data-vision="1">Google Gemini (gratuito)</option>
+                                        <option value="openai" data-vision="1">OpenAI (ChatGPT)</option>
+                                        <option value="deepseek" data-vision="0">DeepSeek (só texto)</option>
+                                        <option value="openrouter" data-vision="1">OpenRouter</option>
+                                        <option value="custom" data-vision="1">Personalizado (compatível com OpenAI)</option>
                                     </select>
+                                    <small class="form-text" id="vai_provider_warn" style="display:none;color:#c0392b;text-transform:none">Este provedor não lê imagens — use-o apenas para resumos/textos.</small>
                                 </div>
                                 <div class="form-group">
                                     <label for="vai_api_key">Chave da API</label>
@@ -253,7 +265,22 @@ if ($row && !empty($row['certificado_a1_id'])) {
                                 </div>
                             </form>
                             <div id="visionAiMsg"></div>
-                            <p class="form-text">Como obter a chave do Gemini: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a> (gratuito).</p>
+                            <p class="form-text">Onde obter a chave:
+                                <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Gemini</a> (gratuito) ·
+                                <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">OpenAI</a> ·
+                                <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">DeepSeek</a>.</p>
+                        </div>
+                    </div>
+
+                    <div data-aba="ia" class="dashboard-card" id="config-ia-uso">
+                        <div class="card-header">
+                            <h3><i class="fas fa-chart-line"></i> Uso e custos do Copiloto (mês)</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="form-text config-card-lead">Consumo do Centro de Inteligência nesta empresa — consultas, tokens estimados e custo aproximado em USD (com base no roteador de modelos).</p>
+                            <div id="iaUsoStatusLine" class="config-openai-status" aria-live="polite">Carregando…</div>
+                            <div id="iaUsoGrid" class="config-ia-uso-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:12px"></div>
+                            <p class="form-text" style="margin-top:10px">Detalhes completos na aba <strong>Saúde</strong> do Centro de Inteligência.</p>
                         </div>
                     </div>
 
@@ -1257,7 +1284,7 @@ if ($row && !empty($row['certificado_a1_id'])) {
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <script src="../js/seguranca.js?v=4"></script>
-    <script src="../js/vision-ai-config.js?v=3"></script>
+    <script src="../js/vision-ai-config.js?v=4"></script>
     <script src="../js/notificacoes-preferencias-config.js?v=1"></script>
     <script>
     document.getElementById('configForm').addEventListener('submit', function(e) {

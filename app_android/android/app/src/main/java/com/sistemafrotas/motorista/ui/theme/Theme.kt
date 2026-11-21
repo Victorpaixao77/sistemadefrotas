@@ -30,6 +30,7 @@ private val AppTypography = androidx.compose.material3.Typography(
 // Primary: #3b82f6 | Background dark: #0f1824, #1a2332 | Light: #f3f4f6, #ffffff
 private val WebPrimary = Color(0xFF3B82F6)
 private val WebPrimaryDark = Color(0xFF2563EB)
+private val WebNavyTop = Color(0xFF0F172A) // bg-sidebar do web (topo/menus escuros)
 private val WebBgDark = Color(0xFF0F1824)
 private val WebBgSecondary = Color(0xFF1A2332)
 private val WebBgTertiary = Color(0xFF243041)
@@ -92,11 +93,13 @@ fun SistemaFrotasMotoristaTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
+            // Status bar no navy da identidade do sistema web (topo/menus escuros),
+            // combinando com o header do Início e as barras de topo (sempre navy).
+            window.statusBarColor = WebNavyTop.toArgb()
             @Suppress("DEPRECATION")
             window.navigationBarColor = colorScheme.surface.toArgb()
             val insets = WindowCompat.getInsetsController(window, view)
-            insets.isAppearanceLightStatusBars = !darkTheme
+            insets.isAppearanceLightStatusBars = false
             insets.isAppearanceLightNavigationBars = !darkTheme
         }
     }

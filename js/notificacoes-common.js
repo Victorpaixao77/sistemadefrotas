@@ -96,7 +96,9 @@
 
             fornecedor: { icon: 'fa-truck-loading', cls: 'warning' },
 
-            checklist: { icon: 'fa-clipboard-check', cls: 'warning' }
+            checklist: { icon: 'fa-clipboard-check', cls: 'warning' },
+
+            plataforma: { icon: 'fa-bullhorn', cls: 'info' }
 
         };
 
@@ -316,7 +318,9 @@
 
             .catch(function (err) {
 
-                console.error('Erro ao atualizar badges:', err);
+                // Best-effort: fetch abortado (navegação) ou falha de rede — o próximo
+                // ciclo re-sincroniza. Não é erro de aplicação, log discreto.
+                console.debug('atualizar badges adiado:', err && err.message);
 
             });
 

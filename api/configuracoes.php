@@ -310,7 +310,7 @@ try {
                 if (file_exists($filepath)) {
                     unlink($filepath);
                 }
-                echo json_encode(['success' => false, 'error' => 'Erro ao processar certificado: ' . $e->getMessage()]);
+                echo json_encode(['success' => false, 'error' => 'Erro ao processar certificado: ']);
             }
         } else {
             echo json_encode(['success' => false, 'error' => 'Erro ao fazer upload do arquivo']);
@@ -720,7 +720,7 @@ try {
         } catch (Exception $e) {
             echo json_encode([
                 'success' => false,
-                'error' => 'Erro ao carregar configurações: ' . $e->getMessage()
+                'error' => 'Erro ao carregar configurações: '
             ]);
         }
         exit;
@@ -2086,5 +2086,5 @@ try {
     throw new Exception('Ação inválida');
 } catch (Exception $e) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Erro interno.']);
 } 

@@ -19,6 +19,7 @@ header('Content-Type: application/json');
 
 // Ensure the request is authenticated
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Protege mutações (POST/PUT/PATCH/DELETE) com CSRF.
 api_require_csrf_json();
@@ -39,39 +40,26 @@ try {
         )");
     }
     
-    // Get vehicle body types
-    $stmt = $conn->prepare("SELECT id, nome FROM carrocerias ORDER BY nome");
-    $stmt->execute();
-    
-    $carrocerias = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    if (empty($carrocerias)) {
-        // Insert default body types if none exist
-        $default_carrocerias = [
-            ['nome' => 'Baú'],
-            ['nome' => 'Graneleiro'],
-            ['nome' => 'Tanque'],
-            ['nome' => 'Plataforma'],
-            ['nome' => 'Sider'],
-            ['nome' => 'Basculante']
-        ];
-        
-        $insert_stmt = $conn->prepare("INSERT INTO carrocerias (nome) VALUES (:nome)");
-        foreach ($default_carrocerias as $carroceria) {
-            $insert_stmt->execute([':nome' => $carroceria['nome']]);
+    // Catálogo de carrocerias — quase estático. Cacheado (APCu/arquivo) por 1h.
+    require_once __DIR__ . '/../includes/sf_cache.php';
+    $carrocerias = sf_cache_remember('catalogo:carrocerias', 3600, function () use ($conn) {
+        $list = $conn->query("SELECT id, nome FROM carrocerias ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($list)) {
+            $ins = $conn->prepare("INSERT INTO carrocerias (nome) VALUES (:nome)");
+            foreach (['Baú', 'Graneleiro', 'Tanque', 'Plataforma', 'Sider', 'Basculante'] as $nome) {
+                $ins->execute([':nome' => $nome]);
+            }
+            $list = $conn->query("SELECT id, nome FROM carrocerias ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
         }
-        
-        // Fetch the inserted body types
-        $stmt->execute();
-        $carrocerias = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-    
+        return $list;
+    });
+
     echo json_encode(['success' => true, 'data' => $carrocerias]);
-    
+
 } catch (PDOException $e) {
     error_log("Error in carrocerias.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Erro ao buscar carrocerias: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Erro ao buscar carrocerias: ']);
 } catch (Exception $e) {
     error_log("General error in carrocerias.php: " . $e->getMessage());
     http_response_code(500);

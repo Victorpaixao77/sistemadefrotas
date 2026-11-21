@@ -24,6 +24,8 @@ object GpsNotifyHelper {
     private const val ID_BATTERY = 9103
     private const val ID_BG_LOC = 9104
     private const val ID_SYS_GPS_OFF = 9105
+    private const val ID_PARADA = 9106
+    private const val ID_ENCERRAR = 9107
 
     fun ensureAlertChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -124,6 +126,49 @@ object GpsNotifyHelper {
 
     fun notifyTrackingStoppedNoPermission(context: Context) {
         notifyLocationRequired(context)
+    }
+
+    /** Intent que abre o app (tela inicial do motorista). */
+    private fun openAppIntent(ctx: Context): Intent {
+        val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
+            ?: Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", ctx.packageName, null)
+            }
+        return newTask(launch)
+    }
+
+    /** Parada automática detectada (veículo parado há alguns minutos). */
+    fun notifyParadaDetectada(context: Context, minutos: Int) {
+        val app = context.applicationContext
+        ensureAlertChannel(app)
+        if (!canPost(app)) return
+        val contentPi = activityPi(app, 91060, openAppIntent(app))
+        val n = NotificationCompat.Builder(app, CHANNEL_ALERTS_ID)
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentTitle("Parada registrada")
+            .setContentText("Veículo parado há $minutos min. Registramos a parada no seu diário.")
+            .setContentIntent(contentPi)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+        NotificationManagerCompat.from(app).notify(ID_PARADA, n)
+    }
+
+    /** Sugere encerrar a rota após parada prolongada. */
+    fun notifyEncerrarRota(context: Context, minutos: Int) {
+        val app = context.applicationContext
+        ensureAlertChannel(app)
+        if (!canPost(app)) return
+        val contentPi = activityPi(app, 91070, openAppIntent(app))
+        val n = NotificationCompat.Builder(app, CHANNEL_ALERTS_ID)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Encerrar a rota?")
+            .setContentText("Você está parado há $minutos min. Toque para encerrar a rota, se já chegou.")
+            .setContentIntent(contentPi)
+            .setAutoCancel(true)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+        NotificationManagerCompat.from(app).notify(ID_ENCERRAR, n)
     }
 
     /** Localização desligada em Ajustes do aparelho (diferente de só negar permissão ao app). */

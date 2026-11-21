@@ -28,3 +28,11 @@ Thumbs.db
 /cd
 /composer
 /LO
+
+# Compilação do app Android (regenera-se com o Gradle; 21/11/2026)
+app_android/android/.gradle/
+app_android/android/build/
+app_android/android/app/build/
+app_android/android/local.properties
+*.apk
+*.aab

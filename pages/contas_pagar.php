@@ -1,3 +1,4 @@
+
 <?php
 // Include configuration and functions first
 require_once '../includes/config.php';
@@ -184,36 +185,42 @@ WHERE empresa_id = :empresa_id";
 
 $kpis = fetchOne($conn, $sql_kpis, [':empresa_id' => $_SESSION['empresa_id']]);
 
-// Buscar dados para o gráfico de categorias
-$sql_categorias = "SELECT 
+$sql_categorias = "SELECT
+    COALESCE(s.nome, 'Sem Status') as status_nome,
     COUNT(*) as quantidade,
-    SUM(valor) as total
-FROM contas_pagar 
-WHERE empresa_id = :empresa_id 
-AND MONTH(data_vencimento) = MONTH(CURDATE()) 
-AND YEAR(data_vencimento) = YEAR(CURDATE())
-GROUP BY status_id";
-
+    COALESCE(SUM(cp.valor), 0) as total
+FROM contas_pagar cp
+LEFT JOIN status_contas_pagar s ON cp.status_id = s.id
+WHERE cp.empresa_id = :empresa_id
+GROUP BY cp.status_id, s.nome
+ORDER BY s.nome";
 $stmt = $conn->prepare($sql_categorias);
 $stmt->bindValue(':empresa_id', $_SESSION['empresa_id']);
 $stmt->execute();
-$categorias = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$cp_categorias_chart = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Buscar dados para o gráfico de evolução
-$sql_evolucao = "SELECT 
-    MONTH(data_vencimento) as mes,
-    YEAR(data_vencimento) as ano,
-    SUM(valor) as total
-FROM contas_pagar 
-WHERE empresa_id = :empresa_id 
-AND data_vencimento >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
-GROUP BY YEAR(data_vencimento), MONTH(data_vencimento)
+$sql_evolucao = "SELECT
+    MONTH(cp.data_vencimento) as mes,
+    YEAR(cp.data_vencimento) as ano,
+    COALESCE(SUM(cp.valor), 0) as total
+FROM contas_pagar cp
+WHERE cp.empresa_id = :empresa_id
+AND cp.data_vencimento >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
+GROUP BY YEAR(cp.data_vencimento), MONTH(cp.data_vencimento)
 ORDER BY ano, mes";
-
 $stmt = $conn->prepare($sql_evolucao);
 $stmt->bindValue(':empresa_id', $_SESSION['empresa_id']);
 $stmt->execute();
-$evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$cp_evolucao_chart = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$cp_initial = [
+    'kpis' => $kpis,
+    'charts' => [
+        'categorias' => $cp_categorias_chart,
+        'evolucao' => $cp_evolucao_chart,
+    ],
+    'mes' => $cp_filters['mes'] !== '' ? $cp_filters['mes'] : null,
+];
 ?>
 
 <!DOCTYPE html>
@@ -236,7 +243,8 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <link rel="icon" type="image/png" href="../logo.png">
     
     <!-- Chart.js for analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
     
     <style>
         /* Pagination Styles */
@@ -431,10 +439,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <option value="Outros">Outros</option>
                         </select>
                         </div>
-                        <div class="fg">
-                            <label for="mesFilter">Mês/ano (lista)</label>
-                            <input type="month" id="mesFilter" placeholder="Filtrar por mês" value="<?php echo htmlspecialchars($cp_filters['mes']); ?>">
-                        </div>
+                        <input type="hidden" id="mesFilter" data-sf-periodo-month value="<?php echo htmlspecialchars($cp_filters['mes']); ?>">
                         <div class="fg">
                             <label for="per_page_contas">Por página</label>
                             <form method="get" action="" style="display:inline-flex; align-items:center; gap:0.35rem;">
@@ -455,6 +460,7 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <div class="fornc-btn-row">
                         <button type="button" id="addContaBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Nova conta</button>
                         <button type="button" class="fornc-btn fornc-btn--accent" id="applyAccountsFilters" title="Aplicar filtros na lista"><i class="fas fa-search"></i> Pesquisar</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" data-sf-periodo data-sf-periodo-onapply="applyContasServerFilters" title="Filtrar por período"><i class="fas fa-calendar-alt"></i> Período</button>
                         <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn" title="Filtros (período KPI)"><i class="fas fa-sliders-h"></i> Opções</button>
                         <button type="button" class="fornc-btn fornc-btn--ghost" id="clearAccountsFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
                         <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar"><i class="fas fa-file-export"></i> Exportar</button>
@@ -853,7 +859,9 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <!-- JavaScript Files -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <script src="../js/sf-periodo.js"></script>
     <?php sf_render_api_scripts(); ?>
+    <script>window.__CP_INITIAL__=<?php echo json_encode($cp_initial, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             initializePage();
@@ -1336,16 +1344,45 @@ $evolucao = $stmt->fetchAll(PDO::FETCH_ASSOC);
             applyContasServerFilters();
         }
         
+        function applyCpInitialCharts(initial) {
+            if (!initial || !initial.charts) return;
+            if (initial.charts.categorias) updateCategoriasChart(initial.charts.categorias);
+            if (initial.charts.evolucao) updateEvolucaoChart(initial.charts.evolucao);
+        }
+
+        let _cpChartsScheduled = false;
+        function scheduleCpChartsLoad(initial) {
+            if (_cpChartsScheduled) return;
+            const section = document.querySelector('.analytics-section');
+            const load = function () { applyCpInitialCharts(initial); };
+            if (!section) {
+                load();
+                return;
+            }
+            _cpChartsScheduled = true;
+            if ('IntersectionObserver' in window) {
+                const io = new IntersectionObserver(function (entries) {
+                    if (entries.some(function (e) { return e.isIntersecting; })) {
+                        load();
+                        io.disconnect();
+                    }
+                }, { rootMargin: '160px' });
+                io.observe(section);
+            } else {
+                setTimeout(load, 600);
+            }
+        }
+
         function initializeCharts() {
-            // Obter parâmetros da URL
             const urlParams = new URLSearchParams(window.location.search);
             const mes = urlParams.get('mes');
-            console.log('Inicializando gráficos - mês da URL:', mes);
-            
-            // Atualizar KPIs com base nos filtros
+            const initial = (typeof window.__CP_INITIAL__ === 'object') ? window.__CP_INITIAL__ : null;
+            const canUseInitial = initial && !mes && !initial.mes;
+            if (canUseInitial) {
+                scheduleCpChartsLoad(initial);
+                return;
+            }
             updateKPIs(mes);
-            
-            // Atualizar gráficos com base nos filtros
             updateCharts(mes);
         }
         

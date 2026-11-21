@@ -710,7 +710,7 @@ if (!function_exists('pneus_abastecimento_insights')) {
                     (SELECT SUM(a.litros) FROM abastecimentos a
                      WHERE a.veiculo_id = v.id AND a.empresa_id = v.empresa_id
                        AND a.data_abastecimento >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)) AS litros
-                 FROM veiculos v WHERE v.empresa_id = ? AND v.status = 'ativo' LIMIT 40"
+                 FROM veiculos v WHERE v.empresa_id = ? AND v.status_id = 1 LIMIT 40"
             );
             $st->execute([$empresa_id]);
             foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $v) {

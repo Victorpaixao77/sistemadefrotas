@@ -5,6 +5,7 @@ require_once 'includes/csrf.php';
 require_once 'includes/remember_token.php';
 require_once 'includes/security.php';
 require_once 'includes/notificacoes_helpers.php';
+require_once 'includes/sf_saas.php';
 
 /**
  * Finaliza um login já autenticado (senha + 2FA OK): regenera a sessão,
@@ -58,11 +59,19 @@ function sf_login_finalize(PDO $conn, array $row, bool $remember, string $userna
         exit;
     }
 
+    $saasCheck = sf_saas_gate_empresa_cliente($conn, (int) $row['empresa_id'], false);
+    if (!$saasCheck['ok']) {
+        $_SESSION['login_error'] = $saasCheck['message'] ?? 'Acesso indisponível para esta empresa.';
+        header('location: login.php');
+        exit;
+    }
+
     $_SESSION["empresa_id"] = $row["empresa_id"];
     registrarLogAcesso($row["id"], $row["empresa_id"], 'login', 'sucesso', 'Login realizado com sucesso');
-    $redirect_url = $_SESSION['redirect_url'] ?? 'index.php';
+    // Sempre iniciar na tela inicial com o menu lateral recolhido.
     unset($_SESSION['redirect_url']);
-    header("location: " . $redirect_url);
+    $_SESSION['sf_sidebar_reset'] = 1;
+    header("location: index.php");
     exit;
 }
 
@@ -119,6 +128,7 @@ if (isset($_COOKIE['remember_user']) && !isset($_SESSION['loggedin']) && !isset(
                     $empresa_id_login = $row["empresa_id"];
                     $_SESSION["empresa_id"] = $empresa_id_login;
                     registrarLogAcesso($row["id"], $empresa_id_login, 'login', 'sucesso', 'Login automático via cookie Remember Me');
+                    $_SESSION['sf_sidebar_reset'] = 1;
                     header("location: index.php");
                 }
                 exit;
@@ -152,6 +162,11 @@ if (isset($_GET['logout']) && $_GET['logout'] == '1') {
 // Sessão encerrada por inatividade
 if (isset($_GET['timeout']) && $_GET['timeout'] == '1') {
     $error = 'Sua sessão foi encerrada por inatividade. Faça login novamente.';
+}
+
+if (!empty($_SESSION['login_error'])) {
+    $error = (string) $_SESSION['login_error'];
+    unset($_SESSION['login_error']);
 }
 
 // Check for saved login data cookie (sempre, exceto se for login automático)
@@ -230,6 +245,9 @@ elseif ($_SERVER["REQUEST_METHOD"] == "POST") {
     } else {
         try {
             $conn = getConnection();
+            if (sf_platform_maintenance_mode($conn)) {
+                $error = 'Plataforma em manutenção programada. Tente novamente em alguns minutos.';
+            } else {
             $sql = "SELECT u.id, u.nome, u.email, u.senha, u.empresa_id, u.status as usuario_status, u.foto_perfil, u.tipo_usuario,
                            u.acesso_todas_empresas, u.is_oculto, u.two_factor_enabled, u.two_factor_secret, u.two_factor_confirmed_at
                    FROM usuarios u
@@ -283,6 +301,7 @@ elseif ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $_SESSION['login_fail_count'] = (int) ($_SESSION['login_fail_count'] ?? 0) + 1;
                 sf_login_attempt_fail($username, $client_ip, 5, 15);
                 $error = "Usuário ou senha inválidos.";
+            }
             }
         } catch (PDOException $e) {
             error_log('Login PDOException: ' . $e->getMessage());

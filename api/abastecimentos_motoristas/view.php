@@ -45,5 +45,5 @@ try {
         echo json_encode(['success' => false, 'error' => 'Abastecimento não encontrado']);
     }
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Erro interno.']);
 } 

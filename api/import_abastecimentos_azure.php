@@ -1038,6 +1038,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 header('Content-Type: application/json; charset=utf-8');
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     api_json_method_not_allowed('Use POST.');
 }

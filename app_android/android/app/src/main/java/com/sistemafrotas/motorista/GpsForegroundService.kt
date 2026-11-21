@@ -70,6 +70,14 @@ class GpsForegroundService : Service() {
     /** Último envio com velocidade baixa → próximo intervalo mínimo maior (economia). */
     private var lastSentSlowMoving: Boolean = false
 
+    /** Detecção automática de parada/ociosidade (registra parada/descanso e sugere encerrar a rota). */
+    private var idleAnchorLat: Double? = null
+    private var idleAnchorLng: Double? = null
+    private var idleSinceWallMs: Long = 0L
+    private var paradaRecorded: Boolean = false
+    private var descansoRecorded: Boolean = false
+    private var encerrarNotified: Boolean = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -163,6 +171,12 @@ class GpsForegroundService : Service() {
         lastSentLng = null
         lastSentElapsedMs = 0L
         lastSentSlowMoving = false
+        idleAnchorLat = null
+        idleAnchorLng = null
+        idleSinceWallMs = 0L
+        paradaRecorded = false
+        descansoRecorded = false
+        encerrarNotified = false
         synchronized(serviceBufferLock) { serviceBuffer.clear() }
         flushHandler.removeCallbacks(periodicFlushRunnable)
         flushHandler.removeCallbacks(debouncedFlushRunnable)
@@ -187,6 +201,12 @@ class GpsForegroundService : Service() {
                     return
                 }
                 Log.d(TAG, "onLocationResult: lat=${loc.latitude}, lng=${loc.longitude}, acc=${loc.accuracy}m")
+                // Avaliação de ociosidade roda no main looper (serial) para não competir pelo estado.
+                evaluateIdle(veiculoId, loc)
+                val kmh = if (loc.hasSpeed() && loc.speed >= 0) loc.speed * 3.6 else 0.0
+                com.sistemafrotas.motorista.feature.viagem.TripModeSignals.onGpsPoint(
+                    loc.latitude, loc.longitude, kmh,
+                )
                 scope.launch {
                     postLocation(veiculoId, loc)
                 }
@@ -212,6 +232,82 @@ class GpsForegroundService : Service() {
             stopSelf()
         } catch (e: Exception) {
             Log.e(TAG, "requestLocationUpdates: Erro inesperado", e)
+        }
+    }
+
+    /**
+     * Detecta parada/ociosidade pelo GPS: parado perto da âncora e em baixa velocidade.
+     * Em ≥5 min registra "parada"; em ≥30 min sugere encerrar a rota; em ≥3 h registra "descanso".
+     * Roda no main looper (chamado em onLocationResult), então o estado é seguro sem lock.
+     */
+    private fun evaluateIdle(veiculoId: Int, loc: Location) {
+        val kmh = if (loc.hasSpeed() && loc.speed >= 0) loc.speed * 3.6 else 0.0
+        val anchorLat = idleAnchorLat
+        val anchorLng = idleAnchorLng
+        var movedFar = false
+        if (anchorLat != null && anchorLng != null) {
+            val d = FloatArray(1)
+            Location.distanceBetween(anchorLat, anchorLng, loc.latitude, loc.longitude, d)
+            movedFar = d[0] >= IDLE_RESET_DIST_M
+        }
+        if (kmh >= IDLE_RESET_KMH || movedFar) {
+            // Em movimento: zera o estado de ociosidade.
+            idleAnchorLat = loc.latitude
+            idleAnchorLng = loc.longitude
+            idleSinceWallMs = 0L
+            paradaRecorded = false
+            descansoRecorded = false
+            encerrarNotified = false
+            return
+        }
+        // Parado perto da âncora.
+        if (idleAnchorLat == null) {
+            idleAnchorLat = loc.latitude
+            idleAnchorLng = loc.longitude
+        }
+        if (idleSinceWallMs == 0L) {
+            idleSinceWallMs = loc.time
+            return
+        }
+        val idleMin = ((loc.time - idleSinceWallMs) / 60_000L).toInt()
+        if (idleMin < 0) {
+            idleSinceWallMs = loc.time
+            return
+        }
+        if (idleMin >= PARADA_MIN && !paradaRecorded) {
+            paradaRecorded = true
+            scope.launch { recordAutoEvento("parada", loc, "Parada automática ($idleMin min)") }
+            GpsNotifyHelper.notifyParadaDetectada(applicationContext, idleMin)
+            com.sistemafrotas.motorista.feature.viagem.TripModeSignals.onIdleDetected(idleMin)
+        }
+        if (idleMin >= ENCERRAR_MIN && !encerrarNotified) {
+            encerrarNotified = true
+            GpsNotifyHelper.notifyEncerrarRota(applicationContext, idleMin)
+        }
+        if (idleMin >= DESCANSO_MIN && !descansoRecorded) {
+            descansoRecorded = true
+            scope.launch { recordAutoEvento("descanso", loc, "Descanso/pernoite automático") }
+        }
+    }
+
+    private suspend fun recordAutoEvento(tipo: String, loc: Location, obs: String) {
+        try {
+            if (Api.getToken().isNullOrBlank()) {
+                AuthDataStore(applicationContext).getToken()?.let { Api.setToken(it) }
+            }
+            if (Api.getToken().isNullOrBlank()) return
+            val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            Api.service.eventoAuto(
+                mapOf(
+                    "tipo" to tipo,
+                    "latitude" to loc.latitude,
+                    "longitude" to loc.longitude,
+                    "data_hora" to sdf.format(Date(loc.time)),
+                    "observacoes" to obs,
+                )
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "recordAutoEvento ($tipo) falhou", e)
         }
     }
 
@@ -249,18 +345,30 @@ class GpsForegroundService : Service() {
         if (!shouldSend) {
             return
         }
+
         val store = AuthDataStore(applicationContext)
-        val motoristaId = store.getMotoristaId() ?: run {
+        var motoristaId: Int? = null
+
+        // Tenta obter o motorista_id com retentativa (útil se o serviço inicia logo após o login)
+        for (i in 1..3) {
+            motoristaId = store.getMotoristaId()
+            if (motoristaId != null) break
+            Log.d(TAG, "postLocation: motorista_id ausente, tentativa $i/3...")
+            kotlinx.coroutines.delay(2000L)
+        }
+
+        if (motoristaId == null) {
             GpsDiagnostics.recordSend(
                 applicationContext,
                 loc.latitude,
                 loc.longitude,
                 false,
-                "Sem sessão: faça login novamente no app.",
+                "Sem sessão: motorista_id não encontrado após retentativas.",
             )
-            Log.w(TAG, "postLocation: motorista_id ausente")
+            Log.w(TAG, "postLocation: Abortando, motorista_id ausente.")
             return
         }
+
         val kmh = if (loc.hasSpeed() && loc.speed >= 0) (loc.speed * 3.6f).toDouble() else null
         val slowMoving = (kmh ?: 0.0) < 5.0
         val bateriaPct = readBatteryPercent(applicationContext)
@@ -322,11 +430,14 @@ class GpsForegroundService : Service() {
 
     private suspend fun flushServiceBuffer() {
         val batch: List<QueuedGpsPoint>
+        val currentSize: Int
         synchronized(serviceBufferLock) {
+            currentSize = serviceBuffer.size
             if (serviceBuffer.isEmpty()) return
             batch = serviceBuffer.take(25).toList()
             repeat(batch.size) { serviceBuffer.removeAt(0) }
         }
+        Log.d(TAG, "flushServiceBuffer: enviando lote de ${batch.size} pontos (buffer total era $currentSize)")
         val pontos = batch.map { it.toMap() }
         val first = batch.firstOrNull() ?: return
         try {
@@ -461,12 +572,25 @@ class GpsForegroundService : Service() {
         const val ACTION_STOP = "com.sistemafrotas.motorista.GPS_STOP"
         const val EXTRA_VEICULO_ID = "veiculo_id"
 
+        // Detecção automática de parada/ociosidade.
+        private const val IDLE_RESET_KMH = 6.0      // acima disso considera "em movimento"
+        private const val IDLE_RESET_DIST_M = 80f    // afastou-se da âncora → em movimento
+        private const val PARADA_MIN = 5             // registra parada
+        private const val ENCERRAR_MIN = 30          // sugere encerrar a rota
+        private const val DESCANSO_MIN = 180         // registra descanso/pernoite
+
         fun start(ctx: Context, veiculoId: Int) {
+            if (veiculoId <= 0) return
             val i = Intent(ctx, GpsForegroundService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_VEICULO_ID, veiculoId)
             }
-            androidx.core.content.ContextCompat.startForegroundService(ctx, i)
+            try {
+                androidx.core.content.ContextCompat.startForegroundService(ctx, i)
+            } catch (e: Exception) {
+                // Android 12+ pode lançar se faltar permissão de localização ou FGS não permitido.
+                Log.e(TAG, "startForegroundService falhou (veiculoId=$veiculoId)", e)
+            }
         }
 
         fun stop(ctx: Context) {

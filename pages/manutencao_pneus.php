@@ -1,9 +1,11 @@
+
 <?php
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
+require_once '../includes/pneu_manutencao_analytics_data.php';
 
 // Configure session before starting it
 configure_session();
@@ -98,6 +100,22 @@ $stmt_veiculos = $conn->prepare($sql_veiculos);
 $stmt_veiculos->bindValue(':empresa_id', $_SESSION['empresa_id']);
 $stmt_veiculos->execute();
 $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
+
+$mp_analytics = [];
+$empresa_id_mp = (int) ($_SESSION['empresa_id'] ?? 0);
+if ($empresa_id_mp > 0) {
+    try {
+        $mp_analytics = pneu_manutencao_fetch_analytics($conn, $empresa_id_mp, $mes ?: null, $ano ?: null);
+    } catch (Throwable $e) {
+        error_log('manutencao_pneus analytics SSR: ' . $e->getMessage());
+    }
+}
+$mp_initial = [
+    'success' => true,
+    'analytics' => $mp_analytics,
+    'mes' => $mes,
+    'ano' => $ano,
+];
 ?>
 
 <!DOCTYPE html>
@@ -121,7 +139,8 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
     <link rel="icon" type="image/png" href="../logo.png">
     
     <!-- Chart.js for analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
 
     <style>
         /* Estilos para paginação */
@@ -311,8 +330,8 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
                         <button type="button" id="addMaintenanceBtn" class="fornc-btn fornc-btn--primary" title="Nova Manutenção">
                             <i class="fas fa-plus"></i> Nova
                         </button>
-                        <button type="button" id="filterBtn" class="fornc-btn fornc-btn--ghost" title="Filtros">
-                            <i class="fas fa-filter"></i>
+                        <button type="button" data-sf-periodo data-sf-periodo-onapply="sfPeriodoNavMesAno" class="fornc-btn fornc-btn--ghost" title="Filtrar por período">
+                            <i class="fas fa-calendar-alt"></i> Período
                         </button>
                         <button type="button" class="fornc-btn fornc-btn--accent" id="applyTireFilters" title="Aplicar filtros">
                             <i class="fas fa-search"></i>
@@ -698,7 +717,7 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="filterMonth">Mês/Ano</label>
-                        <input type="month" id="filterMonth" class="form-control">
+                        <input type="month" id="filterMonth" class="form-control" data-sf-periodo-month>
                     </div>
                 </div>
             </div>
@@ -710,19 +729,33 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
     </div>
     
     <!-- JavaScript Files -->
+    <script>window.__MANUTENCAO_PNEUS_INITIAL__=<?php echo json_encode($mp_initial, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <script src="../js/sf-periodo.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             initializePage();
             setupModals();
             setupFilters();
-            loadAnalytics();
+            const initial = (typeof window.__MANUTENCAO_PNEUS_INITIAL__ === 'object') ? window.__MANUTENCAO_PNEUS_INITIAL__ : null;
+            const urlParams = new URLSearchParams(window.location.search);
+            const mesUrl = urlParams.get('mes');
+            const anoUrl = urlParams.get('ano');
+            const canUseInitial = initial && initial.success && initial.analytics
+                && String(initial.mes || '') === String(mesUrl || '')
+                && String(initial.ano || '') === String(anoUrl || '');
+            if (canUseInitial) {
+                scheduleManutencaoCharts(initial.analytics);
+            } else {
+                loadAnalytics();
+            }
         });
         
         function initializePage() {
             document.getElementById('addMaintenanceBtn').addEventListener('click', showAddMaintenanceModal);
-            document.getElementById('filterBtn').addEventListener('click', showFilterModal);
+            var _fbTp = document.getElementById('filterBtn');
+            if (_fbTp) _fbTp.addEventListener('click', showFilterModal);
             setupTableButtons();
         }
         
@@ -1002,6 +1035,35 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
             document.getElementById('filterModal').style.display = 'block';
         }
         
+        function applyManutencaoAnalytics(data) {
+            if (!data || !data.success) return;
+            renderCustoMensalChart(data.custo_mensal);
+            renderQuantidadeTipoChart(data.quantidade_tipo);
+            renderTopPneusChart(data.top_pneus);
+            renderMediaTipoChart(data.media_tipo);
+        }
+
+        let _mpChartsDone = false;
+        function scheduleManutencaoCharts(data) {
+            if (_mpChartsDone) return;
+            const section = document.querySelector('.analytics-section');
+            const load = function () {
+                _mpChartsDone = true;
+                applyManutencaoAnalytics(data);
+            };
+            if (!section || !('IntersectionObserver' in window)) {
+                load();
+                return;
+            }
+            const io = new IntersectionObserver(function (entries) {
+                if (entries.some(function (e) { return e.isIntersecting; })) {
+                    load();
+                    io.disconnect();
+                }
+            }, { rootMargin: '160px' });
+            io.observe(section);
+        }
+
         function loadAnalytics() {
             console.log('Iniciando carregamento dos gráficos...');
             
@@ -1027,18 +1089,8 @@ $veiculos = $stmt_veiculos->fetchAll(PDO::FETCH_ASSOC);
                     return response.json();
                 })
                 .then(data => {
-                    console.log('Dados recebidos da API:', data);
                     if (data.success) {
-                        console.log('Renderizando gráficos com os dados:', {
-                            custo_mensal: data.custo_mensal,
-                            quantidade_tipo: data.quantidade_tipo,
-                            top_pneus: data.top_pneus,
-                            media_tipo: data.media_tipo
-                        });
-                        renderCustoMensalChart(data.custo_mensal);
-                        renderQuantidadeTipoChart(data.quantidade_tipo);
-                        renderTopPneusChart(data.top_pneus);
-                        renderMediaTipoChart(data.media_tipo);
+                        applyManutencaoAnalytics(data);
                     } else {
                         console.error('API retornou erro:', data.message);
                     }

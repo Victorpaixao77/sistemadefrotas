@@ -5,7 +5,7 @@
  */
 
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
+require __DIR__ . '/_cors_same_origin.php';
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
 
@@ -13,15 +13,19 @@ require_once '../../includes/config.php';
 require_once '../../includes/db_connect.php';
 require_once '../../includes/functions.php';
 
+// A sessão precisa estar ativa para saber a empresa do usuário (isolamento por empresa).
+configure_session();
+session_start();
+
 try {
-    // Verificar se o usuário está logado (mas não bloquear)
-    $usuario_logado = isLoggedIn();
-    if (!$usuario_logado) {
-        // Se não estiver logado, usar empresa_id padrão
-        $empresa_id = 1;
-    } else {
-        $empresa_id = $_SESSION['empresa_id'];
+    // Exige login: a validação é SEMPRE do certificado da empresa do usuário logado
+    // (cada empresa valida o seu). Antes, sem session_start, caía sempre na empresa 1.
+    if (!isLoggedIn()) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Não autorizado']);
+        exit;
     }
+    $empresa_id = (int) $_SESSION['empresa_id'];
 
     $conn = getConnection();
     
@@ -95,10 +99,11 @@ try {
     ]);
     
 } catch (Exception $e) {
+    error_log('validar_sefaz.php: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'error' => 'Erro interno: ' . $e->getMessage()
+        'error' => 'Erro interno ao validar com a SEFAZ.'
     ]);
 }
 

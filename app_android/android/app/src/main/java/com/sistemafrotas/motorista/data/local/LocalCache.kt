@@ -229,7 +229,9 @@ class LocalCache(private val db: AppDatabase) {
 
     private suspend fun pendingChecklistItems(): List<ChecklistItem> = withContext(Dispatchers.IO) {
         val rotaById = rotaDao.getAll().associateBy { it.id }
-        pendingSyncDao.listByOperation(PendingSyncOperation.CREATE_CHECKLIST).map { row ->
+        (pendingSyncDao.listByOperation(PendingSyncOperation.CREATE_CHECKLIST) +
+            pendingSyncDao.listByOperation(PendingSyncOperation.CREATE_CHECKLIST_MULTIPART)
+        ).map { row ->
             val p = OutboxPayloadCodec.jsonToMap(row.payloadJson)
             val rid = (p["rota_id"] as? Number)?.toInt()
             val r = rid?.let { rotaById[it] }

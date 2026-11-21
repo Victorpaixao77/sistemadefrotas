@@ -33,6 +33,8 @@
 /* Dashboard principal — modo moderno (alinhado ao fornc-modern-page) */
 body.index-dashboard-modern .dashboard-content.fornc-page {
     padding-top: 8px;
+    width: 100%;
+    max-width: none;
 }
 body.index-dashboard-modern .index-alerts-modern {
     display: flex;

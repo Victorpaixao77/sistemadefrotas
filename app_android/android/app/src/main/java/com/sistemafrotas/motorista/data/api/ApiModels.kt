@@ -8,6 +8,7 @@ data class LoginRequest(
     val nome: String,
     val senha: String,
     val action: String = "login",
+    @SerializedName("totp_code") val totpCode: String? = null,
 )
 data class LoginResponse(
     val success: Boolean,
@@ -15,12 +16,13 @@ data class LoginResponse(
     val data: LoginData?,
 )
 data class LoginData(
-    val token: String,
-    @SerializedName("motorista_id") val motoristaId: Int,
-    @SerializedName("empresa_id") val empresaId: Int,
-    val nome: String,
-    @SerializedName("expira_em") val expiraEm: String?,
-    @SerializedName("refresh_token") val refreshToken: String?,
+    val token: String? = null,
+    @SerializedName("motorista_id") val motoristaId: Int? = null,
+    @SerializedName("empresa_id") val empresaId: Int? = null,
+    val nome: String? = null,
+    @SerializedName("expira_em") val expiraEm: String? = null,
+    @SerializedName("refresh_token") val refreshToken: String? = null,
+    @SerializedName("requires_2fa") val requires2fa: Boolean? = null,
 )
 
 data class ApiResponse<T>(
@@ -232,6 +234,19 @@ data class PedagiosResponse(
     @SerializedName("total_30d") val total30d: Double = 0.0,
 )
 
+// Avisos do motorista (polling)
+data class AvisoItem(
+    val chave: String,
+    val tipo: String?,
+    val titulo: String?,
+    val descricao: String?,
+    val data: String?,
+)
+data class AvisosResponse(
+    val avisos: List<AvisoItem> = emptyList(),
+    val total: Int = 0,
+)
+
 // Abastecimento inteligente (consumo + antifraude)
 data class AbastecimentoAlerta(
     val data: String?,
@@ -319,6 +334,7 @@ data class OcrCampos(
     val lacre: String? = null,
 )
 data class OcrDocumentoResponse(val tipo: String?, val campos: OcrCampos?)
+data class OcrLeituraResult(val tipo: String, val campos: OcrCampos)
 
 // Conferência de carga
 data class ConferenciaItem(
@@ -370,3 +386,40 @@ data class CarcacaResumo(
     @SerializedName("valor_investido") val valorInvestido: Double?,
     @SerializedName("status_carcaca") val statusCarcaca: String?,
 )
+
+// Modo Viagem / novos endpoints
+data class ViagemPoi(val nome: String, val lat: Double, val lng: Double)
+data class ViagemCerca(
+    val id: Int,
+    val nome: String,
+    val lat: Double,
+    val lng: Double,
+    @SerializedName("raio_metros") val raioMetros: Int,
+)
+data class ViagemContextData(
+    @SerializedName("rota_id") val rotaId: Int,
+    val destino: String?,
+    @SerializedName("destino_lat") val destinoLat: Double?,
+    @SerializedName("destino_lng") val destinoLng: Double?,
+    val postos: List<ViagemPoi>?,
+    val pedagios: List<ViagemPoi>?,
+    val cercas: List<ViagemCerca>?,
+)
+data class TripTimelineSyncResponse(@SerializedName("sincronizados") val sincronizados: Int?)
+data class MotoristaAssistenteResponse(val resposta: String?)
+data class MotoristaDocumentosData(
+    val nome: String?,
+    val cpf: String?,
+    val cnh: String?,
+    @SerializedName("categoria_cnh") val categoriaCnh: String?,
+    @SerializedName("data_validade_cnh") val dataValidadeCnh: String?,
+    @SerializedName("dias_para_vencer") val diasParaVencer: Int?,
+    @SerializedName("status_cnh") val statusCnh: String?,
+)
+data class GpsTrajetoPonto(
+    val lat: Double?,
+    val lng: Double?,
+    @SerializedName("velocidade_kmh") val velocidadeKmh: Double?,
+    @SerializedName("data_hora") val dataHora: String?,
+)
+data class GpsTrajetoResponse(val pontos: List<GpsTrajetoPonto>?, val total: Int?)

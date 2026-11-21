@@ -1,5 +1,6 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -81,9 +82,9 @@ fun RotasScreen(
 ) {
     var showForm by remember { mutableStateOf(false) }
     val vm: RotasViewModel = viewModel(factory = RotasViewModelFactory(authRepository))
-    val list by vm.list.collectAsState()
-    val refreshing by vm.refreshing.collectAsState()
-    val error by vm.error.collectAsState()
+    val list by vm.list.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
     var statusChip by remember { mutableStateOf<String?>(null) }
     var dataIniFiltro by remember { mutableStateOf("") }
     var dataFimFiltro by remember { mutableStateOf("") }

@@ -115,13 +115,22 @@ function getAbastecimentos($page = 1, $data_rota = '', $veiculo_id = '', $rota_i
 // Adicionar cálculo dos cartões do dashboard
 function getDashboardCountsAbastecimentos() {
     $conn = getConnection();
-    $empresa_id = $_SESSION['empresa_id'];
-    $total = $conn->query("SELECT COUNT(*) FROM abastecimentos WHERE empresa_id = $empresa_id AND status = 'pendente'")->fetchColumn();
-    $pendentes = $total;
-    $aprovados = $conn->query("SELECT COUNT(*) FROM abastecimentos WHERE empresa_id = $empresa_id AND status = 'aprovado'")->fetchColumn();
-    $rejeitados = $conn->query("SELECT COUNT(*) FROM abastecimentos WHERE empresa_id = $empresa_id AND status = 'rejeitado'")->fetchColumn();
+    $empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
+    // 1 query agregada (antes eram 3 COUNTs separados) + prepared statement.
+    $stmt = $conn->prepare(
+        "SELECT
+            SUM(status = 'pendente')  AS pendentes,
+            SUM(status = 'aprovado')  AS aprovados,
+            SUM(status = 'rejeitado') AS rejeitados
+         FROM abastecimentos WHERE empresa_id = :e"
+    );
+    $stmt->execute([':e' => $empresa_id]);
+    $r = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $pendentes = (int) ($r['pendentes'] ?? 0);
+    $aprovados = (int) ($r['aprovados'] ?? 0);
+    $rejeitados = (int) ($r['rejeitados'] ?? 0);
     return [
-        'total' => $total,
+        'total' => $pendentes,
         'pendentes' => $pendentes,
         'aprovados' => $aprovados,
         'rejeitados' => $rejeitados
@@ -159,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         setFlashMessage('success', $message);
     } catch (Exception $e) {
-        setFlashMessage('error', 'Erro ao processar abastecimento: ' . $e->getMessage());
+        setFlashMessage('error', 'Erro ao processar abastecimento: ');
     }
     
     header('Location: abastecimentos_motoristas.php' . ($is_modern ? '' : '?classic=1'));

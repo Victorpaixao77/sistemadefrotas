@@ -83,6 +83,8 @@ fun LoginScreen(
 ) {
     var usuario by remember { mutableStateOf("") }
     var senha by remember { mutableStateOf("") }
+    var totpCode by remember { mutableStateOf("") }
+    var needs2fa by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
@@ -98,8 +100,16 @@ fun LoginScreen(
         loading = true
         error = null
         coroutineScope.launch {
-            authRepository.login(usuario, senha)
-                .onSuccess { onLoginSuccess() }
+            authRepository.login(usuario, senha, totpCode.ifBlank { null })
+                .onSuccess { outcome ->
+                    when (outcome) {
+                        AuthRepository.LoginOutcome.SUCCESS -> onLoginSuccess()
+                        AuthRepository.LoginOutcome.NEEDS_2FA -> {
+                            needs2fa = true
+                            loading = false
+                        }
+                    }
+                }
                 .onFailure { loading = false; error = it.message ?: "Erro ao entrar" }
         }
     }
@@ -278,6 +288,29 @@ fun LoginScreen(
                             .fillMaxWidth()
                             .focusRequester(focusSenha),
                     )
+                    if (needs2fa) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        OutlinedTextField(
+                            value = totpCode,
+                            onValueChange = { totpCode = it.filter { c -> c.isDigit() }; error = null },
+                            label = { Text("Código do autenticador (2FA)", color = FrotecTextSecondary) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { tentarLogin() }),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color(0xFFeaf1fb),
+                                unfocusedTextColor = Color(0xFFeaf1fb),
+                                focusedBorderColor = FrotecPrimary,
+                                unfocusedBorderColor = FrotecBorder,
+                                focusedLabelColor = FrotecTextSecondary,
+                                unfocusedLabelColor = FrotecTextSecondary,
+                                cursorColor = FrotecPrimary,
+                                focusedContainerColor = FrotecInputBg,
+                                unfocusedContainerColor = FrotecInputBg,
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                     error?.let { msg ->
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(

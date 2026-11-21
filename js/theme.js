@@ -91,6 +91,10 @@ function toggleTheme() {
     
     // Update any theme-specific elements
     updateThemeSpecificElements(currentTheme);
+
+    if (window.SFColorTheme && typeof window.SFColorTheme.onThemeModeChange === 'function') {
+        window.SFColorTheme.onThemeModeChange();
+    }
 }
 
 /**

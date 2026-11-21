@@ -1,5 +1,6 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -35,9 +36,9 @@ fun DesempenhoScreen(
     val vm: DesempenhoViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository) { DesempenhoViewModel(it) }
     )
-    val data by vm.data.collectAsState()
-    val refreshing by vm.refreshing.collectAsState()
-    val error by vm.error.collectAsState()
+    val data by vm.data.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { vm.carregarSeNecessario() }
 

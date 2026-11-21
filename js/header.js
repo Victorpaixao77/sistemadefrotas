@@ -4,12 +4,17 @@
 
 function initHeader() {
     if (window.__sfHeaderInited) {
+        if (window.SFColorTheme && typeof window.SFColorTheme.initPalette === 'function') {
+            window.SFColorTheme.initPalette();
+        }
         return;
     }
     window.__sfHeaderInited = true;
     initNotifications();
     initProfileDropdown();
-    initColorPalette();
+    if (window.SFColorTheme && typeof window.SFColorTheme.initPalette === 'function') {
+        window.SFColorTheme.initPalette();
+    }
     initEmpresaSelector();
     setupHeaderEscapeKey();
 }
@@ -72,7 +77,9 @@ function initNotifications() {
             sf.updateBadge(badge, total);
         })
         .catch(error => {
-            console.error('Erro ao carregar notificações:', error);
+            // Fetch de fundo abortado (navegação) ou falha de rede — log discreto;
+            // a mensagem na lista abaixo cobre o caso do usuário com o painel aberto.
+            console.debug('carregar notificações adiado:', error && error.message);
             if (notificationList) {
                 notificationList.innerHTML = '<div style="padding:16px;color:#dc3545">Erro ao carregar notificações. Tente novamente.</div>';
             }
@@ -86,7 +93,22 @@ function initNotifications() {
 
     window.carregarNotificacoesOperacional = carregarNotificacoesOperacional;
 
-    sf.refreshBadges();
+    function applySsrBadges() {
+        var body = document.body;
+        if (!body || body.getAttribute('data-notif-op') === null) return false;
+        sf.updateBadge(badge, body.getAttribute('data-notif-op'));
+        sf.updateBadge(document.getElementById('iaNotificationBadge'), body.getAttribute('data-notif-ia'));
+        return true;
+    }
+
+    var hasSsrBadges = applySsrBadges();
+    if (!hasSsrBadges) {
+        sf.refreshBadges();
+    } else if (document.body && document.body.dataset.dashboardHome === '1') {
+        setTimeout(function () { sf.refreshBadges(); }, 12000);
+    } else {
+        setTimeout(function () { sf.refreshBadges(); }, 4000);
+    }
 
     notificationBtn.addEventListener('click', function(e) {
         e.preventDefault();
@@ -145,10 +167,22 @@ function initNotifications() {
         fetch(sfAppUrl('notificacoes/sync_all.php'), { credentials: 'same-origin' })
             .then(res => res.json())
             .then(data => { if (data.success) sf.refreshBadges(); })
-            .catch(err => console.error('sync notificacoes:', err));
+            // Best-effort: se a requisição for abortada (ex.: navegação) ou falhar,
+            // o próximo ciclo re-sincroniza. Não é erro de aplicação — log discreto.
+            .catch(err => console.debug('sync notificacoes adiado:', err && err.message));
     }
 
-    verificarPendenciasHeader();
+    // Adia sync pesado para não competir com o carregamento da próxima página ao clicar no menu.
+    function scheduleHeaderSync() {
+        var run = function () { verificarPendenciasHeader(); };
+        if (typeof requestIdleCallback === 'function') {
+            requestIdleCallback(run, { timeout: 8000 });
+        } else {
+            setTimeout(run, 3500);
+        }
+    }
+
+    scheduleHeaderSync();
     setInterval(verificarPendenciasHeader, 5 * 60 * 1000);
     setInterval(function () { sf.refreshBadges(); }, 2 * 60 * 1000);
 }
@@ -257,83 +291,12 @@ function setupHeaderEscapeKey() {
 }
 
 /**
- * Inicializar seletor de cores
+ * Inicializar seletor de cores (legado — delegado a SFColorTheme)
  */
 function initColorPalette() {
-    // Obter todos os inputs de cores
-    const colorInputs = document.querySelectorAll('input[type="color"]');
-    const restoreBtn = document.getElementById('restoreDefaultColors');
-    
-    if (!colorInputs.length || !restoreBtn) return;
-    
-    // Carregar cores salvas do localStorage
-    loadSavedColors();
-    
-    // Adicionar event listeners para os inputs de cores
-    colorInputs.forEach(input => {
-        input.addEventListener('input', function() {
-            // Obter a variável CSS a ser alterada
-            const cssVar = this.dataset.colorVar;
-            if (cssVar) {
-                document.documentElement.style.setProperty(cssVar, this.value);
-                saveColorPreference(cssVar, this.value);
-            }
-        });
-    });
-    
-    // Restaurar cores padrão
-    restoreBtn.addEventListener('click', function() {
-        colorInputs.forEach(input => {
-            const cssVar = input.dataset.colorVar;
-            if (cssVar) {
-                const defaultValue = getDefaultColorValue(cssVar);
-                input.value = defaultValue;
-                document.documentElement.style.setProperty(cssVar, defaultValue);
-                localStorage.removeItem(cssVar);
-            }
-        });
-    });
-}
-
-/**
- * Carregar cores salvas do localStorage
- */
-function loadSavedColors() {
-    const colorInputs = document.querySelectorAll('input[type="color"]');
-    
-    colorInputs.forEach(input => {
-        const cssVar = input.dataset.colorVar;
-        if (cssVar) {
-            const savedColor = localStorage.getItem(cssVar);
-            if (savedColor) {
-                input.value = savedColor;
-                document.documentElement.style.setProperty(cssVar, savedColor);
-            }
-        }
-    });
-}
-
-/**
- * Salvar preferência de cor no localStorage
- */
-function saveColorPreference(variable, value) {
-    localStorage.setItem(variable, value);
-}
-
-/**
- * Obter valor padrão de uma variável de cor
- */
-function getDefaultColorValue(variable) {
-    const defaultColors = {
-        '--accent-primary': '#3b82f6',
-        '--bg-secondary': '#1a2332',
-        '--bg-primary': '#0f1824',
-        '--bg-sidebar': '#121a29',
-        '--card-bg': '#1e293b',
-        '--bg-tertiary': '#243041'
-    };
-    
-    return defaultColors[variable] || '#000000';
+    if (window.SFColorTheme && typeof window.SFColorTheme.initPalette === 'function') {
+        window.SFColorTheme.initPalette();
+    }
 }
 
 /**

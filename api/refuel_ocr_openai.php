@@ -130,6 +130,82 @@ function refuel_ocr_normalize_openai_item(array $item): ?array
 }
 
 /**
+ * Normaliza o cabeçalho da viagem (ficha de frete) lido pela IA.
+ * Retorna campos limpos + versões formatadas para o front revisar.
+ */
+function refuel_ocr_normalize_rota($rota): ?array
+{
+    if (!is_array($rota)) {
+        return null;
+    }
+    $str = function ($v, int $max = 120): string {
+        $s = trim((string) ($v ?? ''));
+        if ($s === '') return '';
+        $len = function_exists('mb_strlen') ? mb_strlen($s, 'UTF-8') : strlen($s);
+        if ($len > $max) {
+            $s = function_exists('mb_substr') ? mb_substr($s, 0, $max, 'UTF-8') : substr($s, 0, $max);
+        }
+        return $s;
+    };
+    $isoDate = function ($v): string {
+        $p = refuel_ocr_parse_br_date_parts(trim((string) ($v ?? '')));
+        if ($p === null) return '';
+        return sprintf('%04d-%02d-%02d', $p['y'], $p['m'], $p['d']);
+    };
+    $kmInt = function ($v): ?int {
+        return refuel_ocr_parse_km($v);
+    };
+    $dec = function ($v): ?float {
+        if ($v === null || $v === '') return null;
+        return refuel_ocr_parse_decimal_mixed($v);
+    };
+
+    $out = [
+        'motorista' => $str($rota['motorista'] ?? '', 120),
+        'origem' => $str($rota['origem'] ?? '', 120),
+        'destino' => $str($rota['destino'] ?? '', 120),
+        'data_saida' => $isoDate($rota['data_saida'] ?? ''),
+        'data_chegada' => $isoDate($rota['data_chegada'] ?? ''),
+        'km_saida' => $kmInt($rota['km_saida'] ?? null),
+        'km_chegada' => $kmInt($rota['km_chegada'] ?? null),
+        'km_rodado' => $kmInt($rota['km_rodado'] ?? null),
+        'descricao' => $str($rota['tipo_carga'] ?? $rota['descricao_carga'] ?? $rota['descricao'] ?? '', 120),
+        'peso_saida' => $dec($rota['peso_saida'] ?? null),
+        'total_frete' => $dec($rota['total_frete'] ?? null),
+        'comissao' => $dec($rota['comissao'] ?? null),
+        'adiantamento' => $dec($rota['adiantamento'] ?? null),
+        'pedagio' => $dec($rota['pedagio'] ?? null),
+        'anotacoes' => $str($rota['anotacoes'] ?? '', 400),
+    ];
+    // Despesas de viagem extras (pedágio/adiantamento ficam no topo; aqui o resto).
+    $d = is_array($rota['despesas'] ?? null) ? $rota['despesas'] : [];
+    $out['despesas'] = [
+        'descarga' => $dec($d['descarga'] ?? null),
+        'caixinha' => $dec($d['caixinha'] ?? null),
+        'estacionamento' => $dec($d['estacionamento'] ?? null),
+        'lavagem' => $dec($d['lavagem'] ?? null),
+        'borracharia' => $dec($d['borracharia'] ?? null),
+        'eletrica_mecanica' => $dec($d['eletrica_mecanica'] ?? null),
+        'outros' => $dec($d['outros'] ?? null),
+    ];
+    // KM rodado: se não veio, deriva de chegada - saída.
+    if ($out['km_rodado'] === null && $out['km_saida'] !== null && $out['km_chegada'] !== null && $out['km_chegada'] >= $out['km_saida']) {
+        $out['km_rodado'] = $out['km_chegada'] - $out['km_saida'];
+    }
+    // Tem algum dado útil?
+    $hasAny = false;
+    foreach ($out as $k => $v) {
+        if ($k === 'despesas') {
+            foreach ($v as $dv) { if ($dv !== null) { $hasAny = true; break; } }
+            if ($hasAny) break;
+            continue;
+        }
+        if ($v !== '' && $v !== null) { $hasAny = true; break; }
+    }
+    return $hasAny ? $out : null;
+}
+
+/**
  * @return array{y: int, m: int, d: int}|null
  */
 function refuel_ocr_parse_br_date_parts(string $s): ?array
@@ -494,6 +570,32 @@ function refuel_ocr_chat_usage_tokens(array $response): array
     return [(int) ($u['prompt_tokens'] ?? 0), (int) ($u['completion_tokens'] ?? 0)];
 }
 
+/** Limite de tokens de saída — fichas raramente precisam de 4k; OpenRouter free cobra pelo teto reservado. */
+function refuel_ocr_max_tokens(string $provider): int
+{
+    $env = (int) getenv('SF_REFUEL_OCR_MAX_TOKENS');
+    if ($env >= 256 && $env <= 8192) {
+        return $env;
+    }
+    if ($provider === 'openrouter') {
+        return 2048;
+    }
+
+    return 3072;
+}
+
+function refuel_ocr_openrouter_affordable_tokens(string $message): ?int
+{
+    if (preg_match('/can only afford\s+(\d+)/i', $message, $m)) {
+        $n = (int) $m[1];
+        if ($n >= 512) {
+            return max(512, $n - 128);
+        }
+    }
+
+    return null;
+}
+
 configure_session();
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -502,11 +604,15 @@ if (session_status() === PHP_SESSION_NONE) {
 header('Content-Type: application/json; charset=utf-8');
 
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 $empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
 if ($empresa_id <= 0) {
     api_json_error('ID da empresa não encontrado', 400);
 }
+
+$conn = getConnection();
+sf_ia_enforce_quota($conn, $empresa_id);
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     api_json_method_not_allowed('Use POST.');
@@ -615,23 +721,30 @@ $model = $visionModel;
 $system = 'Você transcreve fichas de transporte no Brasil. Responda somente JSON válido, sem markdown, sem texto fora do JSON. Não invente dados.';
 
 $userText = <<<'TXT'
-Na imagem, localize APENAS a tabela ou bloco rotulado como ABASTECIMENTO (colunas típicas: Data, KM, Posto, L ou litros, R$ ou valor).
+Esta é uma FICHA DE FRETE/VIAGEM brasileira. Extraia DUAS coisas em um ÚNICO JSON.
 
-Extraia somente linhas que são claramente um registro de abastecimento nessa tabela. Ignore: totais de frete, KM saída/chegada do cabeçalho, pedágio, estacionamento, "anotações gerais", valores soltos fora da tabela de abastecimento.
+(A) "rota" — dados do cabeçalho da viagem. Preencha SÓ o que ler com clareza; omita o campo se não ler.
+{"motorista":"","data_saida":"dd/mm/aa","data_chegada":"dd/mm/aa","origem":"cidade","destino":"cidade","km_saida":0,"km_chegada":0,"km_rodado":0,"tipo_carga":"","peso_saida":0,"total_frete":0,"comissao":0,"adiantamento":0,"pedagio":0,"despesas":{"descarga":0,"caixinha":0,"estacionamento":0,"lavagem":0,"borracharia":0,"eletrica_mecanica":0,"outros":0},"anotacoes":""}
+Em "despesas" coloque outros gastos da viagem que aparecerem na ficha (descarga/chapa, caixinha, estacionamento, lavagem, borracharia, mecânica/elétrica). Qualquer gasto que não se encaixe nas categorias vai em "outros". Omita o que não ler.
 
-NUNCA preencha com suposições: se não ler com clareza data, km, posto, litros e valor da mesma linha, omita essa linha. Não use texto genérico como posto "Pequena" ou números copiados de outras colunas.
+IMPORTANTE — os rótulos da ficha VARIAM; identifique pelo significado, não pelo texto exato do rótulo:
+- "tipo_carga" = descrição/produto transportado: rótulos como "Tipo Carga", "Tipo de Carga", "Mercadoria", "Produto", "Carga" (ex.: adubo, soja, milho, fertilizante).
+- "origem" = "Frete de", "Origem", "Saída"; "destino" = "Para", "Destino", "Entrega".
+- "km_saida" = "Km Saída Carregado" (ou Vazio); "km_chegada" = "Km Chegada Carregado".
+- "peso_saida" = "Peso Saída" (em kg; 48,000 = 48000); "total_frete" = "Preço Total" / "Valor Frete" / "Total Bruto"; "comissao" = "Comissão".
 
-Responda com um ÚNICO JSON:
-{"abastecimentos":[{"data":"dd/mm/aaaa","km":0,"posto":"nome","litros":0,"valor_total":0}]}
+(B) "abastecimentos" — linhas da tabela/bloco rotulado ABASTECIMENTO (colunas: Data, KM, Posto, L ou litros, R$ ou valor).
+[{"data":"dd/mm/aaaa","km":0,"posto":"nome","litros":0,"valor_total":0}]
 
-Aceitamos também array na raiz ou campo "rows" com o mesmo formato de objetos.
+NUNCA invente. No abastecimento, se não ler com clareza data, km, posto, litros e valor da MESMA linha, omita a linha. Não confunda o KM saída/chegada do cabeçalho (rota) com o KM de cada abastecimento.
 
 Regras de formato:
-- "data": exatamente como na célula (ex.: 22/02/25 ou 22/02/2025).
-- "km": hodômetro inteiro da coluna KM da linha; separador de milhar com ponto vira dígitos (84.971 → 84971).
-- "litros" e "valor_total": números com ponto decimal (ex.: 428 e 2523.33).
-- "posto": nome do posto como escrito.
-- Se não houver linhas legíveis na tabela de abastecimento: {"abastecimentos":[]}.
+- datas: como na célula (ex.: 22/02/25 ou 22/02/2025).
+- "km" do abastecimento: hodômetro inteiro da coluna KM da linha; milhar com ponto vira dígitos (84.971 → 84971).
+- números monetários e litros: ponto decimal (12.410,48 → 12410.48; litros 428; valor 2523.33).
+- "posto": nome como escrito.
+
+Responda SOMENTE o JSON: {"rota":{...},"abastecimentos":[...]}. Sem abastecimentos legíveis: {"rota":{...},"abastecimentos":[]}.
 TXT;
 
 $jsonFlags = JSON_UNESCAPED_UNICODE;
@@ -643,6 +756,7 @@ $response = [];
 $content = '';
 $curlErr = '';
 $rows = [];
+$rotaData = null;
 $warnings = [];
 $source = $visionSource;
 $provider = $visionProvider;
@@ -651,6 +765,7 @@ $deepseekFailure = false;
 $deepseekFailureMsg = '';
 $http = 0;
 if ($key !== '') {
+    $maxTokens = refuel_ocr_max_tokens($visionProvider);
     $payload = [
         'model' => $model,
         'messages' => [
@@ -664,63 +779,82 @@ if ($key !== '') {
             ],
         ],
         'response_format' => ['type' => 'json_object'],
-        'max_tokens' => 4096,
+        'max_tokens' => $maxTokens,
         'temperature' => 0.05,
     ];
     $url = $visionUrl;
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_HTTPHEADER => [
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $key,
-        ],
-        CURLOPT_POSTFIELDS => json_encode($payload, $jsonFlags),
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 120,
-    ]);
-
-    $raw = curl_exec($ch);
-    $curlErr = curl_error($ch);
-    $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
     $provLabel = $visionLabel;
-    if ($raw === false || $raw === '') {
-        $deepseekFailure = true;
-        $deepseekFailureMsg = 'Falha ao contatar ' . $provLabel . ': ' . ($curlErr !== '' ? $curlErr : 'resposta vazia');
-    } else {
+    $attempt = 0;
+    while ($attempt < 2) {
+        $attempt++;
+        $payload['max_tokens'] = $maxTokens;
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $key,
+            ],
+            CURLOPT_POSTFIELDS => json_encode($payload, $jsonFlags),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 120,
+        ]);
+
+        $raw = curl_exec($ch);
+        $curlErr = curl_error($ch);
+        $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($raw === false || $raw === '') {
+            $deepseekFailure = true;
+            $deepseekFailureMsg = 'Falha ao contatar ' . $provLabel . ': ' . ($curlErr !== '' ? $curlErr : 'resposta vazia');
+            break;
+        }
         $response = json_decode($raw, true);
         if (!is_array($response)) {
             $deepseekFailure = true;
             $deepseekFailureMsg = 'Resposta inválida da API ' . $provLabel . '.';
-        } elseif ($http < 200 || $http >= 300) {
-            $deepseekFailure = true;
-            // Extrai detalhe do erro do provedor (motivo real: cota, limite de taxa, etc.).
-            // Alguns provedores (Gemini) embrulham em array: [{"error":{...}}].
-            $errObj = $response['error'] ?? ($response[0]['error'] ?? null);
-            $apiErrMsg = is_array($errObj) ? (string) ($errObj['message'] ?? '') : '';
-            $apiErrType = is_array($errObj)
-                ? (string) ($errObj['status'] ?? ($errObj['type'] ?? ($errObj['code'] ?? '')))
-                : '';
-            if ($http === 429) {
-                $probe = strtolower($apiErrType . ' ' . $apiErrMsg);
-                $isExhausted = preg_match('/quota|billing|exhaust|insufficient|free tier|per day|requests per/', $probe) === 1;
-                $detail = $apiErrMsg !== '' ? ' Detalhe do provedor: ' . $apiErrMsg : '';
-                if ($isExhausted) {
-                    $deepseekFailureMsg = $provLabel . ': cota/créditos esgotados ou indisponíveis (HTTP 429). Verifique cota/billing da conta ' . $provLabel . '.' . $detail;
-                } else {
-                    $deepseekFailureMsg = $provLabel . ': limite de requisições (HTTP 429). Aguarde e tente novamente.' . $detail;
-                }
+            break;
+        }
+        if ($http >= 200 && $http < 300) {
+            break;
+        }
+        $errObj = $response['error'] ?? ($response[0]['error'] ?? null);
+        $apiErrMsg = is_array($errObj) ? (string) ($errObj['message'] ?? '') : '';
+        $apiErrType = is_array($errObj)
+            ? (string) ($errObj['status'] ?? ($errObj['type'] ?? ($errObj['code'] ?? '')))
+            : '';
+        if ($http === 402 && $attempt === 1 && $visionProvider === 'openrouter') {
+            $affordable = refuel_ocr_openrouter_affordable_tokens($apiErrMsg);
+            if ($affordable !== null && $affordable < $maxTokens) {
+                $maxTokens = $affordable;
+                continue;
+            }
+        }
+        $deepseekFailure = true;
+        if ($http === 429) {
+            $probe = strtolower($apiErrType . ' ' . $apiErrMsg);
+            $isExhausted = preg_match('/quota|billing|exhaust|insufficient|free tier|per day|requests per/', $probe) === 1;
+            $detail = $apiErrMsg !== '' ? ' Detalhe do provedor: ' . $apiErrMsg : '';
+            if ($isExhausted) {
+                $deepseekFailureMsg = $provLabel . ': cota/créditos esgotados ou indisponíveis (HTTP 429). Verifique cota/billing da conta ' . $provLabel . '.' . $detail;
             } else {
-                $deepseekFailureMsg = $provLabel . ' retornou erro HTTP ' . $http . ($apiErrMsg !== '' ? ': ' . $apiErrMsg : '.');
+                $deepseekFailureMsg = $provLabel . ': limite de requisições (HTTP 429). Aguarde e tente novamente.' . $detail;
             }
+        } elseif ($http === 402) {
+            $deepseekFailureMsg = $provLabel . ': créditos insuficientes (HTTP 402).'
+                . ($apiErrMsg !== '' ? ' ' . $apiErrMsg : '')
+                . ' Use Google Gemini gratuito em Configurações → IA de Visão, ou adicione créditos no OpenRouter.';
         } else {
-            $content = trim((string) ($response['choices'][0]['message']['content'] ?? ''));
-            if ($content === '') {
-                $deepseekFailure = true;
-                $deepseekFailureMsg = $provLabel . ' não retornou conteúdo.';
-            }
+            $deepseekFailureMsg = $provLabel . ' retornou erro HTTP ' . $http . ($apiErrMsg !== '' ? ': ' . $apiErrMsg : '.');
+        }
+        break;
+    }
+    if (!$deepseekFailure && $http >= 200 && $http < 300) {
+        $content = trim((string) ($response['choices'][0]['message']['content'] ?? ''));
+        if ($content === '') {
+            $deepseekFailure = true;
+            $deepseekFailureMsg = $provLabel . ' não retornou conteúdo.';
         }
     }
     if (!$deepseekFailure) {
@@ -750,6 +884,9 @@ if (!$deepseekFailure) {
         $deepseekFailure = true;
         $deepseekFailureMsg = 'JSON retornado pela IA inválido.';
     } else {
+        if (isset($parsed['rota']) && is_array($parsed['rota'])) {
+            $rotaData = refuel_ocr_normalize_rota($parsed['rota']);
+        }
         $list = $parsed['abastecimentos'] ?? $parsed['rows'] ?? null;
         if (!is_array($list) && isset($parsed[0]) && is_array($parsed[0])) {
             $list = $parsed;
@@ -824,6 +961,7 @@ if ($deepseekFailure && $rows === []) {
 api_json_send([
     'success' => true,
     'rows' => $rows,
+    'rota' => $rotaData,
     'source' => $source,
     'model' => $model,
     'provider' => $provider,

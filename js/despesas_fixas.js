@@ -335,7 +335,59 @@ async function loadPaymentMethods() {
     }
 }
 
+function applyDespesasFixasInitialPayload(initial, refreshTable) {
+    if (!initial || !initial.success) return false;
+    currentPage = initial.pagina_atual || 1;
+    updateKPICards(initial.metrics);
+    if (refreshTable !== false) {
+        const tbody = document.querySelector('#despesasTable tbody');
+        const alreadyRendered = tbody && tbody.querySelector('tr') && !tbody.querySelector('.df-loading-row');
+        if (!alreadyRendered) {
+            updateDespesasTable(initial.despesas, {
+                totalCadastrados: initial.total_cadastrados != null
+                    ? initial.total_cadastrados
+                    : (initial.metrics && initial.metrics.total_despesas) || 0
+            });
+        }
+    }
+    updatePagination(initial.pagina_atual, initial.total_paginas, initial.total_registros || 0);
+    syncDfSortIndicators();
+    return true;
+}
+
+let _dfChartsScheduled = false;
+function scheduleDfChartsLoad(chartsData) {
+    if (_dfChartsScheduled) return;
+    const section = document.querySelector('.analytics-section');
+    const load = function () {
+        initializeDespesasTipoChart();
+        initializeStatusDespesasChart();
+        initializeTopVeiculosChart();
+        initializeFormasPagamentoChart();
+        if (chartsData) {
+            updateCharts(chartsData);
+        }
+    };
+    if (!section) {
+        load();
+        return;
+    }
+    _dfChartsScheduled = true;
+    if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver(function (entries) {
+            if (entries.some(function (e) { return e.isIntersecting; })) {
+                load();
+                io.disconnect();
+            }
+        }, { rootMargin: '160px' });
+        io.observe(section);
+    } else {
+        setTimeout(load, 600);
+    }
+}
+
 async function loadDespesasData(page = null) {
+    let _dfDone = null;
     try {
         // Update current page if provided; senão usar página da URL para ficar igual ao PHP
         if (page !== null) {
@@ -395,8 +447,8 @@ async function loadDespesasData(page = null) {
 
         if (isModern) {
             syncDfEmptyState({ mode: 'hidden' });
-            const tbody = document.querySelector('#despesasTable tbody');
-            if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="text-center">Carregando…</td></tr>';
+            // Anti-flash: mantém as linhas atuais e só esmaece se a resposta demorar (>180ms).
+            _dfDone = (typeof sfDeferTableFlash === 'function') ? sfDeferTableFlash(document.getElementById('despesasTable')) : null;
         }
 
         const response = await fetch(url);
@@ -414,8 +466,9 @@ async function loadDespesasData(page = null) {
         syncDfSortIndicators();
         updateKPICards(data.metrics);
         updateCharts(data.charts);
-        
+        if (_dfDone) _dfDone();
     } catch (error) {
+        if (_dfDone) _dfDone();
         console.error('Erro ao carregar dados:', error);
     }
 }
@@ -816,11 +869,17 @@ document.addEventListener('DOMContentLoaded', async function() {
             dfSortDir = (urlParamsInit.get('dir') || '').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
         }
 
-        // Initialize components
-        initializeDespesasTipoChart();
-        initializeStatusDespesasChart();
-        initializeTopVeiculosChart();
-        initializeFormasPagamentoChart();
+        // Initialize components (gráficos lazy quando SSR)
+        const hasInitial = !!(window.__DESPESAS_FIXAS_INITIAL__ && window.__DESPESAS_FIXAS_INITIAL__.success);
+        if (hasInitial) {
+            applyDespesasFixasInitialPayload(window.__DESPESAS_FIXAS_INITIAL__, false);
+            scheduleDfChartsLoad(window.__DESPESAS_FIXAS_INITIAL__.charts);
+        } else {
+            initializeDespesasTipoChart();
+            initializeStatusDespesasChart();
+            initializeTopVeiculosChart();
+            initializeFormasPagamentoChart();
+        }
         
         // Load data for selects
         await Promise.all([
@@ -847,11 +906,14 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
         });
         
-        // Load initial data
-        await loadDespesasData();
+        // Load initial data (pular se SSR já entregou tabela/KPIs)
+        if (!hasInitial) {
+            await loadDespesasData();
+        }
 
         // Setup filter event listeners
-        document.getElementById('filterBtn').addEventListener('click', showFilterModal);
+        var _fbFx = document.getElementById('filterBtn');
+        if (_fbFx) _fbFx.addEventListener('click', showFilterModal);
         document.getElementById('addDespesaBtn').addEventListener('click', showAddDespesaModal);
 
         var dfEmptyCreateBtn = document.getElementById('dfEmptyCreateBtn');

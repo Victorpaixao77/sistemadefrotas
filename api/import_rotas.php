@@ -6,6 +6,7 @@ require_once __DIR__ . '/../includes/functions.php';
 configure_session();
 if (session_status() === PHP_SESSION_NONE) session_start();
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 header('Content-Type: application/json');
 
 // Erros graves viram exceção; avisos/deprecações só entram no log (PhpSpreadsheet + PHP 8.x em produção geram muitos E_DEPRECATED).
@@ -23,7 +24,7 @@ set_error_handler(function ($severity, $message, $file, $line) {
 set_exception_handler(function($e) {
     error_log('import_rotas.php exception: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     http_response_code(500);
-    echo json_encode(['error' => 'Internal server error', 'message' => $e->getMessage()]);
+    echo json_encode(['error' => 'Internal server error', 'message' => 'Erro interno.']);
     exit;
 });
 
@@ -45,7 +46,7 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
         $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($tmp);
     } catch (\Throwable $e) {
         http_response_code(500);
-        echo json_encode(['error' => 'Erro ao ler o Excel: ' . $e->getMessage()]);
+        echo json_encode(['error' => 'Erro ao ler o Excel: ']);
         exit;
     }
     $sheets = $spreadsheet->getSheetNames();

@@ -764,7 +764,8 @@ function loadRefuelingData(page = null) {
         emptyElStart.classList.remove('visible');
         wrapStart.style.display = '';
     }
-    if (loadingEl) loadingEl.classList.add('is-visible');
+    // Anti-flash: só mostra o loading se a resposta demorar (>180ms). Paginação rápida não pisca.
+    var _refuelLoadTimer = setTimeout(function () { if (loadingEl) loadingEl.classList.add('is-visible'); }, 180);
 
     if (page !== null) {
         const parsedPage = parseInt(page, 10);
@@ -826,6 +827,7 @@ function loadRefuelingData(page = null) {
             return response.json();
         })
         .then(data => {
+            clearTimeout(_refuelLoadTimer);
             if (loadingEl) loadingEl.classList.remove('is-visible');
             if (data.success) {
                 updateRefuelingsTable(data.data);
@@ -849,6 +851,7 @@ function loadRefuelingData(page = null) {
             }
         })
         .catch(error => {
+            clearTimeout(_refuelLoadTimer);
             if (loadingEl) loadingEl.classList.remove('is-visible');
             if (window.__SF_DEBUG__) console.error('Erro ao carregar abastecimentos:', error);
             var msg = typeof sfSafeErrorMessage === 'function' ? sfSafeErrorMessage(error) : (error.message || 'Erro');
@@ -1963,27 +1966,67 @@ function setupFilters() {
     });
 }
 
+function applyRefuelInitialPayload(data, rerenderTable) {
+    if (!data || !data.success) return;
+    if (data.pagination) {
+        refuelingCurrentPage = data.pagination.page || 1;
+        updatePagination(data.pagination);
+    }
+    if (rerenderTable !== false && data.data) {
+        updateRefuelingsTable(data.data);
+    }
+}
+
+let refuelChartsLoaded = false;
+function scheduleRefuelChartsLoad() {
+    const section = document.querySelector('.analytics-section');
+    if (!section) return;
+    const load = function () {
+        if (refuelChartsLoaded) return;
+        refuelChartsLoaded = true;
+        Promise.all([
+            loadConsumptionChart(),
+            loadEfficiencyChart(),
+            loadAnomaliesChart(),
+            loadDriverConsumptionChart(),
+            loadVehicleEfficiencyChart(),
+            loadMonthlyCostChart()
+        ]).catch(function (error) {
+            if (window.__SF_DEBUG__) console.error('Erro ao carregar gráficos iniciais:', error);
+        });
+    };
+    if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver(function (entries) {
+            if (entries.some(function (e) { return e.isIntersecting; })) {
+                load();
+                io.disconnect();
+            }
+        }, { rootMargin: '160px' });
+        io.observe(section);
+    } else {
+        setTimeout(load, 600);
+    }
+}
+
 function initializePage() {
     restoreRefuelFiltersFromUrl();
     syncRefuelSortIndicators();
     wireRefuelSortHeaders();
 
-    loadRefuelingData();
-    loadRefuelingSummary();
+    const hasInitial = !!(window.__REFUEL_INITIAL__ && window.__REFUEL_INITIAL__.success);
+    if (hasInitial) {
+        applyRefuelInitialPayload(window.__REFUEL_INITIAL__, false);
+        if (window.__REFUEL_INITIAL__.summary) {
+            updateMetricCards(window.__REFUEL_INITIAL__.summary);
+        }
+    } else {
+        loadRefuelingData();
+        loadRefuelingSummary();
+    }
+
     loadFilterOptions();
-
     setupRefuelAnomalies();
-
-    Promise.all([
-        loadConsumptionChart(),
-        loadEfficiencyChart(),
-        loadAnomaliesChart(),
-        loadDriverConsumptionChart(),
-        loadVehicleEfficiencyChart(),
-        loadMonthlyCostChart()
-    ]).catch(function (error) {
-        if (window.__SF_DEBUG__) console.error('Erro ao carregar gráficos iniciais:', error);
-    });
+    scheduleRefuelChartsLoad();
 
     var addBtn = document.getElementById('addRefuelBtn');
     if (addBtn) addBtn.addEventListener('click', showAddRefuelModal);

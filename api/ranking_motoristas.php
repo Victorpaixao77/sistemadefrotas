@@ -330,7 +330,7 @@ function getDetalhesMotorista($conn, $empresa_id, $motorista_id) {
         
     } catch (Exception $e) {
         error_log("Erro ao buscar detalhes do motorista: " . $e->getMessage());
-        echo json_encode(['error' => 'Erro ao buscar detalhes: ' . $e->getMessage()]);
+        echo json_encode(['error' => 'Erro ao buscar detalhes: ']);
     }
 }
 
@@ -511,7 +511,7 @@ function calcularRankingMotoristas($conn, $empresa_id) {
         
     } catch (Exception $e) {
         error_log("Erro ao calcular ranking: " . $e->getMessage());
-        echo json_encode(['error' => 'Erro ao calcular ranking: ' . $e->getMessage()]);
+        echo json_encode(['error' => 'Erro ao calcular ranking: ']);
     }
 }
 

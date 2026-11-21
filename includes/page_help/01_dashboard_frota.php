@@ -188,6 +188,13 @@ return [
         ['text' => 'Concluir viagem', 'sub' => ['Atualize KM final e despesas reais.', 'Status Concluída alimenta lucratividade.']],
         ['text' => 'Investigar anomalia', 'sub' => ['Abra o painel de anomalias IA.', 'Compare com rotas similares do mesmo trecho.']],
     ]),
+    'fluxo' => sf_hlp_ol([
+        '<strong>Cotação/OT ou Planejamento</strong> — a rota pode nascer de uma Ordem de Transporte aprovada (ou ser criada direto aqui).',
+        '<strong>Rotas (aqui)</strong> — você define veículo, motorista, trecho e frete; use o <em>Simulador</em> antes para garantir margem.',
+        '<strong>Execução no app do motorista</strong> — GPS, abastecimentos, pedágios, despesas, checklist e POD chegam pelo celular.',
+        '<strong>Acompanhamento</strong> — o gestor vê no mapa da frota e no Centro de Operações; ao concluir, o KM final fecha os custos.',
+        '<strong>Resultado</strong> — a rota concluída alimenta <em>Comissões</em>, <em>Lucratividade</em>, <em>BI</em> e o <em>CT-e</em>.',
+    ]),
     'kpis' => sf_hlp_ul([
         '<strong>Rotas no período:</strong> total planejadas e concluídas.',
         '<strong>Faturamento:</strong> soma de fretes.',
@@ -212,6 +219,44 @@ return [
         'Rotas concluídas sem KM final distorcem custo/km — exija fechamento pelo motorista ou gestor.',
         'Use importação Excel para planejamento semanal de frotas grandes.',
         'Cruze com abastecimentos para validar consumo real vs estimado.',
+    ]),
+],
+'simulador_rota' => [
+    'title' => 'Simulador de Rota',
+    'visao_geral' => '<p>Calcula o custo, a margem e o <strong>frete de equilíbrio (lucro zero)</strong> de uma viagem antes de fechá-la. Traz o piso mínimo de frete da ANTT (Lei 13.703/2018) e um painel <strong>“Simulação rápida (what-if)”</strong> com controles 100% instantâneos — arraste e veja lucro, margem e ponto de equilíbrio mudarem na hora, sem traçar a rota.</p>',
+    'funcionalidades' => sf_hlp_ul([
+        '<strong>Simulação rápida (what-if):</strong> sliders de frete, distância, diesel, consumo, pedágio, comissão, custo/km, fixos e ida-e-volta — recalcula ao vivo, sem internet/mapa.',
+        '<strong>Frete de equilíbrio:</strong> o valor mínimo para lucro zero, destacado.',
+        '<strong>Piso ANTT:</strong> frete mínimo legal por eixo/carga (compare com o seu frete).',
+        '<strong>Simulação completa:</strong> traça a rota no mapa e detalha custos variáveis e fixos.',
+        '<strong>Margem-alvo:</strong> informe a margem desejada e veja o frete necessário.',
+    ]),
+    'como_usar' => sf_hlp_ol([
+        ['text' => 'Responder “e se…?” na hora (what-if)', 'sub' => [
+            'Arraste os controles (frete, distância, diesel, consumo, pedágio, comissão…).',
+            'Acompanhe lucro, margem e o <strong>frete de equilíbrio</strong> mudando ao vivo.',
+            'Marque “Ida e volta” para dobrar a distância.',
+            'Use <strong>Restaurar</strong> para voltar aos valores padrão.',
+        ]],
+        ['text' => 'Simular a rota completa', 'sub' => [
+            'Informe origem e destino para traçar no mapa e obter a distância real.',
+            'Ajuste custo/km, diesel, consumo, pedágio e comissão.',
+            'Leia custo total, margem e o frete de equilíbrio calculados.',
+        ]],
+        ['text' => 'Comparar com o piso ANTT', 'sub' => [
+            'Verifique se o frete cobre o piso mínimo legal (por eixos/tipo de carga).',
+        ]],
+    ]),
+    'fluxo' => sf_hlp_ol([
+        '<strong>Custos da operação</strong> — diesel, consumo, custo/km e fixos vêm da sua realidade (Abastecimentos, Despesas fixas, cadastro do veículo).',
+        '<strong>Simulador (aqui)</strong> — você testa cenários e descobre o frete mínimo (equilíbrio) e o piso ANTT.',
+        '<strong>Decisão comercial</strong> — com o frete definido, gere a <em>Cotação/OT</em> ou crie a <em>Rota</em> já com margem saudável.',
+        '<strong>Execução e conferência</strong> — depois compare o simulado com o real em <em>Rotas</em> e <em>Lucratividade</em>.',
+    ]),
+    'dicas' => sf_hlp_ul([
+        'O what-if é ideal para negociar: mostre ao cliente o impacto de diesel/distância no frete.',
+        'Se o seu frete ficar abaixo do piso ANTT, reveja — é o mínimo legal para o transporte rodoviário de carga.',
+        'Cadastre o consumo médio e o custo/km do veículo para simulações mais fiéis.',
     ]),
 ],
 ];

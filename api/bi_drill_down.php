@@ -10,6 +10,7 @@ require_once __DIR__ . '/../includes/db_connect.php';
 require_once __DIR__ . '/../includes/csrf.php';
 require_once __DIR__ . '/../includes/api_json.php';
 require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/bi_api_helpers.php';
 
 configure_session();
 if (session_status() === PHP_SESSION_NONE) {
@@ -17,6 +18,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 api_require_csrf_json();
 
@@ -77,6 +79,7 @@ try {
         if (!preg_match('/^\d{4}-\d{2}$/', $mes_ano)) {
             api_json_error('Parâmetro mes_ano inválido (use YYYY-MM)', 400, 'invalid_param');
         }
+        $mesBounds = bi_month_range_exclusive($mes_ano);
     } elseif (in_array($serie, $vehicleSeries, true) || $serie === 'desp_viagem_pie' || $serie === 'manut_pie') {
         // mes_ano opcional
     } else {
@@ -112,12 +115,12 @@ try {
             LEFT JOIN cidades cd ON cd.id = r.cidade_destino_id
             WHERE r.empresa_id = :eid
             AND r.data_saida IS NOT NULL
-            AND DATE_FORMAT(r.data_saida, '%Y-%m') = :mes
+            AND r.data_saida >= :mes_ini AND r.data_saida < :mes_excl
             ORDER BY r.data_saida DESC, r.id DESC
             LIMIT {$limit}
         ";
         $stmt = $conn->prepare($sql);
-        $stmt->execute(['eid' => $empresa_id, 'mes' => $mes_ano]);
+        $stmt->execute(['eid' => $empresa_id, 'mes_ini' => $mesBounds['ini'], 'mes_excl' => $mesBounds['excl']]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } elseif ($serie === 'abastecimentos') {
         $columns = [
@@ -144,12 +147,12 @@ try {
             LEFT JOIN motoristas mot ON mot.id = a.motorista_id AND mot.empresa_id = a.empresa_id
             WHERE a.empresa_id = :eid
             AND a.status = 'aprovado'
-            AND DATE_FORMAT(a.data_abastecimento, '%Y-%m') = :mes
+            AND a.data_abastecimento >= :mes_ini AND a.data_abastecimento < :mes_excl
             ORDER BY a.data_abastecimento DESC, a.id DESC
             LIMIT {$limit}
         ";
         $stmt = $conn->prepare($sql);
-        $stmt->execute(['eid' => $empresa_id, 'mes' => $mes_ano]);
+        $stmt->execute(['eid' => $empresa_id, 'mes_ini' => $mesBounds['ini'], 'mes_excl' => $mesBounds['excl']]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } elseif ($serie === 'manutencoes') {
         $columns = [
@@ -173,12 +176,12 @@ try {
             LEFT JOIN veiculos v ON v.id = m.veiculo_id AND v.empresa_id = m.empresa_id
             LEFT JOIN tipos_manutencao tm ON tm.id = m.tipo_manutencao_id
             WHERE m.empresa_id = :eid
-            AND DATE_FORMAT(m.data_manutencao, '%Y-%m') = :mes
+            AND m.data_manutencao >= :mes_ini AND m.data_manutencao < :mes_excl
             ORDER BY m.data_manutencao DESC, m.id DESC
             LIMIT {$limit}
         ";
         $stmt = $conn->prepare($sql);
-        $stmt->execute(['eid' => $empresa_id, 'mes' => $mes_ano]);
+        $stmt->execute(['eid' => $empresa_id, 'mes_ini' => $mesBounds['ini'], 'mes_excl' => $mesBounds['excl']]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } elseif ($serie === 'despesas_viagem') {
         $columns = [
@@ -203,12 +206,12 @@ try {
             LEFT JOIN veiculos v ON v.id = r.veiculo_id AND v.empresa_id = r.empresa_id
             WHERE dv.empresa_id = :eid
             AND r.data_saida IS NOT NULL
-            AND DATE_FORMAT(r.data_saida, '%Y-%m') = :mes
+            AND r.data_saida >= :mes_ini AND r.data_saida < :mes_excl
             ORDER BY r.data_saida DESC, r.id DESC
             LIMIT {$limit}
         ";
         $stmt = $conn->prepare($sql);
-        $stmt->execute(['eid' => $empresa_id, 'mes' => $mes_ano]);
+        $stmt->execute(['eid' => $empresa_id, 'mes_ini' => $mesBounds['ini'], 'mes_excl' => $mesBounds['excl']]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } elseif ($serie === 'despesas_fixas') {
         $columns = [
@@ -232,12 +235,13 @@ try {
             WHERE df.empresa_id = :eid
             AND df.status_pagamento_id = 2
             AND (df.data_pagamento IS NOT NULL OR df.vencimento IS NOT NULL)
-            AND DATE_FORMAT(COALESCE(df.data_pagamento, df.vencimento), '%Y-%m') = :mes
+            AND COALESCE(df.data_pagamento, df.vencimento) >= :mes_ini
+            AND COALESCE(df.data_pagamento, df.vencimento) < :mes_excl
             ORDER BY COALESCE(df.data_pagamento, df.vencimento) DESC, df.id DESC
             LIMIT {$limit}
         ";
         $stmt = $conn->prepare($sql);
-        $stmt->execute(['eid' => $empresa_id, 'mes' => $mes_ano]);
+        $stmt->execute(['eid' => $empresa_id, 'mes_ini' => $mesBounds['ini'], 'mes_excl' => $mesBounds['excl']]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } elseif ($serie === 'rotas_veiculo') {
         $vid = isset($_GET['veiculo_id']) ? (int) $_GET['veiculo_id'] : 0;

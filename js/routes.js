@@ -23,8 +23,14 @@ function sfErrUserMessage(err, fallback) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    const hasInitial = !!(window.__ROUTES_INITIAL__ && window.__ROUTES_INITIAL__.success);
+    if (hasInitial) {
+        applyRoutesInitialPayload(window.__ROUTES_INITIAL__, false);
+        setupTableButtons();
+    }
+
     // Initialize page
-    initializePage();
+    initializePage(hasInitial);
 
     wireRoutesKpiClicks();
     wireRoutesSortHeaders();
@@ -67,11 +73,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     initializeEventListeners();
-    
-    // Carrega os dados iniciais do mês atual (ou do período da URL)
-    const currentDate = new Date();
-    loadDashboardData(currentDate.getMonth() + 1, currentDate.getFullYear());
+
+    const dashKpi = window.__ROUTES_DASHBOARD_KPI__;
+    if (dashKpi && !dashKpi.error) {
+        updateKPIs(dashKpi);
+    }
+
+    scheduleRoutesChartsLoad();
 });
+
+let routesChartsLoaded = false;
+let routesChartsLoading = false;
 
 let currentPage = 1;
 let totalPages = 1;
@@ -678,7 +690,7 @@ function loadRouteAnomalies(forceRefresh) {
         .then(function () { routeInsightsLoading = false; });
 }
 
-function initializePage() {
+function initializePage(skipInitialLoad) {
     // Restaurar filtros da URL
     const urlParams = new URLSearchParams(window.location.search);
     const searchInput = document.getElementById('searchRoute');
@@ -729,8 +741,17 @@ function initializePage() {
         routesPerPageInUrl = true;
     }
     
-    // Load route data from API
-    loadRouteData(page);
+    // Load route data from API (skip when SSR já entregou a primeira página)
+    if (!skipInitialLoad) {
+        loadRouteData(page);
+    } else {
+        currentPage = page;
+        if (window.__ROUTES_INITIAL__ && window.__ROUTES_INITIAL__.pagination) {
+            totalPages = window.__ROUTES_INITIAL__.pagination.total_pages || 1;
+        }
+        setKpiActiveFromDelivery();
+        saveRoutesNonColumnPrefs();
+    }
     
     const importNfeXmlBtn = document.getElementById('importNfeXmlBtn');
     if (importNfeXmlBtn) {
@@ -1126,13 +1147,30 @@ function syncRoutesBrowserUrl(state) {
     }
 }
 
+function applyRoutesInitialPayload(data, rerenderTable) {
+    if (!data || !data.success) return;
+    if (data.pagination) {
+        currentPage = data.pagination.page || 1;
+        totalPages = data.pagination.total_pages || 1;
+        updatePaginationButtons(data.pagination);
+    }
+    if (rerenderTable !== false && data.data) {
+        updateRouteTable(data.data);
+    }
+}
+
 function loadRouteData(page = 1) {
     currentPage = page;
     
     const loadingEl = document.getElementById('routeTableLoading');
     const tableEl = document.querySelector('.data-table');
-    if (loadingEl) loadingEl.style.display = 'block';
-    if (tableEl) tableEl.style.visibility = 'hidden';
+    // Evita o "flash" ao paginar: a tabela atual fica visível e o loading só
+    // aparece se a resposta demorar (>180ms). Em paginação rápida, não pisca.
+    if (tableEl) tableEl.style.transition = 'opacity 0.15s ease';
+    const _routeLoadTimer = setTimeout(function () {
+        if (loadingEl) loadingEl.style.display = 'block';
+        if (tableEl) tableEl.style.opacity = '0.55';
+    }, 180);
     
     const searchTerm = document.getElementById('searchRoute')?.value || '';
     const delivery = document.getElementById('statusFilter')?.value || '';
@@ -1155,8 +1193,9 @@ function loadRouteData(page = 1) {
     fetch(url)
         .then(response => response.json())
         .then(data => {
+            clearTimeout(_routeLoadTimer);
             if (loadingEl) loadingEl.style.display = 'none';
-            if (tableEl) tableEl.style.visibility = '';
+            if (tableEl) { tableEl.style.opacity = ''; tableEl.style.visibility = ''; }
             if (data.success) {
                 updateRouteTable(data.data);
                 if (data.pagination) {
@@ -1178,8 +1217,9 @@ function loadRouteData(page = 1) {
             }
         })
         .catch(error => {
+            clearTimeout(_routeLoadTimer);
             if (loadingEl) loadingEl.style.display = 'none';
-            if (tableEl) tableEl.style.visibility = '';
+            if (tableEl) { tableEl.style.opacity = ''; tableEl.style.visibility = ''; }
             console.error('Erro ao carregar dados das rotas:', error);
             showRouteToast('Erro ao carregar dados: ' + sfErrUserMessage(error), 'error');
             const tbody = document.querySelector('.data-table tbody');
@@ -2175,12 +2215,15 @@ function applyFilter() {
     closeModal('filterModal');
 }
 
-// Função para carregar os dados do dashboard
-function loadDashboardData(month, year) {
-    // Mostrar indicador de carregamento
-    showLoading();
+// Função para carregar os dados do dashboard (KPIs + gráficos)
+function loadDashboardData(month, year, opts) {
+    opts = opts || {};
+    const refreshKpis = opts.refreshKpis !== false;
+    const refreshCharts = opts.refreshCharts !== false;
+    if (refreshKpis) {
+        showLoading();
+    }
 
-    // Fazer requisição AJAX para buscar os dados
     fetch(sfApiUrl(`routes_data.php?action=dashboard&month=${month}&year=${year}`))
         .then(response => {
             if (!response.ok) {
@@ -2199,25 +2242,178 @@ function loadDashboardData(month, year) {
             if (data.error) {
                 throw new Error(data.message || 'Erro ao carregar dados');
             }
-            
-            // Atualiza os KPIs
-            updateKPIs(data);
-            
-            // Atualiza os gráficos
-            updateCharts(data);
-            
-            // Esconde indicador de carregamento
-            hideLoading();
+            if (refreshKpis) {
+                updateKPIs(data);
+            }
+            if (refreshCharts) {
+                updateCharts(data);
+                routesChartsLoaded = true;
+            }
+            if (refreshKpis) {
+                hideLoading();
+            }
         })
         .catch(error => {
             console.error('Erro ao carregar dados:', error);
-            hideLoading();
-            // Mostrar mensagem de erro para o usuário
+            if (refreshKpis) {
+                hideLoading();
+            }
             showRouteToast('Erro ao carregar dados do dashboard: ' + sfErrUserMessage(error), 'error');
         });
 }
 
+function getRoutesDashboardPeriod() {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('month') && urlParams.has('year')) {
+        return {
+            month: parseInt(urlParams.get('month'), 10),
+            year: parseInt(urlParams.get('year'), 10)
+        };
+    }
+    const dash = window.__ROUTES_DASHBOARD_KPI__;
+    if (dash && dash.month && dash.year) {
+        return { month: dash.month, year: dash.year };
+    }
+    const currentDate = new Date();
+    return {
+        month: currentDate.getMonth() + 1,
+        year: currentDate.getFullYear()
+    };
+}
+
+function scheduleRoutesChartsLoad() {
+    const section = document.querySelector('.analytics-section');
+    if (!section) return;
+
+    const loadCharts = function () {
+        if (routesChartsLoaded || routesChartsLoading) return;
+        routesChartsLoading = true;
+        const period = getRoutesDashboardPeriod();
+        fetch(sfApiUrl(`routes_data.php?action=dashboard&month=${period.month}&year=${period.year}`))
+            .then(function (response) {
+                if (!response.ok) throw new Error('Erro ao carregar gráficos');
+                return response.json();
+            })
+            .then(function (data) {
+                if (data.error) throw new Error(data.message || 'Erro ao carregar gráficos');
+                updateCharts(data);
+                routesChartsLoaded = true;
+            })
+            .catch(function (err) {
+                console.error('Erro ao carregar gráficos:', err);
+            })
+            .finally(function () {
+                routesChartsLoading = false;
+            });
+    };
+
+    if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver(function (entries) {
+            if (entries.some(function (e) { return e.isIntersecting; })) {
+                loadCharts();
+                io.disconnect();
+            }
+        }, { rootMargin: '160px' });
+        io.observe(section);
+    } else {
+        setTimeout(loadCharts, 600);
+    }
+}
+
+// Mantido para compatibilidade interna — gráficos sob demanda
+function loadDashboardChartsOnly(month, year) {
+    loadDashboardData(month, year, { refreshKpis: false, refreshCharts: true });
+}
+
 // Função para atualizar os KPIs
+const ROUTES_KPI_ATTRS = {
+    total: 'total_rotas',
+    concluidas: 'rotas_concluidas',
+    distancia: 'distancia_total',
+    frete: 'frete_total',
+    no_prazo: 'rotas_no_prazo',
+    atrasadas: 'rotas_atrasadas',
+    eficiencia: 'media_eficiencia',
+    km_vazio: 'percentual_vazio'
+};
+const ROUTES_KPI_COLORS = {
+    total: '#3B82F6',
+    concluidas: '#22C55E',
+    distancia: '#06B6D4',
+    frete: '#F59E0B',
+    no_prazo: '#14B8A6',
+    atrasadas: '#EF4444',
+    eficiencia: '#8B5CF6',
+    km_vazio: '#F97316'
+};
+
+function rtKpiSparkSvg(points, color) {
+    const pts = (points || []).map(p => {
+        const n = Number(p);
+        return Number.isFinite(n) ? n : 0;
+    });
+    if (pts.length === 1) pts.push(pts[0]);
+    if (pts.length < 2) return '';
+    const w = 42;
+    const h = 14;
+    const pad = 1.5;
+    const min = Math.min(...pts);
+    const max = Math.max(...pts);
+    const rng = (max - min) || 1;
+    const step = (w - pad * 2) / (pts.length - 1);
+    const coords = pts.map((p, i) => {
+        const x = pad + i * step;
+        const y = h - pad - ((p - min) / rng) * (h - pad * 2);
+        return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    const last = coords[coords.length - 1].split(',');
+    return '<svg class="biq-spark" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" aria-hidden="true">'
+        + '<polyline fill="none" stroke="' + color + '" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" points="' + coords.join(' ') + '"/>'
+        + '<circle cx="' + last[0] + '" cy="' + last[1] + '" r="1.5" fill="' + color + '"/></svg>';
+}
+
+function rtKpiDeltaBadge(pct) {
+    if (pct == null || Number.isNaN(pct)) {
+        return '<span class="routes-kpi-delta biq-delta biq-delta--flat"><i class="fas fa-minus"></i> ±0,0%</span>';
+    }
+    const cls = pct > 0 ? 'biq-delta--up' : (pct < 0 ? 'biq-delta--down' : 'biq-delta--flat');
+    const arrow = pct > 0 ? 'fa-arrow-trend-up' : (pct < 0 ? 'fa-arrow-trend-down' : 'fa-minus');
+    const sign = pct > 0 ? '+' : (pct < 0 ? '−' : '±');
+    return '<span class="routes-kpi-delta biq-delta ' + cls + '"><i class="fas ' + arrow + '"></i>'
+        + sign + Math.abs(pct).toFixed(1).replace('.', ',') + '%</span>';
+}
+
+function rtVariacaoFromSerie(serie) {
+    const nums = (serie || []).map(n => Number(n) || 0);
+    for (let i = nums.length - 1; i >= 1; i--) {
+        if (nums[i] === 0 && nums[i - 1] === 0) continue;
+        const prev = nums[i - 1];
+        if (prev === 0) return nums[i] > 0 ? 100 : 0;
+        return ((nums[i] - prev) / prev) * 100;
+    }
+    return null;
+}
+
+function updateRoutesKpiSparklines(data) {
+    const hist = data.kpi_historico || [];
+    document.querySelectorAll('#routes-kpis [data-kpi]').forEach(card => {
+        const key = card.getAttribute('data-kpi');
+        const attr = ROUTES_KPI_ATTRS[key];
+        if (!attr) return;
+        const serie = hist.map(row => Number(row[attr]) || 0);
+        const color = ROUTES_KPI_COLORS[key] || '#3B82F6';
+        const deltaEl = card.querySelector('.routes-kpi-delta');
+        const sparkEl = card.querySelector('.routes-kpi-spark-wrap');
+        if (deltaEl) {
+            deltaEl.outerHTML = rtKpiDeltaBadge(rtVariacaoFromSerie(serie));
+        }
+        if (sparkEl) {
+            const svg = rtKpiSparkSvg(serie, color);
+            sparkEl.innerHTML = svg || '<span class="biq-spark" aria-hidden="true"></span>';
+        }
+    });
+}
+
 function updateKPIs(data) {
     // Atualiza os valores dos cards
     document.getElementById('totalRoutes').textContent = data.total_rotas || '0';
@@ -2230,6 +2426,8 @@ function updateKPIs(data) {
     document.getElementById('rotasAtrasadas').textContent = data.rotas_atrasadas || '0';
     document.getElementById('mediaEficiencia').textContent = formatPercentage(data.media_eficiencia);
     document.getElementById('percentualVazio').textContent = formatPercentage(data.percentual_vazio);
+
+    updateRoutesKpiSparklines(data);
 }
 
 // Função para atualizar os gráficos
@@ -2253,6 +2451,39 @@ function updateCharts(data) {
     updateIndicadoresChart(data.indicadores_motorista);
 }
 
+// ===== Helpers de estilo premium dos gráficos (Chart.js 4) =====
+function rtChartTheme() {
+    var cs = getComputedStyle(document.body);
+    var tick = (cs.getPropertyValue('--text-secondary') || '#94a3b8').trim() || '#94a3b8';
+    var grid = (cs.getPropertyValue('--border-color') || 'rgba(148,163,184,0.18)').trim() || 'rgba(148,163,184,0.18)';
+    return { tick: tick, grid: grid };
+}
+function rtGradient(ctx, hex) {
+    try {
+        var h = (ctx.canvas && ctx.canvas.height) ? ctx.canvas.height : 240;
+        var g = ctx.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, hex + '59'); // ~35%
+        g.addColorStop(1, hex + '00');
+        return g;
+    } catch (e) { return hex + '22'; }
+}
+/** Eixos premium (grade suave, ticks temáticos, sem grade vertical). */
+function rtScales(extraY) {
+    var th = rtChartTheme();
+    extraY = extraY || {};
+    var yTicks = Object.assign({ color: th.tick, font: { size: 11 } }, extraY.ticks || {});
+    var y = Object.assign({ beginAtZero: true, grid: { color: th.grid, drawBorder: false } }, extraY);
+    y.ticks = yTicks;
+    return {
+        x: { grid: { display: false }, ticks: { color: th.tick, font: { size: 11 } } },
+        y: y
+    };
+}
+function rtLegendPoint(pos) {
+    var th = rtChartTheme();
+    return { position: pos || 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 14, color: th.tick } };
+}
+
 // Funções de atualização dos gráficos
 function updateDistanciaChart(data) {
     const ctx = document.getElementById('distanciaMotoristaChart').getContext('2d');
@@ -2269,31 +2500,16 @@ function updateDistanciaChart(data) {
                 label: 'KM Percorridos',
                 data: values,
                 backgroundColor: '#3b82f6',
-                borderColor: '#2563eb',
-                borderWidth: 1
+                borderRadius: 6,
+                borderSkipped: false,
+                maxBarThickness: 38
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 20,
-                        usePointStyle: true
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Quilômetros'
-                    }
-                }
-            }
+            plugins: { legend: { display: false } },
+            scales: rtScales()
         }
     });
 }
@@ -2312,33 +2528,17 @@ function updateEficienciaChart(data) {
             datasets: [{
                 label: 'Eficiência (%)',
                 data: values,
-                backgroundColor: '#10b981',
-                borderColor: '#059669',
-                borderWidth: 1
+                backgroundColor: '#22c55e',
+                borderRadius: 6,
+                borderSkipped: false,
+                maxBarThickness: 38
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 20,
-                        usePointStyle: true
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    title: {
-                        display: true,
-                        text: 'Percentual'
-                    }
-                }
-            }
+            plugins: { legend: { display: false } },
+            scales: rtScales({ max: 100 })
         }
     });
 }
@@ -2356,26 +2556,16 @@ function updateRotasPrazoChart(data) {
             labels: labels,
             datasets: [{
                 data: values,
-                backgroundColor: [
-                    '#3b82f6',
-                    '#10b981',
-                    '#f59e0b'
-                ],
-                borderWidth: 2
+                backgroundColor: ['#22c55e', '#f59e0b', '#3b82f6', '#ef4444', '#8b5cf6'],
+                borderWidth: 0,
+                hoverOffset: 8
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 20,
-                        usePointStyle: true
-                    }
-                }
-            }
+            cutout: '64%',
+            plugins: { legend: rtLegendPoint('bottom') }
         }
     });
 }
@@ -2395,31 +2585,19 @@ function updateFreteChart(data) {
                 label: 'Valor em R$',
                 data: values,
                 backgroundColor: '#8b5cf6',
-                borderColor: '#7c3aed',
-                borderWidth: 1
+                borderRadius: 6,
+                borderSkipped: false,
+                maxBarThickness: 38
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 20,
-                        usePointStyle: true
-                    }
-                }
+                legend: { display: false },
+                tooltip: { callbacks: { label: function (c) { return 'R$ ' + Number(c.raw).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); } } }
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Valor (R$)'
-                    }
-                }
-            }
+            scales: rtScales({ ticks: { callback: function (v) { return 'R$ ' + Number(v).toLocaleString('pt-BR'); } } })
         }
     });
 }
@@ -2439,34 +2617,22 @@ function updateEvolucaoKmChart(data) {
             datasets: [{
                 label: 'KM Rodados',
                 data: values,
-                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                backgroundColor: rtGradient(ctx, '#3b82f6'),
                 borderColor: '#3b82f6',
-                borderWidth: 2,
+                borderWidth: 2.5,
                 fill: true,
-                tension: 0.3
+                tension: 0.4,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                pointBackgroundColor: '#3b82f6'
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 20,
-                        usePointStyle: true
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Quilômetros'
-                    }
-                }
-            }
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { display: false } },
+            scales: rtScales()
         }
     });
 }
@@ -2477,7 +2643,8 @@ function updateIndicadoresChart(data) {
         window.indicadoresChart.destroy();
     }
     // Normaliza os dados para que fiquem entre 0 e 100
-    const normalizedDatasets = Array.isArray(data?.datasets) ? data.datasets.map(dataset => {
+    const rtRadarPal = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899'];
+    const normalizedDatasets = Array.isArray(data?.datasets) ? data.datasets.map((dataset, di) => {
         const normalizedData = Array.isArray(dataset.data) ? dataset.data.map((value, index) => {
             switch (index) {
                 case 0: // Eficiência
@@ -2496,9 +2663,16 @@ function updateIndicadoresChart(data) {
                     return Number(value) || 0;
             }
         }) : [];
+        var rc = rtRadarPal[di % rtRadarPal.length];
         return {
             ...dataset,
-            data: normalizedData
+            data: normalizedData,
+            borderColor: rc,
+            backgroundColor: rc + '26',
+            borderWidth: 2,
+            pointBackgroundColor: rc,
+            pointRadius: 2,
+            pointHoverRadius: 4
         };
     }) : [];
 
@@ -2514,16 +2688,7 @@ function updateIndicadoresChart(data) {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 20,
-                        usePointStyle: true,
-                        font: {
-                            size: 12
-                        }
-                    }
-                },
+                legend: rtLegendPoint('bottom'),
                 tooltip: {
                     callbacks: {
                         label: function(context) {
@@ -2559,16 +2724,10 @@ function updateIndicadoresChart(data) {
                 r: {
                     beginAtZero: true,
                     max: 100,
-                    ticks: {
-                        stepSize: 20,
-                        backdropColor: 'rgba(0, 0, 0, 0.1)'
-                    },
-                    pointLabels: {
-                        font: {
-                            size: 12,
-                            weight: 'bold'
-                        }
-                    }
+                    angleLines: { color: rtChartTheme().grid },
+                    grid: { color: rtChartTheme().grid },
+                    ticks: { display: false, stepSize: 20, backdropColor: 'transparent' },
+                    pointLabels: { color: rtChartTheme().tick, font: { size: 11, weight: '600' } }
                 }
             }
         }

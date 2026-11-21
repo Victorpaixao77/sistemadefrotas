@@ -40,7 +40,7 @@ try {
     ], JSON_UNESCAPED_UNICODE);
 } catch (InvalidArgumentException $e) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => false, 'message' => 'Erro interno.'], JSON_UNESCAPED_UNICODE);
 } catch (Throwable $e) {
     error_log('lucratividade_analytics: ' . $e->getMessage());
     http_response_code(500);

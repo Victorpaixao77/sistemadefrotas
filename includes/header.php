@@ -9,15 +9,60 @@ if (!isset($page_title)) {
 
 // Dados do usuário logado
 $nome_usuario = isset($_SESSION['nome']) ? $_SESSION['nome'] : '';
-$email_usuario = isset($_SESSION['email']) ? $_SESSION['email'] : '';
 $foto_perfil = isset($_SESSION['foto_perfil']) && $_SESSION['foto_perfil'] ? $_SESSION['foto_perfil'] : null;
 $letra = $nome_usuario ? mb_substr($nome_usuario, 0, 1, 'UTF-8') : 'U';
+if (!function_exists('get_user_role_label')) {
+    require_once __DIR__ . '/permissions.php';
+}
+$cargo_usuario = get_user_role_label();
 
 // Carregar sistema de notificações (caminho relativo ao diretório do header)
 require_once __DIR__ . '/notifications.php';
 
+$sf_platform_banner = null;
+if (!empty($_SESSION['empresa_id']) && is_file(__DIR__ . '/sf_platform_banner.php')) {
+    require_once __DIR__ . '/sf_platform_banner.php';
+    try {
+        $sf_platform_banner = sf_platform_banner_atual(getConnection(), (int) $_SESSION['empresa_id']);
+    } catch (Throwable $e) {
+        $sf_platform_banner = null;
+    }
+}
+
+$sf_header_mod_ia = true;
+if (!empty($_SESSION['empresa_id'])) {
+    if (!function_exists('sf_modulo_ativo_sessao')) {
+        require_once __DIR__ . '/sf_saas.php';
+    }
+    try {
+        $sf_header_mod_ia = sf_modulo_ativo_sessao(getConnection(), 'ia');
+    } catch (Throwable $e) {
+    }
+}
+
 // You can override this in specific pages by setting $page_title before including header.php
 ?>
+<?php if (!empty($_SESSION['adm_impersonating'])): ?>
+<div class="adm-cc-support-banner" role="alert" style="margin:0;border-radius:0;border-left:0;border-right:0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem">
+    <span><i class="fas fa-user-secret"></i> <strong>Modo suporte ativo</strong> — sessão assumida por administrador da plataforma. Todas as ações são auditadas.</span>
+    <a href="<?php echo htmlspecialchars(sf_app_url('sair_suporte.php'), ENT_QUOTES, 'UTF-8'); ?>" class="adm-cc-btn adm-cc-btn--sm" style="background:#fff;color:#92400e">Encerrar suporte</a>
+</div>
+<?php endif; ?>
+<?php if (!empty($sf_platform_banner)): ?>
+<div id="sfPlatformBannerModal" class="sf-platform-banner" data-banner-id="<?php echo (int) $sf_platform_banner['id'] . '_' . htmlspecialchars($sf_platform_banner['rev'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" role="dialog" aria-modal="true" aria-labelledby="sfPlatformBannerTitle" hidden>
+    <div class="sf-platform-banner__backdrop" aria-hidden="true"></div>
+    <div class="sf-platform-banner__card">
+        <div class="sf-platform-banner__icon" aria-hidden="true"><i class="fas fa-bullhorn"></i></div>
+        <h2 id="sfPlatformBannerTitle" class="sf-platform-banner__title"><?php echo htmlspecialchars($sf_platform_banner['titulo'], ENT_QUOTES, 'UTF-8'); ?></h2>
+        <?php if ($sf_platform_banner['mensagem'] !== ''): ?>
+        <p class="sf-platform-banner__msg"><?php echo nl2br(htmlspecialchars($sf_platform_banner['mensagem'], ENT_QUOTES, 'UTF-8')); ?></p>
+        <?php endif; ?>
+        <button type="button" class="sf-platform-banner__btn" data-sf-banner-close>Entendi</button>
+    </div>
+</div>
+<link rel="stylesheet" href="<?php echo htmlspecialchars(sf_app_url('css/sf-platform-banner.css?v=' . (function_exists('sf_asset_v') ? sf_asset_v() : '1'))); ?>">
+<script src="<?php echo htmlspecialchars(sf_app_url('js/sf-platform-banner.js?v=' . (function_exists('sf_asset_v') ? sf_asset_v() : '1'))); ?>"></script>
+<?php endif; ?>
 <header class="top-header" role="banner">
     <div class="header-left">
         <button type="button" class="mobile-menu-toggle" id="mobileMenuToggleBtn" aria-label="Abrir menu de navegação" aria-expanded="false" aria-controls="sidebar-nav">
@@ -28,16 +73,18 @@ require_once __DIR__ . '/notifications.php';
     
     <div class="header-controls">
         <!-- Botão BI Frota -->
-        <?php if (function_exists('can_access_advanced_reports') && can_access_advanced_reports()): ?>
+        <?php if (function_exists('can_access_advanced_reports') && can_access_advanced_reports() && $sf_header_mod_ia): ?>
         <a href="<?php echo htmlspecialchars(sf_app_url('pages/bi.php')); ?>" class="header-icon-btn header-bi-btn" title="BI Frota" aria-label="Abrir BI Frota" style="background: var(--bg-tertiary); width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; padding: 0; text-decoration: none; flex-shrink: 0;">
             <img src="<?php echo htmlspecialchars(sf_app_url('bi/bi-icon.png')); ?>" alt="" width="48" height="48" style="width:100%; height:100%; display:block; object-fit:contain; margin:0; padding:0;" />
         </a>
         <?php endif; ?>
+        <?php if ($sf_header_mod_ia): ?>
         <!-- Botão IA Flutuante -->
         <button type="button" class="header-icon-btn" title="IA Notificações" aria-label="Assistente de notificações IA" id="iaFabBtn" style="background: var(--bg-tertiary); color: #2563eb; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: none; cursor: pointer; padding: 0; position: relative;">
             <img src="<?php echo htmlspecialchars(sf_app_url('IA/ia-icon.png')); ?>" alt="" width="48" height="48" style="width:100%; height:100%; display:block; object-fit:contain; margin:0; padding:0; pointer-events: none;" />
             <span class="notification-badge" id="iaNotificationBadge" style="display: none;">0</span>
         </button>
+        <?php endif; ?>
         <!-- Calendário -->
         <a href="<?php echo htmlspecialchars(sf_app_url('calendario/')); ?>" class="header-icon-btn" title="Calendário" aria-label="Abrir calendário" id="calendarBtn" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
             <i class="fas fa-calendar-alt" aria-hidden="true"></i>
@@ -109,96 +156,87 @@ require_once __DIR__ . '/notifications.php';
             </div>
             <div class="user-info">
                 <div class="user-name"><?php echo htmlspecialchars($nome_usuario); ?></div>
-                <div class="user-role"><?php echo htmlspecialchars($email_usuario); ?></div>
+                <div class="user-role"><?php echo htmlspecialchars($cargo_usuario); ?></div>
             </div>
             <i class="fas fa-chevron-down profile-dropdown-icon" aria-hidden="true"></i>
             </button>
             
             <!-- Dropdown do Perfil -->
             <div class="profile-dropdown" id="profileDropdown" aria-label="Opções da conta">
-                <div class="profile-dropdown-header">
-                    <div class="profile-dropdown-avatar">
-                        <?php if ($foto_perfil): ?>
-                            <img src="<?php echo htmlspecialchars(sf_app_url('uploads/perfil/' . $foto_perfil)); ?>" alt="Foto de Perfil" style="width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #ccc;">
-                        <?php else: ?>
-                            <span><?php echo htmlspecialchars($letra); ?></span>
-                        <?php endif; ?>
-                    </div>
-                    <div>
-                        <div class="profile-dropdown-name"><?php echo htmlspecialchars($nome_usuario); ?></div>
-                        <div class="profile-dropdown-email"><?php echo htmlspecialchars($email_usuario); ?></div>
-                    </div>
-                </div>
-                
-                <div class="profile-dropdown-menu">
+                <nav class="profile-dropdown-nav" aria-label="Atalhos da conta">
                     <a href="<?php echo htmlspecialchars(sf_app_url('pages/perfil.php')); ?>" class="profile-dropdown-item">
-                        <i class="fas fa-user"></i>
+                        <i class="fas fa-user" aria-hidden="true"></i>
                         <span>Meu Perfil</span>
                     </a>
                     <a href="<?php echo htmlspecialchars(sf_app_url('pages/usuarios.php')); ?>" class="profile-dropdown-item">
-                        <i class="fas fa-users"></i>
+                        <i class="fas fa-users" aria-hidden="true"></i>
                         <span>Usuários</span>
                     </a>
+                    <?php if ($sf_header_mod_ia): ?>
                     <a href="<?php echo htmlspecialchars(sf_app_url('pages/ia_painel.php')); ?>" class="profile-dropdown-item">
-                        <i class="fas fa-robot"></i>
+                        <i class="fas fa-robot" aria-hidden="true"></i>
                         <span>Painel Inteligente (IA)</span>
                     </a>
-                    <div class="dropdown-divider"></div>
-                    
-                    <!-- Seletor de Cores -->
+                    <?php endif; ?>
+                </nav>
+
+                <details class="profile-dropdown-colors" id="profileColorPanel">
+                    <summary class="profile-dropdown-colors__summary">
+                        <span class="profile-dropdown-colors__label">
+                            <i class="fas fa-palette" aria-hidden="true"></i>
+                            Personalizar cores
+                        </span>
+                    </summary>
                     <div class="color-palette-section">
-                        <div class="color-palette-header">Personalizar Cores</div>
-                        
-                        <!-- Cor Principal -->
-                        <div class="color-option">
-                            <label for="primaryColor">Cor Principal:</label>
-                            <input type="color" id="primaryColor" value="#3b82f6" data-color-var="--accent-primary">
+                        <div class="color-preview-strip" id="colorPreviewStrip" aria-hidden="true"></div>
+
+                        <div class="color-palette-presets" id="colorPresets" role="group" aria-label="Temas prontos">
+                            <button type="button" class="color-preset-btn" data-color-preset="frotec" title="Azul Frotec">Frotec</button>
+                            <button type="button" class="color-preset-btn" data-color-preset="oceano" title="Tons de azul oceano">Oceano</button>
+                            <button type="button" class="color-preset-btn" data-color-preset="floresta" title="Tons de verde">Floresta</button>
+                            <button type="button" class="color-preset-btn" data-color-preset="corporativo" title="Roxo corporativo">Corp.</button>
+                            <button type="button" class="color-preset-btn" data-color-preset="metalico" title="Cinza prata metálico">Metálico</button>
+                            <button type="button" class="color-preset-btn" data-color-preset="branco" title="Menu escuro + conteúdo claro">Branco</button>
                         </div>
-                        
-                        <!-- Cor Secundária -->
-                        <div class="color-option">
-                            <label for="secondaryColor">Cor Secundária:</label>
-                            <input type="color" id="secondaryColor" value="#1a2332" data-color-var="--bg-secondary">
+
+                        <div class="color-palette-grid">
+                            <div class="color-option">
+                                <label for="primaryColor">Cor principal</label>
+                                <input type="color" id="primaryColor" value="#3b82f6" data-color-key="primaryColor" aria-label="Cor principal">
+                            </div>
+                            <div class="color-option">
+                                <label for="accentSecondaryColor">Cor de destaque</label>
+                                <input type="color" id="accentSecondaryColor" value="#0ea5e9" data-color-key="accentSecondary" aria-label="Cor de destaque">
+                            </div>
+                            <div class="color-option">
+                                <label for="bgColor">Fundo da página</label>
+                                <input type="color" id="bgColor" value="#0f1824" data-color-key="bgColor" aria-label="Fundo da página">
+                            </div>
+                            <div class="color-option">
+                                <label for="sidebarColor">Menu lateral</label>
+                                <input type="color" id="sidebarColor" value="#0f172a" data-color-key="sidebarColor" aria-label="Menu lateral">
+                            </div>
+                            <div class="color-option">
+                                <label for="dashboardBgColor">Cards / dashboards</label>
+                                <input type="color" id="dashboardBgColor" value="#1e293b" data-color-key="dashboardBgColor" aria-label="Fundo dos cards">
+                            </div>
+                            <div class="color-option">
+                                <label for="secondaryBgColor">Fundo secundário</label>
+                                <input type="color" id="secondaryBgColor" value="#1a2332" data-color-key="secondaryBgColor" aria-label="Fundo secundário">
+                            </div>
+                            <div class="color-option">
+                                <label for="tertiaryBgColor">Colunas de histórico</label>
+                                <input type="color" id="tertiaryBgColor" value="#243041" data-color-key="tertiaryBgColor" aria-label="Colunas de histórico">
+                            </div>
                         </div>
-                        
-                        <!-- Cor do Fundo -->
-                        <div class="color-option">
-                            <label for="bgColor">Cor de Fundo:</label>
-                            <input type="color" id="bgColor" value="#0f1824" data-color-var="--bg-primary">
-                        </div>
-                        
-                        <!-- Cor do Menu Lateral -->
-                        <div class="color-option">
-                            <label for="sidebarColor">Menu Lateral:</label>
-                            <input type="color" id="sidebarColor" value="#121a29" data-color-var="--bg-sidebar">
-                        </div>
-                        
-                        <!-- Cor do Fundo das Dashboards -->
-                        <div class="color-option">
-                            <label for="dashboardBgColor">Fundo das Dashboards:</label>
-                            <input type="color" id="dashboardBgColor" value="#1e293b" data-color-var="--card-bg">
-                        </div>
-                        
-                        <!-- Cor do Fundo Secundário -->
-                        <div class="color-option">
-                            <label for="secondaryBgColor">Fundo Secundário:</label>
-                            <input type="color" id="secondaryBgColor" value="#1a2332" data-color-var="--bg-secondary">
-                        </div>
-                        
-                        <!-- Cor do Fundo Terciário (Colunas de Histórico) -->
-                        <div class="color-option">
-                            <label for="tertiaryBgColor">Colunas de Histórico:</label>
-                            <input type="color" id="tertiaryBgColor" value="#243041" data-color-var="--bg-tertiary">
-                        </div>
-                        
-                        <!-- Botão para Restaurar Cores Padrão -->
-                        <button id="restoreDefaultColors" class="btn-restore-colors">
-                            Restaurar Padrão
+
+                        <button type="button" id="restoreDefaultColors" class="btn-restore-colors">
+                            <i class="fas fa-undo" aria-hidden="true"></i> Restaurar padrão
                         </button>
                     </div>
-                    
-                    <div class="dropdown-divider"></div>
-                    
+                </details>
+
+                <div class="profile-dropdown-footer">
                     <a href="<?php echo htmlspecialchars(sf_app_url('logout.php')); ?>" class="profile-dropdown-item text-danger" id="logoutLink">
                         <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
                         <span>Sair</span>
@@ -219,7 +257,7 @@ require_once __DIR__ . '/notifications.php';
 }
 
 .profile-dropdown.show {
-    display: block;
+    display: flex;
     opacity: 1;
     visibility: visible;
     transform: translateY(0);

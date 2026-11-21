@@ -16,13 +16,13 @@ function save_data($data) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    $veiculo_id = isset($_GET['veiculo_id']) ? $_GET['veiculo_id'] : null;
+    $veiculo_id = isset($_GET['veiculo_id']) ? trim((string) $_GET['veiculo_id']) : null;
     if (!$veiculo_id) {
         echo json_encode(['success'=>false,'error'=>'veiculo_id obrigatório']);
         exit;
     }
     $data = load_data();
-    $layout = isset($data[$veiculo_id]) ? $data[$veiculo_id] : null;
+    $layout = $data[$veiculo_id] ?? ($data[(int) $veiculo_id] ?? null);
     echo json_encode(['success'=>true,'layout'=>$layout]);
     exit;
 }

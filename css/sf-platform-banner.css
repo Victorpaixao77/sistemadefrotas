@@ -1,0 +1,89 @@
+.sf-platform-banner {
+    position: fixed;
+    inset: 0;
+    z-index: 10050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+}
+
+.sf-platform-banner[hidden] {
+    display: none !important;
+}
+
+.sf-platform-banner__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+}
+
+.sf-platform-banner__card {
+    position: relative;
+    z-index: 1;
+    width: min(520px, 100%);
+    background: var(--bg-secondary, #fff);
+    color: var(--text-primary, #0f172a);
+    border-radius: 16px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+    padding: 1.5rem 1.5rem 1.25rem;
+    text-align: center;
+    animation: sfPlatformBannerIn 0.25s ease-out;
+}
+
+@keyframes sfPlatformBannerIn {
+    from { opacity: 0; transform: scale(0.96) translateY(8px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.sf-platform-banner__icon {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 0.75rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1e40af, #2563eb);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+}
+
+.sf-platform-banner__title {
+    margin: 0 0 0.5rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.sf-platform-banner__msg {
+    margin: 0 0 1.25rem;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--text-secondary, #475569);
+    white-space: pre-wrap;
+}
+
+.sf-platform-banner__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    min-width: 140px;
+    padding: 0.65rem 1.25rem;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #1e40af, #2563eb);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.sf-platform-banner__btn:hover {
+    filter: brightness(1.05);
+}
+
+body.sf-platform-banner-open {
+    overflow: hidden;
+}

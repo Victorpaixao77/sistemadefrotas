@@ -1,4 +1,5 @@
-<?php
+
+﻿<?php
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 
@@ -8,21 +9,17 @@ configure_session();
 // Iniciar sessão
 session_start();
 
-// Verificar se o usuário está autenticado
-if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true) {
+// Requer autenticação (padrão do sistema — igual às demais páginas do gestor)
+require_authentication();
+
+// Validar empresa na sessão (isolamento multi-empresa)
+if (!isset($_SESSION['empresa_id']) || empty($_SESSION['empresa_id'])) {
     header('Location: ../login.php');
     exit;
 }
 
-// Verificar se o usuário tem permissão para acessar esta página
-if (!hasPermission('ia')) {
-    header('Location: ../index.php');
-    exit;
-}
-
-// Obter dados da empresa
-$empresa = getEmpresaData($_SESSION['empresa_id']);
-$empresa_nome = $empresa['nome'] ?? 'Empresa';
+// Nome da empresa (gravado na sessão no login/seleção de empresa) — usado no título
+$empresa_nome = $_SESSION['empresa_nome'] ?? 'Empresa';
 ?>
 
 <!DOCTYPE html>
@@ -37,7 +34,8 @@ $empresa_nome = $empresa['nome'] ?? 'Empresa';
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
     
     <style>
         .ia-card {

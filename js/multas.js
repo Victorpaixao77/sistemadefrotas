@@ -212,11 +212,19 @@ function escapeHtml(str) {
 }
 
 function initializeMultasCharts() {
-    // Carregar dados dos gráficos
-    loadMultasPorMesChart();
-    loadValorPorMesChart();
-    loadMultasPorMotoristaChart();
-    loadPontosPorMotoristaChart();
+    var url = (typeof sfFetchJson === 'function')
+        ? sfFetchJson(sfApiUrl('multas_analytics.php?action=all'))
+        : fetch(sfApiUrl('multas_analytics.php?action=all'), { credentials: 'include' }).then(function (r) { return r.json(); });
+    url.then(function (res) {
+        if (!res || !res.success || !res.data) return;
+        var d = res.data;
+        if (d.multas_por_mes) createMultasPorMesChart(d.multas_por_mes);
+        if (d.valor_por_mes) createValorPorMesChart(d.valor_por_mes);
+        if (d.multas_por_motorista) createMultasPorMotoristaChart(d.multas_por_motorista);
+        if (d.pontos_por_motorista) createPontosPorMotoristaChart(d.pontos_por_motorista);
+    }).catch(function (error) {
+        console.error('Erro ao carregar analytics de multas:', error);
+    });
 }
 
 function loadMultasPorMesChart() {

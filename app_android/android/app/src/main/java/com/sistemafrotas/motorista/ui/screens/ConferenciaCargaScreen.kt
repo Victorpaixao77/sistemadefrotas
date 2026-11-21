@@ -1,5 +1,6 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,8 +26,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sistemafrotas.motorista.data.AuthRepository
 import com.sistemafrotas.motorista.data.LocationHelper
+import com.sistemafrotas.motorista.ui.components.BarcodeScannerDialog
 import com.sistemafrotas.motorista.ui.components.FotoPicker
 import com.sistemafrotas.motorista.ui.components.OcrLeitorButton
+import com.sistemafrotas.motorista.ui.components.extrairNumeroNfDeChave
 import com.sistemafrotas.motorista.ui.viewmodel.AuthViewModelFactory
 import com.sistemafrotas.motorista.ui.viewmodel.ConferenciaViewModel
 import kotlinx.coroutines.launch
@@ -43,10 +47,19 @@ fun ConferenciaCargaScreen(
     val vm: ConferenciaViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository) { ConferenciaViewModel(it) }
     )
-    val list by vm.list.collectAsState()
-    val refreshing by vm.refreshing.collectAsState()
-    val error by vm.error.collectAsState()
+    val list by vm.list.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
     var showForm by remember { mutableStateOf(false) }
+    var ocrPrefill by remember { mutableStateOf<com.sistemafrotas.motorista.data.api.OcrCampos?>(null) }
+
+    LaunchedEffect(Unit) {
+        val (_, campos) = com.sistemafrotas.motorista.feature.viagem.TripFeatureBridge.consumeOcr()
+        if (campos != null) {
+            ocrPrefill = campos
+            showForm = true
+        }
+    }
 
     LaunchedEffect(Unit) { vm.carregarSeNecessario() }
 
@@ -54,8 +67,9 @@ fun ConferenciaCargaScreen(
         LaunchedEffect(Unit) { onSubScreenChange("Nova conferência") { showForm = false } }
         NovaConferenciaScreen(
             authRepository = authRepository,
-            onBack = { showForm = false },
-            onSuccess = { showForm = false; vm.refresh() },
+            onBack = { showForm = false; ocrPrefill = null },
+            onSuccess = { showForm = false; ocrPrefill = null; vm.refresh() },
+            ocrPrefill = ocrPrefill,
             modifier = modifier,
         )
         return
@@ -99,7 +113,7 @@ fun ConferenciaCargaScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(list) { c ->
+                    items(list, key = { it.id }) { c ->
                         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
                             Column(Modifier.padding(14.dp)) {
                                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -138,6 +152,7 @@ private fun NovaConferenciaScreen(
     authRepository: AuthRepository,
     onBack: () -> Unit,
     onSuccess: () -> Unit,
+    ocrPrefill: com.sistemafrotas.motorista.data.api.OcrCampos? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -153,9 +168,34 @@ private fun NovaConferenciaScreen(
     var gpsLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var scanNf by remember { mutableStateOf(false) }
+    var scanLacre by remember { mutableStateOf(false) }
+
+    if (scanNf) {
+        BarcodeScannerDialog(
+            titulo = "Escanear chave / código da NF",
+            onDismiss = { scanNf = false },
+            onScanned = { raw -> nfNumero = extrairNumeroNfDeChave(raw) },
+        )
+    }
+    if (scanLacre) {
+        BarcodeScannerDialog(
+            titulo = "Escanear lacre",
+            onDismiss = { scanLacre = false },
+            onScanned = { raw -> lacre = raw },
+        )
+    }
 
     LaunchedEffect(Unit) {
         LocationHelper(context).takeIf { it.hasLocationPermission() }?.getLastLocation()?.let { gpsLocation = it }
+    }
+
+    LaunchedEffect(ocrPrefill) {
+        val c = ocrPrefill ?: return@LaunchedEffect
+        c.nfNumero?.let { if (it.isNotBlank()) nfNumero = it }
+        c.nfValor?.let { if (it > 0) nfValor = it.toString() }
+        c.volumes?.let { if (it > 0) volumes = it.toString() }
+        c.lacre?.let { if (it.isNotBlank()) lacre = it }
     }
 
     Column(
@@ -189,7 +229,18 @@ private fun NovaConferenciaScreen(
             onResultado = { c -> c.lacre?.let { if (it.isNotBlank()) lacre = it } },
         )
 
-        OutlinedTextField(value = nfNumero, onValueChange = { nfNumero = it }, label = { Text("Número da NF") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(
+            value = nfNumero,
+            onValueChange = { nfNumero = it },
+            label = { Text("Número da NF") },
+            singleLine = true,
+            trailingIcon = {
+                IconButton(onClick = { scanNf = true }) {
+                    Icon(Icons.Filled.QrCodeScanner, contentDescription = "Escanear NF")
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
         OutlinedTextField(
             value = nfValor,
             onValueChange = { v -> nfValor = v.replace(',', '.').filter { it.isDigit() || it == '.' } },
@@ -206,7 +257,18 @@ private fun NovaConferenciaScreen(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(value = lacre, onValueChange = { lacre = it }, label = { Text("Lacre") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(
+            value = lacre,
+            onValueChange = { lacre = it },
+            label = { Text("Lacre") },
+            singleLine = true,
+            trailingIcon = {
+                IconButton(onClick = { scanLacre = true }) {
+                    Icon(Icons.Filled.QrCodeScanner, contentDescription = "Escanear lacre")
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
 
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = if (conforme) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)

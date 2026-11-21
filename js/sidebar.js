@@ -204,6 +204,21 @@ function setupMobileMenu() {
 }
 
 /**
+ * Chave de localStorage dos submenus — ADM e frotas têm índices diferentes.
+ */
+function sfSidebarDropdownStorageKey() {
+    return document.body && document.body.classList.contains('adm-app')
+        ? 'sidebarDropdownsAdm'
+        : 'sidebarDropdowns';
+}
+
+function sfSyncDropdownAria(toggle, isOpen) {
+    if (toggle) {
+        toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    }
+}
+
+/**
  * Initialize dropdown menu states from localStorage + servidor (data-dropdown-open / .active no submenu)
  */
 function initializeDropdowns() {
@@ -212,7 +227,7 @@ function initializeDropdowns() {
 
     let dropdownStates = {};
     try {
-        const savedStates = localStorage.getItem('sidebarDropdowns');
+        const savedStates = localStorage.getItem(sfSidebarDropdownStorageKey());
         if (savedStates) {
             dropdownStates = JSON.parse(savedStates);
         }
@@ -238,6 +253,9 @@ function initializeDropdowns() {
             parentLink.classList.add('active');
             const icon = parentLink.querySelector('.dropdown-icon');
             if (icon) icon.classList.add('rotate');
+            sfSyncDropdownAria(parentLink, true);
+        } else {
+            sfSyncDropdownAria(parentLink, false);
         }
 
         if (isFiscalPage && isSistemaFiscal) {
@@ -271,18 +289,21 @@ function setupDropdowns() {
             const dropdown = toggle.nextElementSibling;
             
             if (dropdown) {
-                // Toggle dropdown visibility
-                if (dropdown.style.display === 'block') {
+                const icon = toggle.querySelector('.dropdown-icon');
+                const isOpen = dropdown.style.display === 'block';
+
+                if (isOpen) {
                     dropdown.style.display = 'none';
                     toggle.classList.remove('active');
-                    toggle.querySelector('.dropdown-icon').classList.remove('rotate');
+                    if (icon) icon.classList.remove('rotate');
+                    sfSyncDropdownAria(toggle, false);
                 } else {
                     dropdown.style.display = 'block';
                     toggle.classList.add('active');
-                    toggle.querySelector('.dropdown-icon').classList.add('rotate');
+                    if (icon) icon.classList.add('rotate');
+                    sfSyncDropdownAria(toggle, true);
                 }
-                
-                // Save dropdown states
+
                 saveDropdownStates();
             }
         });
@@ -300,5 +321,5 @@ function saveDropdownStates() {
         states[index] = dropdown.style.display === 'block';
     });
     
-    localStorage.setItem('sidebarDropdowns', JSON.stringify(states));
+    localStorage.setItem(sfSidebarDropdownStorageKey(), JSON.stringify(states));
 }

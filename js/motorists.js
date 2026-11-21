@@ -180,8 +180,17 @@ function initializePage() {
     if (perPageEl && document.body.classList.contains('motorists-modern')) {
         perPageEl.addEventListener('change', () => loadMotorists(1));
     }
-    // Load initial data
-    loadMotorists(page);
+    // Load initial data (SSR quando __MOTORISTS_INITIAL__ já preencheu a tabela)
+    const hasInitial = !!(window.__MOTORISTS_INITIAL__ && window.__MOTORISTS_INITIAL__.success);
+    if (hasInitial) {
+        applyMotoristsInitialPayload(window.__MOTORISTS_INITIAL__, false);
+        if (window.__MOTORISTS_INITIAL__.pagination) {
+            currentPage = window.__MOTORISTS_INITIAL__.pagination.page || page;
+            totalPages = window.__MOTORISTS_INITIAL__.pagination.total_pages || 1;
+        }
+    } else {
+        loadMotorists(page);
+    }
     
     // Setup button events
     document.getElementById('addMotoristBtn')?.addEventListener('click', showAddMotoristModal);
@@ -387,6 +396,146 @@ function switchTab(tabId) {
     }
 }
 
+function motoristFotoUrl(m) {
+    return m.foto_motorista ? `../uploads/motoristas/foto/${(m.foto_motorista || '').split('/').pop()}` : '';
+}
+
+function motoristFotoHtml(m) {
+    return m.foto_motorista
+        ? `<img src="${encodeURI(motoristFotoUrl(m))}" alt="" class="motorist-thumb" style="width:36px;height:36px;object-fit:cover;border-radius:50%;">`
+        : `<span class="motorist-thumb-placeholder" style="width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;background:var(--bg-tertiary);border-radius:50%;font-size:0.8rem;color:var(--text-muted);"><i class="fas fa-user"></i></span>`;
+}
+
+function buildMotoristRowHtml(motorist) {
+    const dispNome = motorist.disponibilidade_nome || 'N/A';
+    const dispClass = (motorist.disponibilidade_nome || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const favClass = motorist.is_favorite ? ' is-favorite' : '';
+    const favTitle = motorist.is_favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos';
+    return `
+        <td>${motoristFotoHtml(motorist)}</td>
+        <td>${escapeHtml(motorist.nome)}</td>
+        <td>${escapeHtml(motorist.cpf) || '-'}</td>
+        <td>${escapeHtml(motorist.cnh) || '-'}</td>
+        <td>${escapeHtml(motorist.categoria_cnh_nome) || '-'}</td>
+        <td>${escapeHtml(motorist.telefone) || '-'}</td>
+        <td>${escapeHtml(motorist.email) || '-'}</td>
+        <td><span class="status-badge ${dispClass}">${escapeHtml(dispNome)}</span></td>
+        <td>${motorist.porcentagem_comissao ? escapeHtml(motorist.porcentagem_comissao) + '%' : '-'}</td>
+        <td class="actions">
+            <button class="btn-icon view-btn" data-id="${motorist.id}" title="Ver detalhes">
+                <i class="fas fa-eye"></i>
+            </button>
+            <button class="btn-icon favorite-btn${favClass}" data-id="${motorist.id}" title="${favTitle}">
+                <i class="fas fa-star"></i>
+            </button>
+            <button class="btn-icon history-btn" data-id="${motorist.id}" title="Histórico de alterações">
+                <i class="fas fa-history"></i>
+            </button>
+            <button class="btn-icon edit-btn" data-id="${motorist.id}" title="Editar">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button class="btn-icon delete-btn" data-id="${motorist.id}" title="Excluir">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+}
+
+function renderMotoristsList(motoristsList) {
+    const tbody = document.querySelector('#motoristsTable tbody');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+
+    const emptyEl = document.getElementById('motoristsEmptyState');
+    const wrapEl = document.getElementById('motoristsTableContainer');
+    const useModernMotoristEmpty = emptyEl && wrapEl && document.body.classList.contains('motorists-modern');
+    if (useModernMotoristEmpty) {
+        const empty = !motoristsList.length;
+        emptyEl.classList.toggle('visible', empty);
+        wrapEl.style.display = empty ? 'none' : '';
+    }
+
+    motoristsList.forEach(motorist => {
+        const row = document.createElement('tr');
+        row.innerHTML = buildMotoristRowHtml(motorist);
+        tbody.appendChild(row);
+    });
+
+    const viewMode = localStorage.getItem('motorists_view_mode') || 'table';
+    const tableEl = document.getElementById('motoristsTable');
+    const cardsEl = document.getElementById('motoristsCardsContainer');
+    if (viewMode === 'cards' && cardsEl) {
+        if (tableEl) tableEl.style.display = 'none';
+        cardsEl.style.display = 'grid';
+        cardsEl.innerHTML = motoristsList.length ? motoristsList.map(m => {
+            const favClass = m.is_favorite ? ' is-favorite' : '';
+            const photoSrc = motoristFotoUrl(m);
+            const photoHtml = photoSrc
+                ? `<img class="card-foto" src="${encodeURI(photoSrc)}" alt="">`
+                : `<span class="card-foto" style="background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:var(--text-muted);"><i class="fas fa-user"></i></span>`;
+            return `<div class="motorist-card" data-id="${m.id}">
+                ${photoHtml}
+                <div class="card-body">
+                    <div class="card-name">${escapeHtml(m.nome)}</div>
+                    <div class="card-meta">${escapeHtml(m.categoria_cnh_nome) || '-'} · ${escapeHtml(m.disponibilidade_nome) || '-'}</div>
+                    <div class="card-actions">
+                        <button class="btn-icon view-btn" data-id="${m.id}" title="Ver"><i class="fas fa-eye"></i></button>
+                        <button class="btn-icon favorite-btn${favClass}" data-id="${m.id}" title="Favorito"><i class="fas fa-star"></i></button>
+                        <button class="btn-icon history-btn" data-id="${m.id}" title="Histórico"><i class="fas fa-history"></i></button>
+                        <button class="btn-icon edit-btn" data-id="${m.id}" title="Editar"><i class="fas fa-edit"></i></button>
+                        <button class="btn-icon delete-btn" data-id="${m.id}" title="Excluir"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>`;
+        }).join('') : '<p class="text-muted text-center" style="grid-column:1/-1;padding:1rem;">Nenhum motorista encontrado.</p>';
+    } else {
+        if (tableEl) tableEl.style.display = '';
+        if (cardsEl) cardsEl.style.display = 'none';
+    }
+}
+
+function applyMotoristsPayload(data, updateUrl) {
+    if (!data || !data.success) return false;
+
+    if (data.summary) {
+        updateMotoristsKpis(data.summary);
+    }
+
+    if (data.pagination) {
+        currentPage = data.pagination.page || currentPage;
+        totalPages = data.pagination.total_pages || 1;
+        updatePaginationButtons(data.pagination);
+        if (updateUrl !== false) {
+            const limit = data.pagination.limit || 10;
+            syncMotoristsBrowserUrl(currentPage, limit);
+        }
+    }
+
+    renderMotoristsList(data.motorists || []);
+    syncMotoristsSortIndicators();
+    return true;
+}
+
+function applyMotoristsInitialPayload(initial, updateUrl) {
+    if (!initial || !initial.success) return false;
+    if (initial.pagination) {
+        currentPage = initial.pagination.page || 1;
+        totalPages = initial.pagination.total_pages || 1;
+        updatePaginationButtons(initial.pagination);
+    }
+    if (initial.summary) {
+        updateMotoristsKpis(initial.summary);
+    }
+    const tbody = document.querySelector('#motoristsTable tbody');
+    const alreadyRendered = tbody && tbody.querySelector('tr') && !tbody.querySelector('.mnt-loading-row');
+    if (!alreadyRendered) {
+        renderMotoristsList(initial.motorists || []);
+    }
+    syncMotoristsSortIndicators();
+    return true;
+}
+
 function loadMotorists(page = 1) {
     currentPage = page;
     const perPageSelect = document.getElementById('perPageMotorists');
@@ -427,121 +576,7 @@ function loadMotorists(page = 1) {
                 showNotification(data.error || 'Erro ao carregar motoristas', 'error');
                 return;
             }
-            
-            // Update statistics
-            if (data.summary) {
-                updateMotoristsKpis(data.summary);
-            }
-            
-            // Update pagination
-            if (data.pagination) {
-                totalPages = data.pagination.total_pages;
-
-                const currentPageElement = document.getElementById('currentPage');
-                if (currentPageElement) {
-                    currentPageElement.textContent = page;
-                }
-
-                const totalPagesElement = document.getElementById('totalPages');
-                if (totalPagesElement) {
-                    totalPagesElement.textContent = totalPages;
-                }
-
-                updatePaginationButtons(data.pagination);
-                syncMotoristsBrowserUrl(page, limit);
-            }
-            
-            // Update table
-            const tbody = document.querySelector('#motoristsTable tbody');
-            if (!tbody) {
-                console.error('Tabela de motoristas não encontrada');
-                return;
-            }
-
-            tbody.innerHTML = '';
-
-            const motoristsList = data.motorists || [];
-            const emptyEl = document.getElementById('motoristsEmptyState');
-            const wrapEl = document.getElementById('motoristsTableContainer');
-            const useModernMotoristEmpty = emptyEl && wrapEl && document.body.classList.contains('motorists-modern');
-            if (useModernMotoristEmpty) {
-                const empty = motoristsList.length === 0;
-                emptyEl.classList.toggle('visible', empty);
-                wrapEl.style.display = empty ? 'none' : '';
-            }
-            
-            const fotoUrl = (m) => m.foto_motorista ? `../uploads/motoristas/foto/${(m.foto_motorista || '').split('/').pop()}` : '';
-            const fotoHtml = (m) => m.foto_motorista
-                ? `<img src="${encodeURI(fotoUrl(m))}" alt="" class="motorist-thumb" style="width:36px;height:36px;object-fit:cover;border-radius:50%;">`
-                : `<span class="motorist-thumb-placeholder" style="width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;background:var(--bg-tertiary);border-radius:50%;font-size:0.8rem;color:var(--text-muted);"><i class="fas fa-user"></i></span>`;
-            motoristsList.forEach(motorist => {
-                const row = document.createElement('tr');
-                const dispNome = motorist.disponibilidade_nome || 'N/A';
-                const dispClass = (motorist.disponibilidade_nome || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
-                row.innerHTML = `
-                    <td>${fotoHtml(motorist)}</td>
-                    <td>${escapeHtml(motorist.nome)}</td>
-                    <td>${escapeHtml(motorist.cpf) || '-'}</td>
-                    <td>${escapeHtml(motorist.cnh) || '-'}</td>
-                    <td>${escapeHtml(motorist.categoria_cnh_nome) || '-'}</td>
-                    <td>${escapeHtml(motorist.telefone) || '-'}</td>
-                    <td>${escapeHtml(motorist.email) || '-'}</td>
-                    <td><span class="status-badge ${dispClass}">${escapeHtml(dispNome)}</span></td>
-                    <td>${motorist.porcentagem_comissao ? escapeHtml(motorist.porcentagem_comissao) + '%' : '-'}</td>
-                    <td class="actions">
-                        <button class="btn-icon view-btn" data-id="${motorist.id}" title="Ver detalhes">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn-icon favorite-btn ${motorist.is_favorite ? 'is-favorite' : ''}" data-id="${motorist.id}" title="${motorist.is_favorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}">
-                            <i class="fas fa-star"></i>
-                        </button>
-                        <button class="btn-icon history-btn" data-id="${motorist.id}" title="Histórico de alterações">
-                            <i class="fas fa-history"></i>
-                        </button>
-                        <button class="btn-icon edit-btn" data-id="${motorist.id}" title="Editar">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn-icon delete-btn" data-id="${motorist.id}" title="Excluir">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-            
-            // View mode: table vs cards
-            const viewMode = localStorage.getItem('motorists_view_mode') || 'table';
-            const tableEl = document.getElementById('motoristsTable');
-            const cardsEl = document.getElementById('motoristsCardsContainer');
-            if (viewMode === 'cards' && cardsEl) {
-                if (tableEl) tableEl.style.display = 'none';
-                cardsEl.style.display = 'grid';
-                cardsEl.innerHTML = motoristsList.length ? motoristsList.map(m => {
-                    const favClass = m.is_favorite ? ' is-favorite' : '';
-                    const photoSrc = fotoUrl(m);
-                    const photoHtml = photoSrc
-                        ? `<img class="card-foto" src="${encodeURI(photoSrc)}" alt="">`
-                        : `<span class="card-foto" style="background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:var(--text-muted);"><i class="fas fa-user"></i></span>`;
-                    return `<div class="motorist-card" data-id="${m.id}">
-                        ${photoHtml}
-                        <div class="card-body">
-                            <div class="card-name">${escapeHtml(m.nome)}</div>
-                            <div class="card-meta">${escapeHtml(m.categoria_cnh_nome) || '-'} · ${escapeHtml(m.disponibilidade_nome) || '-'}</div>
-                            <div class="card-actions">
-                                <button class="btn-icon view-btn" data-id="${m.id}" title="Ver"><i class="fas fa-eye"></i></button>
-                                <button class="btn-icon favorite-btn${favClass}" data-id="${m.id}" title="Favorito"><i class="fas fa-star"></i></button>
-                                <button class="btn-icon history-btn" data-id="${m.id}" title="Histórico"><i class="fas fa-history"></i></button>
-                                <button class="btn-icon edit-btn" data-id="${m.id}" title="Editar"><i class="fas fa-edit"></i></button>
-                                <button class="btn-icon delete-btn" data-id="${m.id}" title="Excluir"><i class="fas fa-trash"></i></button>
-                            </div>
-                        </div>
-                    </div>`;
-                }).join('') : '<p class="text-muted text-center" style="grid-column:1/-1;padding:1rem;">Nenhum motorista encontrado.</p>';
-            } else {
-                if (tableEl) tableEl.style.display = '';
-                if (cardsEl) cardsEl.style.display = 'none';
-            }
-            syncMotoristsSortIndicators();
+            applyMotoristsPayload(data, true);
         })
         .catch(error => {
             console.error('Error loading motorists:', error);

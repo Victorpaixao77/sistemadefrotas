@@ -2,6 +2,7 @@
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once '../includes/db_connect.php';
+require_once '../includes/sf_page_help.php';
 configure_session();
 session_start();
 require_authentication();
@@ -43,6 +44,7 @@ $tipos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <link rel="stylesheet" href="../css/maintenance.css">
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <?php sf_page_help_css('..'); ?>
 </head>
 <body>
     <div class="app-container">
@@ -54,6 +56,7 @@ $tipos = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <h1><?php echo $page_title; ?></h1>
                     <div>
                         <a href="manutencoes.php" class="btn-restore-layout"><i class="fas fa-arrow-left"></i> Voltar</a>
+                        <button type="button" class="btn-restore-layout" id="helpBtn" title="Ajuda desta tela" aria-label="Ajuda desta tela"><i class="fas fa-question-circle"></i> Ajuda</button>
                         <button type="button" class="btn-add-widget" id="btnNovoPlano"><i class="fas fa-plus"></i> Novo plano</button>
                     </div>
                 </div>
@@ -261,5 +264,7 @@ $tipos = $stmt->fetchAll(PDO::FETCH_ASSOC);
     listar();
 })();
     </script>
+    <?php $sf_help_key = 'planos_manutencao'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
+    <?php sf_page_help_js('..'); ?>
 </body>
 </html>

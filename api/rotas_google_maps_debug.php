@@ -1,13 +1,9 @@
 <?php
+require_once __DIR__ . '/../includes/sf_api_guard_debug.php';
 /**
  * API de Debug para buscar rotas com coordenadas para Google Maps
  * Sistema de Gestão de Frotas
  */
-
-// Habilitar exibição de erros para debug
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
 
 require_once '../includes/config.php';
 require_once '../includes/functions.php';

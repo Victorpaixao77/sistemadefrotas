@@ -5,19 +5,17 @@
 
 if (!function_exists('csrf_token_get')) {
     function csrf_token_get(): string {
+        if (!empty($_SESSION['csrf_token'])) {
+            return (string) $_SESSION['csrf_token'];
+        }
         if (session_status() !== PHP_SESSION_ACTIVE) {
             return '';
         }
-        if (empty($_SESSION['csrf_token'])) {
-            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-        }
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         return (string) $_SESSION['csrf_token'];
     }
 
     function csrf_token_validate(?string $token): bool {
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            return false;
-        }
         if (!is_string($token) || $token === '') {
             return false;
         }

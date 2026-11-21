@@ -1,12 +1,26 @@
 <?php
-require_once '../includes/conexao.php';
-session_start();
+require_once __DIR__ . '/includes/adm_auth.php';
+require_once __DIR__ . '/includes/adm_post_guard.php';
 
-// Verificar se o usuário está logado
-if (!isset($_SESSION['admin_id'])) {
-    header('Location: login.php');
-    exit;
-}
+$page_title = 'Usuários';
+$adm_extra_head = <<<'HTML'
+<style>
+.adm-usuarios .btn { padding: 10px 20px; border-radius: 8px; text-decoration: none; color: #fff; background: var(--accent-primary,#3b82f6); border: none; cursor: pointer; }
+.adm-usuarios .btn-danger { background: #dc3545; }
+.adm-usuarios .table-container { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; }
+.adm-usuarios table { width: 100%; border-collapse: collapse; }
+.adm-usuarios th, .adm-usuarios td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color); color: var(--text-primary); }
+.adm-usuarios th { background: var(--bg-tertiary); font-weight: 600; }
+.adm-usuarios .form-group { margin-bottom: 15px; }
+.adm-usuarios .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+.adm-usuarios .form-group input, .adm-usuarios .form-group select { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-tertiary); color: var(--text-primary); }
+.adm-usuarios .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; color: white; }
+.adm-usuarios .badge-admin { background: #dc3545; }
+.adm-usuarios .badge-user { background: #28a745; }
+.adm-usuarios .badge-ativo { background: #28a745; }
+.adm-usuarios .badge-inativo { background: #dc3545; }
+</style>
+HTML;
 
 // Processar ações
 $mensagem = '';
@@ -31,7 +45,10 @@ if (isset($_GET['msg'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['action'])) {
+    if (!adm_csrf_valid_post()) {
+        $mensagem = 'Sessão expirada. Recarregue a página.';
+        $tipo_mensagem = 'error';
+    } elseif (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'add':
                 try {
@@ -162,8 +179,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     // Redirecionar para evitar reenvio do formulário
                     header('Location: usuarios.php?msg=created');
                     exit;
+                } catch (PDOException $e) {
+                    error_log('usuarios add: ' . $e->getMessage());
+                    $mensagem = "Erro ao cadastrar usuário. Tente novamente.";
+                    $tipo_mensagem = "error";
                 } catch (Exception $e) {
-                    $mensagem = "Erro ao cadastrar usuário: " . $e->getMessage();
+                    $mensagem = $e->getMessage();
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -302,8 +323,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     // Redirecionar para evitar reenvio do formulário
                     header('Location: usuarios.php?msg=updated');
                     exit;
+                } catch (PDOException $e) {
+                    error_log('usuarios edit: ' . $e->getMessage());
+                    $mensagem = "Erro ao atualizar usuário. Tente novamente.";
+                    $tipo_mensagem = "error";
                 } catch (Exception $e) {
-                    $mensagem = "Erro ao atualizar usuário: " . $e->getMessage();
+                    $mensagem = $e->getMessage();
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -324,7 +349,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     header('Location: usuarios.php?msg=deleted');
                     exit;
                 } catch (PDOException $e) {
-                    $mensagem = "Erro ao excluir usuário: " . $e->getMessage();
+                    error_log('usuarios delete: ' . $e->getMessage());
+                    $mensagem = "Erro ao excluir usuário. Tente novamente.";
                     $tipo_mensagem = "error";
                 } catch (Exception $e) {
                     $mensagem = $e->getMessage();
@@ -425,186 +451,24 @@ try {
         error_log("AVISO: Nenhuma empresa encontrada para o select em usuarios.php");
     }
 } catch (PDOException $e) {
-    $mensagem = "Erro ao carregar dados: " . $e->getMessage();
+    error_log('usuarios load: ' . $e->getMessage());
+    $mensagem = "Erro ao carregar dados.";
     $tipo_mensagem = "error";
     $usuarios = [];
     $empresas = [];
 }
+require_once __DIR__ . '/includes/layout_start.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciar Usuários - Sistema de Frotas</title>
-    <link rel="stylesheet" href="../css/styles.css">
-    <link rel="stylesheet" href="../css/theme.css">
-    <link rel="stylesheet" href="../css/responsive.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        .main-content {
-            margin-left: 250px;
-            padding: 20px;
-            background: #f8f9fa;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .header h1 {
-            color: #333;
-            margin: 0;
-        }
-        .btn {
-            padding: 10px 20px;
-            border-radius: 4px;
-            text-decoration: none;
-            color: white;
-            background: #007bff;
-            border: none;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-        .btn:hover {
-            background: #0056b3;
-        }
-        .btn-danger {
-            background: #dc3545;
-        }
-        .btn-danger:hover {
-            background: #c82333;
-        }
-        .table-container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-            color: #333;
-        }
-        th {
-            background: #f8f9fa;
-            font-weight: 600;
-            color: #333;
-        }
-        tr:hover {
-            background: #f8f9fa;
-        }
-        .actions {
-            display: flex;
-            gap: 10px;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-        }
-        .modal-content {
-            background: white;
-            width: 90%;
-            max-width: 500px;
-            margin: 50px auto;
-            padding: 20px;
-            border-radius: 8px;
-            position: relative;
-        }
-        .modal-content h2 {
-            color: #333;
-            margin-top: 0;
-        }
-        .close {
-            position: absolute;
-            right: 20px;
-            top: 20px;
-            font-size: 24px;
-            cursor: pointer;
-            color: #333;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: #333;
-            font-weight: 500;
-        }
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            color: #333;
-        }
-        .message {
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-        .message.success {
-            background: #d4edda;
-            color: #155724;
-        }
-        .message.error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        .badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 600;
-            color: white;
-        }
-        .badge-admin {
-            background: #dc3545;
-        }
-        .badge-user {
-            background: #28a745;
-        }
-        .badge-ativo {
-            background: #28a745;
-        }
-        .badge-inativo {
-            background: #dc3545;
-        }
-        @media (max-width: 768px) {
-            .main-content {
-                margin-left: 60px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Sidebar -->
-    <?php include 'includes/sidebar.php'; ?>
-
-    <!-- Main Content -->
-    <div class="main-content">
-        <div class="header">
-            <h1>Gerenciar Usuários</h1>
-            <button class="btn" onclick="showAddModal()">
+<div class="adm-usuarios">
+        <div class="adm-toolbar">
+            <p class="text-muted mb-0" style="margin:0;color:var(--text-secondary)">Usuários do sistema multi-empresa</p>
+            <button class="btn" type="button" onclick="showAddModal()">
                 <i class="fas fa-plus"></i> Novo Usuário
             </button>
         </div>
 
         <?php if ($mensagem): ?>
-            <div class="message <?php echo $tipo_mensagem; ?>">
+            <div class="adm-alert <?php echo $tipo_mensagem === 'success' ? 'success' : 'error'; ?>">
                 <?php echo htmlspecialchars($mensagem); ?>
             </div>
         <?php endif; ?>
@@ -693,15 +557,15 @@ try {
                 </tbody>
             </table>
         </div>
-    </div>
 
     <!-- Modal Adicionar -->
-    <div id="addModal" class="modal">
+    <div id="addModal" class="modal adm-modal-legacy adm-modal-legacy--wide">
         <div class="modal-content">
             <span class="close" onclick="closeModal('addModal')">&times;</span>
             <h2>Novo Usuário</h2>
-            <form method="POST">
+            <form method="POST" class="adm-modal-form-grid">
                 <input type="hidden" name="action" value="add">
+                <?php echo adm_csrf_field(); ?>
                 <div class="form-group">
                     <label for="nome">Nome:</label>
                     <input type="text" id="nome" name="nome" required>
@@ -714,7 +578,7 @@ try {
                     <label for="senha">Senha:</label>
                     <input type="password" id="senha" name="senha" required>
                 </div>
-                <div class="form-group">
+                <div class="form-group adm-modal-field--full">
                     <label for="empresa_id">Empresa:</label>
                     <select id="empresa_id" name="empresa_id" required>
                         <option value="">Selecione uma empresa</option>
@@ -733,30 +597,34 @@ try {
                         <option value="motorista">Motorista</option>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="form-group adm-modal-field--full">
                     <label style="display: flex; align-items: center; gap: 8px;">
                         <input type="checkbox" id="is_oculto" name="is_oculto" value="1">
                         <span>Usuário Oculto (não aparece nas listagens)</span>
                     </label>
                 </div>
-                <div class="form-group">
+                <div class="form-group adm-modal-field--full">
                     <label style="display: flex; align-items: center; gap: 8px;">
                         <input type="checkbox" id="acesso_todas_empresas" name="acesso_todas_empresas" value="1">
                         <span>Acesso a Todas as Empresas</span>
                     </label>
                 </div>
-                <button type="submit" class="btn">Salvar</button>
+                <div class="adm-modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('addModal')">Cancelar</button>
+                    <button type="submit" class="btn">Salvar</button>
+                </div>
             </form>
         </div>
     </div>
 
     <!-- Modal Editar -->
-    <div id="editModal" class="modal">
+    <div id="editModal" class="modal adm-modal-legacy adm-modal-legacy--wide">
         <div class="modal-content">
             <span class="close" onclick="closeModal('editModal')">&times;</span>
             <h2>Editar Usuário</h2>
-            <form method="POST">
+            <form method="POST" class="adm-modal-form-grid">
                 <input type="hidden" name="action" value="edit">
+                <?php echo adm_csrf_field(); ?>
                 <input type="hidden" name="id" id="edit_id">
                 <div class="form-group">
                     <label for="edit_nome">Nome:</label>
@@ -766,11 +634,11 @@ try {
                     <label for="edit_email">Email:</label>
                     <input type="email" id="edit_email" name="email" required>
                 </div>
-                <div class="form-group">
+                <div class="form-group adm-modal-field--full">
                     <label for="edit_senha">Nova Senha: (deixe em branco para manter a atual)</label>
                     <input type="password" id="edit_senha" name="senha">
                 </div>
-                <div class="form-group">
+                <div class="form-group adm-modal-field--full">
                     <label for="edit_empresa_id">Empresa:</label>
                     <select id="edit_empresa_id" name="empresa_id" required>
                         <option value="">Selecione uma empresa</option>
@@ -796,19 +664,22 @@ try {
                         <option value="inativo">Inativo</option>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="form-group adm-modal-field--full">
                     <label style="display: flex; align-items: center; gap: 8px;">
                         <input type="checkbox" id="edit_is_oculto" name="is_oculto" value="1">
                         <span>Usuário Oculto (não aparece nas listagens)</span>
                     </label>
                 </div>
-                <div class="form-group">
+                <div class="form-group adm-modal-field--full">
                     <label style="display: flex; align-items: center; gap: 8px;">
                         <input type="checkbox" id="edit_acesso_todas_empresas" name="acesso_todas_empresas" value="1">
                         <span>Acesso a Todas as Empresas</span>
                     </label>
                 </div>
-                <button type="submit" class="btn">Atualizar</button>
+                <div class="adm-modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('editModal')">Cancelar</button>
+                    <button type="submit" class="btn">Atualizar</button>
+                </div>
             </form>
         </div>
     </div>
@@ -890,10 +761,10 @@ try {
 
         // Fechar modal ao clicar fora
         window.onclick = function(event) {
-            if (event.target.className === 'modal') {
+            if (event.target.classList.contains('modal')) {
                 event.target.style.display = 'none';
             }
         }
     </script>
-</body>
-</html> 
+</div>
+<?php require_once __DIR__ . '/includes/layout_end.php'; ?>

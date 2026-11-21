@@ -52,7 +52,7 @@ try {
     
 } catch (Exception $e) {
     error_log("Erro na validação de quilometragem: " . $e->getMessage());
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Erro interno.']);
 }
 
 /**

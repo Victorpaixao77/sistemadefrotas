@@ -1,0 +1,84 @@
+/* lucratividade-modern.css — CSS aplicado só no layout moderno ($is_modern) */
+        body.lucratividade-modern .dashboard-content.fornc-page {
+            padding-top: 8px;
+        }
+        body.lucratividade-modern .dashboard-header {
+            display: none;
+        }
+        body.lucratividade-modern .dashboard-grid {
+            gap: 0.65rem;
+        }
+        body.lucratividade-modern .sortable-ghost {
+            opacity: 0.45;
+        }
+        body.lucratividade-modern .dashboard-card {
+            border-radius: 10px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            border: 1px solid var(--border-color);
+        }
+        body.lucratividade-modern .analytics-section {
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+        body.lucratividade-modern .analytics-card {
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        body.lucratividade-modern .card.mb-4.fornc-resumo-shell {
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+            background: var(--card-bg, var(--bg-secondary));
+        }
+        body.lucratividade-modern .fornc-table tbody td {
+            text-transform: none;
+            letter-spacing: normal;
+        }
+        body.lucratividade-modern .fornc-table tr.table-success td {
+            background: rgba(25, 135, 84, 0.1);
+            font-weight: 600;
+        }
+        body.lucratividade-modern .fornc-table tr.table-primary td {
+            background: rgba(13, 110, 253, 0.08);
+            font-weight: 600;
+        }
+        body.lucratividade-modern .exporting .fornc-toolbar,
+        body.lucratividade-modern .exporting .fornc-kpi-strip,
+        body.lucratividade-modern .exporting .lucra-period-nav {
+            display: none !important;
+        }
+        @media print {
+            body.lucratividade-modern .fornc-toolbar,
+            body.lucratividade-modern .fornc-kpi-strip,
+            body.lucratividade-modern .lucra-period-nav {
+                display: none !important;
+            }
+        }
+        body.lucratividade-modern .lucra-period-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            align-items: center;
+        }
+        body.lucratividade-modern .dashboard-card--highlight {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.04)) !important;
+            border: 1px solid rgba(16, 185, 129, 0.45) !important;
+        }
+        body.lucratividade-modern .dashboard-card--highlight .card-header h3 {
+            color: #15803d;
+        }
+        body.lucratividade-modern #lucraKpiGrid .dashboard-card .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            min-width: 0;
+        }
+        body.lucratividade-modern #lucraKpiGrid .dashboard-card .card-header .kpi-card-icon {
+            flex-shrink: 0;
+            font-size: 0.85rem;
+            color: var(--accent-primary);
+            opacity: 0.92;
+        }
+        body.lucratividade-modern .dashboard-card--highlight .card-header .kpi-card-icon {
+            color: #15803d;
+        }

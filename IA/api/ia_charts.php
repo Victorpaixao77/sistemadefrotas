@@ -33,6 +33,11 @@ try {
     }
 
     $empresa_id = $_SESSION['empresa_id'];
+    $conn = getConnection();
+    if (is_file(__DIR__ . '/../../includes/sf_saas.php')) {
+        require_once __DIR__ . '/../../includes/sf_saas.php';
+        sf_ia_enforce_quota($conn, (int) $empresa_id);
+    }
     $period = isset($_GET['period']) ? intval($_GET['period']) : 30;
     $conn = getConnection();
     

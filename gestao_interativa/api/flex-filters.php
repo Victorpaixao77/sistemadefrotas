@@ -98,10 +98,11 @@ try {
     }
     
 } catch (Exception $e) {
+    error_log('flex-filters.php: ' . $e->getMessage());
     ob_clean();
     echo json_encode([
         'success' => false,
-        'error' => $e->getMessage()
+        'error' => 'Erro ao carregar os filtros.'
     ]);
 }
 

@@ -12,6 +12,8 @@ require_once '../includes/config.php';
 require_once '../includes/functions.php';
 require_once __DIR__ . '/../includes/csrf.php';
 require_once __DIR__ . '/../includes/api_json.php';
+require_once __DIR__ . '/../includes/permissions.php';
+require_once __DIR__ . '/../includes/bi_api_helpers.php';
 
 configure_session();
 session_start();
@@ -19,6 +21,12 @@ session_start();
 if (!isset($_SESSION['empresa_id'])) {
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Não autorizado']);
+    exit;
+}
+
+if (!can_access_advanced_reports()) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'Acesso negado']);
     exit;
 }
 
@@ -71,6 +79,9 @@ try {
         $mes_int = ($mes_param !== '' && preg_match('/^([1-9]|1[0-2])$/', $mes_param)) ? (int)$mes_param : 0;
         $data_inicio = ($ano - 1) . '-01-01';
         $data_fim = $ano . '-12-31';
+        if ($mes_int) {
+            $data_fim = date('Y-m-t', strtotime(sprintf('%04d-%02d-01', $ano, $mes_int)));
+        }
         $meses = [];
         $data_formatada = [];
         for ($y = $ano - 1; $y <= $ano; $y++) {
@@ -134,6 +145,16 @@ try {
     $cond_manut = $usar_periodo ? " AND data_manutencao >= :data_inicio AND data_manutencao <= :data_fim " : " AND data_manutencao >= DATE_SUB(NOW(), INTERVAL 3 MONTH) ";
     $cond_manut_m = $usar_periodo ? " AND m.data_manutencao >= :data_inicio AND m.data_manutencao <= :data_fim " : " AND m.data_manutencao >= DATE_SUB(NOW(), INTERVAL 3 MONTH) ";
     $cond_fixas = $usar_periodo ? " AND COALESCE(data_pagamento, vencimento) >= :data_inicio AND COALESCE(data_pagamento, vencimento) <= :data_fim " : " AND COALESCE(data_pagamento, vencimento) >= DATE_SUB(NOW(), INTERVAL 3 MONTH) ";
+
+    $need_veiculos_top = in_array($visao, ['geral', 'rotas'], true);
+    $need_veiculos_abast = in_array($visao, ['geral', 'abastecimento'], true);
+    $need_veiculos_manut = in_array($visao, ['geral', 'manutencao'], true);
+    $need_ranking = in_array($visao, ['geral', 'rotas'], true);
+    $need_dv_tipos = in_array($visao, ['geral', 'despesas_viagem'], true);
+    $need_manut_pc = in_array($visao, ['geral', 'manutencao'], true);
+    $need_consumo = in_array($visao, ['geral', 'abastecimento'], true);
+    $need_ponto_equilibrio = ($visao === 'geral');
+    $need_incompletos = ($visao === 'geral');
 
     // 1. Total de Abastecimentos por mês (incluindo ARLA e litros para consumo KM/L)
     $sql_abastecimentos = "
@@ -308,6 +329,8 @@ try {
     }
     
     // 4. Veículos mais utilizados (período)
+    $veiculos_top = [];
+    if ($need_veiculos_top) {
     $sql_veiculos = "
         SELECT 
             v.id,
@@ -332,8 +355,11 @@ try {
         $v['total_km'] = isset($v['total_km']) ? round((float)$v['total_km'], 2) : 0;
     }
     unset($v);
+    }
 
     // Top veículos por abastecimento (quantidade e valor)
+    $veiculos_top_abastecimento = [];
+    if ($need_veiculos_abast) {
     $sql_veiculos_abast = "
         SELECT 
             v.id,
@@ -361,8 +387,11 @@ try {
         $v['total_gasto'] = isset($v['total_gasto']) ? round((float)$v['total_gasto'], 2) : 0;
     }
     unset($v);
+    }
 
     // Top veículos por custo de manutenção (período)
+    $veiculos_top_manutencao = [];
+    if ($need_veiculos_manut) {
     $sql_veiculos_manut = "
         SELECT 
             v.id,
@@ -383,53 +412,28 @@ try {
     if ($usar_periodo) { $stmt->bindValue(':data_inicio', $data_inicio); $stmt->bindValue(':data_fim', $data_fim); }
     $stmt->execute();
     $veiculos_top_manutencao = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
     
-    // Ranking de rotas (top 5 mais e top 5 menos lucrativas) - últimos 12 meses
+    // Ranking de rotas (top 5 mais e top 5 menos lucrativas)
     $ranking_rotas = ['top5' => [], 'bottom5' => []];
+    if ($need_ranking) {
     try {
-        $sql_ranking = "
-            SELECT 
-                r.id, r.distancia_km as km, r.frete, r.comissao,
-                COALESCE(dv.total_desp, 0) as desp_viagem,
-                (r.frete - r.comissao - COALESCE(dv.total_desp, 0)) as lucro,
-                CASE WHEN r.frete > 0 THEN ((r.frete - r.comissao - COALESCE(dv.total_desp, 0)) / r.frete * 100) ELSE 0 END as margem_pct,
-                COALESCE(co.nome, '') as origem_nome,
-                COALESCE(cd.nome, '') as destino_nome
-            FROM rotas r
-            LEFT JOIN (
-                SELECT rota_id, SUM(COALESCE(total_despviagem, 0)) as total_desp
-                FROM despesas_viagem
-                GROUP BY rota_id
-            ) dv ON dv.rota_id = r.id
-            LEFT JOIN cidades co ON co.id = r.cidade_origem_id
-            LEFT JOIN cidades cd ON cd.id = r.cidade_destino_id
-            WHERE r.empresa_id = :empresa_id
-            AND r.data_saida IS NOT NULL
-            " . $cond_rotas_r . "
-            AND r.frete IS NOT NULL
-        ";
-        $stmt = $conn->prepare($sql_ranking);
+        $ranking_core = bi_pi_ranking_sql_core($cond_rotas_r);
+        $stmt = $conn->prepare($ranking_core . ' ORDER BY lucro DESC LIMIT 5');
         $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
         if ($usar_periodo) { $stmt->bindValue(':data_inicio', $data_inicio); $stmt->bindValue(':data_fim', $data_fim); }
         $stmt->execute();
-        $todas = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($todas as &$r) {
-            $r['origem_destino'] = trim(($r['origem_nome'] ?? '') . ' → ' . ($r['destino_nome'] ?? ''));
-            if ($r['origem_destino'] === ' → ') $r['origem_destino'] = 'Rota #' . $r['id'];
-            $r['custo_total'] = round((float)($r['comissao'] ?? 0) + (float)($r['desp_viagem'] ?? 0), 2);
-            $r['lucro'] = round((float)$r['lucro'], 2);
-            $r['margem_pct'] = round((float)($r['margem_pct'] ?? 0), 2);
-            $r['km'] = round((float)($r['km'] ?? 0), 2);
-            $r['frete'] = round((float)($r['frete'] ?? 0), 2);
-            $r['comissao'] = round((float)($r['comissao'] ?? 0), 2);
-            $r['desp_viagem'] = round((float)($r['desp_viagem'] ?? 0), 2);
-        }
-        unset($r);
-        usort($todas, function ($a, $b) { return $b['lucro'] <=> $a['lucro']; });
-        $ranking_rotas['top5'] = array_slice($todas, 0, 5);
-        $ranking_rotas['bottom5'] = array_slice(array_reverse($todas), 0, 5);
+        $ranking_rotas['top5'] = bi_map_ranking_route_rows($stmt->fetchAll(PDO::FETCH_ASSOC));
+
+        $stmt = $conn->prepare($ranking_core . ' ORDER BY lucro ASC LIMIT 5');
+        $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        if ($usar_periodo) { $stmt->bindValue(':data_inicio', $data_inicio); $stmt->bindValue(':data_fim', $data_fim); }
+        $stmt->execute();
+        $bottom = bi_map_ranking_route_rows($stmt->fetchAll(PDO::FETCH_ASSOC));
+        $ranking_rotas['bottom5'] = array_reverse($bottom);
     } catch (Exception $e) {
         // ignora se tabela cidades não existir ou join falhar
+    }
     }
     
     // Despesas de viagem por tipo (totais no período) para gráfico pizza
@@ -437,6 +441,7 @@ try {
         'descarga' => 0, 'pedagios' => 0, 'caixinha' => 0, 'estacionamento' => 0,
         'lavagem' => 0, 'borracharia' => 0, 'eletrica_mecanica' => 0, 'adiantamento' => 0, 'outros' => 0
     ];
+    if ($need_dv_tipos) {
     try {
         $cols = ['descarga', 'pedagios', 'caixinha', 'estacionamento', 'lavagem', 'borracharia', 'eletrica_mecanica', 'adiantamento', 'outros'];
         $sel = implode(', ', array_map(function ($c) { return 'COALESCE(SUM(' . $c . '), 0) as ' . $c; }, $cols));
@@ -450,9 +455,11 @@ try {
             foreach ($cols as $c) { $despesas_viagem_tipos[$c] = round((float)($row[$c] ?? 0), 2); }
         }
     } catch (Exception $e) { }
+    }
     
     // Manutenção preventiva x corretiva (via tipos_manutencao.nome: Preventiva / Corretiva)
     $manut_preventiva_corretiva = ['preventiva' => ['qtd' => 0, 'valor' => 0], 'corretiva' => ['qtd' => 0, 'valor' => 0]];
+    if ($need_manut_pc) {
     try {
         $sql_manut_tipo = "
             SELECT 
@@ -477,10 +484,11 @@ try {
     } catch (Exception $e) {
         // se tabela tipos_manutencao não existir, deixa zerado
     }
+    }
     
     // Veículos críticos (custo acima da média da frota)
     $veiculos_criticos = [];
-    if (count($veiculos_top_manutencao) > 0) {
+    if ($need_veiculos_manut && count($veiculos_top_manutencao) > 0) {
         $soma = 0;
         foreach ($veiculos_top_manutencao as $v) { $soma += (float)($v['total_gasto'] ?? 0); }
         $media_frota = $soma / count($veiculos_top_manutencao);
@@ -490,13 +498,16 @@ try {
             }
         }
     }
+    if ($need_veiculos_manut) {
     foreach ($veiculos_top_manutencao as &$v) {
         $v['total_gasto'] = isset($v['total_gasto']) ? round((float)$v['total_gasto'], 2) : 0;
     }
     unset($v);
+    }
     
     // Consumo por veículo (KM/L): litros agregados em subquery derivada (evita subquery correlacionada por linha)
     $veiculos_consumo = [];
+    if ($need_consumo) {
     try {
         if ($usar_periodo) {
             $litros_sub = "
@@ -559,8 +570,9 @@ try {
         }
         unset($vc);
     } catch (Exception $e) { }
+    }
     
-    // Filtrar período de retorno e montar comparação (vs mês anterior, vs mesmo mês ano anterior)
+    // Filtrar período de retorno e montar comparação
     if ($usar_periodo) {
         $mes_ref = $mes_int ? sprintf('%04d-%02d', $ano, $mes_int) : $ano . '-12';
         $resultado = [];
@@ -597,7 +609,8 @@ try {
     }
 
     // Dados incompletos no período (podem impactar resultados)
-    $dados_incompletos = ['rotas_sem_despesas' => 0, 'abastecimentos_sem_litros' => 0, 'manutencoes_sem_tipo' => 0];
+    $dados_incompletos = ['rotas_sem_despesas' => 0, 'abastecimentos_sem_litros' => 0, 'manutencoes_sem_tipo' => 0, 'tem_incompletos' => false];
+    if ($need_incompletos) {
     try {
         $cond_incompl = $usar_periodo ? " AND r.data_saida >= :di_ini AND r.data_saida <= :di_fim " : " AND r.data_saida >= DATE_SUB(NOW(), INTERVAL 12 MONTH) ";
         $sql_rotas_sem_desp = "SELECT COUNT(*) as c FROM rotas r WHERE r.empresa_id = :empresa_id AND r.data_saida IS NOT NULL " . $cond_incompl . " AND NOT EXISTS (SELECT 1 FROM despesas_viagem dv WHERE dv.rota_id = r.id)";
@@ -626,10 +639,11 @@ try {
         $dados_incompletos['manutencoes_sem_tipo'] = (int)$stmt->fetchColumn();
     } catch (Exception $e) { }
     $dados_incompletos['tem_incompletos'] = ($dados_incompletos['rotas_sem_despesas'] > 0 || $dados_incompletos['abastecimentos_sem_litros'] > 0 || $dados_incompletos['manutencoes_sem_tipo'] > 0);
+    }
 
     // Ponto de equilíbrio (break-even) com base no último mês do período
     $ponto_equilibrio = null;
-    if (count($resultado) > 0) {
+    if ($need_ponto_equilibrio && count($resultado) > 0) {
         $ref_pe = $resultado[count($resultado) - 1];
         $custo_total_pe = (float)($ref_pe['total_gasto_abastecimentos'] ?? 0) + (float)($ref_pe['total_manutencoes'] ?? 0) + (float)($ref_pe['total_despesas_viagem'] ?? 0) + (float)($ref_pe['total_despesas_fixas'] ?? 0);
         $total_rotas_pe = (int)($ref_pe['total_rotas'] ?? 0);
@@ -663,19 +677,41 @@ try {
         'total_litros' => 0
     ];
     
-    // Estimativa próximo mês (média dos últimos 6 meses de manutenção) – útil na visão Manutenção
+    // Estimativa próximo mês (média dos últimos 6 meses de manutenção)
     $previsao_proximo_mes = null;
-    if (count($resultado) > 0) {
+    if ($need_manut_pc && count($resultado) > 0) {
         $ultimos6 = array_slice($resultado, -6);
         $soma = 0;
         foreach ($ultimos6 as $r) { $soma += (float)($r['total_manutencoes'] ?? 0); }
         $previsao_proximo_mes = round($soma / count($ultimos6), 2);
     }
 
-    $output = [
-        'success' => true,
-        'visao' => $visao,
-        'data' => [
+    $bi_metas = null;
+    try {
+        $conn->exec("CREATE TABLE IF NOT EXISTS bi_metas (
+            empresa_id INT NOT NULL PRIMARY KEY,
+            meta_receita DECIMAL(15,2) NULL,
+            meta_lucro DECIMAL(15,2) NULL,
+            meta_km DECIMAL(15,2) NULL,
+            meta_margem_pct DECIMAL(5,2) NULL DEFAULT 20.00,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $stmtMeta = $conn->prepare('SELECT meta_receita, meta_lucro, meta_km, meta_margem_pct FROM bi_metas WHERE empresa_id = :eid LIMIT 1');
+        $stmtMeta->execute(['eid' => $empresa_id]);
+        $rowMeta = $stmtMeta->fetch(PDO::FETCH_ASSOC);
+        if ($rowMeta) {
+            $bi_metas = [
+                'receita' => $rowMeta['meta_receita'] !== null ? (float)$rowMeta['meta_receita'] : null,
+                'lucro' => $rowMeta['meta_lucro'] !== null ? (float)$rowMeta['meta_lucro'] : null,
+                'km' => $rowMeta['meta_km'] !== null ? (float)$rowMeta['meta_km'] : null,
+                'margem_pct' => $rowMeta['meta_margem_pct'] !== null ? (float)$rowMeta['meta_margem_pct'] : 20.0,
+            ];
+        }
+    } catch (Exception $eMeta) {
+        error_log('bi_metas load: ' . $eMeta->getMessage());
+    }
+
+    $dataPayload = [
             'historico_mensal' => $resultado,
             'comparacao' => $comparacao,
             'mes_atual' => $dados_mes_atual,
@@ -690,8 +726,13 @@ try {
             'labels' => array_column($resultado, 'mes_nome'),
             'dados_incompletos' => $dados_incompletos,
             'ponto_equilibrio' => $ponto_equilibrio,
-            'previsao_proximo_mes' => $previsao_proximo_mes
-        ]
+            'previsao_proximo_mes' => $previsao_proximo_mes,
+            'metas' => $bi_metas
+        ];
+    $output = [
+        'success' => true,
+        'visao' => $visao,
+        'data' => bi_trim_pi_data_for_visao($dataPayload, $visao)
     ];
     $payloadStr = json_encode($output);
     if (!$nocache && $payloadStr !== false) {
@@ -710,7 +751,7 @@ try {
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'error' => 'Erro ao buscar dados: ' . $e->getMessage()
+        'error' => 'Erro ao buscar dados. Tente novamente.'
     ]);
 }
 

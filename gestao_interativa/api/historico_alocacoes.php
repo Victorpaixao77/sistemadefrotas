@@ -98,12 +98,13 @@ try {
     ]);
     
 } catch (Exception $e) {
+    error_log('historico_alocacoes.php: ' . $e->getMessage());
     // Limpar qualquer saída anterior
     ob_clean();
-    
+
     echo json_encode([
         'success' => false,
-        'error' => $e->getMessage()
+        'error' => 'Erro ao carregar o histórico de alocações.'
     ]);
 }
 ?> 

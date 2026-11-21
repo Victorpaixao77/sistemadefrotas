@@ -366,26 +366,6 @@ body.abastecimentos-modern .fornc-page #refuelingTable .percentual-arla {
     .analytics-card .card-body {
         height: 300px;
     }
-    
-    /* Estilos responsivos para mobile */
-    .main-content {
-        margin-left: 0 !important;
-        width: 100% !important;
-    }
-}
-
-/* Estilos responsivos para mobile */
-.main-content {
-    margin-left: var(--sidebar-width);
-    transition: margin-left var(--transition-speed) ease;
-    width: calc(100% - var(--sidebar-width));
-    min-height: 100vh;
-    background: var(--bg-primary);
-}
-
-.sidebar-collapsed .main-content {
-    margin-left: var(--sidebar-collapsed-width);
-    width: calc(100% - var(--sidebar-collapsed-width));
 }
 
 .dashboard-content {
@@ -481,8 +461,62 @@ body:not(.abastecimentos-modern) #helpModal .modal-body:not(.sf-help-modal-body)
     align-self: center;
 }
 
+/* Modal de importação maior por padrão (mais espaço para revisar a ficha) */
+#refuelImportModal .modal-content {
+    max-width: min(1100px, 96vw);
+    width: 96%;
+}
+
+#refuelImportModal .modal-body {
+    max-height: 78vh;
+    overflow-y: auto;
+    padding: 1.1rem 1.25rem;
+}
+
+#refuelImportModal .modal-body .form-group {
+    margin-bottom: 0.9rem;
+}
+
+#refuelImportModal .refuel-import-intro-wrap {
+    margin-bottom: 0.5rem;
+}
+
+#refuelImportModal .refuel-import-intro {
+    margin: 0 0 0.5rem;
+    line-height: 1.5;
+}
+
+#refuelImportModal .modal-footer {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    padding: 0.9rem 1.25rem;
+}
+
+#refuelImportModal .modal-footer .irr-status {
+    font-size: 0.84rem;
+    font-weight: 600;
+}
+
+/* Botões do rodapé com o mesmo tamanho (Fechar = Criar rota = Importar) */
+#refuelImportModal .modal-footer > button {
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.2;
+    padding: 0.6rem 1rem;
+    min-height: 40px;
+    border-radius: 8px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    width: auto;
+    margin: 0;
+}
+
 .refuel-import-preview-wrap {
-    max-height: min(50vh, 320px);
+    max-height: min(46vh, 420px);
     overflow: auto;
     margin-top: 0.75rem;
     border: 1px solid var(--border-color, #e2e8f0);

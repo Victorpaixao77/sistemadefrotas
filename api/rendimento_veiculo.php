@@ -73,12 +73,12 @@ try {
     error_log("Erro PDO ao calcular rendimento por veículo: " . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => 'Erro ao calcular rendimento por veículo: ' . $e->getMessage()
+        'error' => 'Erro ao calcular rendimento por veículo: '
     ]);
 } catch (Exception $e) {
     error_log("Erro ao calcular rendimento por veículo: " . $e->getMessage());
     echo json_encode([
         'success' => false,
-        'error' => 'Erro ao calcular rendimento por veículo: ' . $e->getMessage()
+        'error' => 'Erro ao calcular rendimento por veículo: '
     ]);
 } 

@@ -52,7 +52,7 @@ fun GpsDeviceStatusCard(modifier: Modifier = Modifier) {
             pending = n
             lastUploadMs = last
             systemLocOn = locOn
-            delay(2500)
+            delay(6000)
         }
     }
 

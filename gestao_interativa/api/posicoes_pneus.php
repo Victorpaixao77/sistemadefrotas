@@ -58,16 +58,13 @@ try {
 
 try {
     $conn = getConnection();
-    
-    // Buscar todas as posições de pneus
-    $sql = "SELECT id, nome FROM posicoes_pneus ORDER BY nome";
-    $stmt = $conn->prepare($sql);
-    $stmt->execute();
-    $posicoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Log para debug
-    error_log("API posicoes_pneus: " . count($posicoes) . " posições encontradas");
-    
+
+    // Catálogo global de posições — praticamente estático. Cacheado (APCu/arquivo) por 1h.
+    require_once dirname(__DIR__, 2) . '/includes/sf_cache.php';
+    $posicoes = sf_cache_remember('catalogo:posicoes_pneus', 3600, function () use ($conn) {
+        return $conn->query("SELECT id, nome FROM posicoes_pneus ORDER BY nome")->fetchAll(PDO::FETCH_ASSOC);
+    });
+
     ob_clean();
     echo json_encode([
         'success' => true, 

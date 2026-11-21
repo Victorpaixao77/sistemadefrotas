@@ -104,7 +104,8 @@ if (!function_exists('sf_page_help_sections')) {
         $map = [
             'visao_geral' => 'Visão Geral',
             'funcionalidades' => 'Funcionalidades Principais',
-            'como_usar' => 'Como Usar',
+            'como_usar' => 'Passo a Passo (Como Fazer)',
+            'fluxo' => 'Fluxo do Processo',
             'kpis' => 'Indicadores (KPIs)',
             'graficos' => 'Gráficos e Análises',
             'dicas' => 'Dicas',
@@ -120,16 +121,18 @@ if (!function_exists('sf_page_help_sections')) {
     /**
      * Modal completo de ajuda (id padrão sfHelpModal).
      *
-     * @param array{modern?:bool,modal_id?:string,title?:string} $opts
+     * @param array{modern?:bool,modal_id?:string,title?:string,extra_class?:string} $opts
      */
     function sf_render_page_help_modal(string $key, array $opts = []): void
     {
         $data = sf_page_help_get($key);
         $title = $opts['title'] ?? ($data['title'] ?? 'Ajuda');
         $modalId = $opts['modal_id'] ?? 'helpModal';
-        echo '<div class="modal" id="' . htmlspecialchars($modalId) . '" data-sf-help-key="' . htmlspecialchars($key) . '">';
+        $extra = trim((string) ($opts['extra_class'] ?? ''));
+        $class = 'modal' . ($extra !== '' ? ' ' . $extra : '');
+        echo '<div class="' . htmlspecialchars($class) . '" id="' . htmlspecialchars($modalId) . '" data-sf-help-key="' . htmlspecialchars($key) . '" role="dialog" aria-modal="true" aria-labelledby="' . htmlspecialchars($modalId) . '-title">';
         echo '<div class="modal-content sf-help-modal-content">';
-        echo '<div class="modal-header"><h2><i class="fas fa-question-circle" aria-hidden="true"></i> Ajuda — ' . htmlspecialchars($title) . '</h2>';
+        echo '<div class="modal-header"><h2 id="' . htmlspecialchars($modalId) . '-title"><i class="fas fa-question-circle" aria-hidden="true"></i> Ajuda — ' . htmlspecialchars($title) . '</h2>';
         echo '<span class="close-modal" title="Fechar" aria-label="Fechar">&times;</span></div>';
         echo '<div class="modal-body sf-help-modal-body">';
         sf_echo_page_help($key);

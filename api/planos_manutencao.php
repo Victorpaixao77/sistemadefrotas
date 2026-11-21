@@ -17,6 +17,7 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 
 header('Content-Type: application/json; charset=utf-8');
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 $conn = getConnection();
 $empresa_id = (int)($_SESSION['empresa_id'] ?? 0);

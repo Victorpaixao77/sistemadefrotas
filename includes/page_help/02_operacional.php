@@ -17,6 +17,12 @@ return [
         ['text' => 'Importar cupom', 'sub' => ['Use Importar → foto/PDF.', 'Revise cada linha extraída e clique Usar.', 'Complete veículo e motorista antes de salvar.']],
         ['text' => 'Analisar consumo', 'sub' => ['Aplique filtro mensal.', 'Compare km/L entre veículos do mesmo tipo.', 'Investigue anomalias em vermelho.']],
     ]),
+    'fluxo' => sf_hlp_ol([
+        '<strong>Origem do registro</strong> — o motorista abastece e envia com <em>OCR do cupom</em> pelo app, ou o gestor lança aqui manualmente.',
+        '<strong>Abastecimentos (aqui)</strong> — o registro entra vinculado a veículo, rota e motorista.',
+        '<strong>Antifraude</strong> — o painel de anomalias IA sinaliza consumo/preço fora do padrão para revisão.',
+        '<strong>Resultado</strong> — alimenta o <em>consumo (km/L)</em>, o <em>custo/km</em>, a <em>Lucratividade</em> da rota e o <em>BI</em>.',
+    ]),
     'kpis' => sf_hlp_ul([
         '<strong>Total de abastecimentos</strong> no período.',
         '<strong>Litros consumidos.</strong>',
@@ -83,6 +89,41 @@ return [
         'Descrição pobre na OS prejudica análise de recorrência de falhas.',
         'Vincule sempre o fornecedor correto para negociar pacotes.',
         'MTBF baixo em um veículo específico indica problema crônico — avalie venda ou reforma.',
+    ]),
+],
+'gestao_diesel' => [
+    'title' => 'Gestão de Diesel · Ranking de Postos',
+    'visao_geral' => '<p>Análise dos seus abastecimentos <strong>por posto</strong>: quanto você gastou, quantos litros, o <strong>preço médio ponderado (R$/L)</strong> e a frequência em cada posto — além da evolução do preço mês a mês. Ajuda a decidir onde abastecer para pagar menos e a negociar com fornecedores.</p>',
+    'funcionalidades' => sf_hlp_ul([
+        '<strong>KPIs</strong> do período: gasto total, litros, preço médio ponderado, nº de postos e de abastecimentos.',
+        '<strong>Destaques:</strong> posto mais barato (melhor preço médio), mais utilizado e de maior gasto.',
+        '<strong>Ranking de postos</strong> com litros, preço médio, total e % do gasto.',
+        '<strong>Gráfico</strong> da evolução do preço médio do combustível por mês.',
+        '<strong>Filtros</strong> por período e tipo de combustível; busca rápida por posto.',
+    ]),
+    'como_usar' => sf_hlp_ol([
+        ['text' => 'Definir o período e o combustível', 'sub' => [
+            'Ajuste "De/Até" (padrão: últimos 12 meses) e o tipo de combustível.',
+            'Clique em Aplicar.',
+        ]],
+        ['text' => 'Ler os destaques e o ranking', 'sub' => [
+            'Veja o posto mais barato e o mais usado nos cards do topo.',
+            'Na tabela, compare preço médio e % do gasto entre postos.',
+        ]],
+        ['text' => 'Decidir onde abastecer', 'sub' => [
+            'Priorize postos com melhor preço médio e bom volume.',
+            'Use o gráfico para ver se o diesel está subindo e antecipar compras.',
+        ]],
+    ]),
+    'fluxo' => sf_hlp_ol([
+        '<strong>Abastecimentos</strong> — cada registro (posto, litros, valor) vem da tela de Abastecimentos ou do OCR do cupom no app.',
+        '<strong>Gestão de Diesel (aqui)</strong> — o sistema agrupa por posto e calcula preço médio, gasto e ranking.',
+        '<strong>Decisão</strong> — você escolhe os melhores postos e negocia; a economia aparece no <em>custo/km</em> e na <em>Lucratividade</em>.',
+    ]),
+    'dicas' => sf_hlp_ul([
+        'O preço médio aqui é <strong>ponderado</strong> (gasto ÷ litros) — mais fiel que a média simples.',
+        'O "mais barato" ignora postos com volume muito baixo, para não distorcer com casos isolados.',
+        'Padronize o nome do posto no cadastro para o agrupamento ficar correto.',
     ]),
 ],
 ];

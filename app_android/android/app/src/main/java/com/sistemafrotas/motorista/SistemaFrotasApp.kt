@@ -6,6 +6,7 @@ import android.content.IntentFilter
 import android.content.res.Configuration
 import android.location.LocationManager
 import android.os.Build
+import com.sistemafrotas.motorista.data.AvisosScheduler
 import com.sistemafrotas.motorista.data.GpsPreferencesStore
 import com.sistemafrotas.motorista.data.GpsSystemLocationNotifier
 import com.sistemafrotas.motorista.data.OutboxSyncScheduler
@@ -22,6 +23,8 @@ class SistemaFrotasApp : Application() {
     override fun onCreate() {
         super.onCreate()
         OutboxSyncScheduler.schedulePeriodic(this)
+        AvisosScheduler.schedulePeriodic(this)
+        AvisosScheduler.kickOnce(this)
         registerLocationSettingsReceiver()
         // Ao iniciar o app (ex: após o SO matar o processo em background), 
         // verifica se o rastreamento deveria estar ativo e reinicia o serviço.

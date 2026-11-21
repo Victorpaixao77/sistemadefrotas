@@ -1,0 +1,178 @@
+/* Centro de Inteligência — Copiloto de Operações
+   Redesign minimalista/profissional. Mantém TODAS as classes usadas pelo JS. */
+
+/* ---------- layout base ---------- */
+.ci-wrap { max-width: 940px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.ci-wrap--wide { max-width: 1060px; }
+
+/* ---------- cabeçalho (compacto, sem gradiente pesado) ---------- */
+.ci-hero { padding: 2px 2px 0; }
+.ci-hero h1 { margin: 0; font-size: 1.2rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 9px; }
+.ci-hero h1 i { color: var(--accent-primary); }
+.ci-hero p { margin: 5px 0 0; color: var(--text-muted); font-size: 12.5px; line-height: 1.5; max-width: 720px; }
+
+/* ---------- abas (tab strip com scroll horizontal, ativo sublinhado) ---------- */
+.ci-sections {
+    display: flex; gap: 2px; overflow-x: auto; scrollbar-width: thin;
+    border-bottom: 1px solid var(--border-color); padding-bottom: 0; margin: 0;
+}
+.ci-sections::-webkit-scrollbar { height: 3px; }
+.ci-section {
+    flex: 0 0 auto; border: none; background: none; color: var(--text-muted);
+    padding: 9px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 7px; transition: color .15s, border-color .15s;
+}
+.ci-section:hover { color: var(--text-secondary); }
+.ci-section.active { color: var(--accent-primary); border-bottom-color: var(--accent-primary); }
+
+/* ---------- modos (pills discretos) ---------- */
+.ci-modes { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.ci-mode {
+    border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary);
+    border-radius: 999px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: .15s;
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.ci-mode:hover { border-color: var(--accent-primary); color: var(--text-primary); }
+.ci-mode.active { background: var(--accent-primary); color: #fff; border-color: var(--accent-primary); }
+
+/* ---------- toolbar (ações leves, alinhadas) ---------- */
+.ci-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0; }
+.ci-btn-exec {
+    border: 1px solid var(--border-color); border-radius: 9px; padding: 8px 13px;
+    font-size: 12.5px; font-weight: 600; cursor: pointer; background: var(--bg-secondary); color: var(--text-primary);
+    display: inline-flex; align-items: center; gap: 7px; transition: .15s; text-decoration: none; line-height: 1;
+}
+.ci-btn-exec:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+.ci-btn-exec.ci-btn-ghost { background: transparent; }
+.ci-btn-link { text-decoration: none; }
+.ci-toggle { font-size: 12px; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; margin-left: 2px; }
+
+/* ---------- painéis ---------- */
+.ci-panel { display: flex; flex-direction: column; gap: 12px; }
+.ci-panel-hidden { display: none !important; }
+.ci-card-box { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px; }
+.ci-list { margin: 0; padding-left: 18px; color: var(--text-secondary); font-size: 13px; }
+
+/* ---------- insights ---------- */
+.ci-insights { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px; }
+.ci-insights--compact { padding: 11px 14px; }
+.ci-insights h3 { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 7px; }
+.ci-insights ul { margin: 0; padding-left: 18px; color: var(--text-secondary); font-size: 13px; }
+.ci-insights li { margin: 5px 0; }
+.ci-insights li button { background: none; border: none; color: var(--accent-primary); cursor: pointer; font-size: inherit; padding: 0; text-decoration: underline; }
+
+/* ---------- chips ---------- */
+.ai-chips, .ci-chips { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; }
+.ai-chip { border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-secondary); border-radius: 999px; padding: 7px 13px; font-size: 12.5px; cursor: pointer; transition: .15s; }
+.ai-chip:hover { border-color: var(--accent-primary); color: var(--text-primary); }
+
+/* ---------- chat ---------- */
+.ai-chat { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 16px; min-height: 340px; max-height: 60vh; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.ai-msg { display: flex; gap: 10px; max-width: 92%; }
+.ai-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+.ai-msg .av { width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.ai-msg.bot .av { background: color-mix(in srgb, var(--accent-primary) 15%, transparent); color: var(--accent-primary); }
+.ai-msg.user .av { background: var(--bg-tertiary); color: var(--text-secondary); }
+.ai-bubble { background: var(--bg-tertiary); border-radius: 12px; padding: 12px 14px; font-size: 14px; color: var(--text-primary); line-height: 1.55; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ai-msg.user .ai-bubble { background: var(--accent-primary); color: #fff; }
+.ai-answer-text { white-space: pre-line; }
+
+/* ---------- cards KPI dentro da resposta ---------- */
+.ai-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+.ai-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; text-align: center; }
+.ai-card .k { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); display: flex; align-items: center; justify-content: center; gap: 4px; }
+.ai-card .v { font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin-top: 4px; }
+
+/* ---------- blocos auxiliares da resposta ---------- */
+.ai-block { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border-color); font-size: 13px; }
+.ai-block h4 { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.ai-block ul { margin: 0; padding-left: 18px; color: var(--text-secondary); }
+.ai-conf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 10px; font-size: 12px; color: var(--text-muted); }
+.ai-stars { color: #f59e0b; letter-spacing: 1px; }
+.ai-fontes span { display: inline-block; margin-right: 6px; }
+.ai-fontes span::before { content: '✓ '; color: #16a34a; }
+.ai-fontes-clic .ai-fonte-link { display: inline-block; margin: 4px 8px 4px 0; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border-color); color: var(--accent-primary); text-decoration: none; font-size: 12px; }
+.ai-fontes-clic .ai-fonte-link:hover { border-color: var(--accent-primary); background: color-mix(in srgb, var(--accent-primary) 10%, transparent); }
+.ai-fonte-plain { display: inline-block; margin-right: 6px; font-size: 12px; color: var(--text-secondary); }
+.ai-sugestoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ai-sug { border: 1px dashed var(--border-color); background: transparent; color: var(--accent-primary); border-radius: 999px; padding: 5px 10px; font-size: 11.5px; cursor: pointer; }
+.ai-sug:hover { border-color: var(--accent-primary); }
+.ai-feedback { display: flex; gap: 8px; margin-top: 8px; }
+.ai-fb { border: 1px solid var(--border-color); background: var(--bg-secondary); border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 14px; }
+.ai-agente { font-size: 11px; color: var(--accent-primary); margin-top: 6px; }
+.ai-skill { color: var(--text-muted); font-weight: 600; }
+.ai-raciocinio, .ai-tools { margin-top: 10px; font-size: 12px; color: var(--text-secondary); }
+.ai-raciocinio summary, .ai-tools summary { cursor: pointer; color: var(--text-muted); font-weight: 600; }
+.ai-tools-list { margin: 6px 0 0; padding-left: 18px; }
+.ai-map-wrap { margin-top: 10px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); }
+.ai-acao-tela { margin-top: 10px; }
+.ai-formula { display: inline; margin-left: 4px; cursor: help; opacity: .7; }
+.ai-formula-btn { border: none; background: transparent; cursor: pointer; font-size: 12px; padding: 0 4px; opacity: .85; }
+.ai-formula-detail { font-size: 11px; color: var(--text-muted); margin-top: 4px; padding: 6px 8px; background: var(--bg-tertiary); border-radius: 6px; }
+.ai-formula-inputs { margin: 6px 0 0; padding-left: 18px; font-size: 11px; }
+
+/* ---------- tabela ---------- */
+.ai-table { margin-top: 10px; width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ai-table th { text-align: left; color: var(--text-muted); font-size: 11px; text-transform: uppercase; padding: 5px 8px; border-bottom: 1px solid var(--border-color); }
+.ai-table td { padding: 5px 8px; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); }
+.ai-meta { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+
+/* ---------- barra de input (robusta, sem sobreposição) ---------- */
+.ai-inputbar {
+    display: flex; gap: 8px; align-items: center;
+    background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 14px; padding: 6px;
+}
+.ai-inputbar input[type="text"] {
+    flex: 1 1 auto; min-width: 0; padding: 10px 12px; border: none; background: transparent;
+    color: var(--text-primary); font-size: 14px; outline: none;
+}
+.ai-inputbar button, .ai-attach {
+    flex: 0 0 42px; width: 42px; height: 42px; border-radius: 10px; display: inline-flex;
+    align-items: center; justify-content: center; cursor: pointer; font-size: 15px; border: none;
+}
+.ai-inputbar button { background: var(--accent-primary); color: #fff; }
+.ai-inputbar button:disabled { opacity: .55; cursor: default; }
+.ai-attach { border: 1px solid var(--border-color); background: var(--bg-tertiary); color: var(--text-secondary); }
+.ai-attach:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+.ai-btn-mic { background: var(--bg-tertiary) !important; color: var(--text-primary) !important; border: 1px solid var(--border-color) !important; }
+.ai-btn-mic.listening { color: #dc2626 !important; border-color: #dc2626 !important; }
+.ai-disclaimer { font-size: 11px; color: var(--text-muted); text-align: center; margin: 2px 0 0; }
+
+/* ---------- formulários (Documentos / Memória / Playground) ---------- */
+.ci-upload-form, .ci-memoria-form { display: flex; flex-direction: column; gap: 12px; max-width: 560px; }
+.ci-upload-form label, .ci-memoria-form label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--text-secondary); }
+.ci-upload-form label.ci-toggle, .ci-memoria-form label.ci-toggle { flex-direction: row; align-items: center; }
+.ci-upload-form input, .ci-upload-form textarea, .ci-memoria-form input, .ci-memoria-form select, .ci-memoria-form textarea {
+    padding: 9px 11px; border-radius: 9px; border: 1px solid var(--border-color); background: var(--bg-tertiary);
+    color: var(--text-primary); font-size: 13px; width: 100%;
+}
+.ci-upload-form .ci-btn-exec, .ci-memoria-form .ci-btn-exec { align-self: flex-start; }
+
+/* ---------- ações / automações ---------- */
+.ci-acao-card { border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; margin-bottom: 10px; background: var(--bg-tertiary); }
+.ci-acao-card h4 { margin: 0 0 6px; font-size: 14px; color: var(--text-primary); }
+.ci-acao-btns, .ai-acao-confirm { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+.ci-btn-ok { border: none; background: #16a34a; color: #fff; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; }
+.ci-btn-ok:disabled { opacity: .7; cursor: default; }
+.ci-btn-cancel { border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); padding: 7px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; }
+
+/* ---------- saúde / skills ---------- */
+.ai-saude-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.ai-saude-kpi { background: var(--bg-tertiary); border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; text-align: center; }
+.ai-saude-kpi span { display: block; font-size: 10px; text-transform: uppercase; color: var(--text-muted); }
+.ai-saude-kpi strong { font-size: 1.1rem; color: var(--text-primary); }
+.ai-skills-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.ai-skill-card { border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; text-align: center; background: var(--bg-tertiary); }
+.ai-skill-card i { font-size: 1.4rem; color: var(--accent-primary); display: block; margin-bottom: 6px; }
+.ai-skill-card span { display: block; font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.ai-skill-card--off { opacity: .5; }
+
+/* ---------- responsivo ---------- */
+@media (max-width: 640px) {
+    .ci-hero h1 { font-size: 1.05rem; }
+    .ci-toolbar { gap: 6px; }
+    .ci-btn-exec { padding: 7px 10px; font-size: 12px; }
+    .ai-chat { max-height: 62vh; }
+    .ai-msg { max-width: 100%; }
+}

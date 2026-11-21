@@ -16,4 +16,7 @@ $opts = ['modal_id' => $modalId];
 if (!empty($sf_help_title)) {
     $opts['title'] = (string) $sf_help_title;
 }
+if (!empty($sf_help_modal_extra_class)) {
+    $opts['extra_class'] = (string) $sf_help_modal_extra_class;
+}
 sf_render_page_help_modal((string) $sf_help_key, $opts);

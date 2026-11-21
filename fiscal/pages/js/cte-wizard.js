@@ -88,7 +88,7 @@
         }
     }
 
-    function carregarDadosWizard() {
+    function carregarDadosWizard(preselOt) {
         var host = document.getElementById('cteWizardNfeList');
         if (host) host.innerHTML = '<p class="text-muted small mb-0">Carregando...</p>';
         return fiscalApiFetch('../api/documentos_fiscais_v2.php?action=documentos_para_cte')
@@ -107,10 +107,53 @@
                 fillSelect('cteWizardMotorista', wizardData.motoristas, 'id', function (m) {
                     return (m.nome || '') + (m.cpf ? ' — ' + m.cpf : '');
                 });
+                carregarOtsWizard(preselOt);
             });
     }
 
-    window.abrirModalCteWizard = function () {
+    // Integração: lista Ordens de Transporte (aprovadas/em viagem) para pré-preencher o CT-e.
+    function carregarOtsWizard(preselId) {
+        var sel = document.getElementById('cteWizardOtSel');
+        if (!sel) { return; }
+        fetch('../../api/ordens_transporte.php?action=list', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d || !d.success || !d.ordens) { return; }
+                var elig = d.ordens.filter(function (o) { return o.status === 'aprovada' || o.status === 'em_viagem'; });
+                sel.innerHTML = '<option value="">— não usar OT —</option>';
+                elig.forEach(function (o) {
+                    var opt = document.createElement('option');
+                    opt.value = String(o.id);
+                    opt.textContent = o.numero + (o.cliente_nome ? ' · ' + o.cliente_nome : '') + ' · ' +
+                        ((o.origem || o.estado_origem || '') + '→' + (o.destino || o.estado_destino || ''));
+                    sel.appendChild(opt);
+                });
+                if (preselId) { sel.value = String(preselId); if (sel.value) { prefillDeOt(preselId); } }
+            }).catch(function () {});
+        if (!sel.dataset.bound) {
+            sel.dataset.bound = '1';
+            sel.addEventListener('change', function () { if (sel.value) { prefillDeOt(sel.value); } });
+        }
+    }
+
+    function prefillDeOt(otId) {
+        fetch('../../api/ordens_transporte.php?action=get&id=' + encodeURIComponent(otId), { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d || !d.success || !d.ordem) { return; }
+                var o = d.ordem;
+                function setVal(id, v) { var el = document.getElementById(id); if (el && v != null && v !== '') { el.value = v; } }
+                setVal('cteWizardVeiculo', o.veiculo_id);
+                setVal('cteWizardMotorista', o.motorista_id);
+                setVal('cteWizardOrigem', (o.origem || '') + (o.estado_origem ? '/' + o.estado_origem : ''));
+                setVal('cteWizardDestino', (o.destino || '') + (o.estado_destino ? '/' + o.estado_destino : ''));
+                if (parseFloat(o.valor_frete) > 0) { setVal('cteWizardValorFrete', o.valor_frete); }
+                if (parseFloat(o.peso_carga) > 0) { setVal('cteWizardPeso', o.peso_carga); }
+            }).catch(function () {});
+    }
+    window.cteWizardCarregarOts = carregarOtsWizard;
+
+    window.abrirModalCteWizard = function (otId) {
         clearStatus();
         ['cteWizardOrigem', 'cteWizardDestino'].forEach(function (id) {
             var el = document.getElementById(id);
@@ -120,10 +163,20 @@
         if (vf) vf.value = '0';
         var modal = new bootstrap.Modal(document.getElementById('modalCteWizard'));
         modal.show();
-        carregarDadosWizard().catch(function (err) {
+        carregarDadosWizard(typeof otId === 'number' || typeof otId === 'string' ? otId : null).catch(function (err) {
             showStatus(err.message || 'Erro ao carregar wizard.', 'danger');
         });
     };
+
+    // Abertura automática pré-preenchida quando vem da OT (fiscal/pages/cte.php?ot=ID).
+    document.addEventListener('DOMContentLoaded', function () {
+        try {
+            var ot = new URLSearchParams(window.location.search).get('ot');
+            if (ot && /^\d+$/.test(ot)) {
+                setTimeout(function () { window.abrirModalCteWizard(ot); }, 400);
+            }
+        } catch (e) { /* ignora */ }
+    });
 
     function salvarCteWizard() {
         clearStatus();
@@ -167,6 +220,8 @@
         fd.append('valor_frete', String(valorFrete));
         fd.append('peso_total', String(peso));
         fd.append('volumes_total', String(volumes));
+        var otSel = document.getElementById('cteWizardOtSel');
+        if (otSel && otSel.value) { fd.append('ordem_transporte_id', otSel.value); }
 
         fiscalApiFetch('../api/documentos_fiscais_v2.php', { method: 'POST', body: fd })
             .then(function (res) {

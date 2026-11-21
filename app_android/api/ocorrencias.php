@@ -38,24 +38,36 @@ try {
     if ($method === 'POST') {
         $d = [];
         $foto_path = null;
+        $video_path = null;
         $ct = $_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? '';
 
         if (stripos($ct, 'multipart/form-data') !== false) {
             $d = $_POST;
-            if (isset($_FILES['foto']) && $_FILES['foto']['error'] === UPLOAD_ERR_OK) {
-                $uploadRoot = dirname(__DIR__, 2);
-                $uploadInc = $uploadRoot . '/includes/upload_comprovante.php';
-                if (is_file($uploadInc)) {
-                    require_once $uploadInc;
-                    $uploadAbs = $uploadRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'ocorrencias';
-                    if (!is_dir($uploadAbs)) {
-                        mkdir($uploadAbs, 0775, true);
-                    }
-                    try {
-                        $foto_path = sf_save_comprovante_upload($_FILES['foto'], $uploadAbs, 'uploads/ocorrencias', false);
-                    } catch (Exception $ex) {
-                        api_error($ex->getMessage(), 400);
-                    }
+            $uploadRoot = dirname(__DIR__, 2);
+            $uploadInc = $uploadRoot . '/includes/upload_comprovante.php';
+            if (isset($_FILES['foto']) && $_FILES['foto']['error'] === UPLOAD_ERR_OK && is_file($uploadInc)) {
+                require_once $uploadInc;
+                $uploadAbs = $uploadRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'ocorrencias';
+                if (!is_dir($uploadAbs)) {
+                    mkdir($uploadAbs, 0775, true);
+                }
+                try {
+                    $foto_path = sf_save_comprovante_upload($_FILES['foto'], $uploadAbs, 'uploads/ocorrencias', false);
+                } catch (Exception $ex) {
+                    api_error($ex->getMessage(), 400);
+                }
+            }
+            $video_path = null;
+            if (isset($_FILES['video']) && $_FILES['video']['error'] === UPLOAD_ERR_OK && is_file($uploadInc)) {
+                require_once $uploadInc;
+                $uploadAbsV = $uploadRoot . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'ocorrencias' . DIRECTORY_SEPARATOR . 'videos';
+                if (!is_dir($uploadAbsV)) {
+                    mkdir($uploadAbsV, 0775, true);
+                }
+                try {
+                    $video_path = sf_save_comprovante_upload($_FILES['video'], $uploadAbsV, 'uploads/ocorrencias/videos', false);
+                } catch (Exception $ex) {
+                    api_error($ex->getMessage(), 400);
                 }
             }
         } else {
@@ -97,10 +109,10 @@ try {
         $stmt = $conn->prepare('
             INSERT INTO ocorrencias_viagem
                 (empresa_id, motorista_id, rota_id, veiculo_id, tipo, descricao,
-                 latitude, longitude, data_hora, foto_path, status, fonte)
+                 latitude, longitude, data_hora, foto_path, video_path, status, fonte)
             VALUES
                 (:e, :m, :rota, :veic, :tipo, :desc,
-                 :lat, :lng, :dh, :foto, "aberta", "motorista")
+                 :lat, :lng, :dh, :foto, :video, "aberta", "motorista")
         ');
         $stmt->execute([
             ':e' => $empresa_id,
@@ -113,6 +125,7 @@ try {
             ':lng' => $longitude,
             ':dh' => $data_hora,
             ':foto' => $foto_path,
+            ':video' => $video_path ?? null,
         ]);
         $id = (int) $conn->lastInsertId();
 

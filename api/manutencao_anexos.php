@@ -18,6 +18,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 header('Content-Type: application/json');
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 $conn = getConnection();
 $empresa_id = (int)($_SESSION['empresa_id'] ?? 0);
@@ -84,7 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (file_exists($full_path)) {
             @unlink($full_path);
         }
-        $conn->prepare("DELETE FROM manutencao_anexos WHERE id = :id")->execute(['id' => $id]);
+        $conn->prepare("DELETE FROM manutencao_anexos WHERE id = :id AND empresa_id = :eid")
+            ->execute(['id' => $id, 'eid' => $empresa_id]);
         echo json_encode(['success' => true]);
         exit;
     }

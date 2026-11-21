@@ -283,10 +283,32 @@ function sf_enforce_idle_timeout() {
     $_SESSION['ultima_atividade'] = $agora;
 }
 
+/**
+ * Libera o lock da sessão PHP após leituras/escritas iniciais.
+ * Evita que navegação + APIs paralelas (notificações, sync) fiquem serializadas.
+ */
+function sf_release_session_lock(): void
+{
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+}
+
 // Função para requerer autenticação
 function require_authentication() {
     if (is_logged_in()) {
         sf_enforce_idle_timeout();
+        if (is_file(__DIR__ . '/sf_saas.php')) {
+            require_once __DIR__ . '/sf_saas.php';
+            $connSaas = getConnection();
+            sf_saas_enforce_session($connSaas);
+            sf_saas_enforce_api_quota($connSaas);
+        }
+        if (!function_exists('csrf_token_get')) {
+            require_once __DIR__ . '/csrf.php';
+        }
+        csrf_token_get();
+        sf_release_session_lock();
         return;
     }
     if (!is_logged_in()) {
@@ -304,4 +326,10 @@ function require_authentication() {
             exit;
         }
     }
+}
+
+// Telemetria de performance (Control Center ADM)
+if (is_file(__DIR__ . '/../pages_adm/lib/adm_perf.php')) {
+    require_once __DIR__ . '/../pages_adm/lib/adm_perf.php';
+    adm_perf_bootstrap();
 }

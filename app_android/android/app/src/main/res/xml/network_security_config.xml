@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Configuração de segurança de rede.
+  - cleartextTrafficPermitted="true": mantém o acesso HTTP na LAN / servidor próprio
+    (comportamento atual do app; a URL é configurável em Configurações).
+  - trust-anchors "user": permite HTTPS com certificado interno da empresa
+    (basta o motorista instalar o certificado da CA no aparelho).
+  Quando o servidor migrar para HTTPS público, basta trocar a URL para https://…
+  que já funciona (certificado do sistema).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

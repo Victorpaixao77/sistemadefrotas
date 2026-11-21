@@ -3,8 +3,9 @@
 require_once '../includes/config.php';
 require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
+require_once '../includes/db_connect.php';
+require_once '../includes/refuel_list.php';
 require_once '../includes/sf_api_base.php';
-require_once '../includes/abastecimentos_repository.php';
 
 // Configure session before starting it
 configure_session();
@@ -25,12 +26,63 @@ if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
 
 $is_modern = !isset($_GET['classic']) || (string)$_GET['classic'] !== '1';
 
-// Pegar a página atual da URL ou definir como 1
-$pagina_atual = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
+$pagina_atual = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+$refuel_search = isset($_GET['search']) ? trim((string) $_GET['search']) : '';
+$refuel_veiculo = isset($_GET['veiculo']) ? trim((string) $_GET['veiculo']) : '';
+$refuel_motorista = isset($_GET['motorista']) ? trim((string) $_GET['motorista']) : '';
+$refuel_combustivel = isset($_GET['combustivel']) ? trim((string) $_GET['combustivel']) : '';
+$refuel_pagamento = isset($_GET['pagamento']) ? trim((string) $_GET['pagamento']) : '';
+$refuel_sort = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'data_abastecimento';
+$refuel_dir = (isset($_GET['dir']) && strtoupper((string) $_GET['dir']) === 'ASC') ? 'ASC' : 'DESC';
+$refuel_year = null;
+$refuel_month = null;
+if (!empty($_GET['year']) && !empty($_GET['month'])) {
+    $refuel_year = (int) $_GET['year'];
+    $refuel_month = (int) $_GET['month'];
+} elseif (!empty($_GET['month']) && preg_match('/^(\d{4})-(\d{1,2})$/', (string) $_GET['month'], $refuel_m)) {
+    $refuel_year = (int) $refuel_m[1];
+    $refuel_month = (int) $refuel_m[2];
+}
 
-// Buscar abastecimentos com paginação
-$resultado = getAbastecimentos($pagina_atual, $per_page);
-$abastecimentos = $resultado['abastecimentos'];
+$list_opts = [
+    'page' => $pagina_atual,
+    'limit' => $per_page,
+    'search' => $refuel_search,
+    'veiculo' => $refuel_veiculo,
+    'motorista' => $refuel_motorista,
+    'combustivel' => $refuel_combustivel,
+    'pagamento' => $refuel_pagamento,
+    'sort' => $refuel_sort,
+    'dir' => $refuel_dir,
+];
+if ($refuel_year && $refuel_month) {
+    $list_opts['year'] = $refuel_year;
+    $list_opts['month'] = $refuel_month;
+}
+
+$refuel_initial = ['success' => true, 'data' => [], 'pagination' => ['page' => 1, 'limit' => $per_page, 'total' => 0, 'totalPages' => 1], 'summary' => []];
+if ($empresa_id > 0) {
+    try {
+        $conn = getConnection();
+        $refuel_initial = refuel_fetch_list($conn, $empresa_id, $list_opts);
+        $summary_year = $refuel_year ?? (int) date('Y');
+        $summary_month = $refuel_month ?? (int) date('n');
+        $refuel_initial['summary'] = refuel_fetch_summary($conn, $empresa_id, $summary_year, $summary_month);
+    } catch (Throwable $e) {
+        error_log('abastecimentos.php SSR: ' . $e->getMessage());
+    }
+}
+
+$abastecimentos = $refuel_initial['data'] ?? [];
+$refuel_summary = $refuel_initial['summary'] ?? [];
+$refuel_pag = $refuel_initial['pagination'] ?? ['page' => 1, 'limit' => $per_page, 'total' => 0, 'totalPages' => 1];
+$resultado = [
+    'abastecimentos' => $abastecimentos,
+    'total' => (int) ($refuel_pag['total'] ?? 0),
+    'pagina_atual' => (int) ($refuel_pag['page'] ?? 1),
+    'total_paginas' => max(1, (int) ($refuel_pag['totalPages'] ?? 1)),
+];
 $total_paginas = $resultado['total_paginas'];
 ?>
 
@@ -39,24 +91,22 @@ $total_paginas = $resultado['total_paginas'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Gestão de Frotas - <?php echo $page_title; ?></title>
-    <?php sf_render_api_scripts(); ?>
-    
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="../logo.png">
-    
+    <title>Sistema de Gestão de Frotas - <?php echo htmlspecialchars($page_title, ENT_QUOTES, 'UTF-8'); ?></title>
+    <link rel="icon" type="image/png" href="<?php echo htmlspecialchars(sf_app_url('logo.png'), ENT_QUOTES, 'UTF-8'); ?>">
+
     <!-- CSS Files -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
     <link rel="stylesheet" href="../css/theme.css">
     <link rel="stylesheet" href="../css/responsive.css">
-    <link rel="stylesheet" href="../css/abastecimentos.css?v=<?php echo htmlspecialchars(sf_asset_v(), ENT_QUOTES, 'UTF-8'); ?>">
     <?php if ($is_modern): ?>
     <link rel="stylesheet" href="../css/fornc-modern-page.css">
     <?php endif; ?>
+    <link rel="stylesheet" href="../css/abastecimentos.css?v=<?php echo htmlspecialchars(sf_asset_v(), ENT_QUOTES, 'UTF-8'); ?>">
     
     <!-- Chart.js for analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
     
     <!-- Sortable.js for drag-and-drop -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -101,10 +151,10 @@ $total_paginas = $resultado['total_paginas'];
                 
                 <?php if ($is_modern): ?>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-gas-pump fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Abastecimentos</span></div><span class="val" id="refuelKpiAbastecimentos">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-droplet fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Litros (mês)</span></div><span class="val" id="refuelKpiLitros">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-money-bill-wave fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Valor (mês)</span></div><span class="val" id="refuelKpiValor">R$ 0,00</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-chart-simple fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Média R$/L</span></div><span class="val" id="refuelKpiMediaLitro">R$ 0,00/L</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-gas-pump fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Abastecimentos</span></div><span class="val" id="refuelKpiAbastecimentos"><?php echo htmlspecialchars(refuel_kpi_display('abastecimentos', $refuel_summary), ENT_QUOTES, 'UTF-8'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-droplet fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Litros (mês)</span></div><span class="val" id="refuelKpiLitros"><?php echo htmlspecialchars(refuel_kpi_display('litros', $refuel_summary), ENT_QUOTES, 'UTF-8'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-money-bill-wave fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Valor (mês)</span></div><span class="val" id="refuelKpiValor"><?php echo htmlspecialchars(refuel_kpi_display('valor', $refuel_summary), ENT_QUOTES, 'UTF-8'); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-chart-simple fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Média R$/L</span></div><span class="val" id="refuelKpiMediaLitro"><?php echo htmlspecialchars(refuel_kpi_display('media_litro', $refuel_summary), ENT_QUOTES, 'UTF-8'); ?></span></div>
                 </div>
                 <?php else: ?>
                 <div class="dashboard-grid">
@@ -115,7 +165,7 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="refuelKpiAbastecimentos">0</span>
+                                <span class="metric-value" id="refuelKpiAbastecimentos"><?php echo htmlspecialchars(refuel_kpi_display('abastecimentos', $refuel_summary), ENT_QUOTES, 'UTF-8'); ?></span>
                                 <span class="metric-subtitle">Total este mês</span>
                             </div>
                         </div>
@@ -127,7 +177,7 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="refuelKpiLitros">0</span>
+                                <span class="metric-value" id="refuelKpiLitros"><?php echo htmlspecialchars(refuel_kpi_display('litros', $refuel_summary), ENT_QUOTES, 'UTF-8'); ?></span>
                                 <span class="metric-subtitle">Total este mês</span>
                             </div>
                         </div>
@@ -139,7 +189,7 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="refuelKpiValor">R$ 0,00</span>
+                                <span class="metric-value" id="refuelKpiValor"><?php echo htmlspecialchars(refuel_kpi_display('valor', $refuel_summary), ENT_QUOTES, 'UTF-8'); ?></span>
                                 <span class="metric-subtitle">Total este mês</span>
                             </div>
                         </div>
@@ -151,7 +201,7 @@ $total_paginas = $resultado['total_paginas'];
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="refuelKpiMediaLitro">R$ 0,00/L</span>
+                                <span class="metric-value" id="refuelKpiMediaLitro"><?php echo htmlspecialchars(refuel_kpi_display('media_litro', $refuel_summary), ENT_QUOTES, 'UTF-8'); ?></span>
                                 <span class="metric-subtitle">Média no mês</span>
                             </div>
                         </div>
@@ -218,7 +268,7 @@ $total_paginas = $resultado['total_paginas'];
                         <button type="button" id="addRefuelBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Novo</button>
                         <button type="button" id="refuelImportBtn" class="fornc-btn fornc-btn--ghost" title="Importar CSV/JSON (planilha de frete)"><i class="fas fa-file-import"></i> Importar</button>
                         <button type="button" class="fornc-btn fornc-btn--accent" id="applyRefuelFilters" title="Aplicar filtros"><i class="fas fa-search"></i> Pesquisar</button>
-                        <button type="button" class="fornc-btn fornc-btn--ghost" id="filterBtn" title="Filtro por mês/ano"><i class="fas fa-sliders-h"></i> Opções</button>
+                        <button type="button" class="fornc-btn fornc-btn--ghost" data-sf-periodo data-sf-periodo-onapply="sfPeriodoClickApply" title="Filtrar por período"><i class="fas fa-calendar-alt"></i> Período</button>
                         <button type="button" class="fornc-btn fornc-btn--ghost" id="clearRefuelFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
                         <button type="button" class="fornc-btn fornc-btn--ghost" id="refuelColumnsBtn" title="Colunas da tabela" aria-label="Colunas da tabela"><i class="fas fa-columns"></i></button>
                         <button type="button" class="fornc-btn fornc-btn--muted" id="exportBtn" title="Exportar CSV"><i class="fas fa-file-export"></i> Exportar</button>
@@ -648,92 +698,7 @@ $total_paginas = $resultado['total_paginas'];
         </div>
     </div>
 
-    <!-- Importar abastecimentos (CSV/JSON — mesmo layout da coluna DATA/KM/POSTO/L/R$ do papel de frete) -->
-    <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="refuelImportModal">
-        <div class="modal-content<?php echo $is_modern ? ' modal-lg fornc-modal--wide' : ''; ?>">
-            <div class="modal-header">
-                <h2>Importar abastecimentos</h2>
-                <span class="close-modal">&times;</span>
-            </div>
-            <div class="modal-body">
-                <p class="refuel-import-intro text-muted">
-                    <strong>CSV / JSON:</strong> colunas <strong>data</strong>, <strong>km</strong>, <strong>posto</strong>, <strong>litros</strong>, <strong>valor_total</strong>
-                    (<code>;</code> ou <code>,</code>; datas <code>19/03/2025</code> ou <code>2025-03-19</code>).
-                </p>
-                <p class="refuel-import-intro text-muted">
-                    <strong>Foto ou PDF:</strong>
-                    com chave do <strong>Google Vision</strong> (em Configurações) ou <code>SF_GOOGLE_VISION_API_KEY</code> no servidor, a leitura usa OCR em nuvem no backend; sem chave, cai para <strong>OCR no navegador</strong> (Tesseract). Revise sempre antes de salvar.
-                </p>
-                <p class="refuel-import-intro text-muted">
-                    <a href="../examples/abastecimento_import_modelo.csv" download class="refuel-import-model-link"><i class="fas fa-download" aria-hidden="true"></i> Modelo CSV</a>
-                    ·
-                    <a href="../examples/abastecimento_import_modelo.json" download class="refuel-import-model-link"><i class="fas fa-download" aria-hidden="true"></i> Modelo JSON</a>
-                </p>
-                <div class="form-group">
-                    <label for="refuelImportFile">Arquivo</label>
-                    <input type="file" id="refuelImportFile" accept=".csv,.json,.pdf,image/*,text/csv,application/json,application/pdf">
-                </div>
-                <p id="refuelImportProgress" class="refuel-import-progress" role="status" aria-live="polite"></p>
-                <p id="refuelImportError" class="refuel-import-error" role="alert"></p>
-                <details class="refuel-import-ocr-details" id="refuelImportOcrWrap" hidden>
-                    <summary>Texto extraído (OCR / PDF)</summary>
-                    <pre id="refuelImportOcrRaw" class="refuel-import-ocr-pre"></pre>
-                </details>
-                <div class="refuel-import-shared" id="refuelImportShared" hidden>
-                    <p class="refuel-import-intro text-muted" style="margin-bottom:.5rem">
-                        <strong>Aplicar a todas as linhas:</strong> o comprovante não traz estes campos — selecione uma vez.
-                    </p>
-                    <div class="refuel-import-shared-grid">
-                        <div class="form-group">
-                            <label for="impVeiculo">Veículo</label>
-                            <select id="impVeiculo"><option value="">Selecione…</option></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="impMotorista">Motorista</label>
-                            <select id="impMotorista"><option value="">Selecione…</option></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="impRota">Rota</label>
-                            <select id="impRota"><option value="">Selecione veículo e motorista…</option></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="impCombustivel">Combustível</label>
-                            <select id="impCombustivel"><option value="">Selecione…</option></select>
-                        </div>
-                        <div class="form-group">
-                            <label for="impFormaPgto">Forma de pagamento</label>
-                            <select id="impFormaPgto">
-                                <option value="Dinheiro">Dinheiro</option>
-                                <option value="PIX">PIX</option>
-                                <option value="Cartão">Cartão</option>
-                                <option value="Boleto">Boleto</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="refuel-import-preview-wrap">
-                    <table class="data-table refuel-import-preview" id="refuelImportPreviewTable">
-                        <thead>
-                            <tr>
-                                <th>Data</th>
-                                <th>KM</th>
-                                <th>Posto</th>
-                                <th>Litros</th>
-                                <th>Valor R$</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="refuelImportPreviewBody"></tbody>
-                    </table>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <span id="refuelImportResult" class="refuel-import-result" aria-live="polite" style="margin-right:auto"></span>
-                <button type="button" class="btn-secondary close-modal">Fechar</button>
-                <button type="button" class="btn-primary" id="refuelImportSaveBtn" disabled><i class="fas fa-file-import"></i> Importar</button>
-            </div>
-        </div>
-    </div>
+    <?php include '../includes/refuel_import_modal.php'; ?>
 
     <!-- Filter Modal -->
     <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="filterModal">
@@ -746,7 +711,7 @@ $total_paginas = $resultado['total_paginas'];
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="filterMonth">Mês/Ano</label>
-                        <input type="month" id="filterMonth" class="form-control">
+                        <input type="month" id="filterMonth" class="form-control" data-sf-periodo-month>
                     </div>
                 </div>
             </div>
@@ -795,9 +760,11 @@ $total_paginas = $resultado['total_paginas'];
     <!-- JavaScript Files -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <script src="../js/sf-periodo.js"></script>
     <?php if (!empty($is_modern)): ?><script src="../js/fornc-table-columns.js"></script><?php endif; ?>
     <script src="../js/sf_insights.js?v=1.3"></script>
-    <script src="../js/abastecimentos.js?v=1.1.1"></script>
+    <script>window.__REFUEL_INITIAL__=<?php echo json_encode($refuel_initial, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
+    <script src="../js/abastecimentos.js?v=1.2"></script>
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="../js/refuel-import.js?v=<?php echo htmlspecialchars(sf_asset_v(), ENT_QUOTES, 'UTF-8'); ?>"></script>

@@ -7,13 +7,14 @@ require_once __DIR__ . '/../includes/security.php';
 
 configure_session();
 session_start();
+header('Content-Type: application/json; charset=utf-8');
+require_authentication();
 
-if (!isset($_SESSION['empresa_id'])) {
+$empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
+if ($empresa_id < 1) {
     echo json_encode(['success' => false, 'error' => 'Não autorizado']);
     exit;
 }
-
-$empresa_id = $_SESSION['empresa_id'];
 $conn = getConnection();
 $sec_cfg = sf_security_config((int) $empresa_id);
 
@@ -39,11 +40,6 @@ $jsonData = json_decode($input, true);
 
 // Determinar a action de diferentes fontes
 $action = $_POST['action'] ?? $_GET['action'] ?? ($jsonData['action'] ?? '');
-
-// Log para debug
-error_log('API usuarios.php - Action: ' . $action);
-error_log('API usuarios.php - Input: ' . $input);
-error_log('API usuarios.php - POST: ' . print_r($_POST, true));
 
 switch ($action) {
     case 'create':
@@ -263,7 +259,7 @@ switch ($action) {
             }
         } catch (PDOException $e) {
             error_log('Erro ao excluir usuário: ' . $e->getMessage());
-            echo json_encode(['success' => false, 'error' => 'Erro ao excluir usuário: ' . $e->getMessage()]);
+            echo json_encode(['success' => false, 'error' => 'Erro ao excluir usuário: ']);
         }
         break;
 

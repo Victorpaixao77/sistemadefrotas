@@ -1,6 +1,9 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,7 +24,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sistemafrotas.motorista.data.AuthRepository
 import com.sistemafrotas.motorista.data.LocationHelper
+import com.sistemafrotas.motorista.feature.viagem.TripFeatureBridge
 import com.sistemafrotas.motorista.ui.components.FotoPicker
+import com.sistemafrotas.motorista.ui.components.rememberSignatureUri
 import com.sistemafrotas.motorista.ui.viewmodel.AuthViewModelFactory
 import com.sistemafrotas.motorista.ui.viewmodel.OcorrenciasViewModel
 import kotlinx.coroutines.launch
@@ -52,10 +57,19 @@ fun OcorrenciasScreen(
     val vm: OcorrenciasViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository) { OcorrenciasViewModel(it) }
     )
-    val list by vm.list.collectAsState()
-    val refreshing by vm.refreshing.collectAsState()
-    val error by vm.error.collectAsState()
+    val list by vm.list.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
     var showForm by remember { mutableStateOf(false) }
+    var voicePrefill by remember { mutableStateOf<Pair<String?, String?>?>(null) }
+
+    LaunchedEffect(Unit) {
+        val (desc, tipo) = TripFeatureBridge.consumeOcorrencia()
+        if (!desc.isNullOrBlank() || !tipo.isNullOrBlank()) {
+            voicePrefill = desc to tipo
+            showForm = true
+        }
+    }
 
     LaunchedEffect(Unit) { vm.carregarSeNecessario() }
 
@@ -63,8 +77,10 @@ fun OcorrenciasScreen(
         LaunchedEffect(Unit) { onSubScreenChange("Nova ocorrência") { showForm = false } }
         NovaOcorrenciaScreen(
             authRepository = authRepository,
-            onBack = { showForm = false },
-            onSuccess = { showForm = false; vm.refresh() },
+            onBack = { showForm = false; voicePrefill = null },
+            onSuccess = { showForm = false; voicePrefill = null; vm.refresh() },
+            initialDescricao = voicePrefill?.first,
+            initialTipo = voicePrefill?.second,
             modifier = modifier,
         )
         return
@@ -113,7 +129,7 @@ fun OcorrenciasScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(list) { o ->
+                        items(list, key = { it.id }) { o ->
                             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
                                 Column(Modifier.padding(14.dp)) {
                                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -146,13 +162,20 @@ private fun NovaOcorrenciaScreen(
     authRepository: AuthRepository,
     onBack: () -> Unit,
     onSuccess: () -> Unit,
+    initialDescricao: String? = null,
+    initialTipo: String? = null,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var tipo by remember { mutableStateOf<String?>(null) }
-    var descricao by remember { mutableStateOf("") }
+    var tipo by remember { mutableStateOf<String?>(initialTipo) }
+    var descricao by remember { mutableStateOf(initialDescricao.orEmpty()) }
     var fotoUri by remember { mutableStateOf<Uri?>(null) }
+    var videoUri by remember { mutableStateOf<Uri?>(null) }
+    val (assinaturaUri, assinaturaUi) = rememberSignatureUri()
+    val videoLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        videoUri = uri
+    }
     var gpsLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -180,6 +203,12 @@ private fun NovaOcorrenciaScreen(
         )
 
         FotoPicker(label = "Foto da ocorrência", uri = fotoUri, onUri = { fotoUri = it }, modifier = Modifier.fillMaxWidth())
+
+        OutlinedButton(onClick = { videoLauncher.launch("video/*") }, modifier = Modifier.fillMaxWidth()) {
+            Text(if (videoUri != null) "Vídeo selecionado ✓" else "Anexar vídeo (opcional)")
+        }
+
+        assinaturaUi()
 
         Text(
             gpsLocation?.let { "Localização capturada: %.5f, %.5f".format(Locale.US, it.first, it.second) }
@@ -211,7 +240,13 @@ private fun NovaOcorrenciaScreen(
                         "longitude" to gpsLocation?.second,
                     )
                     scope.launch {
-                        authRepository.criarOcorrencia(body, context = context, fotoUri = fotoUri)
+                        authRepository.criarOcorrencia(
+                            body,
+                            context = context,
+                            fotoUri = fotoUri,
+                            videoUri = videoUri,
+                            assinaturaUri = assinaturaUri(),
+                        )
                             .onSuccess { onSuccess() }
                             .onFailure { err -> error = err.message; loading = false }
                     }

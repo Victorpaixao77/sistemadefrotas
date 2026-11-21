@@ -26,6 +26,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 header('Content-Type: application/json');
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 $empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
 if (!$empresa_id) {
@@ -46,7 +47,7 @@ function sf_pertence(PDO $conn, string $tabela, int $id, int $empresa): bool
 try {
     switch ($action) {
         case 'veiculos':
-            $stmt = $conn->prepare('SELECT id, placa, modelo, marca FROM veiculos WHERE empresa_id = :e ORDER BY placa');
+            $stmt = $conn->prepare('SELECT id, placa, modelo, marca, capacidade_carga FROM veiculos WHERE empresa_id = :e ORDER BY placa');
             $stmt->execute([':e' => $empresa_id]);
             api_json_send(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
             break;

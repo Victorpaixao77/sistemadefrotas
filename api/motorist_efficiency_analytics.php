@@ -1,6 +1,7 @@
 <?php
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
+require_once __DIR__ . '/../includes/permissions.php';
 
 // Configurar sessão antes de iniciá-la
 configure_session();
@@ -12,6 +13,12 @@ session_start();
 if (!isset($_SESSION['loggedin']) || $_SESSION['loggedin'] !== true || !isset($_SESSION['empresa_id'])) {
     http_response_code(401);
     echo json_encode(['error' => 'Não autorizado']);
+    exit;
+}
+
+if (!can_access_advanced_reports()) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Acesso negado']);
     exit;
 }
 
@@ -79,6 +86,6 @@ try {
 } catch (Exception $e) {
     error_log("Motorist Efficiency Analytics API Error: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['error' => 'Erro ao buscar dados de eficiência dos motoristas: ' . $e->getMessage()]);
+    echo json_encode(['error' => 'Erro ao buscar dados de eficiência dos motoristas: ']);
     exit;
 } 

@@ -309,7 +309,7 @@ function sf_google_routes_compute_raw(string $apiKey, array $payload, ?string $f
 {
     $mask = $fieldMask !== null && $fieldMask !== ''
         ? $fieldMask
-        : 'routes.distanceMeters,routes.duration,routes.travelAdvisory.tollInfo,routes.legs.travelAdvisory.tollInfo,routes.localizedValues';
+        : 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline,routes.travelAdvisory.tollInfo,routes.legs.travelAdvisory.tollInfo,routes.localizedValues';
     $ch = curl_init('https://routes.googleapis.com/directions/v2:computeRoutes');
     curl_setopt_array($ch, [
         CURLOPT_POST => true,
@@ -534,6 +534,7 @@ function computeRoutesWithTolls() {
             'toll_estimate_method' => $useTruckToll ? 'google_scaled_eixos_div2' : 'google_raw',
             'toll_passes_requested' => $tollPasses,
             'tolls_legs_brl' => $tollsLegsOut,
+            'encoded_polyline' => (string) ($route['polyline']['encodedPolyline'] ?? ''),
             'total_cost' => round($fuelCost + $tollsForCost, 2),
             'route' => $route,
         ],

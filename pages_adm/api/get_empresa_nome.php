@@ -1,6 +1,6 @@
 <?php
 require_once '../../includes/conexao.php';
-session_start();
+require_once __DIR__ . '/../includes/adm_session.php';
 
 header('Content-Type: application/json');
 
@@ -22,6 +22,8 @@ try {
         echo json_encode(['success' => false, 'error' => 'Empresa não encontrada']);
     }
 } catch (PDOException $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    error_log('get_empresa_nome: ' . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Erro ao buscar empresa.']);
 }
 ?>

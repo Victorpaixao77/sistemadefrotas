@@ -21,10 +21,18 @@ if (!can_view_financial_data()) {
     exit;
 }
 
+$empresa_id = (int) $_SESSION['empresa_id'];
+if (function_exists('session_write_close')) { session_write_close(); }
+
 try {
     $conn = getConnection();
-    $empresa_id = (int) $_SESSION['empresa_id'];
     $ctx = sf_dashboard_analytics_context();
+
+    // Dashboard cacheado (APCu/arquivo) por 120s, por empresa+período.
+    require_once __DIR__ . '/../includes/sf_cache.php';
+    $ckey = 'dash:comissoes:' . $empresa_id . ':' . $ctx['d1'] . ':' . $ctx['d2'] . ':' . $ctx['bucket'];
+    if (($cached = sf_cache_get($ckey)) !== null) { echo json_encode($cached); exit; }
+
     $series = sf_dashboard_analytics_series($ctx['d1'], $ctx['d2'], $ctx['bucket']);
     $values = array_fill_keys($series['keys'], 0.0);
 
@@ -43,7 +51,7 @@ try {
         }
     }
 
-    echo json_encode([
+    $payload = [
         'labels' => $series['labels'],
         'datasets' => [[
             'label' => 'Comissões',
@@ -54,7 +62,9 @@ try {
             'tension' => 0.4,
         ]],
         'period_label' => $ctx['label'],
-    ]);
+    ];
+    sf_cache_set($ckey, $payload, 120);
+    echo json_encode($payload);
 } catch (Throwable $e) {
     error_log('Commissions Analytics API Error: ' . $e->getMessage());
     http_response_code(500);

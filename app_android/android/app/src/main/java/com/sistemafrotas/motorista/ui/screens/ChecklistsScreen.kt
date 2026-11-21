@@ -1,5 +1,6 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,7 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import com.sistemafrotas.motorista.data.AuthRepository
+import com.sistemafrotas.motorista.ui.components.rememberSignatureUri
 import com.sistemafrotas.motorista.data.api.ChecklistItem
 import com.sistemafrotas.motorista.data.api.RotaItem
 import com.sistemafrotas.motorista.data.api.VeiculoItem
@@ -46,9 +49,9 @@ fun ChecklistsScreen(
     val vm: ChecklistsViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository) { ChecklistsViewModel(it) }
     )
-    val list by vm.list.collectAsState()
-    val refreshing by vm.refreshing.collectAsState()
-    val error by vm.error.collectAsState()
+    val list by vm.list.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
     var showForm by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { vm.carregarSeNecessario() }
@@ -106,7 +109,7 @@ fun ChecklistsScreen(
                 }
             } else {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(list) { c ->
+                    items(list, key = { it.id }) { c ->
                         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Outlined.Checklist, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -192,6 +195,7 @@ private fun configTemCarreta(config: String): Boolean = config == "conjunto" || 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NovoChecklistScreen(authRepository: AuthRepository, onBack: () -> Unit, onSuccess: () -> Unit, showTopBar: Boolean = true, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     var rotas by remember { mutableStateOf<List<RotaItem>>(emptyList()) }
     var veiculos by remember { mutableStateOf<List<VeiculoItem>>(emptyList()) }
     var rotaId by remember { mutableStateOf<Int?>(null) }
@@ -205,6 +209,7 @@ private fun NovoChecklistScreen(authRepository: AuthRepository, onBack: () -> Un
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val (assinaturaUri, assinaturaUi) = rememberSignatureUri()
 
     LaunchedEffect(Unit) {
         authRepository.loadRotas().onSuccess { rotas = it.rotas ?: emptyList() }
@@ -244,7 +249,7 @@ private fun NovoChecklistScreen(authRepository: AuthRepository, onBack: () -> Un
                             g.itens.forEach { (key, _) -> body[key] = if (itemOk[key] == true) 1 else 0 }
                         }
                         scope.launch {
-                            authRepository.criarChecklist(body).onSuccess { onSuccess() }.onFailure { error = it.message; loading = false }
+                            authRepository.criarChecklist(body, context, assinaturaUri()).onSuccess { onSuccess() }.onFailure { error = it.message; loading = false }
                         }
                     },
                     modifier = Modifier
@@ -336,6 +341,7 @@ private fun NovoChecklistScreen(authRepository: AuthRepository, onBack: () -> Un
                 }
                 Spacer(Modifier.height(12.dp))
             }
+            assinaturaUi()
             Spacer(Modifier.height(24.dp))
             }
         }

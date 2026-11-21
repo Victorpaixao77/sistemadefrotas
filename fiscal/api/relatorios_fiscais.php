@@ -27,7 +27,7 @@ try {
     $action = $_GET['action'] ?? '';
     
     if ($action !== 'gerar_relatorio') {
-        throw new Exception('Ação inválida');
+        throw new Exception('Ação inválida', 400);
     }
     
     $tipo = $_GET['tipo'] ?? '';
@@ -37,7 +37,7 @@ try {
     
     // Validar parâmetros
     if (empty($tipo)) {
-        throw new Exception('Tipo de relatório é obrigatório');
+        throw new Exception('Tipo de relatório é obrigatório', 400);
     }
     
     // Gerar dados do relatório
@@ -50,12 +50,17 @@ try {
         gerarRelatorioExcel($dados_relatorio, $tipo);
     }
     
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error' => $e->getMessage()
-    ]);
+} catch (Throwable $e) {
+    // Erros de validação (código 400) carregam mensagem segura para o cliente;
+    // qualquer outra falha é registrada e devolve mensagem genérica (não vazar detalhe).
+    if ($e->getCode() === 400) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    } else {
+        error_log('relatorios_fiscais: ' . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Erro ao gerar relatório fiscal']);
+    }
 }
 
 /**
@@ -344,7 +349,7 @@ function gerarDadosRelatorio($tipo, $data_inicio, $data_fim, $empresa_id) {
             break;
             
         default:
-            throw new Exception('Tipo de relatório não encontrado: ' . $tipo);
+            throw new Exception('Tipo de relatório não encontrado', 400);
     }
     
     return $dados;

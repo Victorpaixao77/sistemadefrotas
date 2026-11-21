@@ -11,6 +11,7 @@ require_once '../includes/sf_insights_cache.php';
 configure_session();
 session_start();
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 if (!can_view_financial_data()) {
     api_json_error('Sem permissão.', 403);

@@ -22,6 +22,7 @@ header('Content-Type: application/json');
 
 // Garante que a requisição está autenticada
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Obtém o empresa_id da sessão
 $empresa_id = isset($_SESSION["empresa_id"]) ? $_SESSION["empresa_id"] : null;
@@ -79,6 +80,26 @@ try {
         case 'get_veiculos':
             echo json_encode(getVeiculos());
             break;
+
+        case 'get_vehicle_sim_stats':
+            $vid = isset($_GET['veiculo_id']) ? (int) $_GET['veiculo_id'] : 0;
+            echo json_encode(getVehicleSimStats($vid));
+            break;
+
+        case 'get_antt_piso':
+            require_once __DIR__ . '/../includes/sf_antt_frete.php';
+            $tipo = isset($_GET['tipo_carga']) ? (string) $_GET['tipo_carga'] : 'geral';
+            $eixosP = isset($_GET['eixos']) ? (int) $_GET['eixos'] : 6;
+            $distP = isset($_GET['distancia']) ? (float) str_replace(',', '.', $_GET['distancia']) : 0;
+            $contr = (isset($_GET['contratacao']) && $_GET['contratacao'] === 'TRACAO') ? 'TRACAO' : 'COMPOSICAO';
+            $alto = (isset($_GET['alto']) && $_GET['alto'] === 'S') ? 'S' : 'N';
+            $res = sf_antt_calc_piso(getConnection(), $tipo, $eixosP, $distP, $contr, $alto);
+            if ($res === null) {
+                echo json_encode(['success' => false, 'message' => 'Sem coeficiente ANTT para esses parâmetros.']);
+            } else {
+                echo json_encode(['success' => true, 'data' => $res, 'tipos' => sf_antt_tipos_carga()]);
+            }
+            break;
             
         case 'get_clientes':
             echo json_encode(getClientes());
@@ -96,6 +117,11 @@ try {
             echo json_encode(getCidades($uf));
             break;
             
+        case 'resolve_cidade':
+            $nomeC = isset($_GET['nome']) ? (string) $_GET['nome'] : '';
+            echo json_encode(resolveCidade($nomeC));
+            break;
+
         case 'get_motorista_comissao':
             $id = isset($_GET['id']) ? $_GET['id'] : null;
             if (!$id) {
@@ -116,7 +142,7 @@ try {
                 if (defined('DEBUG_MODE') && DEBUG_MODE) {
                     error_log('importNFeXml: ' . $e->getMessage());
                 }
-                echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+                echo json_encode(['success' => false, 'message' => 'Erro interno.']);
             }
             break;
             
@@ -202,7 +228,7 @@ try {
                     throw new Exception($stmt->errorInfo()[2]);
                 }
             } catch (Exception $e) {
-                echo json_encode(['success' => false, 'message' => 'Erro ao salvar despesas.', 'error' => $e->getMessage()]);
+                echo json_encode(['success' => false, 'message' => 'Erro ao salvar despesas.', 'error' => 'Erro interno.']);
             }
             break;
             
@@ -219,7 +245,7 @@ try {
                     bi_cache_invalidate_empresa($conn, (int) $empresa_id);
                     echo json_encode(['success' => true]);
                 } catch (Exception $e) {
-                    echo json_encode(['success' => false, 'message' => 'Erro ao excluir despesas.', 'error' => $e->getMessage()]);
+                    echo json_encode(['success' => false, 'message' => 'Erro ao excluir despesas.', 'error' => 'Erro interno.']);
                 }
             } else {
                 echo json_encode(['success' => false, 'message' => 'ID da rota inválido']);
@@ -334,12 +360,13 @@ function addRoute($data) {
         }
         
         $stmt->execute();
-        
+        $novaRotaId = (int) $conn->lastInsertId();
+
         bi_cache_invalidate_empresa($conn, (int) $empresa_id);
         return [
             'success' => true,
             'message' => 'Rota adicionada com sucesso',
-            'id' => $conn->lastInsertId()
+            'id' => $novaRotaId
         ];
         
     } catch(PDOException $e) {
@@ -515,16 +542,16 @@ function getMotoristas() {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
         
-        $sql = "SELECT id, nome FROM motoristas WHERE empresa_id = :empresa_id ORDER BY nome";
+        $sql = "SELECT id, nome, porcentagem_comissao FROM motoristas WHERE empresa_id = :empresa_id ORDER BY nome";
         $stmt = $conn->prepare($sql);
         $stmt->bindParam(':empresa_id', $empresa_id, PDO::PARAM_INT);
         $stmt->execute();
-        
+
         return [
             'success' => true,
             'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)
         ];
-        
+
     } catch(PDOException $e) {
         if (defined('DEBUG_MODE') && DEBUG_MODE) { error_log("Erro em getMotoristas: " . $e->getMessage()); }
         throw new Exception('Erro ao buscar motoristas');
@@ -538,9 +565,13 @@ function getVeiculos() {
     try {
         $conn = getConnection();
         $empresa_id = $_SESSION['empresa_id'];
-        
+
+        require_once __DIR__ . '/../includes/sf_vehicle_sim_columns.php';
+        sf_ensure_veiculos_sim_columns($conn);
+
         $sql = "SELECT v.id, v.placa, v.modelo, v.id_carreta, tc.nome AS tipo_combustivel_nome,
-                       cr.nome AS carreta_nome,
+                       cr.nome AS carreta_nome, v.capacidade_carga,
+                       v.capacidade_tanque, v.consumo_medio, v.custo_operacional_km,
                        COALESCE(NULLIF(v.numero_eixos, 0), NULLIF(cv.eixos, 0), 6) AS eixos_conjunto
                 FROM veiculos v
                 LEFT JOIN tipos_combustivel tc ON v.tipo_combustivel_id = tc.id
@@ -560,6 +591,87 @@ function getVeiculos() {
     } catch(PDOException $e) {
         if (defined('DEBUG_MODE') && DEBUG_MODE) { error_log("Erro em getVeiculos: " . $e->getMessage()); }
         throw new Exception('Erro ao buscar veículos');
+    }
+}
+
+/**
+ * Estatísticas reais do veículo para a simulação de rota:
+ *  - consumo_medio_km_l: média histórica = (maior km − menor km) / litros, a partir
+ *    dos abastecimentos do veículo (mais preciso que o chute fixo 4/5 km/L);
+ *  - ultimo_valor_litro: último preço pago por litro pelo veículo (cai para a média
+ *    da empresa nos últimos 90 dias se o veículo não tiver histórico).
+ * Campos retornam null quando não há dados suficientes (o front mantém o padrão).
+ */
+function getVehicleSimStats($veiculo_id) {
+    try {
+        $conn = getConnection();
+        $empresa_id = $_SESSION['empresa_id'];
+        if ($veiculo_id <= 0) {
+            return ['success' => false, 'message' => 'Veículo não informado'];
+        }
+
+        // Consumo médio (km/L) a partir do histórico de abastecimentos do veículo.
+        $sqlCons = "SELECT
+                        COUNT(*) AS n,
+                        MAX(km_atual) AS km_max,
+                        MIN(km_atual) AS km_min,
+                        SUM(litros) AS litros_total
+                    FROM abastecimentos
+                    WHERE empresa_id = :empresa_id AND veiculo_id = :veiculo_id
+                      AND km_atual IS NOT NULL AND litros > 0";
+        $stmt = $conn->prepare($sqlCons);
+        $stmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindValue(':veiculo_id', $veiculo_id, PDO::PARAM_INT);
+        $stmt->execute();
+        $c = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        $consumo = null;
+        $n = (int) ($c['n'] ?? 0);
+        $kmRange = (float) ($c['km_max'] ?? 0) - (float) ($c['km_min'] ?? 0);
+        $litros = (float) ($c['litros_total'] ?? 0);
+        if ($n >= 2 && $kmRange > 0 && $litros > 0) {
+            $consumo = round($kmRange / $litros, 2);
+            // Sanidade: ignora valores absurdos (dados sujos de odômetro).
+            if ($consumo <= 0 || $consumo > 30) {
+                $consumo = null;
+            }
+        }
+
+        // Último preço por litro do veículo.
+        $sqlPrice = "SELECT valor_litro FROM abastecimentos
+                     WHERE empresa_id = :empresa_id AND veiculo_id = :veiculo_id AND valor_litro > 0
+                     ORDER BY data_abastecimento DESC, id DESC LIMIT 1";
+        $stmt = $conn->prepare($sqlPrice);
+        $stmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+        $stmt->bindValue(':veiculo_id', $veiculo_id, PDO::PARAM_INT);
+        $stmt->execute();
+        $preco = $stmt->fetchColumn();
+        $precoSource = 'veiculo';
+
+        if ($preco === false || (float) $preco <= 0) {
+            // Sem histórico do veículo: média recente da empresa.
+            $sqlAvg = "SELECT AVG(valor_litro) FROM abastecimentos
+                       WHERE empresa_id = :empresa_id AND valor_litro > 0
+                         AND data_abastecimento >= (CURRENT_DATE - INTERVAL 90 DAY)";
+            $stmt = $conn->prepare($sqlAvg);
+            $stmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            $stmt->execute();
+            $preco = $stmt->fetchColumn();
+            $precoSource = 'empresa_media';
+        }
+
+        return [
+            'success' => true,
+            'data' => [
+                'consumo_medio_km_l' => $consumo,
+                'consumo_amostras' => $n,
+                'ultimo_valor_litro' => ($preco !== false && (float) $preco > 0) ? round((float) $preco, 3) : null,
+                'valor_litro_origem' => ($preco !== false && (float) $preco > 0) ? $precoSource : null,
+            ],
+        ];
+    } catch (PDOException $e) {
+        if (defined('DEBUG_MODE') && DEBUG_MODE) { error_log("Erro em getVehicleSimStats: " . $e->getMessage()); }
+        return ['success' => false, 'message' => 'Erro ao buscar estatísticas do veículo'];
     }
 }
 
@@ -614,17 +726,59 @@ function getEstados() {
 /**
  * Obtém lista de cidades por UF
  */
+/**
+ * Resolve uma cidade pelo nome (para importação de ficha). Aceita "Jataí" ou
+ * "Jataí, GO". Retorna a melhor correspondência com id + uf.
+ */
+function resolveCidade($raw) {
+    try {
+        $conn = getConnection();
+        $nome = trim((string) $raw);
+        if ($nome === '') {
+            return ['success' => false, 'message' => 'Nome vazio'];
+        }
+        $uf = '';
+        if (preg_match('/^(.*?)[,\-\/]\s*([A-Za-z]{2})\.?\s*$/u', $nome, $m)) {
+            $nome = trim($m[1]);
+            $uf = strtoupper($m[2]);
+        }
+        $like = $nome . '%';
+        if ($uf !== '') {
+            $sql = "SELECT id, nome, uf FROM cidades WHERE uf = :uf AND nome LIKE :lk
+                    ORDER BY CASE WHEN nome = :ex THEN 0 ELSE 1 END, CHAR_LENGTH(nome) LIMIT 1";
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([':uf' => $uf, ':lk' => $like, ':ex' => $nome]);
+        } else {
+            $sql = "SELECT id, nome, uf FROM cidades WHERE nome LIKE :lk
+                    ORDER BY CASE WHEN nome = :ex THEN 0 ELSE 1 END, CHAR_LENGTH(nome) LIMIT 1";
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([':lk' => $like, ':ex' => $nome]);
+        }
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return ['success' => false, 'message' => 'Cidade não encontrada: ' . $nome];
+        }
+        return ['success' => true, 'id' => (int) $row['id'], 'nome' => $row['nome'], 'uf' => $row['uf']];
+    } catch (Throwable $e) {
+        if (defined('DEBUG_MODE') && DEBUG_MODE) { error_log('resolveCidade: ' . $e->getMessage()); }
+        return ['success' => false, 'message' => 'Erro ao resolver cidade'];
+    }
+}
+
 function getCidades($uf) {
     try {
         $conn = getConnection();
-        
-        $sql = "SELECT id, nome FROM cidades WHERE uf = :uf ORDER BY nome";
-        $stmt = $conn->prepare($sql);
-        $stmt->bindParam(':uf', $uf);
-        $stmt->execute();
-        
-        $cidades = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
+        // Lista de cidades por UF — dado estático. Cacheado (APCu/arquivo) por 24h.
+        $uf = strtoupper(trim((string) $uf));
+        require_once dirname(__DIR__) . '/includes/sf_cache.php';
+        $cidades = sf_cache_remember('catalogo:cidades:uf:' . $uf, 86400, function () use ($conn, $uf) {
+            $stmt = $conn->prepare("SELECT id, nome FROM cidades WHERE uf = :uf ORDER BY nome");
+            $stmt->bindValue(':uf', $uf);
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        });
+
         return [
             'success' => true,
             'data' => $cidades

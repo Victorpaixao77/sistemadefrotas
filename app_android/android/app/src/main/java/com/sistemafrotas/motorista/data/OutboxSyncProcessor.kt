@@ -122,6 +122,31 @@ object OutboxSyncProcessor {
                         throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
                     }
                 }
+                PendingSyncOperation.CREATE_CHECKLIST_MULTIPART -> {
+                    val resolved = resolveRotaIdInPayload(context.applicationContext, payload)
+                    val bodyMap = resolved.filterKeys { it != "assinatura_abs_path" }
+                    val text = "text/plain; charset=utf-8".toMediaType()
+                    val parts = bodyMap.mapNotNull { (k, v) ->
+                        if (v == null) null else k to (
+                            when (v) {
+                                is Number -> v.toString()
+                                is Boolean -> if (v) "1" else "0"
+                                else -> v.toString()
+                            }
+                        ).toRequestBody(text)
+                    }.toMap()
+                    val path = resolved["assinatura_abs_path"]?.toString()
+                    val file = path?.let { File(it) }
+                    val part = if (file != null && file.exists() && file.length() > 0L) {
+                        val mime = if (path.endsWith(".png")) "image/png" else "image/jpeg"
+                        MultipartBody.Part.createFormData("assinatura", file.name, file.asRequestBody(mime.toMediaType()))
+                    } else null
+                    val res = Api.service.criarChecklistMultipart(parts, part)
+                    if (!res.isSuccessful || res.body()?.success != true) {
+                        throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
+                    }
+                    path?.let { runCatching { File(it).delete() } }
+                }
                 PendingSyncOperation.CREATE_OCORRENCIA_JSON -> {
                     val toSend = resolveRotaIdInPayload(context.applicationContext, payload)
                     val res = Api.service.criarOcorrencia(toSend)
@@ -175,13 +200,9 @@ object OutboxSyncProcessor {
                     }
                 }
                 PendingSyncOperation.CREATE_OCORRENCIA_MULTIPART -> {
-                    val path = payload["foto_abs_path"]?.toString()
-                    val file = path?.let { File(it) }
-                    if (file == null || !file.exists() || file.length() == 0L) {
-                        throw IllegalStateException("Foto ausente ou vazia")
-                    }
                     val resolved = resolveRotaIdInPayload(context.applicationContext, payload)
-                    val bodyMap = resolved.filterKeys { it != "foto_abs_path" }
+                    val fileKeys = listOf("foto_abs_path", "video_abs_path", "assinatura_abs_path")
+                    val bodyMap = resolved.filterKeys { it !in fileKeys }
                     val text = "text/plain; charset=utf-8".toMediaType()
                     val parts = bodyMap.mapNotNull { (k, v) ->
                         if (v == null) null
@@ -194,21 +215,32 @@ object OutboxSyncProcessor {
                             k to s.toRequestBody(text)
                         }
                     }.toMap()
-                    val mime = when {
-                        path.endsWith(".png") -> "image/png"
-                        path.endsWith(".webp") -> "image/webp"
-                        else -> "image/jpeg"
+                    fun partFrom(pathKey: String, field: String, defaultMime: String): MultipartBody.Part? {
+                        val p = resolved[pathKey]?.toString() ?: return null
+                        val f = File(p)
+                        if (!f.exists() || f.length() == 0L) return null
+                        val mime = when {
+                            p.endsWith(".png") -> "image/png"
+                            p.endsWith(".webp") -> "image/webp"
+                            p.endsWith(".mp4") -> "video/mp4"
+                            p.endsWith(".3gp") -> "video/3gpp"
+                            else -> defaultMime
+                        }
+                        return MultipartBody.Part.createFormData(field, f.name, f.asRequestBody(mime.toMediaType()))
                     }
-                    val part = MultipartBody.Part.createFormData(
-                        "foto",
-                        file.name,
-                        file.asRequestBody(mime.toMediaType()),
-                    )
-                    val res = Api.service.criarOcorrenciaMultipart(parts, part)
+                    val fotoPart = partFrom("foto_abs_path", "foto", "image/jpeg")
+                        ?: partFrom("assinatura_abs_path", "foto", "image/png")
+                    val videoPart = partFrom("video_abs_path", "video", "video/mp4")
+                    if (fotoPart == null && videoPart == null) {
+                        throw IllegalStateException("Anexo ausente ou vazio")
+                    }
+                    val res = Api.service.criarOcorrenciaMultipart(parts, fotoPart, videoPart)
                     if (!res.isSuccessful || res.body()?.success != true) {
                         throw IllegalStateException(res.body()?.message ?: "HTTP ${res.code()}")
                     }
-                    runCatching { file.delete() }
+                    fileKeys.forEach { key ->
+                        resolved[key]?.toString()?.let { runCatching { File(it).delete() } }
+                    }
                 }
                 PendingSyncOperation.CREATE_PEDAGIO_JSON -> {
                     val toSend = resolveRotaIdInPayload(context.applicationContext, payload)

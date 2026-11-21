@@ -11,6 +11,7 @@ session_start();
 
 // Require authentication
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Create database connection
 $conn = getConnection();
@@ -32,10 +33,16 @@ try {
             break;
             
         default:
-            throw new Exception('Ação não suportada');
+            throw new Exception('Ação não suportada', 400);
     }
-} catch (Exception $e) {
-    error_log("Error in formas_pagamento.php: " . $e->getMessage());
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-} 
+} catch (Throwable $e) {
+    // Ação inválida (400) → mensagem clara; erro real → log + mensagem genérica (500).
+    if ($e->getCode() === 400) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    } else {
+        error_log("Error in formas_pagamento.php: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Erro interno.']);
+    }
+}

@@ -1,3 +1,4 @@
+
 <?php
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
@@ -211,7 +212,8 @@ $kpis = getMultasKPIs($conn);
     <?php if ($is_modern): ?>
     <link rel="stylesheet" href="../css/fornc-modern-page.css">
     <?php endif; ?>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
     <style>

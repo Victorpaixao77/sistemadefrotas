@@ -12,7 +12,8 @@ function verificarPendencias() {
                 window.atualizarContadores();
             }
         })
-        .catch(function (error) { console.error('Erro ao verificar pendências:', error); });
+        // Best-effort: fetch abortado (navegação) ou falha de rede → re-tenta no próximo ciclo.
+        .catch(function (error) { console.debug('verificar pendências adiado:', error && error.message); });
 }
 
 setInterval(verificarPendencias, 5 * 60 * 1000);

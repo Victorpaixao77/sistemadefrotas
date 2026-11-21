@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/includes/adm_session.php';
 
 // Registrar logout no log
 if (isset($_SESSION['admin_id'])) {

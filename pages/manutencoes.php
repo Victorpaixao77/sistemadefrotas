@@ -1,3 +1,4 @@
+
 <?php
 // Include configuration and functions first
 require_once '../includes/config.php';
@@ -366,6 +367,7 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
             margin-bottom: 1.25rem;
         }
         body.manutencoes-modern .mann-toolbar-main { margin-top: 0.75rem; }
+        .fornc-btn.is-active { border-color: var(--accent-primary, #3b82f6); color: var(--accent-primary, #3b82f6); background: color-mix(in srgb, var(--accent-primary, #3b82f6) 10%, transparent); }
         body.manutencoes-modern .mann-analytics-modern .analytics-card:nth-child(1),
         body.manutencoes-modern .mann-analytics-modern .analytics-card:nth-child(5) {
             border: 1px solid rgba(16, 185, 129, 0.35);
@@ -375,7 +377,8 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
     <?php endif; ?>
     
     <!-- Chart.js for analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
     
     <!-- Sortable.js for drag-and-drop -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -530,6 +533,7 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
     <!-- Custom scripts -->
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
+    <script src="../js/sf-periodo.js"></script>
     <script src="../js/maintenance.js?v=1.6"></script>
     <?php sf_page_help_css('..'); ?>
 </head>
@@ -876,7 +880,7 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                 
                 <?php if ($is_modern): ?>
                 <div class="fornc-toolbar mann-toolbar-main">
-                    <form method="get" action="" id="formFiltroPeriodo" class="fornc-filters-inline">
+                    <form method="get" action="" id="formFiltroPeriodo" style="display:contents">
                         <div class="fornc-search-block">
                             <label for="searchMaintenance">Busca</label>
                             <div class="fornc-search-inner">
@@ -884,72 +888,69 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                                 <input type="text" id="searchMaintenance" name="q" value="<?php echo htmlspecialchars($filter_q); ?>" placeholder="Placa, descrição, fornecedor..." autocomplete="off">
                             </div>
                         </div>
-                        <div class="fg">
-                            <label for="mannDataInicio">De</label>
-                            <input type="date" id="mannDataInicio" name="data_inicio" value="<?php echo htmlspecialchars($data_inicio); ?>" title="Data inicial" class="filter-date">
-                        </div>
-                        <div class="fg">
-                            <label for="mannDataFim">Até</label>
-                            <input type="date" id="mannDataFim" name="data_fim" value="<?php echo htmlspecialchars($data_fim); ?>" title="Data final" class="filter-date">
-                        </div>
-                        <div class="fg">
-                            <label for="mannPerPage">Por página</label>
-                            <select id="mannPerPage" name="per_page" class="filter-per-page" title="Registros por página" onchange="this.form.submit()">
-                                <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
-                                <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
-                                <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
-                                <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
-                                <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
-                            </select>
+                        <input type="hidden" name="data_inicio" id="mannDataInicio" data-sf-periodo-from value="<?php echo htmlspecialchars($data_inicio); ?>">
+                        <input type="hidden" name="data_fim" id="mannDataFim" data-sf-periodo-to value="<?php echo htmlspecialchars($data_fim); ?>">
+                        <div class="fornc-filters-inline">
+                            <div class="fg">
+                                <label for="mannPerPage">Por página</label>
+                                <select id="mannPerPage" name="per_page" class="filter-per-page" title="Registros por página" onchange="this.form.submit()">
+                                    <option value="5"  <?php echo $per_page == 5  ? 'selected' : ''; ?>>5</option>
+                                    <option value="10" <?php echo $per_page == 10 ? 'selected' : ''; ?>>10</option>
+                                    <option value="25" <?php echo $per_page == 25 ? 'selected' : ''; ?>>25</option>
+                                    <option value="50" <?php echo $per_page == 50 ? 'selected' : ''; ?>>50</option>
+                                    <option value="100" <?php echo $per_page == 100 ? 'selected' : ''; ?>>100</option>
+                                </select>
+                            </div>
+                            <div class="fg">
+                                <label for="vehicleFilter">Veículo</label>
+                                <select id="vehicleFilter" name="veiculo_id">
+                                    <option value="">Todos</option>
+                                    <?php foreach ($mnt_filter_opts['veiculos'] as $fv): ?>
+                                    <option value="<?php echo (int) $fv['id']; ?>"<?php echo ($filter_veiculo_id === (int) $fv['id']) ? ' selected' : ''; ?>><?php echo htmlspecialchars($fv['placa']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="fg">
+                                <label for="maintenanceTypeFilter">Tipo</label>
+                                <select id="maintenanceTypeFilter" name="tipo_classe">
+                                    <option value="">Todos</option>
+                                    <option value="preventiva"<?php echo $filter_tipo_classe === 'preventiva' ? ' selected' : ''; ?>>Preventiva</option>
+                                    <option value="corretiva"<?php echo $filter_tipo_classe === 'corretiva' ? ' selected' : ''; ?>>Corretiva</option>
+                                </select>
+                            </div>
+                            <div class="fg">
+                                <label for="statusFilter">Status</label>
+                                <select id="statusFilter" name="status_id">
+                                    <option value="">Todos</option>
+                                    <?php foreach ($mnt_filter_opts['status'] as $fs): ?>
+                                    <option value="<?php echo (int) $fs['id']; ?>"<?php echo ($filter_status_id === (int) $fs['id']) ? ' selected' : ''; ?>><?php echo htmlspecialchars($fs['nome']); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="fg">
+                                <label for="supplierFilter">Fornecedor</label>
+                                <select id="supplierFilter" name="fornecedor">
+                                    <option value="">Todos</option>
+                                    <?php foreach ($mnt_filter_opts['fornecedores'] as $ff): ?>
+                                    <option value="<?php echo htmlspecialchars($ff); ?>"<?php echo $filter_fornecedor === $ff ? ' selected' : ''; ?>><?php echo htmlspecialchars($ff); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
                         </div>
                         <input type="hidden" name="order" value="<?php echo htmlspecialchars($order_by); ?>">
                         <input type="hidden" name="dir" value="<?php echo htmlspecialchars($order_dir); ?>">
-                        <div class="fg">
-                            <label for="vehicleFilter">Veículo</label>
-                            <select id="vehicleFilter" name="veiculo_id">
-                                <option value="">Todos</option>
-                                <?php foreach ($mnt_filter_opts['veiculos'] as $fv): ?>
-                                <option value="<?php echo (int) $fv['id']; ?>"<?php echo ($filter_veiculo_id === (int) $fv['id']) ? ' selected' : ''; ?>><?php echo htmlspecialchars($fv['placa']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
+                        <div class="fornc-btn-row">
+                            <button type="submit" class="fornc-btn fornc-btn--accent" title="Aplicar filtros"><i class="fas fa-filter"></i> Filtrar</button>
+                            <button type="button" id="mannPeriodoBtn" data-sf-periodo class="fornc-btn fornc-btn--ghost" title="Filtrar por período"><i class="fas fa-calendar-alt"></i> Período</button>
+                            <button type="button" id="addMaintenanceBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Nova</button>
+                            <button type="button" id="mntImportBtn" class="fornc-btn fornc-btn--ghost" title="Importar CSV da oficina"><i class="fas fa-file-import"></i> Importar</button>
+                            <a href="planos_manutencao.php" class="fornc-btn fornc-btn--ghost" title="Planos de manutenção"><i class="fas fa-clipboard-list"></i> Planos</a>
+                            <a href="../calendario/index.php" class="fornc-btn fornc-btn--ghost" title="Calendário de manutenções"><i class="fas fa-calendar-alt"></i> Calendário</a>
+                            <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="clearMaintenanceFilters" title="Limpar filtros" aria-label="Limpar filtros"><i class="fas fa-undo"></i></button>
+                            <a href="?<?php echo htmlspecialchars(http_build_query($export_params)); ?>" class="fornc-btn fornc-btn--ghost fornc-btn--icon" title="Exportar CSV" id="exportBtn" aria-label="Exportar"><i class="fas fa-file-export"></i></a>
+                            <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
                         </div>
-                        <div class="fg">
-                            <label for="maintenanceTypeFilter">Tipo</label>
-                            <select id="maintenanceTypeFilter" name="tipo_classe">
-                                <option value="">Todos</option>
-                                <option value="preventiva"<?php echo $filter_tipo_classe === 'preventiva' ? ' selected' : ''; ?>>Preventiva</option>
-                                <option value="corretiva"<?php echo $filter_tipo_classe === 'corretiva' ? ' selected' : ''; ?>>Corretiva</option>
-                            </select>
-                        </div>
-                        <div class="fg">
-                            <label for="statusFilter">Status</label>
-                            <select id="statusFilter" name="status_id">
-                                <option value="">Todos</option>
-                                <?php foreach ($mnt_filter_opts['status'] as $fs): ?>
-                                <option value="<?php echo (int) $fs['id']; ?>"<?php echo ($filter_status_id === (int) $fs['id']) ? ' selected' : ''; ?>><?php echo htmlspecialchars($fs['nome']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="fg">
-                            <label for="supplierFilter">Fornecedor</label>
-                            <select id="supplierFilter" name="fornecedor">
-                                <option value="">Todos</option>
-                                <?php foreach ($mnt_filter_opts['fornecedores'] as $ff): ?>
-                                <option value="<?php echo htmlspecialchars($ff); ?>"<?php echo $filter_fornecedor === $ff ? ' selected' : ''; ?>><?php echo htmlspecialchars($ff); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <button type="submit" class="fornc-btn fornc-btn--accent" title="Aplicar filtros"><i class="fas fa-filter"></i> Filtrar</button>
                     </form>
-                    <div class="fornc-btn-row">
-                        <button type="button" id="addMaintenanceBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Nova</button>
-                        <button type="button" id="mntImportBtn" class="fornc-btn fornc-btn--ghost" title="Importar CSV da oficina"><i class="fas fa-file-import"></i> Importar</button>
-                        <a href="planos_manutencao.php" class="fornc-btn fornc-btn--ghost" title="Planos de manutenção"><i class="fas fa-clipboard-list"></i> Planos</a>
-                        <a href="../calendario/index.php" class="fornc-btn fornc-btn--ghost" title="Calendário de manutenções"><i class="fas fa-calendar-alt"></i> Calendário</a>
-                        <button type="button" class="fornc-btn fornc-btn--ghost" id="clearMaintenanceFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
-                        <a href="?<?php echo htmlspecialchars(http_build_query($export_params)); ?>" class="fornc-btn fornc-btn--muted" title="Exportar CSV" id="exportBtn"><i class="fas fa-file-export"></i> Exportar</a>
-                        <button type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" id="helpBtn" title="Ajuda" aria-label="Ajuda"><i class="fas fa-question-circle"></i></button>
-                    </div>
                 </div>
                 <?php else: ?>
                 <!-- Search and Filter -->
@@ -1353,9 +1354,24 @@ require_once __DIR__ . '/../includes/sync_manutencao_notificacoes.php';
                                 <label for="valor">Valor*</label>
                                 <input type="number" id="valor" name="valor" step="0.01" required>
                             </div>
-                            
+
                             <div class="form-group">
-                                <label for="custo_total">Custo Total</label>
+                                <label for="valor_pecas">Peças</label>
+                                <input type="number" id="valor_pecas" name="valor_pecas" step="0.01" min="0" placeholder="0,00">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="valor_mao_obra">Mão de obra</label>
+                                <input type="number" id="valor_mao_obra" name="valor_mao_obra" step="0.01" min="0" placeholder="0,00">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="valor_outros">Outros serviços</label>
+                                <input type="number" id="valor_outros" name="valor_outros" step="0.01" min="0" placeholder="0,00">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="custo_total">Custo Total <small style="color:var(--text-muted,#94a3b8);font-weight:400">(auto: peças+mão de obra+outros)</small></label>
                                 <input type="number" id="custo_total" name="custo_total" step="0.01">
                             </div>
                             

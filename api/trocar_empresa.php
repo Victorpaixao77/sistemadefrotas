@@ -38,7 +38,7 @@ if ($action === 'listar') {
             'empresa_atual' => $empresa_atual_id
         ]);
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Erro ao listar empresas.', 'error' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'Erro ao listar empresas.', 'error' => 'Erro interno.']);
     }
 } elseif ($action === 'trocar' && isset($_POST['empresa_id'])) {
     api_require_csrf_json();
@@ -72,7 +72,7 @@ if ($action === 'listar') {
             echo json_encode(['success' => false, 'message' => 'Empresa não encontrada ou inativa']);
         }
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Erro ao trocar empresa.', 'error' => $e->getMessage()]);
+        echo json_encode(['success' => false, 'message' => 'Erro ao trocar empresa.', 'error' => 'Erro interno.']);
     }
 } else {
     echo json_encode(['success' => false, 'message' => 'Ação inválida']);

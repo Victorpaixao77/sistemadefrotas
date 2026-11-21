@@ -103,5 +103,5 @@ try {
     }
 } catch (Exception $e) {
     error_log('Erro ao deslocar pneu: ' . $e->getMessage());
-    echo json_encode(['success' => false, 'error' => 'Erro ao deslocar pneu: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Erro ao deslocar pneu: ']);
 } 

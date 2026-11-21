@@ -21,6 +21,7 @@ header('Content-Type: application/json');
 
 // Garante que a requisição está autenticada
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Obtém o empresa_id da sessão
 $empresa_id = isset($_SESSION["empresa_id"]) ? $_SESSION["empresa_id"] : null;
@@ -87,7 +88,7 @@ try {
     http_response_code(400);
     echo json_encode([
         'success' => false,
-        'error' => $e->getMessage()
+        'error' => 'Erro interno.'
     ]);
 }
 

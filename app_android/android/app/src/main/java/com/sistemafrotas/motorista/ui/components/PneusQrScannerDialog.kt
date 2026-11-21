@@ -121,7 +121,7 @@ private fun QrCameraPreview(onBarcode: (String) -> Unit) {
                                 val code = barcodes.firstOrNull { it.rawValue != null }
                                 if (code != null) {
                                     handled = true
-                                    onBarcode(code.rawValue!!)
+                                    code.rawValue?.let(onBarcode)
                                 }
                             }
                             .addOnCompleteListener { imageProxy.close() }

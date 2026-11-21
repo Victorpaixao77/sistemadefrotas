@@ -24,10 +24,17 @@ if (!can_view_financial_data()) {
     exit;
 }
 
+$empresa_id = (int) $_SESSION['empresa_id'];
+if (function_exists('session_write_close')) { session_write_close(); }
+
 try {
     $conn = getConnection();
-    $empresa_id = (int) $_SESSION['empresa_id'];
     $ctx = sf_dashboard_analytics_context();
+
+    // Dashboard: 7 agregações por período. Cacheado (APCu/arquivo) por 120s, por empresa+período.
+    require_once __DIR__ . '/../includes/sf_cache.php';
+    $ckey = 'dash:exp_dist:' . $empresa_id . ':' . $ctx['d1'] . ':' . $ctx['d2'];
+    $payload = sf_cache_remember($ckey, 120, function () use ($conn, $empresa_id, $ctx) {
 
     $parts = [
         'Despesas de Viagem' => "SELECT COALESCE(SUM(total_despviagem), 0) FROM despesas_viagem WHERE empresa_id = :e AND DATE(created_at) BETWEEN :d1 AND :d2",
@@ -41,7 +48,7 @@ try {
 
     $labels = [];
     $data = [];
-    $colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#2ecc71'];
+    $colors = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'];
     $i = 0;
 
     foreach ($parts as $label => $sql) {
@@ -55,15 +62,18 @@ try {
         }
     }
 
-    echo json_encode([
-        'labels' => $labels,
-        'datasets' => [[
-            'data' => $data,
-            'backgroundColor' => array_slice($colors, 0, count($labels)),
-            'borderWidth' => 1,
-        ]],
-        'period_label' => $ctx['label'],
-    ]);
+        return [
+            'labels' => $labels,
+            'datasets' => [[
+                'data' => $data,
+                'backgroundColor' => array_slice($colors, 0, count($labels)),
+                'borderWidth' => 0,
+            ]],
+            'period_label' => $ctx['label'],
+        ];
+    });
+
+    echo json_encode($payload);
 } catch (Throwable $e) {
     error_log('Expenses Distribution API Error: ' . $e->getMessage());
     http_response_code(500);

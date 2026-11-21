@@ -6,7 +6,7 @@
  */
 
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
+require __DIR__ . '/_cors_same_origin.php';
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
 header('Access-Control-Allow-Headers: Content-Type');
 
@@ -2829,6 +2829,18 @@ try {
                     date('Y-m-d H:i:s'), date('Y-m-d H:i:s'),
                 ]);
                 $cte_id = (int)$conn->lastInsertId();
+
+                // Vínculo opcional com a Ordem de Transporte (integração OT→CT-e).
+                // Isolado e defensivo: não afeta a criação/emissão do CT-e se falhar.
+                $ot_vinc = isset($_POST['ordem_transporte_id']) ? (int)$_POST['ordem_transporte_id'] : 0;
+                if ($ot_vinc > 0) {
+                    try {
+                        $conn->prepare('UPDATE fiscal_cte SET ordem_transporte_id = ? WHERE id = ? AND empresa_id = ?')
+                             ->execute([$ot_vinc, $cte_id, $empresa_id]);
+                    } catch (Throwable $eOt) {
+                        error_log('criar_cte vinculo OT: ' . $eOt->getMessage());
+                    }
+                }
 
                 foreach ($nfe_ids as $nfe_id) {
                     $stmt = $conn->prepare("

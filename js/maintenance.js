@@ -132,37 +132,200 @@ function duplicateMaintenance(id) {
         .catch(function () { mntToast('Erro ao duplicar.', 'error'); });
 }
 
-function buildOsHtml(m, veiculoLabel) {
-    var fmtDate = function (d) { return d ? d.split('-').reverse().join('/') : '—'; };
+function buildOsHtml(m, veiculoLabel, anexos) {
+    var fmtDate = function (d) { return d ? String(d).slice(0, 10).split('-').reverse().join('/') : '—'; };
+    var fmtDateTime = function (d) {
+        if (!d) return '';
+        var s = String(d).replace(' ', 'T');
+        var dt = new Date(s);
+        return isNaN(dt) ? fmtDate(d) : dt.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
     var fmtMoney = function (v) { return 'R$ ' + (parseFloat(v) || 0).toFixed(2).replace('.', ','); };
-    return '<div class="mann-os-doc">' +
-        '<h1>Ordem de Serviço #' + mntEsc(String(m.id || '')) + '</h1>' +
-        '<div class="mann-os-grid">' +
-        '<div class="mann-os-block"><strong>Veículo</strong>' + mntEsc(veiculoLabel || '') + '</div>' +
-        '<div class="mann-os-block"><strong>Data</strong>' + fmtDate(m.data_manutencao) + '</div>' +
-        '<div class="mann-os-block"><strong>Componente</strong>' + mntEsc(m.componente_nome || '—') + '</div>' +
-        '<div class="mann-os-block"><strong>Tipo</strong>' + mntEsc(m.tipo_nome || '—') + '</div>' +
-        '<div class="mann-os-block"><strong>Status</strong>' + mntEsc(m.status_nome || '—') + '</div>' +
-        '<div class="mann-os-block"><strong>KM</strong>' + mntEsc(String(m.km_atual != null ? m.km_atual : '—')) + '</div>' +
-        '<div class="mann-os-block"><strong>Fornecedor</strong>' + mntEsc(m.fornecedor || '—') + '</div>' +
-        '<div class="mann-os-block"><strong>Valor</strong>' + fmtMoney(m.valor) + '</div>' +
-        '<div class="mann-os-block"><strong>Nota fiscal</strong>' + mntEsc(m.nota_fiscal || '—') + '</div>' +
+    var e = mntEsc;
+    var total = (m.custo_total != null && parseFloat(m.custo_total) > 0) ? parseFloat(m.custo_total) : (parseFloat(m.valor) || 0);
+    var pecas = parseFloat(m.valor_pecas) || 0;
+    var maoObra = parseFloat(m.valor_mao_obra) || 0;
+    var outros = parseFloat(m.valor_outros) || 0;
+    // Registros antigos (sem detalhamento) mostram o total como mão de obra, pra bater com o TOTAL.
+    if ((pecas + maoObra + outros) <= 0 && total > 0) { maoObra = total; }
+    if ((pecas + maoObra + outros) > 0) { total = pecas + maoObra + outros; }
+    var statusNome = (m.status_nome || '').toString();
+    var concluida = /conclu|finaliz|aprov/i.test(statusNome);
+    var tipoNome = (m.tipo_nome || '—').toString();
+    var now = new Date();
+    var emissao = now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+    // Fotos (só anexos de imagem)
+    var fotos = (anexos || []).filter(function (a) { return /image|jpg|jpeg|png|webp|gif/i.test((a.tipo || '') + (a.nome_original || '')); }).slice(0, 3);
+    var fotosHtml = fotos.length
+        ? fotos.map(function (a) { return '<div class="os-foto" style="background-image:url(' + mntSafeUrl(a.url) + ')"></div>'; }).join('')
+        : '<div class="os-foto os-foto--empty"><i class="fas fa-image"></i></div>';
+
+    // QR (aponta para o próprio sistema; degrada se offline)
+    var qrData = encodeURIComponent((location.origin || '') + '/sistema-frotas/pages/manutencoes.php?os=' + (m.id || ''));
+    var qrImg = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&data=' + qrData;
+
+    // Timeline
+    var tl = [];
+    tl.push({ ic: 'fa-file-circle-plus', c: '#2563eb', t: 'Ordem de serviço criada', s: 'por ' + e(m.responsavel_aprovacao || '—'), d: fmtDateTime(m.created_at || m.data_manutencao) });
+    tl.push({ ic: 'fa-screwdriver-wrench', c: '#f59e0b', t: 'Serviço em andamento', s: 'Início da execução do serviço', d: fmtDate(m.data_manutencao) });
+    if (m.data_conclusao) tl.push({ ic: 'fa-circle-check', c: '#16a34a', t: 'Serviço concluído', s: 'Serviço finalizado com sucesso', d: fmtDate(m.data_conclusao) });
+    if (concluida) tl.push({ ic: 'fa-clipboard-check', c: '#2563eb', t: 'Ordem finalizada', s: 'Registro encerrado no sistema', d: fmtDateTime(m.updated_at || m.data_conclusao || m.data_manutencao) });
+    var tlHtml = tl.map(function (i, idx) {
+        return '<li' + (idx === tl.length - 1 ? ' class="last"' : '') + '><span class="os-tl-dot" style="background:' + i.c + '"><i class="fas ' + i.ic + '"></i></span>' +
+            '<div class="os-tl-c"><span class="os-tl-date">' + i.d + '</span><b>' + i.t + '</b><span class="os-tl-sub">' + i.s + '</span></div></li>';
+    }).join('');
+
+    var checklist = ['Serviço realizado conforme padrão', 'Peças conferidas e instaladas', 'Testes realizados com sucesso', 'Veículo liberado para operação'];
+
+    var line = function (ic, k, v) {
+        return '<div class="os-line"><span class="os-line-k"><i class="fas ' + ic + '"></i> ' + k + '</span><span class="os-line-v">' + v + '</span></div>';
+    };
+    var statCard = function (ic, cor, label, val) {
+        return '<div class="os-stat"><span class="os-stat-ic" style="color:' + cor + ';background:' + cor + '1a"><i class="fas ' + ic + '"></i></span>' +
+            '<div><span class="os-stat-l">' + label + '</span><b>' + val + '</b></div></div>';
+    };
+
+    return '<style>' + MNT_OS_DOC_CSS + '</style>' +
+    '<div class="os-doc">' +
+        // Header
+        '<div class="os-head">' +
+            '<div class="os-head-truck"></div>' +
+            '<div class="os-brand"><img src="../logo.png" class="os-logo" onerror="this.style.display=\'none\'"><div class="os-brand-t"><b>FROTEC</b><span>GESTÃO DE FROTAS</span></div></div>' +
+            '<div class="os-head-num"><span>ORDEM DE SERVIÇO</span><h1>#' + e(String(m.id || '')) + '</h1></div>' +
+            '<div class="os-emissao"><span class="os-emissao-ic"><i class="fas fa-calendar-day"></i></span><div><small>EMISSÃO</small><b>' + emissao.split(' ')[0] + '</b><span>' + (emissao.split(' ')[1] || '') + '</span></div></div>' +
+            '<div class="os-qr"><img src="' + qrImg + '" onerror="this.parentNode.style.visibility=\'hidden\'"><span>Escaneie para<br>ver detalhes<br>no sistema</span></div>' +
         '</div>' +
-        '<div class="mann-os-block"><strong>Descrição</strong>' + mntEsc(m.descricao || '') + '</div>' +
-        '<div class="mann-os-block"><strong>Serviço executado</strong>' + mntEsc(m.descricao_servico || '') + '</div>' +
-        (m.observacoes ? '<div class="mann-os-block"><strong>Observações</strong>' + mntEsc(m.observacoes) + '</div>' : '') +
-        '<div class="mann-os-block"><strong>Responsável</strong>' + mntEsc(m.responsavel_aprovacao || '—') + '</div>' +
-        '<p class="mann-os-footer">Emitido em ' + new Date().toLocaleString('pt-BR') + ' — Sistema de Gestão de Frotas</p>' +
-        '</div>';
+        // Stat cards
+        '<div class="os-stats">' +
+            statCard('fa-circle-check', concluida ? '#16a34a' : '#f59e0b', 'STATUS', e(statusNome || '—')) +
+            statCard('fa-screwdriver-wrench', '#2563eb', 'TIPO', e(tipoNome)) +
+            statCard('fa-gauge-high', '#2563eb', 'KM NO MOMENTO', (m.km_atual != null ? Number(m.km_atual).toLocaleString('pt-BR') : '—')) +
+            statCard('fa-calendar', '#2563eb', 'DATA DO SERVIÇO', fmtDate(m.data_manutencao)) +
+        '</div>' +
+        // Veículo + Componente
+        '<div class="os-row">' +
+            '<div class="os-veic">' +
+                '<div class="os-veic-top"><span>VEÍCULO</span><i class="fas fa-truck"></i></div>' +
+                '<div class="os-veic-placa">' + e(m.veiculo_placa || veiculoLabel || '—') + '</div>' +
+                '<div class="os-veic-tipo">Cavalo Mecânico</div>' +
+                '<div class="os-veic-grid">' +
+                    '<div class="wide"><small>Marca/Modelo</small><b>' + e(((m.veiculo_marca || '') + ' ' + (m.veiculo_modelo || '')).trim() || '—') + '</b></div>' +
+                    '<div><small>Ano</small><b>' + e(m.veiculo_ano || '—') + '</b></div>' +
+                    '<div><small>Chassi</small><b>' + e(m.veiculo_chassi || '—') + '</b></div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="os-comp">' +
+                '<div class="os-comp-top"><span>COMPONENTE / SERVIÇO</span><i class="fas fa-gears"></i></div>' +
+                '<div class="os-comp-name">' + e(m.componente_nome || '—') + '</div>' +
+                '<small class="os-comp-lbl">Descrição do serviço realizado</small>' +
+                '<div class="os-comp-desc">' + (e(m.descricao_servico || m.descricao || '—')) + '</div>' +
+            '</div>' +
+        '</div>' +
+        // Dados + Financeiro
+        '<div class="os-row">' +
+            '<div class="os-lines">' +
+                line('fa-store', 'FORNECEDOR', e(m.fornecedor || '—')) +
+                line('fa-file-invoice', 'NOTA FISCAL', e(m.nota_fiscal || '—')) +
+                line('fa-wrench', 'SERVIÇO EXECUTADO', e(m.descricao_servico || '—')) +
+                line('fa-comment', 'OBSERVAÇÕES', e(m.observacoes || '—')) +
+                line('fa-user', 'RESPONSÁVEL', e(m.responsavel_aprovacao || '—')) +
+            '</div>' +
+            '<div class="os-fin">' +
+                '<div class="os-fin-total"><span class="os-fin-ic"><i class="fas fa-dollar-sign"></i></span><div><small>VALOR TOTAL</small><b>' + fmtMoney(total) + '</b><span>Custo total da ordem de serviço</span></div></div>' +
+                '<div class="os-fin-resumo"><span class="os-fin-h">RESUMO FINANCEIRO</span>' +
+                    '<div class="os-fin-row"><span>Peças</span><b>' + fmtMoney(pecas) + '</b></div>' +
+                    '<div class="os-fin-row"><span>Mão de obra</span><b>' + fmtMoney(maoObra) + '</b></div>' +
+                    '<div class="os-fin-row"><span>Outros serviços</span><b>' + fmtMoney(outros) + '</b></div>' +
+                    '<div class="os-fin-row total"><span>TOTAL</span><b>' + fmtMoney(total) + '</b></div>' +
+                '</div>' +
+            '</div>' +
+        '</div>' +
+        // Timeline + Fotos/Checklist
+        '<div class="os-row">' +
+            '<div class="os-tl"><div class="os-block-h">LINHA DO TEMPO</div><ul>' + tlHtml + '</ul></div>' +
+            '<div class="os-right">' +
+                '<div class="os-fotos"><div class="os-block-h">FOTOS DO SERVIÇO</div><div class="os-fotos-grid">' + fotosHtml + '</div></div>' +
+                '<div class="os-check"><div class="os-check-list">' +
+                    checklist.map(function (c) { return '<div class="os-check-i"><i class="fas fa-circle-check"></i>' + c + '</div>'; }).join('') +
+                    '</div><div class="os-check-badge"><i class="fas fa-shield-halved"></i><b>' + (concluida ? 'APROVADO' : 'EM ANÁLISE') + '</b><span>' + (concluida ? 'Todos os itens concluídos' : 'Serviço em execução') + '</span></div>' +
+                '</div>' +
+            '</div>' +
+        '</div>' +
+        // Info + Footer
+        '<div class="os-info"><span class="os-info-ic"><i class="fas fa-circle-info"></i></span><div><b>INFORMAÇÕES IMPORTANTES</b><span>Manter o veículo em acompanhamento conforme plano de manutenção preventiva.</span></div></div>' +
+        '<div class="os-foot">' +
+            '<div><span class="os-foot-ic"><i class="fas fa-headset"></i></span><div><small>Precisa de ajuda?</small><b>(44) 99999-0000</b><span>suporte@frotec.com.br</span></div></div>' +
+            '<div class="os-foot-mid"><b>Frotec Gestão de Frotas</b><span>Sistema de Gestão Inteligente</span><a>www.frotec.com.br</a></div>' +
+            '<div class="os-foot-r"><span>Documento gerado automaticamente</span><span>' + emissao + '</span><span>Página 1 de 1</span></div>' +
+        '</div>' +
+    '</div>';
 }
 
-var MNT_OS_PRINT_CSS =
-    'body{font-family:system-ui,-apple-system,sans-serif;margin:20mm;color:#111;font-size:11pt;line-height:1.45}' +
-    '.mann-os-doc h1{font-size:16pt;margin:0 0 12px;border-bottom:1px solid #ccc;padding-bottom:8px}' +
-    '.mann-os-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:12px}' +
-    '.mann-os-block{margin-bottom:10px}' +
-    '.mann-os-block strong{display:block;font-size:8pt;text-transform:uppercase;color:#555;margin-bottom:2px}' +
-    '.mann-os-footer{margin-top:24px;font-size:8pt;color:#666}';
+// CSS do documento — embutido no HTML pra valer na prévia (modal) e na impressão.
+var MNT_OS_DOC_CSS =
+    '.os-doc{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;color:#1e293b;background:#0b1220;padding:0;max-width:900px;margin:0 auto;border-radius:12px;overflow:hidden;font-size:11px;line-height:1.32}' +
+    '.os-doc *{box-sizing:border-box}' +
+    '.os-doc small{font-size:9px;letter-spacing:.04em;text-transform:uppercase}' +
+    // header
+    '.os-head{position:relative;background:linear-gradient(120deg,#0f1e33,#16324f);color:#fff;padding:16px 24px 18px;display:grid;grid-template-columns:auto 1fr auto auto;grid-template-areas:"brand num emis qr";gap:16px;align-items:center;overflow:hidden}' +
+    '.os-head-truck{position:absolute;inset:0;background:radial-gradient(600px 200px at 60% -20%,rgba(59,130,246,.25),transparent 70%);pointer-events:none}' +
+    '.os-brand{grid-area:brand;display:flex;align-items:center;gap:10px;z-index:1}.os-logo{width:34px;height:34px;object-fit:contain}' +
+    '.os-brand-t{display:flex;flex-direction:column;line-height:1}.os-brand-t b{font-size:18px;letter-spacing:.02em}.os-brand-t span{font-size:8px;letter-spacing:.22em;color:#9fc0e8}' +
+    '.os-head-num{grid-area:num;z-index:1}.os-head-num span{font-size:10px;letter-spacing:.14em;color:#7db0e6}.os-head-num h1{margin:1px 0 0;font-size:30px;font-weight:800;letter-spacing:-.02em}' +
+    '.os-emissao{grid-area:emis;display:flex;gap:10px;align-items:center;z-index:1}.os-emissao-ic{width:38px;height:38px;border-radius:9px;background:#2563eb;display:grid;place-items:center;font-size:15px}' +
+    '.os-emissao small{color:#7db0e6}.os-emissao b{display:block;font-size:15px}.os-emissao span{font-size:11px;color:#c7dcf3}' +
+    '.os-qr{grid-area:qr;display:flex;flex-direction:column;align-items:center;gap:4px;background:#fff;padding:6px;border-radius:9px;z-index:1}.os-qr img{width:58px;height:58px;display:block}.os-qr span{font-size:7px;color:#334155;text-align:center;line-height:1.2}' +
+    // body wrapper
+    '.os-doc .os-stats,.os-doc .os-row,.os-doc .os-info,.os-doc .os-foot{background:#f1f5f9}' +
+    '.os-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:10px 16px 2px}' +
+    '.os-stat{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:9px 12px;display:flex;gap:9px;align-items:center}' +
+    '.os-stat-ic{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:14px;flex:0 0 auto}' +
+    '.os-stat-l{display:block;font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;color:#64748b}.os-stat b{font-size:14px;color:#0f172a}' +
+    '.os-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:8px 16px}' +
+    // veiculo
+    '.os-veic{background:linear-gradient(160deg,#132a45,#0f2138);color:#fff;border-radius:12px;padding:12px 15px}' +
+    '.os-veic-top{display:flex;justify-content:space-between;align-items:center;color:#7db0e6;font-size:10px;letter-spacing:.1em}.os-veic-top i{font-size:20px;opacity:.5}' +
+    '.os-veic-placa{font-size:22px;font-weight:800;margin-top:4px;letter-spacing:.02em}.os-veic-tipo{color:#9fc0e8;font-size:10.5px;margin-bottom:9px}' +
+    '.os-veic-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px 14px}.os-veic-grid .wide{grid-column:1/-1}.os-veic-grid small{color:#7db0e6;font-size:8px}.os-veic-grid b{display:block;font-size:12px;margin-top:1px}' +
+    // componente
+    '.os-comp{background:#eef4fb;border:1px solid #dbe7f5;border-radius:12px;padding:12px 15px}' +
+    '.os-comp-top{display:flex;justify-content:space-between;align-items:center;color:#2563eb;font-size:10px;letter-spacing:.1em}.os-comp-top i{font-size:22px;opacity:.55}' +
+    '.os-comp-name{font-size:19px;font-weight:800;color:#0f172a;margin:4px 0 9px}.os-comp-lbl{color:#64748b}.os-comp-desc{margin-top:3px;color:#334155;font-size:12px;word-break:break-word}' +
+    // lines
+    '.os-lines{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:4px 15px}' +
+    '.os-line{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid #eef2f7}.os-line:last-child{border-bottom:0}' +
+    '.os-line-k{color:#475569;font-size:10px;letter-spacing:.03em;text-transform:uppercase;display:flex;align-items:center;gap:8px}.os-line-k i{color:#94a3b8}' +
+    '.os-line-v{color:#0f172a;font-weight:600;text-align:right;word-break:break-word;max-width:60%}' +
+    // financeiro
+    '.os-fin{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 15px;display:flex;flex-direction:column;gap:10px}' +
+    '.os-fin-total{display:flex;gap:11px;align-items:center}.os-fin-ic{width:36px;height:36px;border-radius:10px;background:#dcfce7;color:#16a34a;display:grid;place-items:center;font-size:15px}' +
+    '.os-fin-total small{color:#64748b}.os-fin-total b{display:block;font-size:21px;color:#0f172a;letter-spacing:-.02em}.os-fin-total span{font-size:9.5px;color:#94a3b8}' +
+    '.os-fin-resumo{border-top:1px solid #eef2f7;padding-top:8px}.os-fin-h{display:block;color:#2563eb;font-size:9.5px;letter-spacing:.08em;margin-bottom:4px}' +
+    '.os-fin-row{display:flex;justify-content:space-between;padding:4px 0;color:#475569}.os-fin-row b{color:#0f172a}.os-fin-row.total{border-top:1px solid #e2e8f0;margin-top:3px;padding-top:7px;font-size:13px}.os-fin-row.total span,.os-fin-row.total b{color:#2563eb;font-weight:800}' +
+    // timeline
+    '.os-block-h{color:#2563eb;font-size:10.5px;letter-spacing:.08em;font-weight:700;margin-bottom:9px}' +
+    '.os-tl{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 15px}.os-tl ul{list-style:none;margin:0;padding:0}' +
+    '.os-tl li{position:relative;display:flex;gap:11px;padding-bottom:10px}.os-tl li::before{content:"";position:absolute;left:12px;top:25px;bottom:0;width:2px;background:#e2e8f0}.os-tl li.last::before{display:none}' +
+    '.os-tl-dot{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:10px;flex:0 0 auto;z-index:1}' +
+    '.os-tl-c{display:flex;flex-direction:column}.os-tl-date{font-size:9px;color:#94a3b8}.os-tl-c b{font-size:12px;color:#0f172a}.os-tl-sub{font-size:10.5px;color:#64748b}' +
+    // fotos + checklist
+    '.os-right{display:flex;flex-direction:column;gap:12px}' +
+    '.os-fotos{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 15px}.os-fotos-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}' +
+    '.os-foto{aspect-ratio:4/3;border-radius:8px;background-size:cover;background-position:center;background-color:#e2e8f0}.os-foto--empty{display:grid;place-items:center;color:#94a3b8;font-size:20px;grid-column:1/-1;aspect-ratio:auto;height:56px}' +
+    '.os-check{background:#eef4fb;border:1px solid #dbe7f5;border-radius:12px;padding:12px 15px;display:flex;justify-content:space-between;align-items:center;gap:12px}' +
+    '.os-check-list{display:flex;flex-direction:column;gap:6px}.os-check-i{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#334155}.os-check-i i{color:#16a34a;font-size:12px}' +
+    '.os-check-badge{text-align:center;color:#2563eb}.os-check-badge i{font-size:22px;display:block;margin-bottom:3px}.os-check-badge b{display:block;font-size:13px}.os-check-badge span{font-size:8.5px;color:#64748b}' +
+    // info + footer
+    '.os-info{margin:6px 16px 0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:10px 15px;display:flex;gap:11px;align-items:center}' +
+    '.os-info-ic{width:30px;height:30px;border-radius:9px;background:#dbeafe;color:#2563eb;display:grid;place-items:center;font-size:14px}.os-info b{display:block;color:#2563eb;font-size:10.5px;letter-spacing:.06em}.os-info span{color:#475569;font-size:11px}' +
+    '.os-foot{background:#0b1220;color:#cbd5e1;padding:12px 22px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:center;margin-top:10px}' +
+    '.os-foot>div:first-child{display:flex;gap:10px;align-items:center}.os-foot-ic{width:34px;height:34px;border-radius:9px;background:#16233a;color:#7db0e6;display:grid;place-items:center}.os-foot small{color:#7db0e6}.os-foot b{color:#fff;display:block}.os-foot span{font-size:10.5px}' +
+    '.os-foot-mid{text-align:center}.os-foot-mid b{color:#fff}.os-foot-mid span{display:block;font-size:10px}.os-foot-mid a{color:#7db0e6;font-size:10px}' +
+    '.os-foot-r{text-align:right}.os-foot-r span{display:block;font-size:10px}' +
+    '@media print{.os-doc{max-width:100%;border-radius:0}}';
+
+var MNT_OS_PRINT_CSS = '@page{size:A4;margin:7mm}body{margin:0;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}.os-doc{max-width:100%!important}';
 
 function mntPrintHtml(html, title) {
     var iframe = document.createElement('iframe');
@@ -172,7 +335,9 @@ function mntPrintHtml(html, title) {
     var win = iframe.contentWindow;
     var doc = win.document;
     doc.open();
-    doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + mntEsc(title || 'Ordem de Serviço') + '</title><style>' + MNT_OS_PRINT_CSS + '</style></head><body>' + html + '</body></html>');
+    doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + mntEsc(title || 'Ordem de Serviço') + '</title>' +
+        '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">' +
+        '<style>' + MNT_OS_PRINT_CSS + '</style></head><body>' + html + '</body></html>');
     doc.close();
     setTimeout(function () {
         try {
@@ -200,9 +365,16 @@ function printOrdemServico(id) {
                     if (opt) veiculoLabel = opt.textContent;
                 }
             }
-            var html = buildOsHtml(m, veiculoLabel);
-            document.getElementById('osPrintBody').innerHTML = html;
-            document.getElementById('osPrintModal').classList.add('active');
+            // Busca os anexos (fotos do serviço) e só então monta a OS.
+            fetch('../api/manutencao_anexos.php?manutencao_id=' + (m.id || ''), { credentials: 'include' })
+                .then(function (r) { return r.json(); })
+                .then(function (aj) { return (aj && aj.success && aj.data) ? aj.data : []; })
+                .catch(function () { return []; })
+                .then(function (anexos) {
+                    var html = buildOsHtml(m, veiculoLabel, anexos);
+                    document.getElementById('osPrintBody').innerHTML = html;
+                    document.getElementById('osPrintModal').classList.add('active');
+                });
         })
         .catch(function () { mntToast('Erro ao gerar OS.', 'error'); });
 }
@@ -520,7 +692,22 @@ document.addEventListener('DOMContentLoaded', function() {
     setupMntCollapsiblePanels();
     setupMaintenanceInsights();
     setupAlertAndScoreClicks();
+    setupFinanceiroAutoSum();
+    // Filtro "Período" agora é o widget compartilhado sf-periodo.js (auto-wire por data-*).
 });
+
+// Soma peças + mão de obra + outros no Custo Total (e no Valor, se vazio).
+function setupFinanceiroAutoSum() {
+    var ids = ['valor_pecas', 'valor_mao_obra', 'valor_outros'];
+    var recalc = function () {
+        var soma = ids.reduce(function (s, id) { var el = document.getElementById(id); return s + (el ? (parseFloat(el.value) || 0) : 0); }, 0);
+        if (soma > 0) {
+            var ct = document.getElementById('custo_total'); if (ct) ct.value = soma.toFixed(2);
+            var v = document.getElementById('valor'); if (v && !v.value) v.value = soma.toFixed(2);
+        }
+    };
+    ids.forEach(function (id) { var el = document.getElementById(id); if (el) el.addEventListener('input', recalc); });
+}
 
 function initializePage() {
     // Setup event listeners
@@ -830,10 +1017,12 @@ function loadPageViaAjax(page) {
     if (!tbody) return Promise.resolve();
     const url = buildListUrl(page);
     const container = tbody.closest('.data-table-container') || tbody.closest('.fornc-table-wrap') || tbody.closest('.mann-table-wrap');
-    if (container) container.classList.add('loading');
+    // Anti-flash: só marca "loading" se a resposta demorar (>180ms). Paginação rápida não pisca.
+    const _mannLoadTimer = setTimeout(function () { if (container) container.classList.add('loading'); }, 180);
     return fetch(url, { credentials: 'include' })
         .then(r => r.json())
         .then(data => {
+            clearTimeout(_mannLoadTimer);
             if (container) container.classList.remove('loading');
             if (!data.success || !data.data) return;
             const rows = data.data;
@@ -843,6 +1032,7 @@ function loadPageViaAjax(page) {
             updatePaginationUI(data);
         })
         .catch(function() {
+            clearTimeout(_mannLoadTimer);
             if (container) container.classList.remove('loading');
         });
 }
@@ -944,6 +1134,10 @@ function fillMaintenanceForm(data) {
     document.getElementById('km_atual').value = data.km_atual;
     document.getElementById('fornecedor').value = data.fornecedor || '';
     document.getElementById('valor').value = data.valor;
+    var _fp = function (id, v) { var el = document.getElementById(id); if (el) el.value = (v != null && parseFloat(v) > 0) ? v : ''; };
+    _fp('valor_pecas', data.valor_pecas);
+    _fp('valor_mao_obra', data.valor_mao_obra);
+    _fp('valor_outros', data.valor_outros);
     document.getElementById('custo_total').value = data.custo_total || '';
     document.getElementById('nota_fiscal').value = data.nota_fiscal || '';
     updateContaPagarLink(data.conta_pagar_id || null);

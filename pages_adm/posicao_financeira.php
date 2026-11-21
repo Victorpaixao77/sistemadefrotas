@@ -1,12 +1,8 @@
-<?php
-require_once '../includes/conexao.php';
-session_start();
+﻿<?php
+require_once __DIR__ . '/includes/adm_auth.php';
+require_once __DIR__ . '/includes/adm_post_guard.php';
 
-// Verificar se o usuário está logado
-if (!isset($_SESSION['admin_id'])) {
-    header('Location: login.php');
-    exit;
-}
+$page_title = 'Posição financeira';
 
 // Criar tabelas se não existirem
 try {
@@ -59,7 +55,10 @@ $tipo_mensagem = '';
 
 // Processar ações
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['action'])) {
+    if (!adm_csrf_valid_post()) {
+        $mensagem = 'Token CSRF inválido. Recarregue a página e tente novamente.';
+        $tipo_mensagem = 'error';
+    } elseif (isset($_POST['action'])) {
         switch ($_POST['action']) {
             case 'gerar_boleto':
                 try {
@@ -146,29 +145,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                     $stmt_check->execute([$numero_boleto]);
                                 } while ($stmt_check->fetch());
                                 
-                                // Gerar código de barras
+                                // Boleto interno (controle de contas a receber). Código de barras e
+                                // linha digitável só são válidos com registro bancário real, então
+                                // ficam vazios até integrar um provedor de cobrança — nunca gerar
+                                // dígitos fictícios que aparentem ser um boleto pagável.
                                 $codigo_barras = '';
-                                for ($i = 0; $i < 44; $i++) {
-                                    $codigo_barras .= rand(0, 9);
-                                }
-                                
-                                // Gerar linha digitável
-                                $ultimos_14_digitos = '';
-                                for ($i = 0; $i < 14; $i++) {
-                                    $ultimos_14_digitos .= rand(0, 9);
-                                }
-                                
-                                $linha_digitavel = sprintf(
-                                    "%05d.%05d %05d.%06d %05d.%06d %d %s",
-                                    rand(10000, 99999),
-                                    rand(10000, 99999),
-                                    rand(10000, 99999),
-                                    rand(100000, 999999),
-                                    rand(10000, 99999),
-                                    rand(100000, 999999),
-                                    rand(0, 9),
-                                    $ultimos_14_digitos
-                                );
+                                $linha_digitavel = '';
                                 
                                 // Inserir boleto
                                 $stmt = $pdo->prepare("INSERT INTO adm_boletos (
@@ -288,30 +270,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             $numero_boleto = date('Ymd') . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
                         }
                         
-                        // Gerar código de barras fictício (44 dígitos)
+                        // Boleto interno (contas a receber) — sem código de barras/linha
+                        // digitável fictícios. Só terão valor com registro bancário real.
                         $codigo_barras = '';
-                        for ($i = 0; $i < 44; $i++) {
-                            $codigo_barras .= rand(0, 9);
-                        }
-                        
-                        // Gerar linha digitável (formato: 00000.00000 00000.000000 00000.000000 0 00000000000000)
-                        // Gerar os 14 últimos dígitos manualmente para evitar problemas com números grandes
-                        $ultimos_14_digitos = '';
-                        for ($i = 0; $i < 14; $i++) {
-                            $ultimos_14_digitos .= rand(0, 9);
-                        }
-                        
-                        $linha_digitavel = sprintf(
-                            "%05d.%05d %05d.%06d %05d.%06d %d %s",
-                            rand(10000, 99999),
-                            rand(10000, 99999),
-                            rand(10000, 99999),
-                            rand(100000, 999999),
-                            rand(10000, 99999),
-                            rand(100000, 999999),
-                            rand(0, 9),
-                            $ultimos_14_digitos
-                        );
+                        $linha_digitavel = '';
                         
                         // Inserir boleto
                         $stmt = $pdo->prepare("INSERT INTO adm_boletos (
@@ -337,11 +299,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $mensagem = "Boleto gerado com sucesso! Número: $numero_boleto";
                         $tipo_mensagem = "success";
                     }
+                } catch (PDOException $e) {
+                    if (isset($pdo) && $pdo->inTransaction()) {
+                        $pdo->rollBack();
+                    }
+                    error_log('posicao_financeira gerar boleto: ' . $e->getMessage());
+                    $mensagem = "Erro ao gerar boleto. Tente novamente.";
+                    $tipo_mensagem = "error";
                 } catch (Exception $e) {
                     if (isset($pdo) && $pdo->inTransaction()) {
                         $pdo->rollBack();
                     }
-                    $mensagem = "Erro ao gerar boleto: " . $e->getMessage();
+                    $mensagem = $e->getMessage();
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -406,8 +375,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         }
                         throw $e;
                     }
+                } catch (PDOException $e) {
+                    error_log('posicao_financeira registrar pagamento: ' . $e->getMessage());
+                    $mensagem = "Erro ao registrar pagamento. Tente novamente.";
+                    $tipo_mensagem = "error";
                 } catch (Exception $e) {
-                    $mensagem = "Erro ao registrar pagamento: " . $e->getMessage();
+                    $mensagem = $e->getMessage();
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -425,8 +398,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     } else {
                         throw new Exception("Boleto não encontrado ou não pode ser cancelado.");
                     }
+                } catch (PDOException $e) {
+                    error_log('posicao_financeira cancelar boleto: ' . $e->getMessage());
+                    $mensagem = "Erro ao cancelar boleto. Tente novamente.";
+                    $tipo_mensagem = "error";
                 } catch (Exception $e) {
-                    $mensagem = "Erro ao cancelar boleto: " . $e->getMessage();
+                    $mensagem = $e->getMessage();
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -481,8 +458,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         }
                         throw $e;
                     }
+                } catch (PDOException $e) {
+                    error_log('posicao_financeira reverter pagamento: ' . $e->getMessage());
+                    $mensagem = "Erro ao reverter pagamento. Tente novamente.";
+                    $tipo_mensagem = "error";
                 } catch (Exception $e) {
-                    $mensagem = "Erro ao reverter pagamento: " . $e->getMessage();
+                    $mensagem = $e->getMessage();
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -522,8 +503,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         }
                         throw $e;
                     }
+                } catch (PDOException $e) {
+                    error_log('posicao_financeira excluir boleto: ' . $e->getMessage());
+                    $mensagem = "Erro ao excluir boleto. Tente novamente.";
+                    $tipo_mensagem = "error";
                 } catch (Exception $e) {
-                    $mensagem = "Erro ao excluir boleto: " . $e->getMessage();
+                    $mensagem = $e->getMessage();
                     $tipo_mensagem = "error";
                 }
                 break;
@@ -617,7 +602,8 @@ try {
     $empresas = $empresas_stmt->fetchAll();
     
 } catch (PDOException $e) {
-    $mensagem = "Erro ao carregar dados: " . $e->getMessage();
+    error_log('posicao_financeira load: ' . $e->getMessage());
+    $mensagem = "Erro ao carregar dados.";
     $tipo_mensagem = "error";
     $boletos = [];
     $estatisticas = [
@@ -631,318 +617,94 @@ try {
     ];
     $empresas = [];
 }
+
+$adm_iframe_mode = !empty($is_iframe);
+ob_start();
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Posição Financeira - Sistema de Frotas</title>
-    <link rel="stylesheet" href="../css/styles.css">
-    <link rel="stylesheet" href="../css/theme.css">
-    <link rel="stylesheet" href="../css/responsive.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        .main-content {
-            margin-left: 250px;
-            padding: 20px;
-            background: #f8f9fa;
-            min-height: 100vh;
-        }
-        .main-content.iframe-mode {
-            margin-left: 0 !important;
-            padding: 0;
-            background: white;
-        }
-        .main-content.iframe-mode .header {
-            padding: 10px 20px;
-            margin-bottom: 0;
-            background: #f8f9fa;
-            border-bottom: 1px solid #dee2e6;
-        }
-        .main-content.iframe-mode .header h1 {
-            font-size: 1.1rem;
-            margin: 0;
-            font-weight: 600;
-        }
-        .main-content.iframe-mode .stats-grid {
-            padding: 10px 20px;
-            margin-bottom: 0;
-            background: white;
-            border-bottom: 1px solid #dee2e6;
-            grid-template-columns: repeat(6, 1fr);
-            gap: 8px;
-        }
-        .main-content.iframe-mode .stats-grid .stat-card {
-            padding: 8px 10px;
-            margin-bottom: 0;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-        }
-        .main-content.iframe-mode .stats-grid .stat-card h3 {
-            font-size: 0.7rem;
-            margin-bottom: 4px;
-            color: #6c757d;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .main-content.iframe-mode .stats-grid .stat-card .value {
-            font-size: 0.95rem;
-            font-weight: 600;
-        }
-        .main-content.iframe-mode .table-container {
-            margin: 0;
-            border-radius: 0;
-            box-shadow: none;
-        }
-        .main-content.iframe-mode .table-container table {
-            font-size: 0.8rem;
-        }
-        .main-content.iframe-mode .table-container th,
-        .main-content.iframe-mode .table-container td {
-            padding: 6px 10px;
-        }
-        .main-content.iframe-mode .table-container th {
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-        .main-content.iframe-mode .message {
-            margin: 0;
-            border-radius: 0;
-            padding: 8px 20px;
-        }
-        .header {
+        .adm-fin .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
         }
-        .header h1 {
-            color: #333;
-            margin: 0;
-        }
-        .stats-grid {
+        .adm-fin .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
-        .stat-card {
-            background: white;
-            border-radius: 8px;
+        .adm-fin .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .stat-card h3 {
-            color: #666;
-            font-size: 0.9rem;
-            margin: 0 0 10px 0;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+        .adm-fin .stat-card h3 { color: var(--text-secondary); font-size: 0.9rem; margin: 0 0 10px 0; }
+        .adm-fin .stat-card .value { font-size: 2rem; font-weight: bold; color: var(--accent-primary,#3b82f6); margin: 0; }
+        .adm-fin .table-container,
+        .adm-fin .message { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; }
+        .adm-fin .table-container { overflow-x: auto; }
+        .adm-fin table { width: 100%; border-collapse: collapse; min-width: 900px; }
+        .adm-fin th, .adm-fin td { padding: 12px 15px; border-bottom: 1px solid var(--border-color); color: var(--text-primary); }
+        .adm-fin th { background: var(--bg-tertiary); font-weight: 600; }
+        .adm-fin .actions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+        .adm-fin .actions .btn { padding: 6px 10px; font-size: 0.8125rem; }
+        body.adm-iframe-mode .adm-iframe-content { padding: 0.4rem 0.5rem; }
+        body.adm-iframe-mode .adm-fin .adm-toolbar { margin-bottom: 0.5rem; }
+        body.adm-iframe-mode .adm-fin .stats-grid {
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 6px;
+            margin-bottom: 0.65rem;
         }
-        .stat-card .value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #007bff;
-            margin: 0;
-        }
-        .stat-card.success .value {
-            color: #28a745;
-        }
-        .stat-card.danger .value {
-            color: #dc3545;
-        }
-        .stat-card.warning .value {
-            color: #ffc107;
-        }
-        .filters-container {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .filters-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-        }
-        .form-group {
-            margin-bottom: 0;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: #333;
-            font-weight: 500;
-            font-size: 0.9rem;
-        }
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
+        body.adm-iframe-mode .adm-fin .stat-card { padding: 8px 10px; }
+        body.adm-iframe-mode .adm-fin .stat-card h3 { font-size: 0.68rem; margin: 0 0 4px; line-height: 1.2; }
+        body.adm-iframe-mode .adm-fin .stat-card .value { font-size: 0.95rem; }
+        body.adm-iframe-mode .adm-fin .table-container { overflow-x: visible; }
+        body.adm-iframe-mode .adm-fin table.adm-fin-boletos {
+            min-width: 0;
             width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            color: #333;
-            font-size: 0.9rem;
-            font-family: inherit;
+            font-size: 0.875rem;
+            table-layout: auto;
         }
-        .btn {
-            padding: 8px 16px;
-            border-radius: 4px;
-            text-decoration: none;
-            color: white;
-            background: #007bff;
-            border: none;
-            cursor: pointer;
-            transition: background 0.3s;
-            font-size: 0.9rem;
-            display: inline-block;
+        body.adm-iframe-mode .adm-fin table.adm-fin-boletos th,
+        body.adm-iframe-mode .adm-fin table.adm-fin-boletos td {
+            padding: 8px 10px;
+            vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
+            white-space: normal;
         }
-        .btn:hover {
-            background: #0056b3;
+        body.adm-iframe-mode .adm-fin table.adm-fin-boletos th:last-child,
+        body.adm-iframe-mode .adm-fin table.adm-fin-boletos td:last-child {
+            white-space: nowrap;
         }
-        .btn-success {
-            background: #28a745;
+        body.adm-iframe-mode .adm-fin .actions .btn { padding: 4px 7px; font-size: 0.75rem; }
+        body.adm-iframe-mode .adm-fin .badge { font-size: 0.72rem; padding: 3px 6px; }
+        body.adm-iframe-mode .adm-fin table.adm-fin-boletos td small { font-size: 0.72rem; }
+        .adm-fin .btn { padding: 8px 16px; border-radius: 8px; color: #fff; background: var(--accent-primary,#3b82f6); border: none; cursor: pointer; }
+        .adm-fin .btn-success { background: #28a745; }
+        .adm-fin .btn-danger { background: #dc3545; }
+        .adm-fin .btn-secondary { background: #6c757d; }
+        .adm-fin .form-group label { display: block; margin-bottom: 5px; font-weight: 500; }
+        .adm-fin .form-group input, .adm-fin .form-group select, .adm-fin .form-group textarea {
+            width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 8px;
+            background: var(--bg-tertiary); color: var(--text-primary);
         }
-        .btn-success:hover {
-            background: #218838;
-        }
-        .btn-danger {
-            background: #dc3545;
-        }
-        .btn-danger:hover {
-            background: #c82333;
-        }
-        .btn-secondary {
-            background: #6c757d;
-        }
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-        .table-container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            overflow-x: auto;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 1200px;
-        }
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-            color: #333;
-        }
-        th {
-            background: #f8f9fa;
-            font-weight: 600;
-            color: #333;
-        }
-        tr:hover {
-            background: #f8f9fa;
-        }
-        .badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            display: inline-block;
-        }
-        .badge-success {
-            background: #28a745;
-            color: white;
-        }
-        .badge-danger {
-            background: #dc3545;
-            color: white;
-        }
-        .badge-warning {
-            background: #ffc107;
-            color: #212529;
-        }
-        .badge-secondary {
-            background: #6c757d;
-            color: white;
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-        }
-        .modal-content {
-            background: white;
-            width: 90%;
-            max-width: 600px;
-            margin: 50px auto;
-            padding: 20px;
-            border-radius: 8px;
-            position: relative;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-        .modal-content h2 {
-            margin-top: 0;
-            color: #333;
-        }
-        .close {
-            position: absolute;
-            right: 20px;
-            top: 20px;
-            font-size: 24px;
-            cursor: pointer;
-            color: #333;
-        }
-        .message {
-            padding: 12px 20px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-        }
-        .message.success {
-            background: #d4edda;
-            color: #155724;
-        }
-        .message.error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        .actions {
-            display: flex;
-            gap: 5px;
-        }
-        .actions button {
-            padding: 5px 10px;
-            font-size: 0.85rem;
-        }
-        @media (max-width: 768px) {
-            .main-content:not(.iframe-mode) {
-                margin-left: 0;
-            }
-        }
+        .adm-fin .message.success { background: color-mix(in srgb, #22c55e 14%, var(--bg-secondary)); padding: 12px; margin-bottom: 1rem; border-radius: 8px; }
+        .adm-fin .message.error { background: color-mix(in srgb, #ef4444 14%, var(--bg-secondary)); padding: 12px; margin-bottom: 1rem; border-radius: 8px; }
     </style>
-</head>
-<body>
-    <?php if (!$is_iframe): ?>
-        <?php include 'includes/sidebar.php'; ?>
-    <?php endif; ?>
-    
-    <div class="main-content <?php echo $is_iframe ? 'iframe-mode' : ''; ?>">
-        <div class="header">
-            <h1><i class="fas fa-dollar-sign"></i> Posição Financeira</h1>
-            <button class="btn btn-success" onclick="showGerarBoletoModal()">
+<?php
+$adm_extra_head = ob_get_clean();
+require_once __DIR__ . '/includes/layout_start.php';
+?>
+<div class="adm-fin">
+        <div class="adm-toolbar">
+            <?php if (!$is_iframe): ?><span></span><?php endif; ?>
+            <button class="btn btn-success" type="button" onclick="showGerarBoletoModal()">
                 <i class="fas fa-plus"></i> Gerar Boleto
             </button>
         </div>
-
         <?php if ($mensagem && !$is_iframe): ?>
             <div class="message <?php echo $tipo_mensagem; ?>">
                 <?php echo htmlspecialchars($mensagem); ?>
@@ -977,58 +739,34 @@ try {
             </div>
         </div>
 
-        <!-- Filtros -->
-        <div class="filters-container" <?php echo $is_iframe ? 'style="display: none;"' : ''; ?>>
-            <h3 style="margin-top: 0; margin-bottom: 15px; color: #333;"><i class="fas fa-filter"></i> Filtros</h3>
-            <form method="GET" action="">
-                <?php if ($is_iframe): ?>
-                    <input type="hidden" name="empresa_id" value="<?php echo $filtro_empresa; ?>">
-                <?php endif; ?>
-                <div class="filters-row">
-                    <div class="form-group">
-                        <label>Empresa</label>
-                        <select name="empresa_id" <?php echo $is_iframe ? 'disabled' : ''; ?>>
-                            <option value="">Todas as empresas</option>
-                            <?php foreach ($empresas as $empresa): ?>
-                                <option value="<?php echo $empresa['id']; ?>" <?php echo ($filtro_empresa == $empresa['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($empresa['razao_social']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Status</label>
-                        <select name="status">
-                            <option value="">Todos</option>
-                            <option value="pendente" <?php echo ($filtro_status == 'pendente') ? 'selected' : ''; ?>>Pendente</option>
-                            <option value="pago" <?php echo ($filtro_status == 'pago') ? 'selected' : ''; ?>>Pago</option>
-                            <option value="vencido" <?php echo ($filtro_status == 'vencido') ? 'selected' : ''; ?>>Vencido</option>
-                            <option value="cancelado" <?php echo ($filtro_status == 'cancelado') ? 'selected' : ''; ?>>Cancelado</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Data Início</label>
-                        <input type="date" name="data_inicio" value="<?php echo htmlspecialchars($data_inicio); ?>">
-                    </div>
-                    <div class="form-group">
-                        <label>Data Fim</label>
-                        <input type="date" name="data_fim" value="<?php echo htmlspecialchars($data_fim); ?>">
-                    </div>
-                </div>
-                <div style="margin-top: 15px;">
-                    <button type="submit" class="btn">
-                        <i class="fas fa-search"></i> Filtrar
-                    </button>
-                    <a href="posicao_financeira.php" class="btn btn-secondary" style="margin-left: 10px;">
-                        <i class="fas fa-times"></i> Limpar
-                    </a>
-                </div>
-            </form>
-        </div>
+        <!-- Filtros compactos -->
+        <?php if (!$is_iframe): ?>
+        <form method="GET" action="" class="adm-cc-filters" id="adm-fin-filters-form">
+            <select name="empresa_id" id="filtro-empresa" aria-label="Empresa">
+                <option value="">Todas empresas</option>
+                <?php foreach ($empresas as $empresa): ?>
+                    <option value="<?php echo (int) $empresa['id']; ?>" <?php echo ($filtro_empresa == $empresa['id']) ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($empresa['razao_social'], ENT_QUOTES, 'UTF-8'); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <select name="status" id="filtro-status" aria-label="Status">
+                <option value="">Todos status</option>
+                <option value="pendente" <?php echo ($filtro_status === 'pendente') ? 'selected' : ''; ?>>Pendente</option>
+                <option value="pago" <?php echo ($filtro_status === 'pago') ? 'selected' : ''; ?>>Pago</option>
+                <option value="vencido" <?php echo ($filtro_status === 'vencido') ? 'selected' : ''; ?>>Vencido</option>
+                <option value="cancelado" <?php echo ($filtro_status === 'cancelado') ? 'selected' : ''; ?>>Cancelado</option>
+            </select>
+            <?php if ($filtro_empresa || $filtro_status): ?>
+            <a href="posicao_financeira.php" class="adm-cc-filters__clear" title="Limpar filtros"><i class="fas fa-xmark" aria-hidden="true"></i> Limpar</a>
+            <?php endif; ?>
+            <span class="adm-cc-filters__meta"><?php echo count($boletos); ?> boleto(s)</span>
+        </form>
+        <?php endif; ?>
 
         <!-- Tabela de Boletos -->
         <div class="table-container">
-            <table>
+            <table class="adm-fin-boletos">
                 <thead>
                     <tr>
                         <th>Nº Boleto</th>
@@ -1109,16 +847,16 @@ try {
                 </tbody>
             </table>
         </div>
-    </div>
 
     <!-- Modal Gerar Boleto -->
-    <div id="gerarBoletoModal" class="modal">
+    <div id="gerarBoletoModal" class="modal adm-modal-legacy adm-modal-legacy--wide">
         <div class="modal-content">
             <span class="close" onclick="closeModal('gerarBoletoModal')">&times;</span>
             <h2><i class="fas fa-file-invoice"></i> Gerar Novo Boleto</h2>
-            <form method="POST" action="">
+            <form method="POST" action="" class="adm-modal-form-grid">
+                <?php echo adm_csrf_field(); ?>
                 <input type="hidden" name="action" value="gerar_boleto">
-                <div class="form-group">
+                <div class="form-group adm-modal-field--full">
                     <label>Empresa Cliente *</label>
                     <select name="empresa_cliente_id" id="empresa_cliente_id" required <?php echo $is_iframe && $filtro_empresa ? 'disabled' : ''; ?> onchange="toggleLoteFields()">
                         <option value="">Selecione uma empresa</option>
@@ -1137,8 +875,12 @@ try {
                     <label>Descrição *</label>
                     <input type="text" name="descricao" required placeholder="Ex: Mensalidade Janeiro/2025">
                 </div>
+                <div class="form-group">
+                    <label>Data de Vencimento *</label>
+                    <input type="date" name="data_vencimento" required>
+                </div>
                 <!-- Campos para geração individual -->
-                <div id="campo_valor_individual">
+                <div id="campo_valor_individual" class="adm-modal-field--full">
                     <div class="form-group">
                         <label style="display: flex; align-items: center; gap: 8px;">
                             <input type="checkbox" name="usar_valor_plano" id="usar_valor_plano" value="1" onchange="toggleValorPlano()">
@@ -1153,7 +895,7 @@ try {
                     </div>
                 </div>
                 <!-- Campos para geração em lote -->
-                <div id="campos_lote" style="display: none;">
+                <div id="campos_lote" class="adm-modal-field--full" style="display: none;">
                     <div class="form-group">
                         <label>Valor Fixo para Todas (R$)</label>
                         <input type="number" name="valor_fixo" id="valor_fixo" step="0.01" min="0" placeholder="0.00">
@@ -1168,10 +910,6 @@ try {
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Data de Vencimento *</label>
-                    <input type="date" name="data_vencimento" required>
-                </div>
-                <div class="form-group">
                     <label>Tipo de Boleto</label>
                     <select name="tipo_boleto">
                         <option value="mensalidade">Mensalidade</option>
@@ -1184,12 +922,10 @@ try {
                     <label>Mês de Referência (opcional)</label>
                     <input type="month" name="mes_referencia" placeholder="YYYY-MM">
                 </div>
-                <div style="margin-top: 20px;">
+                <div class="adm-modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('gerarBoletoModal')">Cancelar</button>
                     <button type="submit" class="btn btn-success">
                         <i class="fas fa-check"></i> Gerar Boleto
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('gerarBoletoModal')" style="margin-left: 10px;">
-                        Cancelar
                     </button>
                 </div>
             </form>
@@ -1197,16 +933,17 @@ try {
     </div>
 
     <!-- Modal Registrar Pagamento -->
-    <div id="registrarPagamentoModal" class="modal">
+    <div id="registrarPagamentoModal" class="modal adm-modal-legacy">
         <div class="modal-content">
             <span class="close" onclick="closeModal('registrarPagamentoModal')">&times;</span>
             <h2><i class="fas fa-money-bill-wave"></i> Registrar Pagamento</h2>
             <form method="POST" action="" id="formRegistrarPagamento">
+                <?php echo adm_csrf_field(); ?>
                 <input type="hidden" name="action" value="registrar_pagamento">
                 <input type="hidden" name="boleto_id" id="boleto_id_pagamento">
                 <div class="form-group">
                     <label>Valor do Boleto</label>
-                    <input type="text" id="valor_boleto" readonly style="background: #f0f0f0;">
+                    <input type="text" id="valor_boleto" readonly>
                 </div>
                 <div class="form-group">
                     <label>Data do Pagamento *</label>
@@ -1230,12 +967,10 @@ try {
                     <label>Observações</label>
                     <textarea name="observacoes" rows="3" placeholder="Observações sobre o pagamento"></textarea>
                 </div>
-                <div style="margin-top: 20px;">
+                <div class="adm-modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('registrarPagamentoModal')">Cancelar</button>
                     <button type="submit" class="btn btn-success">
                         <i class="fas fa-check"></i> Registrar Pagamento
-                    </button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('registrarPagamentoModal')" style="margin-left: 10px;">
-                        Cancelar
                     </button>
                 </div>
             </form>
@@ -1243,7 +978,7 @@ try {
     </div>
 
     <!-- Modal Ver Detalhes -->
-    <div id="detalhesModal" class="modal">
+    <div id="detalhesModal" class="modal adm-modal-legacy">
         <div class="modal-content">
             <span class="close" onclick="closeModal('detalhesModal')">&times;</span>
             <h2><i class="fas fa-info-circle"></i> Detalhes do Boleto</h2>
@@ -1252,6 +987,8 @@ try {
     </div>
 
     <script>
+        const SF_ADM_CSRF = <?php echo json_encode(csrf_token_get(), JSON_THROW_ON_ERROR); ?>;
+
         function showGerarBoletoModal() {
             document.getElementById('gerarBoletoModal').style.display = 'block';
             toggleLoteFields(); // Verificar estado inicial
@@ -1366,6 +1103,7 @@ try {
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.innerHTML = `
+                    <input type="hidden" name="csrf_token" value="${SF_ADM_CSRF}">
                     <input type="hidden" name="action" value="cancelar_boleto">
                     <input type="hidden" name="boleto_id" value="${boletoId}">
                 `;
@@ -1379,6 +1117,7 @@ try {
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.innerHTML = `
+                    <input type="hidden" name="csrf_token" value="${SF_ADM_CSRF}">
                     <input type="hidden" name="action" value="reverter_pagamento">
                     <input type="hidden" name="boleto_id" value="${boletoId}">
                 `;
@@ -1392,6 +1131,7 @@ try {
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.innerHTML = `
+                    <input type="hidden" name="csrf_token" value="${SF_ADM_CSRF}">
                     <input type="hidden" name="action" value="excluir_boleto">
                     <input type="hidden" name="boleto_id" value="${boletoId}">
                 `;
@@ -1413,6 +1153,7 @@ try {
                     <p><strong>Status:</strong> ${boleto.status}</p>
                     ${boleto.linha_digitavel ? `<p><strong>Linha Digitável:</strong> ${boleto.linha_digitavel}</p>` : ''}
                     ${boleto.codigo_barras ? `<p><strong>Código de Barras:</strong> ${boleto.codigo_barras}</p>` : ''}
+                    ${!boleto.linha_digitavel && !boleto.codigo_barras ? `<p style="color:#94a3b8;font-size:.85rem;margin-top:8px;"><i class="fas fa-info-circle"></i> Cobrança interna (contas a receber). Sem registro bancário — a integração de boleto pagável ainda não foi configurada.</p>` : ''}
                     ${boleto.data_pagamento ? `<p><strong>Data de Pagamento:</strong> ${new Date(boleto.data_pagamento).toLocaleDateString('pt-BR')}</p>` : ''}
                     ${boleto.forma_pagamento ? `<p><strong>Forma de Pagamento:</strong> ${boleto.forma_pagamento}</p>` : ''}
                     ${boleto.observacoes ? `<p><strong>Observações:</strong> ${boleto.observacoes}</p>` : ''}
@@ -1434,12 +1175,22 @@ try {
                     modal.style.display = 'none';
                 }
             });
-        }
+        };
+
+        // Filtros: aplicar ao mudar seleção
+        (function () {
+            var form = document.getElementById('adm-fin-filters-form');
+            if (!form) return;
+            form.querySelectorAll('select').forEach(function (sel) {
+                sel.addEventListener('change', function () { form.submit(); });
+            });
+        })();
 
         // Atualizar status de boletos vencidos
         setInterval(function() {
             // Esta função pode ser chamada via AJAX para atualizar status de vencidos
         }, 60000); // A cada minuto
     </script>
-</body>
-</html>
+</div>
+<?php require_once __DIR__ . '/includes/layout_end.php'; ?>
+

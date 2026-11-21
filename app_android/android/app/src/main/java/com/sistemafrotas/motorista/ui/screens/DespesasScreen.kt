@@ -1,5 +1,6 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -40,10 +41,10 @@ fun DespesasScreen(
     val vm: DespesasViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository) { DespesasViewModel(it) }
     )
-    val rotas by vm.rotas.collectAsState()
-    val loading by vm.loading.collectAsState()
-    val refreshing by vm.refreshing.collectAsState()
-    val error by vm.error.collectAsState()
+    val rotas by vm.rotas.collectAsStateWithLifecycle()
+    val loading by vm.loading.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
     var selectedRota by remember { mutableStateOf<RotaItem?>(null) }
 
     LaunchedEffect(Unit) { vm.carregarSeNecessario() }
@@ -92,7 +93,7 @@ fun DespesasScreen(
             }
         } else {
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(rotas) { r ->
+                items(rotas, key = { it.id }) { r ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()

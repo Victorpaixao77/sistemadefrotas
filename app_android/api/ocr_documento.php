@@ -21,7 +21,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
 }
 
 $tipo = strtolower(trim((string) ($_POST['tipo'] ?? 'abastecimento')));
-$tiposValidos = ['abastecimento', 'painel', 'pedagio', 'nota', 'lacre'];
+$tiposValidos = ['abastecimento', 'painel', 'pedagio', 'nota', 'lacre', 'auto'];
 if (!in_array($tipo, $tiposValidos, true)) {
     api_error('Tipo de documento inválido.');
 }
@@ -72,7 +72,40 @@ try {
     [$binary, $mime] = sf_vision_ocr_prepare_image($binary, $mime);
     $dataUrl = 'data:' . $mime . ';base64,' . base64_encode($binary);
 
-    $system = 'Você lê documentos de transporte no Brasil (comprovantes de posto, painel de veículo, recibos de pedágio). Responda SOMENTE JSON válido, sem markdown e sem texto fora do JSON. Nunca invente: se não ler com clareza um campo, use null.';
+    $system = 'Você lê documentos de transporte no Brasil (comprovantes de posto, painel de veículo, recibos de pedágio, notas fiscais, lacres). Responda SOMENTE JSON válido, sem markdown e sem texto fora do JSON. Nunca invente: se não ler com clareza um campo, use null.';
+
+    if ($tipo === 'auto') {
+        $classifyText = <<<'TXT'
+Identifique o tipo deste documento/foto de transporte no Brasil.
+
+Responda com este JSON exato:
+{"tipo_documento":"abastecimento|pedagio|painel|nota|lacre|desconhecido","confianca":0}
+
+Regras:
+- abastecimento: cupom/nota de posto de combustível
+- pedagio: recibo de praça de pedágio
+- painel: foto do hodômetro/painel do veículo
+- nota: DANFE/NF-e/nota fiscal de carga
+- lacre: foto de lacre de container/carga
+- desconhecido: foto de veículo, carga, estrada ou outro sem texto fiscal claro
+- confianca: 0 a 100
+TXT;
+        $classRes = sf_vision_ocr_call($cfg, $dataUrl, $system, $classifyText);
+        if (!$classRes['ok']) {
+            if ($classRes['http'] === 429) {
+                api_error('Serviço de IA ocupado no momento. Tente novamente em instantes.', 429);
+            }
+            error_log('ocr_documento.php classificação: ' . $classRes['error']);
+            api_error('Não foi possível identificar o documento. Tente novamente.', 502);
+        }
+        $classParsed = sf_vision_ocr_decode_json($classRes['content']);
+        $detected = strtolower(trim((string) ($classParsed['tipo_documento'] ?? 'desconhecido')));
+        if (!in_array($detected, ['abastecimento', 'painel', 'pedagio', 'nota', 'lacre'], true)) {
+            api_success(['tipo' => 'desconhecido', 'campos' => new stdClass()], 'Tipo não identificado. Abra o formulário manualmente.');
+            exit;
+        }
+        $tipo = $detected;
+    }
 
     if ($tipo === 'abastecimento') {
         $userText = <<<'TXT'

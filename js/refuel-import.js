@@ -391,6 +391,500 @@
     });
   }
 
+  /**
+   * Alterna o modo do rodapé/cabeçalho do modal.
+   * hasRota=true  → ficha de frete: mostra "Criar rota…", esconde "Importar", o texto de instruções
+   *                 e o select "Rota" (a rota será criada agora, não há o que vincular).
+   * hasRota=false → CSV/foto simples: mostra "Importar", esconde "Criar rota…", restaura instruções
+   *                 e o select "Rota" (abastecimento avulso precisa vincular a uma rota existente).
+   */
+  function irrSetFooterMode(hasRota) {
+    var saveBtn = document.getElementById('refuelImportSaveBtn');
+    var createBtn = document.getElementById('irrCreateBtn');
+    var intro = document.getElementById('refuelImportIntro');
+    // Página só de rotas (Importar ficha): nunca há import avulso → "Importar" do rodapé fica sempre oculto.
+    var routesOnly = typeof window.loadRouteData === 'function' && typeof window.loadRefuelingData !== 'function';
+    if (saveBtn) saveBtn.style.display = (hasRota || routesOnly) ? 'none' : '';
+    if (createBtn) createBtn.style.display = hasRota ? '' : 'none';
+    if (intro) intro.style.display = hasRota ? 'none' : '';
+    var rotaSel = document.getElementById('impRota');
+    var rotaGroup = rotaSel ? rotaSel.closest('.form-group') : null;
+    if (rotaGroup) rotaGroup.style.display = hasRota ? 'none' : '';
+  }
+
+  /** Recarrega a lista da página atual após importar (rotas em routes.php, abastecimentos em abastecimentos.php). */
+  function irrRefreshList() {
+    if (typeof window.loadRouteData === 'function') { window.loadRouteData(1); return; }
+    if (typeof window.loadRefuelingData === 'function') { window.loadRefuelingData(1); }
+  }
+
+  function irrEnsureStyle() {
+    if (document.getElementById('imp-rota-resumo-style')) return;
+    var st = document.createElement('style');
+    st.id = 'imp-rota-resumo-style';
+    st.textContent =
+      '.imp-rota-resumo{margin:0 0 14px;border:1px solid var(--border-color,#e5e7eb);border-radius:12px;background:var(--bg-secondary,#fff);padding:16px 18px;}' +
+      '.imp-rota-resumo .irr-head{display:flex;align-items:center;gap:8px;font-weight:700;font-size:.92rem;margin-bottom:14px;color:var(--text-primary);}' +
+      '.imp-rota-resumo .irr-head i{color:var(--accent-primary,#3b82f6);}' +
+      '.imp-rota-resumo .irr-tag{margin-left:auto;font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(245,158,11,.16);color:#b45309;text-transform:uppercase;}' +
+      '.imp-rota-resumo .irr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px 18px;}' +
+      '.imp-rota-resumo .irr-item{display:flex;flex-direction:column;gap:3px;}' +
+      '.imp-rota-resumo .irr-l{font-size:.68rem;text-transform:uppercase;letter-spacing:.3px;color:var(--text-muted,#64748b);}' +
+      '.imp-rota-resumo .irr-v{font-size:.9rem;font-weight:600;color:var(--text-primary);}' +
+      '.imp-rota-resumo .irr-notes{margin-top:8px;font-size:.82rem;color:var(--text-secondary,#475569);}' +
+      '.imp-rota-resumo .irr-foot{margin-top:10px;font-size:.78rem;color:var(--text-muted,#64748b);display:flex;gap:6px;align-items:flex-start;}' +
+      '.imp-rota-resumo .irr-actions{margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}' +
+      '.imp-rota-resumo #irrCreateBtn{background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:9px 14px;font-weight:600;cursor:pointer;}' +
+      '.imp-rota-resumo #irrCreateBtn:hover{filter:brightness(1.07);}' +
+      '.imp-rota-resumo #irrCreateBtn:disabled{opacity:.6;cursor:default;}' +
+      '.imp-rota-resumo .irr-status{font-size:.82rem;font-weight:600;}' +
+      '.imp-rota-resumo .irr-inp{width:100%;box-sizing:border-box;padding:6px 8px;font-size:.85rem;border:1px solid var(--border-color,#d0d5dd);border-radius:6px;background:var(--bg-tertiary,var(--bg-secondary,#fff));color:var(--text-primary);}' +
+      '.imp-rota-resumo .irr-inp:focus{outline:none;border-color:var(--accent-primary,#3b82f6);box-shadow:0 0 0 2px rgba(59,130,246,.15);}' +
+      '.imp-rota-resumo .irr-item.irr-full{grid-column:1/-1;margin-top:8px;}' +
+      '.imp-rota-resumo .irr-item label.irr-l{margin-bottom:3px;display:block;}' +
+      '.imp-rota-resumo .irr-subhead{display:flex;align-items:center;gap:7px;font-weight:700;font-size:.82rem;margin:14px 0 8px;padding-top:10px;border-top:1px dashed var(--border-color,#e5e7eb);color:var(--text-primary);}' +
+      '.imp-rota-resumo .irr-subhead i{color:#16a34a;}' +
+      '.imp-rota-resumo .irr-subhead .irr-hint{margin-left:auto;font-weight:500;text-transform:none;letter-spacing:0;color:var(--text-muted,#64748b);}' +
+      '.imp-rota-resumo .irr-km-warn{margin:10px 0 0;font-size:.78rem;font-weight:600;padding:7px 11px;border-radius:8px;line-height:1.35;}' +
+      '.imp-rota-resumo .irr-km-warn.err{background:rgba(220,38,38,.12);color:#b91c1c;border:1px solid rgba(220,38,38,.25);}' +
+      '.imp-rota-resumo .irr-km-warn.ok{background:rgba(22,163,74,.12);color:#15803d;border:1px solid rgba(22,163,74,.25);}' +
+      /* alarga o modal de importação quando há resumo de viagem */
+      '#refuelImportModal .modal-content,.refuel-import-modal .modal-content{max-width:min(1280px,97vw)!important;width:97%!important;}' +
+      '#refuelImportModal .modal-body{max-height:78vh!important;overflow-y:auto;}' +
+      '#refuelImportModal .refuel-import-preview-wrap{max-height:min(46vh,420px)!important;}';
+    document.head.appendChild(st);
+  }
+
+  /** Mostra o cabeçalho da viagem lido da ficha (para o usuário validar). */
+  function renderRotaResumo(tbody, rota) {
+    var table = tbody ? tbody.closest('table') : null;
+    var host = table ? table.parentNode : null;
+    var box = document.getElementById('imp-rota-resumo');
+    _irrCreatedRotaId = 0; // nova ficha/limpeza → nenhuma rota criada ainda nesta sessão
+    if (!rota) { _currentRota = null; if (box && box.parentNode) box.parentNode.removeChild(box); irrSetFooterMode(false); return; }
+    irrEnsureStyle();
+    // Com ficha de rota: botão "Criar rota…" no rodapé, esconde "Importar" e o texto de instruções.
+    irrSetFooterMode(true);
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'imp-rota-resumo';
+      box.className = 'imp-rota-resumo';
+      if (host && table) host.insertBefore(box, table);
+      else if (host) host.appendChild(box);
+      else if (tbody && tbody.parentNode) tbody.parentNode.insertBefore(box, tbody);
+    }
+    var fmtMoney = function (v) { if (v == null || v === '') return ''; var n = Number(v); return isNaN(n) ? '' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+    var fmtInt = function (v) { if (v == null || v === '') return ''; var n = Number(v); return isNaN(n) ? '' : String(Math.round(n)); };
+    var inp = function (id, val, ph, type) { type = type || 'text'; return '<input id="' + id + '" class="irr-inp" type="' + type + '" value="' + escapeHtml(String(val == null ? '' : val)) + '"' + (ph ? ' placeholder="' + ph + '"' : '') + '>'; };
+    var fld = function (id, label, val, ph, type) { return '<div class="irr-item"><label class="irr-l" for="' + id + '">' + label + '</label>' + inp(id, val, ph, type) + '</div>'; };
+    var dz = rota.despesas || {};
+    var dfld = function (id, label, val) { return fld(id, label, fmtMoney(val), '0,00'); };
+    var despHtml =
+      '<div class="irr-subhead"><i class="fas fa-receipt"></i> Despesas de Viagem <span class="irr-hint">vão para a aba Despesas da rota</span></div>' +
+      '<div class="irr-grid">' +
+      dfld('irr-desp-pedagios', 'Pedágio (R$)', rota.pedagio) +
+      dfld('irr-desp-adiantamento', 'Adiantamento (R$)', rota.adiantamento) +
+      dfld('irr-desp-descarga', 'Descarga/Chapa (R$)', dz.descarga) +
+      dfld('irr-desp-caixinha', 'Caixinha (R$)', dz.caixinha) +
+      dfld('irr-desp-estacionamento', 'Estacionamento (R$)', dz.estacionamento) +
+      dfld('irr-desp-lavagem', 'Lavagem (R$)', dz.lavagem) +
+      dfld('irr-desp-borracharia', 'Borracharia (R$)', dz.borracharia) +
+      dfld('irr-desp-eletrica', 'Elétrica/Mecânica (R$)', dz.eletrica_mecanica) +
+      dfld('irr-desp-outros', 'Outros (R$)', dz.outros) +
+      '</div>';
+    box.innerHTML =
+      '<div class="irr-head"><i class="fas fa-route"></i> Viagem lida da ficha <span class="irr-tag">revise / edite</span></div>' +
+      '<div class="irr-grid">' +
+      '<div class="irr-item"><span class="irr-l">Motorista (sugerido)</span><span class="irr-v">' + escapeHtml(rota.motorista || '—') + '</span></div>' +
+      '<div class="irr-item irr-loc"><label class="irr-l">Origem <small class="irr-hint">(' + escapeHtml(rota.origem || '?') + ')</small></label><div class="irr-loc-row"><select id="irr-uf-origem" class="irr-inp irr-uf"><option value="">UF</option></select><select id="irr-cid-origem" class="irr-inp"><option value="">Selecione a UF…</option></select></div></div>' +
+      '<div class="irr-item irr-loc"><label class="irr-l">Destino <small class="irr-hint">(' + escapeHtml(rota.destino || '?') + ')</small></label><div class="irr-loc-row"><select id="irr-uf-destino" class="irr-inp irr-uf"><option value="">UF</option></select><select id="irr-cid-destino" class="irr-inp"><option value="">Selecione a UF…</option></select></div></div>' +
+      fld('irr-dsaida', 'Saída', rota.data_saida, '', 'date') +
+      fld('irr-dchegada', 'Chegada', rota.data_chegada, '', 'date') +
+      fld('irr-kmsaida', 'KM saída', fmtInt(rota.km_saida), '') +
+      fld('irr-kmchegada', 'KM chegada', fmtInt(rota.km_chegada), '') +
+      fld('irr-kmrodado', 'KM rodado', fmtInt(rota.km_rodado), '') +
+      fld('irr-peso', 'Peso (kg)', fmtInt(rota.peso_saida), '') +
+      fld('irr-frete', 'Total frete (R$)', fmtMoney(rota.total_frete), '') +
+      fld('irr-comissao', 'Comissão (R$)', fmtMoney(rota.comissao), '') +
+      fld('irr-descricao', 'Descrição da carga', rota.descricao || '', 'opcional') +
+      '</div>' +
+      '<div id="irr-km-warn" class="irr-km-warn" hidden></div>' +
+      '<div id="irr-comissao-warn" class="irr-km-warn" hidden></div>' +
+      '<div id="irr-peso-warn" class="irr-km-warn" hidden></div>' +
+      despHtml +
+      '<div class="irr-item irr-full"><label class="irr-l" for="irr-anotacoes">Anotações</label>' + inp('irr-anotacoes', rota.anotacoes || '', '') + '</div>' +
+      '<div class="irr-foot"><i class="fas fa-info-circle"></i><span>O veículo não vem na ficha — selecione <b>Veículo</b>, <b>Combustível</b> e <b>Forma de pagamento</b> abaixo. O motorista foi sugerido pelo nome (confira no campo Motorista acima). Para gravar, use <b>Criar rota e importar abastecimentos</b> no rodapé.</span></div>';
+
+    _currentRota = rota;
+    // Rótulo do botão conforme tenha ou não abastecimentos a vincular.
+    var createBtn = document.getElementById('irrCreateBtn');
+    if (createBtn) createBtn.innerHTML = '<i class="fas fa-route"></i> ' + (_cachedRows.length ? 'Criar rota e importar abastecimentos' : 'Criar rota');
+    // Pré-seleciona o motorista pelo nome (se houver correspondência no select).
+    irrPreselectMotorista(rota.motorista);
+    irrSetupLocais(rota);
+    // KM rodado: recalcula quando vazio e avisa quando o valor informado não confere.
+    ['irr-kmsaida', 'irr-kmchegada', 'irr-kmrodado'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('input', irrRecalcKm);
+    });
+    irrRecalcKm();
+    // Comissão: ao mudar frete/comissão/motorista, valida com o % do motorista (frete × % / 100).
+    ['irr-frete', 'irr-comissao'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('input', irrValidateComissao);
+    });
+    var motSel = document.getElementById('impMotorista');
+    if (motSel && !motSel._irrComWired) { motSel._irrComWired = true; motSel.addEventListener('change', irrValidateComissao); }
+    irrValidateComissao();
+    // Peso: valida faixa e capacidade do veículo selecionado.
+    var pesoEl = document.getElementById('irr-peso');
+    if (pesoEl) pesoEl.addEventListener('input', irrValidatePeso);
+    var vehSel = document.getElementById('impVeiculo');
+    if (vehSel && !vehSel._irrPesoWired) { vehSel._irrPesoWired = true; vehSel.addEventListener('change', irrValidatePeso); }
+    irrValidatePeso();
+  }
+
+  /**
+   * Valida o peso da carga lido da ficha:
+   * - peso muito baixo para um caminhão (< 100 kg) → provável erro de leitura (ex.: 48 em vez de 48000);
+   * - acima da capacidade do veículo selecionado → aviso (mesma regra do simulador, em kg);
+   * - dentro da capacidade → mostra a ocupação (%).
+   */
+  function irrValidatePeso() {
+    var warn = document.getElementById('irr-peso-warn');
+    var pesoEl = document.getElementById('irr-peso');
+    if (!warn || !pesoEl) return;
+    var setWarn = function (msg, type) {
+      if (!msg) { warn.hidden = true; warn.textContent = ''; warn.className = 'irr-km-warn'; return; }
+      warn.hidden = false; warn.textContent = msg; warn.className = 'irr-km-warn ' + (type || 'err');
+    };
+    var peso = irrParseNum(pesoEl.value);
+    if (peso == null || peso <= 0) { setWarn(''); return; }
+    var kg = function (n) { return Math.round(n).toLocaleString('pt-BR') + ' kg'; };
+    if (peso < 100) {
+      setWarn('⚠ Peso muito baixo para um caminhão (' + kg(peso) + '). Confira — talvez seja ' + kg(peso * 1000) + '.', 'err');
+      return;
+    }
+    var vehSel = document.getElementById('impVeiculo');
+    var opt = (vehSel && vehSel.value) ? vehSel.options[vehSel.selectedIndex] : null;
+    var cap = opt ? parseFloat(opt.getAttribute('data-cap')) : NaN;
+    if (!isFinite(cap) || cap <= 0) { setWarn(''); return; }
+    if (peso > cap) {
+      setWarn('⚠ Carga (' + kg(peso) + ') acima da capacidade do veículo (' + kg(cap) + ').', 'err');
+    } else {
+      setWarn('Ocupação: ' + Math.round((peso / cap) * 100) + '% da capacidade (' + kg(cap) + ').', 'ok');
+    }
+  }
+
+  var _irrComissaoPctCache = {};
+  /**
+   * Valida a comissão da ficha contra o % cadastrado do motorista (mesma conta da rota: frete × % / 100).
+   * - comissão vazia → preenche com o valor calculado;
+   * - comissão informada diferente → mostra aviso embaixo, igual ao do KM rodado.
+   */
+  function irrValidateComissao() {
+    var warn = document.getElementById('irr-comissao-warn');
+    var freteEl = document.getElementById('irr-frete');
+    var comEl = document.getElementById('irr-comissao');
+    if (!warn || !freteEl || !comEl) return;
+    var setWarn = function (msg, type) {
+      if (!msg) { warn.hidden = true; warn.textContent = ''; warn.className = 'irr-km-warn'; return; }
+      warn.hidden = false; warn.textContent = msg; warn.className = 'irr-km-warn ' + (type || 'err');
+    };
+    var motSel = document.getElementById('impMotorista');
+    var motId = motSel ? String(motSel.value || '') : '';
+    var frete = irrParseNum(freteEl.value);
+    if (!motId || frete == null) { setWarn(''); return; }
+    var apply = function (pct) {
+      if (pct == null || isNaN(pct)) { setWarn(''); return; }
+      var expected = frete * pct / 100;
+      var brl = function (n) { return 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+      var com = irrParseNum(comEl.value);
+      if (com == null || String(comEl.value).trim() === '') {
+        comEl.value = expected.toFixed(2);
+        setWarn('Comissão calculada automaticamente: ' + pct + '% de ' + brl(frete) + ' = ' + brl(expected) + '.', 'ok');
+        return;
+      }
+      if (Math.abs(com - expected) > 0.5) {
+        setWarn('⚠ Comissão informada (' + brl(com) + ') não confere com ' + pct + '% do frete (' + brl(expected) + '). Corrija se necessário.', 'err');
+      } else {
+        setWarn('');
+      }
+    };
+    if (Object.prototype.hasOwnProperty.call(_irrComissaoPctCache, motId)) {
+      apply(_irrComissaoPctCache[motId]);
+      return;
+    }
+    var url = irrRouteActionsUrl() + '?action=get_motorista_comissao&id=' + encodeURIComponent(motId);
+    fetch(url, { credentials: 'include' }).then(function (r) { return r.json(); }).then(function (d) {
+      var pct = (d && d.success && d.porcentagem_comissao != null) ? parseFloat(d.porcentagem_comissao) : null;
+      _irrComissaoPctCache[motId] = pct;
+      apply(pct);
+    }).catch(function () { setWarn(''); });
+  }
+
+  /**
+   * Confere/recalcula o KM rodado a partir de KM saída e chegada.
+   * - rodado vazio → preenche com (chegada − saída);
+   * - rodado informado mas diferente → mostra aviso de cálculo incorreto;
+   * - chegada menor que saída → aviso de inconsistência.
+   */
+  function irrRecalcKm(ev) {
+    var sEl = document.getElementById('irr-kmsaida');
+    var cEl = document.getElementById('irr-kmchegada');
+    var rEl = document.getElementById('irr-kmrodado');
+    var warn = document.getElementById('irr-km-warn');
+    if (!sEl || !cEl || !rEl) return;
+    var setWarn = function (msg, type) {
+      if (!warn) return;
+      if (!msg) { warn.hidden = true; warn.textContent = ''; warn.className = 'irr-km-warn'; return; }
+      warn.hidden = false; warn.textContent = msg; warn.className = 'irr-km-warn ' + (type || 'err');
+    };
+    var s = irrParseNum(sEl.value), c = irrParseNum(cEl.value), r = irrParseNum(rEl.value);
+    var fromRodado = ev && ev.target && ev.target.id === 'irr-kmrodado';
+    if (s == null || c == null) { setWarn(''); return; }
+    var expected = Math.round(c - s);
+    if (expected < 0) {
+      setWarn('⚠ KM chegada (' + Math.round(c) + ') é menor que KM saída (' + Math.round(s) + '). Verifique os valores.', 'err');
+      return;
+    }
+    if (r == null || String(rEl.value).trim() === '') {
+      // Vazio: o sistema mesmo calcula (a menos que o usuário esteja editando o próprio campo).
+      if (!fromRodado) {
+        rEl.value = String(expected);
+        setWarn('KM rodado calculado automaticamente: ' + expected + ' km.', 'ok');
+      } else {
+        setWarn('');
+      }
+      return;
+    }
+    if (Math.abs(Math.round(r) - expected) > 1) {
+      setWarn('⚠ Cálculo do KM rodado parece errado: informado ' + Math.round(r) + ' km, mas chegada − saída = ' + expected + ' km. Corrija se necessário.', 'err');
+    } else {
+      setWarn('');
+    }
+  }
+
+  function irrRouteActionsUrl() {
+    return typeof sfApiUrl === 'function' ? sfApiUrl('route_actions.php') : '../api/route_actions.php';
+  }
+  var _irrEstadosCache = null;
+  function irrLoadEstados() {
+    if (_irrEstadosCache) return Promise.resolve(_irrEstadosCache);
+    return fetch(irrRouteActionsUrl() + '?action=get_estados', { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { _irrEstadosCache = (d && d.success && Array.isArray(d.data)) ? d.data : []; return _irrEstadosCache; })
+      .catch(function () { return []; });
+  }
+  function irrFillCidades(uf, cidSel, selectedId) {
+    if (!cidSel) return Promise.resolve();
+    if (!uf) { cidSel.innerHTML = '<option value="">Selecione a UF…</option>'; return Promise.resolve(); }
+    cidSel.innerHTML = '<option value="">Carregando…</option>';
+    return fetch(irrRouteActionsUrl() + '?action=get_cidades&uf=' + encodeURIComponent(uf), { credentials: 'include' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var cids = (d && d.success && Array.isArray(d.data)) ? d.data : [];
+        cidSel.innerHTML = '<option value="">Selecione a cidade…</option>' +
+          cids.map(function (c) { return '<option value="' + c.id + '">' + escapeHtml(c.nome) + '</option>'; }).join('');
+        if (selectedId) cidSel.value = String(selectedId);
+      })
+      .catch(function () { cidSel.innerHTML = '<option value="">Erro ao carregar</option>'; });
+  }
+  /** Monta os selects UF/cidade de origem e destino e pré-seleciona pelo nome lido. */
+  function irrSetupLocais(rota) {
+    var ufO = document.getElementById('irr-uf-origem'), cidO = document.getElementById('irr-cid-origem');
+    var ufD = document.getElementById('irr-uf-destino'), cidD = document.getElementById('irr-cid-destino');
+    if (!ufO || !ufD) return;
+    irrLoadEstados().then(function (estados) {
+      var opts = '<option value="">UF</option>' + estados.map(function (e) { return '<option value="' + e.uf + '">' + e.uf + '</option>'; }).join('');
+      ufO.innerHTML = opts; ufD.innerHTML = opts;
+      ufO.addEventListener('change', function () { irrFillCidades(ufO.value, cidO); });
+      ufD.addEventListener('change', function () { irrFillCidades(ufD.value, cidD); });
+      // Pré-seleciona resolvendo o nome lido (UF + cidade), sem travar se falhar.
+      irrResolveCidade(rota.origem).then(function (c) { if (c && c.uf) { ufO.value = c.uf; irrFillCidades(c.uf, cidO, c.id); } });
+      irrResolveCidade(rota.destino).then(function (c) { if (c && c.uf) { ufD.value = c.uf; irrFillCidades(c.uf, cidD, c.id); } });
+    });
+  }
+
+  function irrSetStatus(msg, color) {
+    var s = document.getElementById('irrStatus');
+    if (s) { s.textContent = msg || ''; s.style.color = color || ''; }
+  }
+  function irrNorm(s) {
+    s = String(s || '').toLowerCase();
+    try { s = s.normalize('NFD').replace(/[̀-ͯ]/g, ''); } catch (e) {}
+    return s.replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function irrPreselectMotorista(nome) {
+    var sel = document.getElementById('impMotorista');
+    if (!sel || sel.value) return; // não sobrescreve escolha manual
+    var alvo = irrNorm(nome);
+    if (!alvo) return;
+    var tokens = alvo.split(' ').filter(function (t) { return t.length >= 3; });
+    var best = null, bestScore = 0;
+    for (var i = 0; i < sel.options.length; i++) {
+      var opt = sel.options[i];
+      if (!opt.value) continue;
+      var on = irrNorm(opt.textContent);
+      var score = 0;
+      tokens.forEach(function (t) { if (on.indexOf(t) >= 0) score++; });
+      if (on === alvo) score += 5;
+      if (score > bestScore) { bestScore = score; best = opt; }
+    }
+    if (best && bestScore >= 1) sel.value = best.value;
+  }
+
+  function irrParseNum(s) {
+    s = String(s == null ? '' : s).trim();
+    if (!s) return null;
+    s = s.replace(/[^\d.,-]/g, '');
+    if (s.indexOf(',') >= 0) { s = s.replace(/\./g, '').replace(',', '.'); }
+    else if ((s.match(/\./g) || []).length > 1) { s = s.replace(/\./g, ''); }
+    else if (/\.\d{3}$/.test(s)) { s = s.replace(/\./g, ''); }
+    var n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  }
+  function irrVal(id) { var e = document.getElementById(id); return e ? String(e.value).trim() : ''; }
+  function irrNum(id, asInt) { var n = irrParseNum(irrVal(id)); if (n == null) return null; return asInt ? Math.round(n) : n; }
+
+  function irrPostJson(url, body) {
+    var headers = typeof sfMutationHeaders === 'function' ? sfMutationHeaders({ 'Content-Type': 'application/json' }) : { 'Content-Type': 'application/json' };
+    if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__ && !headers['X-CSRF-Token']) headers['X-CSRF-Token'] = window.__SF_CSRF__;
+    return fetch(url, { method: 'POST', credentials: 'include', headers: headers, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); });
+  }
+  function irrResolveCidade(nome) {
+    if (!nome) return Promise.resolve(null);
+    var url = (typeof sfApiUrl === 'function' ? sfApiUrl('route_actions.php') : '../api/route_actions.php') + '?action=resolve_cidade&nome=' + encodeURIComponent(nome);
+    return fetch(url, { credentials: 'include' }).then(function (r) { return r.json(); }).then(function (d) { return (d && d.success) ? d : null; }).catch(function () { return null; });
+  }
+
+  /** Etapa 3: cria a rota a partir da ficha e (se houver) importa os abastecimentos vinculados. */
+  function createRouteFromFicha() {
+    var rota = _currentRota;
+    if (!rota) return;
+    var temAbastecimentos = _cachedRows.length > 0;
+    var v = importSharedValues();
+    if (!v.veiculo_id) { irrSetStatus('Selecione o veículo.', '#c0392b'); return; }
+    // Combustível e forma de pagamento só são necessários quando há abastecimentos a importar.
+    if (temAbastecimentos && !v.tipo_combustivel) { irrSetStatus('Selecione o combustível.', '#c0392b'); return; }
+    if (temAbastecimentos && !v.forma_pagamento) { irrSetStatus('Selecione a forma de pagamento.', '#c0392b'); return; }
+    var motoristaId = v.motorista_id;
+    if (!motoristaId) { irrSetStatus('Selecione o motorista (não consegui sugerir).', '#c0392b'); return; }
+
+    var btn = document.getElementById('irrCreateBtn');
+    var anotacoes = irrVal('irr-anotacoes');
+    var descricao = irrVal('irr-descricao');
+    var ufO = irrVal('irr-uf-origem'), cidOId = irrVal('irr-cid-origem');
+    var ufD = irrVal('irr-uf-destino'), cidDId = irrVal('irr-cid-destino');
+    if (!ufO || !cidOId) { irrSetStatus('Selecione UF e cidade de Origem.', '#c0392b'); return; }
+    if (!ufD || !cidDId) { irrSetStatus('Selecione UF e cidade de Destino.', '#c0392b'); return; }
+
+    var btnLabel = btn ? btn.innerHTML : '';
+    var setBusy = function (busy, txt) {
+      if (!btn) return;
+      btn.disabled = busy;
+      btn.innerHTML = busy ? '<i class="fas fa-spinner fa-spin"></i> ' + (txt || 'Processando…') : btnLabel;
+    };
+
+    // Despesas + importação dos abastecimentos para uma rota já existente.
+    var finishWithRoute = function (rotaId) {
+      _irrCreatedRotaId = rotaId; // guarda para não recriar a rota numa retentativa
+      var despUrl = irrRouteActionsUrl() + '?action=save_expenses';
+      var desp = {
+        rota_id: rotaId,
+        pedagios: irrNum('irr-desp-pedagios') || 0,
+        adiantamento: irrNum('irr-desp-adiantamento') || 0,
+        descarga: irrNum('irr-desp-descarga') || 0,
+        caixinha: irrNum('irr-desp-caixinha') || 0,
+        estacionamento: irrNum('irr-desp-estacionamento') || 0,
+        lavagem: irrNum('irr-desp-lavagem') || 0,
+        borracharia: irrNum('irr-desp-borracharia') || 0,
+        eletrica_mecanica: irrNum('irr-desp-eletrica') || 0,
+        outros: irrNum('irr-desp-outros') || 0
+      };
+      var despTotal = desp.pedagios + desp.adiantamento + desp.descarga + desp.caixinha + desp.estacionamento + desp.lavagem + desp.borracharia + desp.eletrica_mecanica + desp.outros;
+      var despPromise = despTotal > 0 ? irrPostJson(despUrl, desp).catch(function () { return null; }) : Promise.resolve(null);
+
+      // Sem abastecimentos legíveis: cria só a rota (com as despesas) e encerra.
+      if (!temAbastecimentos) {
+        irrSetStatus('Salvando despesas…', '');
+        despPromise.then(function () {
+          var msg = 'Rota #' + rotaId + ' criada (sem abastecimentos).';
+          irrSetStatus(msg, '#0a7d2c');
+          if (typeof showToast === 'function') showToast(msg, 'success');
+          setTimeout(function () {
+            if (typeof closeRefuelImportModal === 'function') closeRefuelImportModal();
+            irrRefreshList();
+          }, 1400);
+        });
+        return;
+      }
+
+      irrSetStatus('Importando abastecimentos…', '');
+      despPromise.then(function () {
+        var impPayload = {
+          action: 'import',
+          veiculo_id: v.veiculo_id, motorista_id: motoristaId, rota_id: rotaId,
+          tipo_combustivel: v.tipo_combustivel, forma_pagamento: v.forma_pagamento,
+          rows: _cachedRows.map(function (r) { return { ymd: r.ymd, datetimeLocal: r.datetimeLocal, km: r.km, posto: r.posto, litros: r.litros, valorTotal: r.valorTotal }; })
+        };
+        irrPostJson(importApiUrl() + '?action=import', impPayload).then(function (o2) {
+          var d2 = o2.d || {};
+          if (!o2.ok || !d2.success) { irrSetStatus('Rota #' + rotaId + ' criada, mas falhou ao importar abastecimentos: ' + (d2.message || d2.error || '') + ' — clique de novo para tentar só a importação.', '#c0392b'); setBusy(false); return; }
+          var msg = 'Rota #' + rotaId + ' criada com ' + (d2.inserted || 0) + ' abastecimento(s) vinculado(s).';
+          irrSetStatus(msg, '#0a7d2c');
+          if (typeof showToast === 'function') showToast(msg, 'success');
+          setTimeout(function () {
+            if (typeof closeRefuelImportModal === 'function') closeRefuelImportModal();
+            irrRefreshList();
+          }, 1600);
+        }).catch(function () { irrSetStatus('Rota #' + rotaId + ' criada, mas erro de comunicação ao importar — clique de novo para tentar só a importação.', '#c0392b'); setBusy(false); });
+      });
+    };
+
+    // Já criada numa tentativa anterior? Não recria — só refaz despesas + importação.
+    if (_irrCreatedRotaId) {
+      setBusy(true, 'Reimportando…');
+      irrSetStatus('Reusando rota #' + _irrCreatedRotaId + '…', '');
+      finishWithRoute(_irrCreatedRotaId);
+      return;
+    }
+
+    setBusy(true, 'Criando rota…');
+    var hoje = new Date().toISOString().slice(0, 10);
+    var dataSaida = irrVal('irr-dsaida') || rota.data_saida || rota.data_chegada || hoje;
+    var dataChegada = irrVal('irr-dchegada') || rota.data_chegada || '';
+    var routePayload = {
+      motorista_id: motoristaId,
+      veiculo_id: v.veiculo_id,
+      estado_origem: ufO, cidade_origem_id: cidOId,
+      estado_destino: ufD, cidade_destino_id: cidDId,
+      data_saida: dataSaida + ' 00:00:00',
+      data_chegada: dataChegada ? (dataChegada + ' 00:00:00') : null,
+      data_rota: dataSaida,
+      km_saida: irrNum('irr-kmsaida', true),
+      km_chegada: irrNum('irr-kmchegada', true),
+      distancia_km: irrNum('irr-kmrodado', true),
+      frete: irrNum('irr-frete'),
+      comissao: irrNum('irr-comissao'),
+      peso_carga: irrNum('irr-peso'),
+      descricao_carga: descricao || null,
+      no_prazo: 1,
+      observacoes: 'Importado da ficha de frete.' + (anotacoes ? ' Anotações: ' + anotacoes : '')
+    };
+    irrSetStatus('Criando rota (' + ufO + ' → ' + ufD + ')…', '');
+    irrPostJson(irrRouteActionsUrl() + '?action=add', routePayload).then(function (o) {
+      var d = o.d || {};
+      var rotaId = parseInt(d.id || d.rota_id || (d.data && d.data.id) || 0, 10) || 0;
+      if (!o.ok || !d.success || !rotaId) {
+        irrSetStatus('Falha ao criar a rota: ' + (d.message || d.error || 'erro'), '#c0392b');
+        setBusy(false); return;
+      }
+      finishWithRoute(rotaId);
+    }).catch(function () { irrSetStatus('Erro de comunicação ao criar a rota.', '#c0392b'); setBusy(false); });
+  }
+
   function normalizeEditedRow(base, field, value) {
     var row = Object.assign({}, base || {});
     var v = String(value || '').trim();
@@ -472,6 +966,8 @@
   }
 
   var _cachedRows = [];
+  var _currentRota = null;
+  var _irrCreatedRotaId = 0; // evita criar rota duplicada se a importação falhar e o usuário tentar de novo
 
   function setProgress(el, msg) {
     if (el) el.textContent = msg || '';
@@ -488,6 +984,12 @@
     var modal = document.getElementById('refuelImportModal');
     if (!modal) return;
     modal.classList.add('active');
+    // Em routes.php os modais são fechados com display:none inline; limpa para o .active voltar a valer.
+    modal.style.display = '';
+    // Página só de rotas: o bloco "Só abastecimentos" não se aplica (não há import avulso aqui).
+    var routesOnly = typeof window.loadRouteData === 'function' && typeof window.loadRefuelingData !== 'function';
+    var avulso = document.getElementById('refuelImportIntroAvulso');
+    if (avulso) avulso.style.display = routesOnly ? 'none' : '';
     var err = document.getElementById('refuelImportError');
     if (err) err.textContent = '';
     var tbody = document.getElementById('refuelImportPreviewBody');
@@ -499,6 +1001,10 @@
     var wrap = document.getElementById('refuelImportOcrWrap');
     if (wrap) wrap.hidden = true;
     _cachedRows = [];
+    // Limpa ficha de rota anterior e volta o rodapé/instruções ao modo padrão.
+    renderRotaResumo(tbody, null);
+    var st = document.getElementById('irrStatus');
+    if (st) { st.textContent = ''; st.style.color = ''; }
 
     // Reset / carrega selects de import em massa
     var resultEl = document.getElementById('refuelImportResult');
@@ -511,7 +1017,7 @@
 
   function closeRefuelImportModal() {
     var modal = document.getElementById('refuelImportModal');
-    if (modal) modal.classList.remove('active');
+    if (modal) { modal.classList.remove('active'); modal.style.display = 'none'; }
   }
 
   function refuelAiOcrEnabled() {
@@ -589,6 +1095,7 @@
         return {
           text: data.ocr_text || summary,
           rows: rows,
+          rota: data.rota || null,
           source: data.source || 'deepseek-vision',
           model: data.model,
           warnings: Array.isArray(data.warnings) ? data.warnings : []
@@ -694,10 +1201,16 @@
       .then(function (r) { return r.json(); })
       .then(function (res) {
         if (res && res.success) {
-          fillSelect(document.getElementById('impVeiculo'), res.data || [],
-            function (v) { return v.id; },
-            function (v) { return (v.placa || '') + (v.modelo ? ' · ' + v.modelo : ''); },
-            'Selecione…');
+          var vsel = document.getElementById('impVeiculo');
+          if (vsel) {
+            var html = '<option value="">Selecione…</option>';
+            (res.data || []).forEach(function (v) {
+              var cap = (v.capacidade_carga != null && v.capacidade_carga !== '') ? v.capacidade_carga : '';
+              var label = (v.placa || '') + (v.modelo ? ' · ' + v.modelo : '');
+              html += '<option value="' + escapeHtml(String(v.id)) + '" data-cap="' + escapeHtml(String(cap)) + '">' + escapeHtml(label) + '</option>';
+            });
+            vsel.innerHTML = html;
+          }
         }
       }).catch(function () {});
     fetch(url + '?action=motoristas', { credentials: 'include' })
@@ -761,7 +1274,14 @@
     var shared = document.getElementById('refuelImportShared');
     var saveBtn = document.getElementById('refuelImportSaveBtn');
     var hasRows = _cachedRows.length > 0;
-    if (shared) shared.hidden = !hasRows;
+    // Mostra os campos compartilhados quando há abastecimentos OU quando há ficha de rota
+    // (na ficha sem abastecimentos ainda é preciso escolher o veículo para criar a rota).
+    if (shared) shared.hidden = !(hasRows || _currentRota);
+    // Tabela de abastecimentos só aparece com linhas; o wrapper só quando há linhas ou ficha de rota (o card fica nele).
+    var previewTable = document.getElementById('refuelImportPreviewTable');
+    var previewWrap = document.getElementById('refuelImportPreviewWrap');
+    if (previewTable) previewTable.style.display = hasRows ? '' : 'none';
+    if (previewWrap) previewWrap.hidden = !(hasRows || _currentRota);
     if (saveBtn) {
       var v = importSharedValues();
       var ready = hasRows && v.veiculo_id && v.motorista_id && v.rota_id && v.tipo_combustivel && v.forma_pagamento;
@@ -793,7 +1313,7 @@
     if (typeof window.__SF_CSRF__ === 'string' && window.__SF_CSRF__ && !headers['X-CSRF-Token']) {
       headers['X-CSRF-Token'] = window.__SF_CSRF__;
     }
-    fetch(importApiUrl(), { method: 'POST', credentials: 'include', headers: headers, body: JSON.stringify(payload) })
+    fetch(importApiUrl() + '?action=import', { method: 'POST', credentials: 'include', headers: headers, body: JSON.stringify(payload) })
       .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
       .then(function (o) {
         var d = o.d || {};
@@ -808,7 +1328,7 @@
         if (resultEl) { resultEl.style.color = '#0a7d2c'; resultEl.textContent = msg; }
         setTimeout(function () {
           closeRefuelImportModal();
-          if (typeof window.loadRefuelingData === 'function') window.loadRefuelingData(1);
+          if (typeof window.loadRouteData === 'function' || typeof window.loadRefuelingData === 'function') irrRefreshList();
           else location.reload();
         }, 1200);
       })
@@ -828,6 +1348,8 @@
       file.addEventListener('change', function () {
         var f = file.files && file.files[0];
         if (!f) return;
+        // Novo arquivo: volta ao modo padrão (botão "Importar" + instruções) até saber se há ficha de rota.
+        irrSetFooterMode(false);
         var errEl = document.getElementById('refuelImportError');
         var tbody = document.getElementById('refuelImportPreviewBody');
         var progressEl = document.getElementById('refuelImportProgress');
@@ -865,7 +1387,7 @@
         }
 
         if (errEl) errEl.textContent = '';
-        if (tbody) tbody.innerHTML = '';
+        if (tbody) { tbody.innerHTML = ''; renderRotaResumo(tbody, null); }
         _cachedRows = [];
 
         processBinaryFile(f, errEl, tbody, progressEl)
@@ -901,6 +1423,7 @@
               }
             }
             if (tbody) renderPreview(tbody, rows);
+            if (tbody) renderRotaResumo(tbody, pack.rota || null);
             refreshImportUI();
           })
           .catch(function (e) {
@@ -949,6 +1472,8 @@
     });
     var saveBtn = document.getElementById('refuelImportSaveBtn');
     if (saveBtn) saveBtn.addEventListener('click', doBulkImport);
+    var createBtn = document.getElementById('irrCreateBtn');
+    if (createBtn) createBtn.addEventListener('click', createRouteFromFicha);
   }
 
   if (document.readyState === 'loading') {

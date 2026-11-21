@@ -573,7 +573,39 @@
         syncFornSortIndicators();
     }
 
-    function loadList(goPage) {
+    function applyFornPayload(data, bindActions) {
+        if (!data || !data.success) return;
+        _fornecedoresCache = data.fornecedores || [];
+        if (data.kpi) {
+            updateKpisFromApi(data.kpi);
+        } else {
+            updateKpisFromRows(_fornecedoresCache);
+        }
+        if (data.pagination) {
+            updatePagination(data.pagination);
+        }
+        if (_fornecedoresCache.length === 0) {
+            var tbody = document.getElementById('fornecedoresTableBody');
+            if (tbody) tbody.innerHTML = '';
+            syncFornEmptyState(true);
+            syncFornSortIndicators();
+            return;
+        }
+        if (bindActions !== false) {
+            renderTable();
+        }
+    }
+
+    function setTableLoading(on) {
+        var wrap = document.getElementById('fornTableWrap');
+        if (wrap) {
+            wrap.style.opacity = on ? '0.55' : '';
+            wrap.style.pointerEvents = on ? 'none' : '';
+        }
+    }
+
+    function loadList(goPage, opts) {
+        opts = opts || {};
         const tbody = document.getElementById('fornecedoresTableBody');
         if (!tbody) return;
 
@@ -581,9 +613,13 @@
             _fornPage = goPage;
         }
 
-        tbody.innerHTML = '<tr><td colspan="6">Carregando...</td></tr>';
+        var hadRows = _fornecedoresCache && _fornecedoresCache.length > 0;
+        if (!hadRows && !opts.keepTable) {
+            tbody.innerHTML = '<tr><td colspan="6">Carregando...</td></tr>';
+        }
         syncFornEmptyState(false);
-        setGlobalLoading(true);
+        if (opts.overlay) setGlobalLoading(true);
+        else setTableLoading(true);
 
         const qs = buildListQueryParams(false);
 
@@ -598,33 +634,22 @@
                     updatePagination({ page: 1, total_pages: 1, total: 0 });
                     return;
                 }
-                _fornecedoresCache = data.fornecedores || [];
-                if (data.kpi) {
-                    updateKpisFromApi(data.kpi);
-                } else {
-                    updateKpisFromRows(_fornecedoresCache);
-                }
-                if (data.pagination) {
-                    updatePagination(data.pagination);
-                }
-                if (_fornecedoresCache.length === 0) {
-                    tbody.innerHTML = '';
-                    syncFornEmptyState(true);
-                    syncFornSortIndicators();
-                    return;
-                }
-                renderTable();
+                applyFornPayload(data, true);
             })
             .catch(function () {
-                tbody.innerHTML = '<tr><td colspan="6">Falha de rede ou tempo esgotado. Tente novamente.</td></tr>';
-                _fornecedoresCache = [];
-                syncFornEmptyState(false);
-                updateKpisFromRows([]);
-                updatePagination({ page: 1, total_pages: 1, total: 0 });
+                if (!hadRows) {
+                    tbody.innerHTML = '<tr><td colspan="6">Falha de rede ou tempo esgotado. Tente novamente.</td></tr>';
+                }
+                if (!_fornecedoresCache.length) {
+                    syncFornEmptyState(false);
+                    updateKpisFromRows([]);
+                    updatePagination({ page: 1, total_pages: 1, total: 0 });
+                }
                 showToast('Não foi possível carregar a lista.', 'err');
             })
             .finally(function () {
-                setGlobalLoading(false);
+                if (opts.overlay) setGlobalLoading(false);
+                else setTableLoading(false);
             });
     }
 
@@ -1052,7 +1077,8 @@
         if (!panel || !summary) return;
         panel.style.display = '';
         var resumo = document.getElementById('fnResumoIa');
-        if (resumo) resumo.style.display = '';
+        var fnBody = document.getElementById('fnBody');
+        if (resumo) resumo.style.display = (fnBody && fnBody.style.display !== 'none') ? '' : 'none';
 
         var er = json.q_erros || 0, av = json.q_avisos || 0;
         panel.classList.remove('has-erros', 'has-avisos');
@@ -1216,11 +1242,47 @@
             .then(function () { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-file-import"></i> Importar'; } });
     }
 
+    function fnPreloadInsightsSummaryFromCache() {
+        var hit = fnReadInsightsCache();
+        if (hit && hit.success) {
+            renderFornInsights(hit);
+            var fnBody = document.getElementById('fnBody');
+            var resumo = document.getElementById('fnResumoIa');
+            if (fnBody) fnBody.style.display = 'none';
+            if (resumo) resumo.style.display = 'none';
+            var fnToggle = document.getElementById('fnToggle');
+            if (fnToggle) fnToggle.setAttribute('aria-expanded', 'false');
+            return;
+        }
+        var panel = document.getElementById('fnInsights');
+        var summary = document.getElementById('fnSummary');
+        if (panel && summary) {
+            panel.style.display = '';
+            summary.innerHTML = '<i class="fas fa-clipboard-check"></i> Insights de fornecedores — <span style="font-weight:500;color:var(--text-muted)">expandir para analisar</span>';
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         wireKpiQuickFilters();
         wireFornecedoresSortHeaders();
         syncFornSortIndicators();
-        loadList(1);
+
+        var initial = (typeof window.__FORN_INITIAL__ === 'object' && window.__FORN_INITIAL__) ? window.__FORN_INITIAL__ : null;
+        if (initial && initial.success) {
+            applyFornPayload(initial, false);
+            var tbody = document.getElementById('fornecedoresTableBody');
+            if (tbody) bindTableActions(tbody);
+            if (initial.pagination) {
+                _fornPage = initial.pagination.page || 1;
+                _fornTotalPages = initial.pagination.total_pages || 1;
+                _fornTotal = initial.pagination.total || 0;
+                _fornPerPage = initial.pagination.per_page || 10;
+            }
+        } else {
+            loadList(1, { keepTable: false });
+        }
+
+        fnPreloadInsightsSummaryFromCache();
         wireCnpjBrasilapiOnce();
 
         const filtro = document.getElementById('filtroSituacaoFornecedor');
@@ -1310,13 +1372,7 @@
         const exportBtn = document.getElementById('exportBtn');
         if (exportBtn) exportBtn.addEventListener('click', exportCsv);
 
-        // Insights + resumo IA (lazy: só busca ao expandir)
-        var fnPanel = document.getElementById('fnInsights');
-        var fnSummary = document.getElementById('fnSummary');
-        if (fnPanel && fnSummary) {
-            fnPanel.style.display = '';
-            fnSummary.innerHTML = '<i class="fas fa-clipboard-check"></i> Insights de fornecedores — <span style="font-weight:500;color:var(--text-muted)">expandir para analisar</span>';
-        }
+        // Insights + resumo IA (lazy: só busca ao expandir o painel)
         var fnToggle = document.getElementById('fnToggle');
         var fnBody = document.getElementById('fnBody');
         if (fnToggle && fnBody) {
@@ -1325,6 +1381,8 @@
                 var willOpen = !open;
                 fnToggle.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
                 fnBody.style.display = willOpen ? '' : 'none';
+                var resumo = document.getElementById('fnResumoIa');
+                if (resumo) resumo.style.display = willOpen ? '' : 'none';
                 if (willOpen && !_fnInsightsLoaded && !_fnInsightsLoading) {
                     loadFornInsights(false);
                 }

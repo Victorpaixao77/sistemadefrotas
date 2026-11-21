@@ -76,6 +76,24 @@ if (!function_exists('getKPIsOptimized')) {
         $mes = (int) $mes;
         $ano = (int) $ano;
         $empresa_id = (int) $empresa_id;
+
+        if (!function_exists('sf_cache_remember')) {
+            require_once __DIR__ . '/sf_cache.php';
+        }
+        $cacheKey = 'lucra:kpi:' . $empresa_id . ':' . $ano . '-' . sprintf('%02d', $mes);
+
+        return sf_cache_remember($cacheKey, 300, static function () use ($conn, $empresa_id, $mes, $ano) {
+            return lucra_compute_kpis($conn, $empresa_id, $mes, $ano);
+        });
+    }
+}
+
+if (!function_exists('lucra_compute_kpis')) {
+    function lucra_compute_kpis($conn, $empresa_id, $mes, $ano): array
+    {
+        $empresa_id = (int) $empresa_id;
+        $mes = (int) $mes;
+        $ano = (int) $ano;
         $abast = lucra_abastecimento_expr('a');
         $rotaPeriod = lucra_rota_period_sql('r');
 

@@ -116,4 +116,48 @@ if (!function_exists('sf_app_web_base')) {
         $out = rtrim($raw, '/');
         return $out !== '' ? $out : 'https://frotec.online';
     }
+
+    /** CDN Chart.js 4.x (UMD) — versão fixa em todo o sistema. */
+    function sf_chartjs_cdn_url(): string
+    {
+        return 'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js';
+    }
+
+    function sf_chartjs_script_tag(): string
+    {
+        return '<script src="' . htmlspecialchars(sf_chartjs_cdn_url(), ENT_QUOTES, 'UTF-8') . '"></script>';
+    }
+
+    /**
+     * WhatsApp de suporte (menu lateral). Sobrescreva com SF_SUPPORT_WHATSAPP no ambiente
+     * (somente dígitos, ex.: 5544997263823). Padrão: mesmo contato do site Frotec.
+     */
+    function sf_support_whatsapp_digits(): string
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+        $raw = getenv('SF_SUPPORT_WHATSAPP');
+        if (!is_string($raw) || trim($raw) === '') {
+            if (defined('SF_SUPPORT_WHATSAPP') && is_string(SF_SUPPORT_WHATSAPP) && trim(SF_SUPPORT_WHATSAPP) !== '') {
+                $raw = SF_SUPPORT_WHATSAPP;
+            } else {
+                $cached = '5544997263823';
+                return $cached;
+            }
+        }
+        $digits = preg_replace('/\D/', '', $raw);
+        $cached = (strlen($digits) >= 10) ? $digits : '5544997263823';
+        return $cached;
+    }
+
+    /** Link wa.me para abrir conversa de suporte no WhatsApp. */
+    function sf_support_whatsapp_url(?string $message = null): string
+    {
+        if ($message === null || $message === '') {
+            $message = 'Olá! Preciso de ajuda com o Sistema Frotec.';
+        }
+        return 'https://wa.me/' . sf_support_whatsapp_digits() . '?text=' . rawurlencode($message);
+    }
 }

@@ -29,6 +29,93 @@ if (!function_exists('relatorio_rota_period_literal')) {
     }
 }
 
+if (!function_exists('relatorio_valid_date')) {
+    function relatorio_valid_date(string $d): bool
+    {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
+            return false;
+        }
+        [$y, $m, $dd] = array_map('intval', explode('-', $d));
+        return checkdate($m, $dd, $y);
+    }
+}
+
+if (!function_exists('relatorio_period_state')) {
+    /**
+     * Estado do período (modo mês/ano — padrão — ou intervalo de datas).
+     * Opt-in: enquanto não configurado, tudo continua no modo mês/ano de sempre.
+     */
+    function &relatorio_period_state(): array
+    {
+        static $state = ['mode' => 'mes', 'dini' => null, 'dfim' => null];
+        return $state;
+    }
+}
+
+if (!function_exists('relatorio_period_configure')) {
+    function relatorio_period_configure(string $mode, ?string $dini = null, ?string $dfim = null): void
+    {
+        $state = &relatorio_period_state();
+        if ($mode === 'intervalo' && $dini && $dfim) {
+            $state['mode'] = 'intervalo';
+            $state['dini'] = $dini;
+            $state['dfim'] = $dfim;
+        } else {
+            $state['mode'] = 'mes';
+            $state['dini'] = null;
+            $state['dfim'] = null;
+        }
+    }
+}
+
+if (!function_exists('relatorio_period_is_range')) {
+    function relatorio_period_is_range(): bool
+    {
+        $state = relatorio_period_state();
+        return $state['mode'] === 'intervalo' && !empty($state['dini']) && !empty($state['dfim']);
+    }
+}
+
+if (!function_exists('relatorio_apply_daterange')) {
+    /**
+     * Converte os filtros de período mês/ano de um SQL para um intervalo de datas.
+     * Troca `YEAR(EXPR) = :param AND MONTH(EXPR) = :param2` e a versão literal
+     * (`= 2026 AND MONTH(...) = 7`) por `DATE(EXPR) BETWEEN :dini_x AND :dfim_x`
+     * (ou literais). Só é chamado no modo intervalo — no modo mês/ano o SQL fica intacto.
+     */
+    function relatorio_apply_daterange(string $sql): string
+    {
+        // EXPR pode ter um nível de parênteses (ex.: COALESCE(a.data_rota, a.data_saida)).
+        $expr = '((?:[^()]|\([^()]*\))+)';
+
+        // 1) Predicados com placeholders nomeados (:year, :year_abastecimento, :year2, ...).
+        $sql = preg_replace_callback(
+            '/YEAR\(' . $expr . '\)\s*=\s*:(\w+)\s+AND\s+MONTH\(\1\)\s*=\s*:(\w+)/s',
+            function ($m) {
+                $e = $m[1];
+                $suffix = preg_replace('/^year/', '', $m[2]); // year -> '', year_abastecimento -> _abastecimento, year2 -> 2
+                return "DATE($e) BETWEEN :dini$suffix AND :dfim$suffix";
+            },
+            $sql
+        );
+
+        // 2) Predicados com literais numéricos (subqueries com {$year}/{$month} interpolados).
+        $state = relatorio_period_state();
+        $dini = $state['dini'];
+        $dfim = $state['dfim'];
+        $sql = preg_replace_callback(
+            '/YEAR\(' . $expr . '\)\s*=\s*\d+\s+AND\s+MONTH\(\1\)\s*=\s*\d+/s',
+            function ($m) use ($dini, $dfim) {
+                $e = $m[1];
+                return "DATE($e) BETWEEN '$dini' AND '$dfim'";
+            },
+            $sql
+        );
+
+        return $sql;
+    }
+}
+
 if (!function_exists('relatorio_allowed_types')) {
     function relatorio_allowed_types(): array
     {
@@ -43,6 +130,11 @@ if (!function_exists('relatorio_allowed_types')) {
             'veiculos_ociosos', 'custos_manutencao_veiculo', 'comparacao_mensal',
             'tendencia_6', 'tendencia_12', 'margem_veiculo', 'veiculos_prejuizo', 'ranking',
             'sla_manutencao', 'custo_tipo_manutencao', 'desvio_consumo', 'executivo_resumido',
+            // Motoristas & Viagem
+            'jornada_motorista', 'ocorrencias_viagem', 'pedagios_viagem', 'entregas_pod',
+            'telemetria_gps', 'comissoes_motorista', 'vencimentos_cnh',
+            // Novos: checklists, modo viagem, ESG e DRE
+            'checklists', 'modo_viagem', 'co2_emissoes', 'dre_mensal',
         ];
     }
 }
@@ -62,7 +154,7 @@ if (!function_exists('relatorio_validate_request')) {
                 'report_type' => $reportType,
                 'month' => max(1, min(12, (int) $month)),
                 'year' => (int) $year,
-                'format' => in_array($format, ['pdf', 'excel'], true) ? $format : 'pdf',
+                'format' => in_array($format, ['pdf', 'excel', 'csv'], true) ? $format : 'pdf',
             ];
         }
 
@@ -78,7 +170,7 @@ if (!function_exists('relatorio_validate_request')) {
         if ($y < 2000 || $y > 2100) {
             throw new InvalidArgumentException('Ano inválido.');
         }
-        if (!in_array($format, ['pdf', 'excel'], true)) {
+        if (!in_array($format, ['pdf', 'excel', 'csv'], true)) {
             $format = 'pdf';
         }
 
@@ -94,7 +186,22 @@ if (!function_exists('relatorio_validate_request')) {
 if (!function_exists('relatorio_bind_stmt_params')) {
     function relatorio_bind_stmt_params(PDOStatement $stmt, string $reportType, int $month, int $year, int $empresa_id, string $sql): void
     {
-        $noPeriod = ['veiculos_status', 'vida_util_pneus', 'otimizacao_pneus', 'analise_preditiva'];
+        // Modo intervalo: liga os placeholders de data (:dini*/:dfim*) presentes no SQL já transformado.
+        if (relatorio_period_is_range()) {
+            $state = relatorio_period_state();
+            if (preg_match_all('/:(?:dini|dfim)\w*/', $sql, $mm)) {
+                foreach (array_unique($mm[0]) as $ph) {
+                    $isDini = strpos($ph, 'dini') !== false;
+                    $stmt->bindValue($ph, $isDini ? $state['dini'] : $state['dfim']);
+                }
+            }
+            if (strpos($sql, ':empresa_id') !== false) {
+                $stmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+            }
+            return;
+        }
+
+        $noPeriod = ['veiculos_status', 'vida_util_pneus', 'otimizacao_pneus', 'analise_preditiva', 'vencimentos_cnh'];
 
         if (!in_array($reportType, $noPeriod, true)) {
             if ($reportType === 'eficiencia_frota') {

@@ -4,6 +4,7 @@
 require_once '../includes/config.php';
 require_once '../includes/db_connect.php';
 require_once '../includes/functions.php';
+require_once '../includes/refuel_list.php';
 
 // Configure session before starting it
 configure_session();
@@ -18,6 +19,7 @@ header('Content-Type: application/json');
 
 // Ensure the request is authenticated
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Get empresa_id from session
 $empresa_id = isset($_SESSION["empresa_id"]) ? $_SESSION["empresa_id"] : null;
@@ -42,232 +44,20 @@ try {
     
     switch ($action) {
         case 'list':
-            // Parâmetros de paginação (por página: 5, 10, 25, 50, 100; padrão 10)
-            $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-            $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
-            if (!in_array($limit, [5, 10, 25, 50, 100], true)) {
-                $limit = 10;
-            }
-            $offset = ($page - 1) * $limit;
-
-            // Prepara a consulta base para contar o total de registros
-            $sql_count = "SELECT COUNT(*) as total
-                FROM abastecimentos a
-                LEFT JOIN veiculos v ON a.veiculo_id = v.id
-                LEFT JOIN motoristas m ON a.motorista_id = m.id
-                LEFT JOIN rotas r ON a.rota_id = r.id
-                LEFT JOIN cidades co ON r.cidade_origem_id = co.id
-                LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-                WHERE a.empresa_id = :empresa_id AND a.status = 'aprovado'";
-            
-            // Prepara a consulta base para buscar os registros
-            $sql = "SELECT 
-                    a.*,
-                    v.placa as veiculo_placa,
-                    m.nome as motorista_nome,
-                    co.nome as cidade_origem_nome,
-                    cd.nome as cidade_destino_nome
-                FROM abastecimentos a
-                LEFT JOIN veiculos v ON a.veiculo_id = v.id
-                LEFT JOIN motoristas m ON a.motorista_id = m.id
-                LEFT JOIN rotas r ON a.rota_id = r.id
-                LEFT JOIN cidades co ON r.cidade_origem_id = co.id
-                LEFT JOIN cidades cd ON r.cidade_destino_id = cd.id
-                WHERE a.empresa_id = :empresa_id AND a.status = 'aprovado'";
-            
-            // Adiciona filtros se fornecidos
-            $params = [':empresa_id' => $empresa_id];
-            
-            if (!empty($_GET['search'])) {
-                $rawSearch = trim($_GET['search']);
-                $normalizedSearch = function_exists('mb_strtolower')
-                    ? mb_strtolower($rawSearch, 'UTF-8')
-                    : strtolower($rawSearch);
-                $normalizedSearch = trim($normalizedSearch);
-                $searchConditions = [];
-
-                $searchLike = '%' . $normalizedSearch . '%';
-                $rawLike = '%' . $rawSearch . '%';
-
-                // Veículo: placa e modelo
-                $params[':search_vehicle_plate'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(v.placa, "")) LIKE :search_vehicle_plate';
-
-                $params[':search_vehicle_model'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(v.modelo, "")) LIKE :search_vehicle_model';
-
-                // Motorista: nome e CPF
-                $params[':search_driver_name'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(m.nome, "")) LIKE :search_driver_name';
-
-                $params[':search_driver_cpf_mask'] = $rawLike;
-                $searchConditions[] = 'm.cpf LIKE :search_driver_cpf_mask';
-
-                // Posto e forma de pagamento
-                $params[':search_station'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(a.posto, "")) LIKE :search_station';
-
-                $params[':search_payment'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(a.forma_pagamento, "")) LIKE :search_payment';
-
-                // Tipo de combustível
-                $params[':search_fuel'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(a.tipo_combustivel, "")) LIKE :search_fuel';
-
-                // Cidades de origem e destino
-                $params[':search_origin'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(co.nome, "")) LIKE :search_origin';
-
-                $params[':search_destination'] = $searchLike;
-                $searchConditions[] = 'LOWER(COALESCE(cd.nome, "")) LIKE :search_destination';
-
-                // Combinação cidade origem + destino
-                $params[':search_route_concat'] = $searchLike;
-                $searchConditions[] = 'LOWER(CONCAT_WS(" ", COALESCE(co.nome, ""), COALESCE(cd.nome, ""))) LIKE :search_route_concat';
-
-                // IDs e datas
-                $params[':search_refuel_id'] = $rawLike;
-                $searchConditions[] = 'CAST(a.id AS CHAR) LIKE :search_refuel_id';
-
-                $params[':search_route_id'] = $rawLike;
-                $searchConditions[] = 'CAST(r.id AS CHAR) LIKE :search_route_id';
-
-                $params[':search_date_br'] = $rawLike;
-                $searchConditions[] = "DATE_FORMAT(a.data_abastecimento, '%d/%m/%Y') LIKE :search_date_br";
-
-                $params[':search_date_iso'] = $rawLike;
-                $searchConditions[] = "DATE_FORMAT(a.data_abastecimento, '%Y-%m-%d') LIKE :search_date_iso";
-
-                // Busca por números (CPF/placa sem máscara, valores)
-                $searchDigits = preg_replace('/\D+/', '', $rawSearch);
-                if ($searchDigits !== '') {
-                    $digitsLike = '%' . $searchDigits . '%';
-
-                    $params[':search_driver_cpf_digits'] = $digitsLike;
-                    $searchConditions[] = "REPLACE(REPLACE(REPLACE(m.cpf, '.', ''), '-', ''), ' ', '') LIKE :search_driver_cpf_digits";
-
-                    $params[':search_plate_digits'] = $digitsLike;
-                    $searchConditions[] = "REPLACE(REPLACE(REPLACE(v.placa, '-', ''), ' ', ''), '.', '') LIKE :search_plate_digits";
-
-                    $params[':search_id_digits'] = $digitsLike;
-                    $searchConditions[] = 'CAST(a.id AS CHAR) LIKE :search_id_digits';
-                }
-
-                // Busca numérica para valores monetários ou litros
-                $normalizedNumber = str_replace(['R$', ' '], '', str_replace(',', '.', $rawSearch));
-                if (is_numeric($normalizedNumber)) {
-                    $params[':search_numeric_exact'] = (float) $normalizedNumber;
-                    $searchConditions[] = 'ABS(a.valor_total - :search_numeric_exact) < 0.01';
-                    $searchConditions[] = 'ABS(a.valor_litro - :search_numeric_exact) < 0.01';
-                    $searchConditions[] = 'ABS(a.litros - :search_numeric_exact) < 0.01';
-                }
-
-                if (!empty($searchConditions)) {
-                    $params[':search_general'] = $searchLike;
-                    $searchConditions[] = "LOWER(CONCAT_WS(' ', 
-                        COALESCE(v.placa, ''), 
-                        COALESCE(v.modelo, ''), 
-                        COALESCE(m.nome, ''), 
-                        COALESCE(a.posto, ''), 
-                        COALESCE(a.tipo_combustivel, ''), 
-                        COALESCE(a.forma_pagamento, '')
-                    )) LIKE :search_general";
-
-                    $searchClause = '(' . implode(' OR ', $searchConditions) . ')';
-                    $sql .= " AND $searchClause";
-                    $sql_count .= " AND $searchClause";
-                }
-            }
-            
-            if (!empty($_GET['veiculo'])) {
-                $sql .= " AND a.veiculo_id = :veiculo";
-                $params[':veiculo'] = $_GET['veiculo'];
-                $sql_count .= " AND a.veiculo_id = :veiculo";
-            }
-            
-            if (!empty($_GET['motorista'])) {
-                $sql .= " AND a.motorista_id = :motorista";
-                $params[':motorista'] = $_GET['motorista'];
-                $sql_count .= " AND a.motorista_id = :motorista";
-            }
-
-            if (!empty($_GET['rota_id'])) {
-                $sql .= " AND a.rota_id = :rota_id";
-                $params[':rota_id'] = $_GET['rota_id'];
-                $sql_count .= " AND a.rota_id = :rota_id";
-            }
-
-            if (!empty($_GET['combustivel'])) {
-                $sql .= " AND a.tipo_combustivel = :combustivel";
-                $params[':combustivel'] = $_GET['combustivel'];
-                $sql_count .= " AND a.tipo_combustivel = :combustivel";
-            }
-
-            if (!empty($_GET['pagamento'])) {
-                $sql .= " AND a.forma_pagamento = :pagamento";
-                $params[':pagamento'] = $_GET['pagamento'];
-                $sql_count .= " AND a.forma_pagamento = :pagamento";
-            }
-            
-            if (!empty($_GET['year']) && !empty($_GET['month'])) {
-                $sql .= " AND YEAR(a.data_abastecimento) = :year AND MONTH(a.data_abastecimento) = :month";
-                $params[':year'] = $_GET['year'];
-                $params[':month'] = $_GET['month'];
-                $sql_count .= " AND YEAR(a.data_abastecimento) = :year AND MONTH(a.data_abastecimento) = :month";
-            }
-            
-            // Executa a consulta de contagem
-            $stmt_count = $conn->prepare($sql_count);
-            foreach ($params as $key => &$val) {
-                $stmt_count->bindValue($key, $val);
-            }
-            $stmt_count->execute();
-            $total = $stmt_count->fetch(PDO::FETCH_ASSOC)['total'];
-            
-            $sortKey = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'data_abastecimento';
-            $allowedSort = [
-                'data_abastecimento' => 'a.data_abastecimento',
-                'veiculo_placa' => 'v.placa',
-                'motorista_nome' => 'm.nome',
-                'posto' => 'a.posto',
-                'litros' => 'a.litros',
-                'valor_litro' => 'a.valor_litro',
-                'valor_total' => 'a.valor_total',
-                'km_atual' => 'a.km_atual',
-                'forma_pagamento' => 'a.forma_pagamento',
-                'tipo_combustivel' => 'a.tipo_combustivel',
-                'litros_arla' => 'a.litros_arla',
-                'rota' => 'CONCAT(COALESCE(co.nome, ""), " ", COALESCE(cd.nome, ""))',
-                'id' => 'a.id',
-            ];
-            $orderCol = $allowedSort[$sortKey] ?? 'a.data_abastecimento';
-            $dir = (isset($_GET['dir']) && strtoupper(trim((string) $_GET['dir'])) === 'ASC') ? 'ASC' : 'DESC';
-
-            $sql .= ' ORDER BY ' . $orderCol . ' ' . $dir . ', a.id DESC LIMIT :limit OFFSET :offset';
-            $params[':limit'] = $limit;
-            $params[':offset'] = $offset;
-            
-            $stmt = $conn->prepare($sql);
-            foreach ($params as $key => &$val) {
-                $stmt->bindValue($key, $val);
-            }
-            $stmt->execute();
-            
-            $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            // Log para debug (desativado em produção)
-            // error_log("Dados dos abastecimentos: " . print_r($result, true));
-            
-            echo json_encode([
-                'success' => true,
-                'data' => $result,
-                'pagination' => [
-                    'page' => $page,
-                    'limit' => $limit,
-                    'total' => $total,
-                    'totalPages' => ceil($total / $limit)
-                ]
-            ]);
+            echo json_encode(refuel_fetch_list($conn, (int) $empresa_id, [
+                'page' => isset($_GET['page']) ? (int) $_GET['page'] : 1,
+                'limit' => isset($_GET['limit']) ? (int) $_GET['limit'] : 10,
+                'search' => $_GET['search'] ?? '',
+                'veiculo' => $_GET['veiculo'] ?? '',
+                'motorista' => $_GET['motorista'] ?? '',
+                'rota_id' => $_GET['rota_id'] ?? '',
+                'combustivel' => $_GET['combustivel'] ?? '',
+                'pagamento' => $_GET['pagamento'] ?? '',
+                'year' => $_GET['year'] ?? null,
+                'month' => $_GET['month'] ?? null,
+                'sort' => $_GET['sort'] ?? 'data_abastecimento',
+                'dir' => $_GET['dir'] ?? 'DESC',
+            ]));
             break;
 
         case 'filter_options':
@@ -367,38 +157,12 @@ try {
             break;
             
         case 'summary':
-            $sql = "SELECT 
-                    COUNT(*) as total_abastecimentos,
-                    SUM(litros) as total_litros,
-                    SUM(valor_total) as total_gasto,
-                    AVG(valor_litro) as media_valor_litro,
-                    CASE 
-                        WHEN COUNT(*) > 1 
-                        AND MAX(km_atual) > MIN(km_atual) 
-                        AND SUM(litros) > 0 
-                        THEN (MAX(km_atual) - MIN(km_atual)) / SUM(litros)
-                        ELSE 0 
-                    END as media_km_litro
-                FROM abastecimentos 
-                WHERE empresa_id = :empresa_id AND status = 'aprovado'";
-
-            $params = [':empresa_id' => $empresa_id];
-
-            // Sempre filtra pelo mês/ano atual se não vierem parâmetros
-            $year = !empty($_GET['year']) ? intval($_GET['year']) : intval(date('Y'));
-            $month = !empty($_GET['month']) ? intval($_GET['month']) : intval(date('n'));
-            $sql .= " AND YEAR(data_abastecimento) = :year AND MONTH(data_abastecimento) = :month";
-            $params[':year'] = $year;
-            $params[':month'] = $month;
-
-            $stmt = $conn->prepare($sql);
-            foreach ($params as $key => &$val) {
-                $stmt->bindValue($key, $val);
-            }
-            $stmt->execute();
-            
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            echo json_encode(['success' => true, 'data' => $result]);
+            $year = !empty($_GET['year']) ? (int) $_GET['year'] : null;
+            $month = !empty($_GET['month']) ? (int) $_GET['month'] : null;
+            echo json_encode([
+                'success' => true,
+                'data' => refuel_fetch_summary($conn, (int) $empresa_id, $year, $month),
+            ]);
             break;
             
         case 'consumption_chart':

@@ -1,3 +1,4 @@
+
 <?php
 // Exibir erros apenas com ?debug=1 (remover em produção se necessário)
 if (!empty($_GET['debug']) && $_GET['debug'] === '1') {
@@ -9,6 +10,8 @@ if (!empty($_GET['debug']) && $_GET['debug'] === '1') {
 require_once '../includes/config.php';
 require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
+require_once '../includes/db_connect.php';
+require_once '../includes/vehicles_list.php';
 require_once '../includes/sf_api_base.php';
 
 // Configure session before starting it
@@ -32,15 +35,47 @@ if (!in_array($per_page, [5, 10, 25, 50, 100], true)) {
 // Layout moderno por padrão (como rotas / fornecedores_moderno); ?classic=1 para o anterior
 $is_modern = !isset($_GET['classic']) || (string)$_GET['classic'] !== '1';
 
-// Função para formatar quilometragem
-function formatKmVehicles($km) {
-    if ($km === null) return '0 km';
-    return number_format($km, 0, ',', '.') . ' km';
+$empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
+$current_page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+$veh_sort = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'placa';
+$veh_dir = (isset($_GET['dir']) && strtoupper((string) $_GET['dir']) === 'DESC') ? 'DESC' : 'ASC';
+$veh_search = isset($_GET['search']) ? trim((string) $_GET['search']) : '';
+$veh_status = isset($_GET['status']) ? trim((string) $_GET['status']) : '';
+$veh_marca = isset($_GET['marca']) ? trim((string) $_GET['marca']) : '';
+
+$veh_initial = [
+    'success' => true,
+    'data' => [],
+    'pagination' => ['page' => 1, 'limit' => $per_page, 'total' => 0, 'totalPages' => 1],
+    'summary' => ['totalVehicles' => 0, 'activeVehicles' => 0, 'maintenanceVehicles' => 0, 'totalMileage' => 0],
+];
+if ($empresa_id > 0) {
+    try {
+        $veh_initial = vehicles_fetch_list(getConnection(), $empresa_id, [
+            'page' => $current_page,
+            'limit' => $per_page,
+            'search' => $veh_search,
+            'status' => $veh_status,
+            'marca' => $veh_marca,
+            'sort' => $veh_sort,
+            'dir' => $veh_dir,
+        ]);
+    } catch (Throwable $e) {
+        error_log('vehicles.php SSR: ' . $e->getMessage());
+    }
 }
+$veh_rows = $veh_initial['data'] ?? [];
+$veh_summary = $veh_initial['summary'] ?? [];
+$veh_pag = $veh_initial['pagination'] ?? ['page' => 1, 'limit' => $per_page, 'total' => 0, 'totalPages' => 1];
+$veh_empty = empty($veh_rows);
+$veh_pag_page = (int) ($veh_pag['page'] ?? 1);
+$veh_pag_total_pages = max(1, (int) ($veh_pag['totalPages'] ?? 1));
+$veh_pag_total = (int) ($veh_pag['total'] ?? 0);
 
-// Lista e KPIs vêm da API (vehicles.js loadVehicleData). Não buscar veículos no PHP.
-$current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-
+// Compatível com formatKmVehicles() usado no restante da página
+function formatKmVehicles($km) {
+    return vehicles_fmt_km($km);
+}
 ?>
 
 <!DOCTYPE html>
@@ -60,13 +95,14 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
     <?php endif; ?>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="../logo.png">
+    <link rel="icon" type="image/png" href="<?php echo htmlspecialchars(sf_app_url('logo.png'), ENT_QUOTES, 'UTF-8'); ?>">
 
     <!-- jQuery (necessário para o modal de foto) -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
     <!-- Chart.js for analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
     
     <style>
     /* Estilos para a seção de análise */
@@ -291,10 +327,10 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                 <!-- KPIs (moderno: mesma faixa compacta que fornecedores_moderno) -->
                 <?php if ($is_modern): ?>
                 <div class="fornc-kpi-strip">
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-truck fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total</span></div><span class="val" id="totalVehicles">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Ativos</span></div><span class="val" id="activeVehicles">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-wrench fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Em manutenção</span></div><span class="val" id="maintenanceVehicles">0</span></div>
-                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-gauge-high fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Quilometragem</span></div><span class="val" id="totalMileage">0 km</span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-truck fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Total</span></div><span class="val" id="totalVehicles"><?php echo (int) ($veh_summary['totalVehicles'] ?? 0); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-circle-check fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Ativos</span></div><span class="val" id="activeVehicles"><?php echo (int) ($veh_summary['activeVehicles'] ?? 0); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-wrench fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Em manutenção</span></div><span class="val" id="maintenanceVehicles"><?php echo (int) ($veh_summary['maintenanceVehicles'] ?? 0); ?></span></div>
+                    <div class="fornc-kpi-cell"><div class="fornc-kpi-head"><i class="fas fa-gauge-high fornc-kpi-icon" aria-hidden="true"></i><span class="lbl">Quilometragem</span></div><span class="val" id="totalMileage"><?php echo htmlspecialchars(vehicles_fmt_km($veh_summary['totalMileage'] ?? 0), ENT_QUOTES, 'UTF-8'); ?></span></div>
                 </div>
                 <?php else: ?>
                 <div class="dashboard-grid">
@@ -305,7 +341,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="totalVehicles">0</span>
+                                <span class="metric-value" id="totalVehicles"><?php echo (int) ($veh_summary['totalVehicles'] ?? 0); ?></span>
                                 <span class="metric-subtitle">Veículos cadastrados</span>
                             </div>
                         </div>
@@ -317,7 +353,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="activeVehicles">0</span>
+                                <span class="metric-value" id="activeVehicles"><?php echo (int) ($veh_summary['activeVehicles'] ?? 0); ?></span>
                                 <span class="metric-subtitle">Em operação</span>
                             </div>
                         </div>
@@ -329,7 +365,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="maintenanceVehicles">0</span>
+                                <span class="metric-value" id="maintenanceVehicles"><?php echo (int) ($veh_summary['maintenanceVehicles'] ?? 0); ?></span>
                                 <span class="metric-subtitle">Neste mês</span>
                             </div>
                         </div>
@@ -341,7 +377,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                         </div>
                         <div class="card-body">
                             <div class="metric">
-                                <span class="metric-value" id="totalMileage">0 km</span>
+                                <span class="metric-value" id="totalMileage"><?php echo htmlspecialchars(vehicles_fmt_km($veh_summary['totalMileage'] ?? 0), ENT_QUOTES, 'UTF-8'); ?></span>
                                 <span class="metric-subtitle">Percorridos</span>
                             </div>
                         </div>
@@ -435,7 +471,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                 <div id="sfVehInsights"></div>
 
                 <?php if (!empty($is_modern)): ?>
-                <div class="fornc-empty-state" id="vehiclesEmptyState" role="status" aria-live="polite">
+                <div class="fornc-empty-state<?php echo $veh_empty ? ' visible' : ''; ?>" id="vehiclesEmptyState" role="status" aria-live="polite">
                     <p class="fornc-empty-state-title">Nenhum veículo encontrado</p>
                     <p class="fornc-empty-state-hint">Ajuste os filtros ou cadastre um novo veículo na frota.</p>
                     <button type="button" class="fornc-btn fornc-btn--primary" id="vehiclesEmptyCreateBtn"><i class="fas fa-plus"></i> Cadastrar primeiro veículo</button>
@@ -443,7 +479,7 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                 <?php endif; ?>
 
                 <!-- Vehicles List Table -->
-                <div class="<?php echo $is_modern ? 'vehicles-table-wrap fornc-table-wrap' : 'data-table-container'; ?>" id="vehiclesTableOuter">
+                <div class="<?php echo $is_modern ? 'vehicles-table-wrap fornc-table-wrap' : 'data-table-container'; ?>" id="vehiclesTableOuter"<?php echo ($is_modern && $veh_empty) ? ' style="display:none;"' : ''; ?>>
                     <table class="<?php echo $is_modern ? 'fornc-table' : 'data-table'; ?>" id="vehiclesTable">
                         <thead>
                             <tr>
@@ -470,20 +506,22 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                             </tr>
                         </thead>
                         <tbody>
-                            <tr>
-                                <td colspan="9" class="text-center" id="vehiclesTableLoading">Carregando...</td>
-                            </tr>
+                            <?php if (empty($veh_rows) && !$is_modern): ?>
+                            <tr><td colspan="9" class="text-center">Nenhum veículo encontrado</td></tr>
+                            <?php else: foreach ($veh_rows as $veh_row): ?>
+                            <?php echo vehicles_render_table_row($veh_row, !empty($is_modern)); ?>
+                            <?php endforeach; endif; ?>
                         </tbody>
                     </table>
                 </div>
 
                 <!-- Pagination -->
                 <div class="pagination" id="vehiclesPagination" data-per-page="<?php echo (int)$per_page; ?>">
-                    <a href="#" class="pagination-btn" id="prevPageBtn"><i class="fas fa-chevron-left"></i></a>
+                    <a href="#" class="pagination-btn<?php echo $veh_pag_page <= 1 ? ' disabled' : ''; ?>" id="prevPageBtn"><i class="fas fa-chevron-left"></i></a>
                     <span class="pagination-info" id="paginationInfo">
-                        Página <span id="currentPage">1</span> de <span id="totalPages">1</span> (0 registros)
+                        Página <span id="currentPage"><?php echo $veh_pag_page; ?></span> de <span id="totalPages"><?php echo $veh_pag_total_pages; ?></span> (<?php echo $veh_pag_total; ?> registros)
                     </span>
-                    <a href="#" class="pagination-btn" id="nextPageBtn"><i class="fas fa-chevron-right"></i></a>
+                    <a href="#" class="pagination-btn<?php echo $veh_pag_page >= $veh_pag_total_pages ? ' disabled' : ''; ?>" id="nextPageBtn"><i class="fas fa-chevron-right"></i></a>
                 </div>
                 
                 <!-- Vehicle Analytics -->
@@ -635,6 +673,30 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
                         <div class="form-group">
                             <label for="capacidade_carga">Capacidade de Carga (kg)</label>
                             <input type="number" id="capacidade_carga" name="capacidade_carga" min="0" step="0.01">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="capacidade_tanque">Capacidade do Tanque (L)</label>
+                            <input type="number" id="capacidade_tanque" name="capacidade_tanque" min="0" step="1" placeholder="Ex: 400">
+                            <small class="form-text" style="color:#6c757d;font-size:0.875rem;margin-top:4px;">
+                                <i class="fas fa-info-circle"></i> Usado na simulação de rota (autonomia/reabastecimentos).
+                            </small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="consumo_medio">Consumo Médio (km/L)</label>
+                            <input type="number" id="consumo_medio" name="consumo_medio" min="0" step="0.1" placeholder="Ex: 3.5">
+                            <small class="form-text" style="color:#6c757d;font-size:0.875rem;margin-top:4px;">
+                                <i class="fas fa-info-circle"></i> Estimativa; a simulação prioriza o consumo real dos abastecimentos.
+                            </small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="custo_operacional_km">Custo Operacional (R$/km)</label>
+                            <input type="number" id="custo_operacional_km" name="custo_operacional_km" min="0" step="0.01" placeholder="Ex: 0.80">
+                            <small class="form-text" style="color:#6c757d;font-size:0.875rem;margin-top:4px;">
+                                <i class="fas fa-info-circle"></i> Manutenção/pneus/depreciação por km, usado no custo da rota.
+                            </small>
                         </div>
                         
                         <div class="form-group">
@@ -857,7 +919,8 @@ $current_page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <?php if (!empty($is_modern)): ?><script src="../js/fornc-table-columns.js"></script><?php endif; ?>
-    <script src="../js/vehicles.js?v=1.2"></script>
+    <script>window.__VEH_INITIAL__=<?php echo json_encode($veh_initial, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
+    <script src="../js/vehicles.js?v=1.4"></script>
     <script src="../js/sf_insights.js?v=1.3"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function () {

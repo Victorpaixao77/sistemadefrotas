@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // Include configuration and functions first
 require_once '../includes/config.php';
 require_once '../includes/functions.php';
@@ -27,7 +27,7 @@ $page_title = "Título da Página";
     <link rel="stylesheet" href="../css/responsive.css">
     
     <!-- Chart.js for analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
     
     <!-- Sortable.js for drag-and-drop -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>

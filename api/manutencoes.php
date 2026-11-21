@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Ensure the request is authenticated
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Protege mutações (POST/PUT/PATCH/DELETE) com CSRF e retorno JSON padronizado.
 api_require_csrf_json();
@@ -75,7 +76,9 @@ switch ($method) {
             $id = isset($_GET['id']) ? intval($_GET['id']) : null;
             
             if ($id) {
-                $sql = "SELECT m.*, v.placa as veiculo_placa, tm.nome as tipo_nome, sm.nome as status_nome, cm.nome as componente_nome
+                $sql = "SELECT m.*, v.placa as veiculo_placa, v.marca as veiculo_marca, v.modelo as veiculo_modelo,
+                               v.ano as veiculo_ano, v.chassi as veiculo_chassi,
+                               tm.nome as tipo_nome, sm.nome as status_nome, cm.nome as componente_nome
                         FROM manutencoes m
                         LEFT JOIN veiculos v ON m.veiculo_id = v.id
                         LEFT JOIN tipos_manutencao tm ON m.tipo_manutencao_id = tm.id
@@ -149,7 +152,7 @@ switch ($method) {
             }
         } catch (PDOException $e) {
             http_response_code(500);
-            echo json_encode(['error' => 'Erro ao buscar manutenções: ' . $e->getMessage()]);
+            echo json_encode(['error' => 'Erro ao buscar manutenções: ']);
         }
         break;
 
@@ -185,19 +188,19 @@ switch ($method) {
             
             // Insert maintenance record
             $sql = "INSERT INTO manutencoes (
-                        empresa_id, data_manutencao, data_conclusao, veiculo_id, tipo_manutencao_id, 
+                        empresa_id, data_manutencao, data_conclusao, veiculo_id, tipo_manutencao_id,
                         componente_id, status_manutencao_id, km_atual, fornecedor,
-                        valor, custo_total, nota_fiscal, descricao, descricao_servico,
+                        valor, valor_pecas, valor_mao_obra, valor_outros, custo_total, nota_fiscal, descricao, descricao_servico,
                         observacoes, responsavel_aprovacao
                     ) VALUES (
                         :empresa_id, :data_manutencao, :data_conclusao, :veiculo_id, :tipo_manutencao_id,
                         :componente_id, :status_manutencao_id, :km_atual, :fornecedor,
-                        :valor, :custo_total, :nota_fiscal, :descricao, :descricao_servico,
+                        :valor, :valor_pecas, :valor_mao_obra, :valor_outros, :custo_total, :nota_fiscal, :descricao, :descricao_servico,
                         :observacoes, :responsavel_aprovacao
                     )";
-            
+
             $stmt = $conn->prepare($sql);
-            
+
             $stmt->bindParam(':empresa_id', $_SESSION['empresa_id'], PDO::PARAM_INT);
             $stmt->bindParam(':data_manutencao', $data['data_manutencao']);
             $stmt->bindValue(':data_conclusao', !empty($data['data_conclusao']) ? $data['data_conclusao'] : null);
@@ -208,6 +211,9 @@ switch ($method) {
             $stmt->bindParam(':km_atual', $data['km_atual'], PDO::PARAM_INT);
             $stmt->bindParam(':fornecedor', $data['fornecedor']);
             $stmt->bindParam(':valor', $data['valor'], PDO::PARAM_STR);
+            $stmt->bindValue(':valor_pecas', (float) ($data['valor_pecas'] ?? 0));
+            $stmt->bindValue(':valor_mao_obra', (float) ($data['valor_mao_obra'] ?? 0));
+            $stmt->bindValue(':valor_outros', (float) ($data['valor_outros'] ?? 0));
             $stmt->bindParam(':custo_total', $data['custo_total'], PDO::PARAM_STR);
             $stmt->bindParam(':nota_fiscal', $data['nota_fiscal']);
             $stmt->bindParam(':descricao', $data['descricao']);
@@ -249,7 +255,7 @@ switch ($method) {
             
         } catch (Exception $e) {
             http_response_code(400);
-            echo json_encode(['error' => $e->getMessage()]);
+            echo json_encode(['error' => 'Erro interno.']);
         }
         break;
 
@@ -293,6 +299,9 @@ switch ($method) {
                         km_atual = :km_atual,
                         fornecedor = :fornecedor,
                         valor = :valor,
+                        valor_pecas = :valor_pecas,
+                        valor_mao_obra = :valor_mao_obra,
+                        valor_outros = :valor_outros,
                         custo_total = :custo_total,
                         nota_fiscal = :nota_fiscal,
                         descricao = :descricao,
@@ -314,15 +323,18 @@ switch ($method) {
             $stmt->bindParam(':km_atual', $data['km_atual'], PDO::PARAM_INT);
             $stmt->bindParam(':fornecedor', $data['fornecedor']);
             $stmt->bindParam(':valor', $data['valor'], PDO::PARAM_STR);
+            $stmt->bindValue(':valor_pecas', (float) ($data['valor_pecas'] ?? 0));
+            $stmt->bindValue(':valor_mao_obra', (float) ($data['valor_mao_obra'] ?? 0));
+            $stmt->bindValue(':valor_outros', (float) ($data['valor_outros'] ?? 0));
             $stmt->bindParam(':custo_total', $data['custo_total'], PDO::PARAM_STR);
             $stmt->bindParam(':nota_fiscal', $data['nota_fiscal']);
             $stmt->bindParam(':descricao', $data['descricao']);
             $stmt->bindParam(':descricao_servico', $data['descricao_servico']);
             $stmt->bindParam(':observacoes', $data['observacoes']);
             $stmt->bindParam(':responsavel_aprovacao', $data['responsavel_aprovacao']);
-            
+
             $stmt->execute();
-            
+
             atualizar_plano_apos_manutencao($conn, $_SESSION['empresa_id'], (int)$data['veiculo_id'], (int)$data['componente_id'], (int)$data['tipo_manutencao_id'], (int)$data['status_manutencao_id'], $data['data_manutencao'], (int)$data['km_atual']);
             
             $gerar_conta = !empty($data['gerar_conta_pagar']);
@@ -340,7 +352,7 @@ switch ($method) {
             
         } catch (Exception $e) {
             http_response_code(400);
-            echo json_encode(['error' => $e->getMessage()]);
+            echo json_encode(['error' => 'Erro interno.']);
         }
         break;
 
@@ -376,7 +388,7 @@ switch ($method) {
             
         } catch (Exception $e) {
             http_response_code(400);
-            echo json_encode(['error' => $e->getMessage()]);
+            echo json_encode(['error' => 'Erro interno.']);
         }
         break;
 

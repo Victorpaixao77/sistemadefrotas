@@ -6,14 +6,43 @@ require_once '../includes/db_connect.php';
 configure_session();
 session_start();
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 header('Content-Type: application/json');
 
 $conn = getConnection();
-$empresa_id = $_SESSION['empresa_id'];
+$empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
 $action = $_GET['action'] ?? '';
 
+require_once __DIR__ . '/../includes/sf_cache.php';
+
 try {
+    if ($action === 'all') {
+        $ckey = 'multas:analytics:all:' . $empresa_id;
+        if (($cached = sf_cache_get($ckey)) !== null) {
+            echo json_encode($cached, JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $payload = [
+            'success' => true,
+            'data' => [
+                'multas_por_mes' => getMultasPorMes($conn, $empresa_id),
+                'valor_por_mes' => getValorPorMes($conn, $empresa_id),
+                'multas_por_motorista' => getMultasPorMotorista($conn, $empresa_id),
+                'pontos_por_motorista' => getPontosPorMotorista($conn, $empresa_id),
+            ],
+        ];
+        sf_cache_set($ckey, $payload, 180);
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $ckey = 'multas:analytics:' . $empresa_id . ':' . $action;
+    if (($cached = sf_cache_get($ckey)) !== null) {
+        echo json_encode($cached, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     switch ($action) {
         case 'multas_por_mes':
             $data = getMultasPorMes($conn, $empresa_id);
@@ -32,20 +61,26 @@ try {
             break;
             
         default:
-            throw new Exception('Ação não especificada');
+            throw new Exception('Ação não especificada', 400);
     }
     
-    echo json_encode([
+    $payload = [
         'success' => true,
-        'data' => $data
-    ]);
+        'data' => $data,
+    ];
+    sf_cache_set($ckey, $payload, 180);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     
-} catch (Exception $e) {
-    error_log("Erro na API de analytics de multas: " . $e->getMessage());
-    echo json_encode([
-        'success' => false,
-        'message' => 'Erro ao carregar dados: ' . $e->getMessage()
-    ]);
+} catch (Throwable $e) {
+    // Ação inválida (400) → mensagem clara; erro real → log + genérica (500).
+    if ($e->getCode() === 400) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'message' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    } else {
+        error_log("Erro na API de analytics de multas: " . $e->getMessage());
+        http_response_code(500);
+        echo json_encode(['success' => false, 'message' => 'Erro ao carregar dados de multas.'], JSON_UNESCAPED_UNICODE);
+    }
 }
 
 function getMultasPorMes($conn, $empresa_id) {

@@ -11,6 +11,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($id <= 0) {

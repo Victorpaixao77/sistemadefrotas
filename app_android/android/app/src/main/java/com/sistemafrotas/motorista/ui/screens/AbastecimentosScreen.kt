@@ -1,5 +1,6 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -57,10 +58,19 @@ fun AbastecimentosScreen(
     val vm: AbastecimentosViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository) { AbastecimentosViewModel(it) }
     )
-    val list by vm.list.collectAsState()
-    val refreshing by vm.refreshing.collectAsState()
-    val error by vm.error.collectAsState()
+    val list by vm.list.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
     var showForm by remember { mutableStateOf(false) }
+    var ocrPrefill by remember { mutableStateOf<com.sistemafrotas.motorista.data.api.OcrCampos?>(null) }
+
+    LaunchedEffect(Unit) {
+        val (_, campos) = com.sistemafrotas.motorista.feature.viagem.TripFeatureBridge.consumeOcr()
+        if (campos != null) {
+            ocrPrefill = campos
+            showForm = true
+        }
+    }
 
     LaunchedEffect(Unit) { vm.carregarSeNecessario() }
     val pullRefreshState = rememberPullRefreshState(refreshing, onRefresh = { vm.refresh() })
@@ -71,9 +81,10 @@ fun AbastecimentosScreen(
         }
         NovoAbastecimentoScreen(
             authRepository = authRepository,
-            onBack = { showForm = false },
-            onSuccess = { showForm = false; vm.refresh() },
+            onBack = { showForm = false; ocrPrefill = null },
+            onSuccess = { showForm = false; ocrPrefill = null; vm.refresh() },
             showTopBar = false,
+            ocrPrefill = ocrPrefill,
             modifier = modifier,
         )
         return
@@ -117,7 +128,7 @@ fun AbastecimentosScreen(
                 }
             } else {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(list) { a ->
+                    items(list, key = { it.id }) { a ->
                         Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(8.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                             Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Filled.LocalGasStation, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -164,7 +175,14 @@ private fun normalizarDataApi(s: String): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun NovoAbastecimentoScreen(authRepository: AuthRepository, onBack: () -> Unit, onSuccess: () -> Unit, showTopBar: Boolean = true, modifier: Modifier = Modifier) {
+private fun NovoAbastecimentoScreen(
+    authRepository: AuthRepository,
+    onBack: () -> Unit,
+    onSuccess: () -> Unit,
+    showTopBar: Boolean = true,
+    ocrPrefill: com.sistemafrotas.motorista.data.api.OcrCampos? = null,
+    modifier: Modifier = Modifier,
+) {
     var veiculos by remember { mutableStateOf<List<VeiculoItem>>(emptyList()) }
     var rotas by remember { mutableStateOf<List<RotaItem>>(emptyList()) }
     var veiculoId by remember { mutableStateOf<Int?>(null) }
@@ -194,6 +212,20 @@ private fun NovoAbastecimentoScreen(authRepository: AuthRepository, onBack: () -
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             LocationHelper(context).takeIf { it.hasLocationPermission() }?.getLastLocation()?.let { gpsLocation = it }
+        }
+    }
+
+    LaunchedEffect(ocrPrefill) {
+        val c = ocrPrefill ?: return@LaunchedEffect
+        c.posto?.takeIf { it.isNotBlank() }?.let { posto = it }
+        c.combustivel?.takeIf { it.isNotBlank() }?.let { tipoCombustivel = it }
+        c.litros?.let { litros = formatDecimal(it) }
+        c.valorLitro?.let { valorLitro = formatDecimal(it) }
+        c.valorTotal?.let { valorTotal = formatDecimal(it) }
+        c.km?.let { kmAtual = it.toString() }
+        if (!c.data.isNullOrBlank()) {
+            val hora = c.hora?.takeIf { it.isNotBlank() }
+            dataAbast = if (hora != null) "${c.data}T$hora" else c.data!!
         }
     }
 

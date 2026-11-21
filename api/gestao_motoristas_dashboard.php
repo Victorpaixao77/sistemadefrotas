@@ -3,7 +3,7 @@ require_once '../includes/config.php';
 require_once '../includes/functions.php';
 
 // Configurar log de erros
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 ini_set('error_log', '../logs/php_errors.log');
@@ -11,12 +11,20 @@ ini_set('error_log', '../logs/php_errors.log');
 configure_session();
 session_start();
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 header('Content-Type: application/json');
 
 $action = isset($_GET['action']) ? $_GET['action'] : '';
-$empresa_id = $_SESSION['empresa_id'];
+$empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
 
+// Cache de leitura por ação (APCu/arquivo, TTL 120s). Captura a saída via buffer.
+require_once __DIR__ . '/../includes/sf_cache.php';
+$ckey = 'dash:motoristas:' . $empresa_id . ':' . md5(serialize($_GET));
+if (($cached = sf_cache_get($ckey)) !== null) { echo $cached; exit; }
+
+ob_start();
+$ok = false;
 try {
     $conn = getConnection();
     switch ($action) {
@@ -196,8 +204,12 @@ try {
         default:
             echo json_encode(['success' => false, 'error' => 'Ação inválida']);
     }
+    $ok = true;
 } catch (Exception $e) {
     error_log("Erro geral na API: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
-} 
+    echo json_encode(['success' => false, 'error' => 'Erro ao carregar o painel.']);
+}
+$out = ob_get_clean();
+if ($ok) { sf_cache_set($ckey, $out, 120); }
+echo $out;

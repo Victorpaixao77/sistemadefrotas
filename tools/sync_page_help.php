@@ -23,7 +23,7 @@ $map = [
     'pages/lucratividade.php' => ['key' => 'lucratividade', 'modal_id' => 'helpLucratividadeModal'],
     'pages/pneus.php' => ['key' => 'pneus', 'modal_id' => 'helpPneusModal'],
     'pages/estoque_pneus.php' => ['key' => 'estoque_pneus', 'modal_id' => 'helpModal'],
-    'pages/gestao_interativa.php' => ['key' => 'gestao_interativa', 'modal_id' => 'helpModal'],
+    'pages/gestao_interativa_pro.php' => ['key' => 'gestao_interativa_pro', 'modal_id' => 'helpModal'],
     'pages/manutencao_pneus.php' => ['key' => 'manutencao_pneus', 'modal_id' => 'helpModal'],
     'pages/gestao_motoristas.php' => ['key' => 'gestao_motoristas', 'modal_id' => 'helpModal'],
 ];

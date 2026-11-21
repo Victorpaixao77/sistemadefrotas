@@ -63,6 +63,13 @@ interface ApiService {
     @POST("checklists.php")
     suspend fun criarChecklist(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<ApiResponse<IdResponse>>
 
+    @Multipart
+    @POST("checklists.php")
+    suspend fun criarChecklistMultipart(
+        @PartMap parts: Map<String, @JvmSuppressWildcards RequestBody>,
+        @Part assinatura: MultipartBody.Part?,
+    ): Response<ApiResponse<IdResponse>>
+
     @GET("ocorrencias.php")
     suspend fun ocorrencias(@Query("limite") limite: Int? = null): Response<ApiResponse<OcorrenciasResponse>>
 
@@ -73,11 +80,15 @@ interface ApiService {
     @POST("ocorrencias.php")
     suspend fun criarOcorrenciaMultipart(
         @PartMap parts: Map<String, @JvmSuppressWildcards RequestBody>,
-        @Part foto: MultipartBody.Part,
+        @Part foto: MultipartBody.Part?,
+        @Part video: MultipartBody.Part? = null,
     ): Response<ApiResponse<IdResponse>>
 
     @POST("evento_auto.php")
     suspend fun eventoAuto(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<ApiResponse<IdResponse>>
+
+    @GET("avisos.php")
+    suspend fun avisos(): Response<ApiResponse<AvisosResponse>>
 
     @GET("abastecimento_insights.php")
     suspend fun abastecimentoInsights(@Query("dias") dias: Int? = null): Response<ApiResponse<AbastecimentoInsightsResponse>>
@@ -211,6 +222,27 @@ interface ApiService {
         @PartMap parts: Map<String, @JvmSuppressWildcards RequestBody>,
         @Part foto: MultipartBody.Part,
     ): Response<ApiResponse<IdResponse>>
+
+    @GET("viagem_context.php")
+    suspend fun viagemContext(@Query("rota_id") rotaId: Int): Response<ApiResponse<ViagemContextData>>
+
+    @GET("trip_timeline.php")
+    suspend fun tripTimeline(@Query("rota_id") rotaId: Int): Response<ApiResponse<Map<String, List<Map<String, Any?>>>>>
+
+    @POST("trip_timeline.php")
+    suspend fun syncTripTimeline(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<ApiResponse<TripTimelineSyncResponse>>
+
+    @POST("motorista_assistente.php")
+    suspend fun motoristaAssistente(@Body body: Map<String, @JvmSuppressWildcards Any?>): Response<ApiResponse<MotoristaAssistenteResponse>>
+
+    @GET("motorista_documentos.php")
+    suspend fun motoristaDocumentos(): Response<ApiResponse<MotoristaDocumentosData>>
+
+    @GET("gps_trajeto.php")
+    suspend fun gpsTrajeto(
+        @Query("horas") horas: Int? = null,
+        @Query("limite") limite: Int? = null,
+    ): Response<ApiResponse<GpsTrajetoResponse>>
 }
 
 data class GpsLoteResult(

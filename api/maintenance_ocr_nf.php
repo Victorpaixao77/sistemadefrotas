@@ -17,6 +17,7 @@ session_start();
 
 header('Content-Type: application/json; charset=utf-8');
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 api_require_csrf_json();
 
 $empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
@@ -25,6 +26,7 @@ if ($empresa_id <= 0) {
 }
 
 $conn = getConnection();
+sf_ia_enforce_quota($conn, $empresa_id);
 
 $binary = '';
 $mime = 'image/jpeg';

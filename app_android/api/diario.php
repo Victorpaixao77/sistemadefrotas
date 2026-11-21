@@ -19,7 +19,7 @@ try {
 
     // Cada SELECT devolve as mesmas colunas: tipo, titulo, descricao, data_hora.
     $sql = "
-        SELECT 'jornada' AS tipo, tipo AS titulo, '' AS descricao, data_hora
+        SELECT 'jornada' AS tipo, tipo AS titulo, COALESCE(observacoes, '') AS descricao, data_hora
           FROM jornada_motorista
          WHERE empresa_id = :e1 AND motorista_id = :m1
            AND data_hora >= DATE_SUB(NOW(), INTERVAL :d1 DAY)

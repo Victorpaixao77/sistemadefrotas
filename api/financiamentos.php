@@ -510,9 +510,9 @@ try {
     header('Content-Type: application/json');
     echo json_encode([
         'success' => false, 
-        'message' => 'Erro ao processar a requisição: ' . $e->getMessage(),
+        'message' => 'Erro ao processar a requisição: ',
         'error_details' => [
-            'message' => $e->getMessage(),
+            'message' => 'Erro interno.',
             'file' => $e->getFile(),
             'line' => $e->getLine()
         ]

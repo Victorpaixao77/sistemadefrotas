@@ -1,3 +1,4 @@
+
 <?php
 // Include configuration and functions first
 require_once '../includes/config.php';
@@ -535,7 +536,8 @@ $total_paginas = $resultado['total_paginas'];
     <?php endif; ?>
 
     <!-- JavaScript Files -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
     <?php if (!empty($is_modern)): ?><script src="../js/fornc-table-columns.js"></script><?php endif; ?>
     <script>
     // DASHBOARDS E GRÁFICOS DE MOTORISTAS

@@ -98,6 +98,11 @@ if (!can_access_tire_management()) {
     exit;
 }
 
+// Libera o lock de sessão (só leitura daqui pra frente) para as chamadas não serializarem.
+if (function_exists('session_write_close')) {
+    session_write_close();
+}
+
 $action = $_GET['action'] ?? '';
 $veiculo_id = $_GET['veiculo_id'] ?? null;
 
@@ -139,49 +144,49 @@ try {
             }
         }
         
-        // Buscar alocações ativas
-        // Primeiro verificar se a coluna posicao_id existe
-        $stmt = $conn->prepare("SHOW COLUMNS FROM alocacoes_pneus_flexiveis LIKE 'posicao_id'");
-        $stmt->execute();
-        $posicao_id_exists = $stmt->rowCount() > 0;
-        
-        if ($posicao_id_exists) {
-            // Query com posicao_id
-            $sql = "SELECT apf.*, p.numero_serie, p.marca, p.modelo, p.medida, p.status_id, sp.nome as status_nome, pp.nome as posicao_nome
-                    FROM alocacoes_pneus_flexiveis apf
-                    INNER JOIN pneus p ON apf.pneu_id = p.id
-                    LEFT JOIN status_pneus sp ON p.status_id = sp.id
-                    LEFT JOIN posicoes_pneus pp ON apf.posicao_id = pp.id
-                    INNER JOIN eixos_veiculos ev ON apf.eixo_veiculo_id = ev.id
-                    WHERE ev.veiculo_id = ? AND apf.empresa_id = ? AND apf.ativo = 1";
-        } else {
-            // Query sem posicao_id
-            $sql = "SELECT apf.*, p.numero_serie, p.marca, p.modelo, p.medida, p.status_id, sp.nome as status_nome
-                    FROM alocacoes_pneus_flexiveis apf
-                    INNER JOIN pneus p ON apf.pneu_id = p.id
-                    LEFT JOIN status_pneus sp ON p.status_id = sp.id
-                    INNER JOIN eixos_veiculos ev ON apf.eixo_veiculo_id = ev.id
-                    WHERE ev.veiculo_id = ? AND apf.empresa_id = ? AND apf.ativo = 1";
-        }
-        
-        $stmt = $conn->prepare($sql);
-        $stmt->execute([$veiculo_id, $empresa_id]);
-        $alocacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Organizar alocações por slot_id
+        // Buscar alocações ativas (falha aqui não deve esconder os eixos já configurados)
         $pneusFlexAlocados = [];
-        foreach ($alocacoes as $alocacao) {
-            $pneusFlexAlocados[$alocacao['slot_id']] = [
-                'id' => $alocacao['pneu_id'],
-                'numero_serie' => $alocacao['numero_serie'],
-                'marca' => $alocacao['marca'],
-                'modelo' => $alocacao['modelo'],
-                'medida' => $alocacao['medida'],
-                'status_id' => $alocacao['status_id'],
-                'status_nome' => $alocacao['status_nome'],
-                'posicao_id' => $posicao_id_exists ? ($alocacao['posicao_id'] ?? null) : null,
-                'posicao_nome' => $posicao_id_exists ? ($alocacao['posicao_nome'] ?? null) : null
-            ];
+        try {
+            $stmt = $conn->prepare("SHOW COLUMNS FROM alocacoes_pneus_flexiveis LIKE 'posicao_id'");
+            $stmt->execute();
+            $posicao_id_exists = $stmt->rowCount() > 0;
+
+            if ($posicao_id_exists) {
+                $sql = "SELECT apf.*, p.numero_serie, p.marca, p.modelo, p.medida, p.status_id, sp.nome as status_nome, pp.nome as posicao_nome
+                        FROM alocacoes_pneus_flexiveis apf
+                        INNER JOIN pneus p ON apf.pneu_id = p.id
+                        LEFT JOIN status_pneus sp ON p.status_id = sp.id
+                        LEFT JOIN posicoes_pneus pp ON apf.posicao_id = pp.id
+                        INNER JOIN eixos_veiculos ev ON apf.eixo_veiculo_id = ev.id
+                        WHERE ev.veiculo_id = ? AND apf.empresa_id = ? AND apf.ativo = 1";
+            } else {
+                $sql = "SELECT apf.*, p.numero_serie, p.marca, p.modelo, p.medida, p.status_id, sp.nome as status_nome
+                        FROM alocacoes_pneus_flexiveis apf
+                        INNER JOIN pneus p ON apf.pneu_id = p.id
+                        LEFT JOIN status_pneus sp ON p.status_id = sp.id
+                        INNER JOIN eixos_veiculos ev ON apf.eixo_veiculo_id = ev.id
+                        WHERE ev.veiculo_id = ? AND apf.empresa_id = ? AND apf.ativo = 1";
+            }
+
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([$veiculo_id, $empresa_id]);
+            $alocacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($alocacoes as $alocacao) {
+                $pneusFlexAlocados[$alocacao['slot_id']] = [
+                    'id' => $alocacao['pneu_id'],
+                    'numero_serie' => $alocacao['numero_serie'],
+                    'marca' => $alocacao['marca'],
+                    'modelo' => $alocacao['modelo'],
+                    'medida' => $alocacao['medida'],
+                    'status_id' => $alocacao['status_id'],
+                    'status_nome' => $alocacao['status_nome'],
+                    'posicao_id' => $posicao_id_exists ? ($alocacao['posicao_id'] ?? null) : null,
+                    'posicao_nome' => $posicao_id_exists ? ($alocacao['posicao_nome'] ?? null) : null
+                ];
+            }
+        } catch (Exception $alocEx) {
+            error_log('layout_completo alocacoes veiculo ' . $veiculo_id . ': ' . $alocEx->getMessage());
         }
         
         // Calcular próximo ID de eixo

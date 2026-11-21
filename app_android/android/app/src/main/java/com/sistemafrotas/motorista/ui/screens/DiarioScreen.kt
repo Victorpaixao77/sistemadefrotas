@@ -1,5 +1,6 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -69,9 +70,9 @@ fun DiarioScreen(
     val vm: DiarioViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository) { DiarioViewModel(it) }
     )
-    val eventos by vm.eventos.collectAsState()
-    val refreshing by vm.refreshing.collectAsState()
-    val error by vm.error.collectAsState()
+    val eventos by vm.eventos.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { vm.carregarSeNecessario() }
 

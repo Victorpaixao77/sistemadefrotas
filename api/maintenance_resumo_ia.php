@@ -16,6 +16,7 @@ session_start();
 
 header('Content-Type: application/json');
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 api_require_csrf_json();
 
 $empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
@@ -24,7 +25,7 @@ if (!$empresa_id) {
 }
 
 $conn = getConnection();
-$cfg = function_exists('sf_vision_ai_resolve') ? sf_vision_ai_resolve($conn, $empresa_id) : null;
+$cfg = function_exists('sf_vision_ai_resolve') ? sf_vision_ai_resolve($conn, $empresa_id, 'text') : null;
 if ($cfg === null) {
     api_json_error('Nenhuma IA configurada. Vá em Configurações → IA de Visão e cadastre uma chave (ex.: Gemini, gratuito).', 422, 'ia_nao_configurada');
 }

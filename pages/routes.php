@@ -3,6 +3,9 @@
 require_once '../includes/config.php';
 require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
+require_once '../includes/db_connect.php';
+require_once '../includes/routes_list.php';
+require_once '../includes/routes_dashboard.php';
 require_once '../includes/sf_api_base.php';
 
 // Configure session before starting it
@@ -30,6 +33,74 @@ if (array_key_exists('modern', $_GET)) {
     header('Location: routes.php' . ($qs !== '' ? '?' . $qs : ''), true, 301);
     exit;
 }
+
+$empresa_id = (int) ($_SESSION['empresa_id'] ?? 0);
+$routes_page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+$routes_sort = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'data_rota';
+$routes_dir = (isset($_GET['dir']) && strtoupper((string) $_GET['dir']) === 'ASC') ? 'ASC' : 'DESC';
+$routes_search = isset($_GET['search']) ? trim((string) $_GET['search']) : '';
+$routes_delivery = isset($_GET['delivery']) ? trim((string) $_GET['delivery']) : '';
+if ($routes_delivery === '' && !empty($_GET['status'])) {
+    $legacy = trim((string) $_GET['status']);
+    if ($legacy === 'no_prazo') {
+        $routes_delivery = 'no_prazo';
+    } elseif ($legacy === 'atrasado') {
+        $routes_delivery = 'atrasado';
+    }
+}
+$routes_driver = isset($_GET['driver']) ? trim((string) $_GET['driver']) : '';
+$routes_date = isset($_GET['date']) ? trim((string) $_GET['date']) : '';
+$routes_date_from = isset($_GET['date_from']) ? trim((string) $_GET['date_from']) : '';
+$routes_date_to = isset($_GET['date_to']) ? trim((string) $_GET['date_to']) : '';
+$routes_dash_month = (isset($_GET['month']) && (int) $_GET['month'] > 0) ? (int) $_GET['month'] : (int) date('n');
+$routes_dash_year = (isset($_GET['year']) && (int) $_GET['year'] > 0) ? (int) $_GET['year'] : (int) date('Y');
+
+$routes_initial = [
+    'success' => true,
+    'data' => [],
+    'pagination' => ['page' => 1, 'limit' => $per_page, 'total' => 0, 'total_pages' => 1],
+];
+$routes_dash_kpi = [
+    'total_rotas' => 0,
+    'rotas_concluidas' => 0,
+    'distancia_total' => 0,
+    'frete_total' => 0,
+    'rotas_no_prazo' => 0,
+    'rotas_atrasadas' => 0,
+    'media_eficiencia' => 0,
+    'percentual_vazio' => 0,
+    'kpi_historico' => [],
+    'month' => $routes_dash_month,
+    'year' => $routes_dash_year,
+];
+
+if ($empresa_id > 0) {
+    try {
+        $routes_conn = getConnection();
+        $routes_initial = routes_fetch_list($routes_conn, $empresa_id, [
+            'page' => $routes_page,
+            'limit' => $per_page,
+            'search' => $routes_search,
+            'delivery' => $routes_delivery,
+            'driver' => $routes_driver,
+            'date' => $routes_date,
+            'date_from' => $routes_date_from,
+            'date_to' => $routes_date_to,
+            'sort' => $routes_sort,
+            'dir' => $routes_dir,
+        ]);
+        $routes_dash_kpi = routes_fetch_dashboard_kpis($routes_conn, $empresa_id, $routes_dash_month, $routes_dash_year);
+    } catch (Throwable $e) {
+        error_log('routes.php SSR: ' . $e->getMessage());
+    }
+}
+
+$routes_rows = $routes_initial['data'] ?? [];
+$routes_pag = $routes_initial['pagination'] ?? ['page' => 1, 'limit' => $per_page, 'total' => 0, 'total_pages' => 1];
+$routes_empty = empty($routes_rows);
+$routes_pag_page = (int) ($routes_pag['page'] ?? 1);
+$routes_pag_total_pages = max(1, (int) ($routes_pag['total_pages'] ?? 1));
+$routes_pag_total = (int) ($routes_pag['total'] ?? 0);
 ?>
 
 <!DOCTYPE html>
@@ -38,7 +109,7 @@ if (array_key_exists('modern', $_GET)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Gestão de Frotas - <?php echo $page_title; ?></title>
-    <?php sf_render_api_scripts(); ?>
+    <link rel="icon" type="image/png" href="<?php echo htmlspecialchars(sf_app_url('logo.png'), ENT_QUOTES, 'UTF-8'); ?>">
     
     <!-- CSS Files -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -47,18 +118,20 @@ if (array_key_exists('modern', $_GET)) {
     <link rel="stylesheet" href="../css/responsive.css">
     <link rel="stylesheet" href="../css/fornc-modern-page.css">
     
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="../logo.png">
-    
     <!-- Chart.js for analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
     
     <!-- Route Profitability Analysis -->
     <script src="../js/route-profitability.js"></script>
-    <link rel="stylesheet" href="../css/routes.css?v=1.0.2">
+    <link rel="stylesheet" href="../css/routes.css?v=1.0.20">
+    <link rel="stylesheet" href="../css/abastecimentos.css?v=<?php echo htmlspecialchars(sf_asset_v(), ENT_QUOTES, 'UTF-8'); ?>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/sf-premium.css?v=1.0.2">
+    <link rel="stylesheet" href="../css/bi-premium.css?v=<?php echo htmlspecialchars(sf_asset_v(), ENT_QUOTES, 'UTF-8'); ?>">
     <?php sf_page_help_css('..'); ?>
 </head>
-<body class="routes-modern">
+<body class="routes-modern sf-premium">
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <?php include '../includes/sidebar_pages.php'; ?>
@@ -70,114 +143,33 @@ if (array_key_exists('modern', $_GET)) {
             
             <!-- Page Content -->
             <div class="dashboard-content routes-modern-page">
-                <!-- KPI Cards Row -->
-                <div class="dashboard-grid">
-                    <div class="dashboard-card" data-kpi="total" title="Clique para ver todas as rotas do período">
-                        <div class="card-header">
-                            <i class="fas fa-route kpi-card-icon" aria-hidden="true"></i>
-                            <h3>Total de Rotas</h3>
+                <?php
+                $routes_kpis = [
+                    ['kpi' => 'total', 'label' => 'Total de Rotas', 'hint' => 'Rotas cadastradas', 'id' => 'totalRoutes', 'value' => '0', 'icon' => 'fa-route', 'ic' => 'ic-blue', 'title' => 'Clique para ver todas as rotas do período'],
+                    ['kpi' => 'concluidas', 'label' => 'Rotas Concluídas', 'hint' => 'Neste mês', 'id' => 'completedRoutes', 'value' => '0', 'icon' => 'fa-circle-check', 'ic' => 'ic-green', 'title' => 'Rotas concluídas no período'],
+                    ['kpi' => 'distancia', 'label' => 'Distância Total', 'hint' => 'Percorridos', 'id' => 'totalDistance', 'value' => '0 km', 'icon' => 'fa-road', 'ic' => 'ic-cyan', 'title' => 'Distância total no período'],
+                    ['kpi' => 'frete', 'label' => 'Frete Total', 'hint' => 'Em fretes', 'id' => 'totalFrete', 'value' => 'R$ 0,00', 'icon' => 'fa-sack-dollar', 'ic' => 'ic-amber', 'title' => 'Frete total no período'],
+                    ['kpi' => 'no_prazo', 'label' => 'Rotas no Prazo', 'hint' => 'Entregas no prazo', 'id' => 'rotasNoPrazo', 'value' => '0', 'icon' => 'fa-calendar-check', 'ic' => 'ic-green', 'title' => 'Filtrar entregas no prazo'],
+                    ['kpi' => 'atrasadas', 'label' => 'Rotas Atrasadas', 'hint' => 'Entregas atrasadas', 'id' => 'rotasAtrasadas', 'value' => '0', 'icon' => 'fa-triangle-exclamation', 'ic' => 'ic-red', 'title' => 'Filtrar entregas atrasadas'],
+                    ['kpi' => 'eficiencia', 'label' => 'Eficiência Média', 'hint' => 'Taxa de eficiência', 'id' => 'mediaEficiencia', 'value' => '0%', 'icon' => 'fa-chart-line', 'ic' => 'ic-violet', 'title' => 'Eficiência média no período'],
+                    ['kpi' => 'km_vazio', 'label' => 'Média KM Vazio', 'hint' => 'Quilometragem sem carga', 'id' => 'percentualVazio', 'value' => '0%', 'icon' => 'fa-box-open', 'ic' => 'ic-amber', 'title' => 'Média de quilometragem vazia'],
+                ];
+                ?>
+                <div id="routes-kpis" class="dashboard-grid biq-kpis" role="region" aria-label="Indicadores de rotas">
+                    <?php foreach ($routes_kpis as $rk): ?>
+                    <div class="dashboard-card biq-card biq-kpi" data-kpi="<?php echo htmlspecialchars($rk['kpi'], ENT_QUOTES, 'UTF-8'); ?>" title="<?php echo htmlspecialchars($rk['title'], ENT_QUOTES, 'UTF-8'); ?>">
+                        <div class="biq-kpi__top">
+                            <span class="biq-kpi__label biq-kpi-tip" title="<?php echo htmlspecialchars($rk['title'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($rk['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+                            <span class="biq-kpi__icon <?php echo htmlspecialchars($rk['ic'], ENT_QUOTES, 'UTF-8'); ?>"><i class="fas <?php echo htmlspecialchars($rk['icon'], ENT_QUOTES, 'UTF-8'); ?>" aria-hidden="true"></i></span>
                         </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="totalRoutes">0</span>
-                                <span class="metric-subtitle">Rotas cadastradas</span>
-                            </div>
+                        <div class="biq-kpi__value" id="<?php echo htmlspecialchars($rk['id'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars(routes_kpi_display_value($rk['kpi'], $routes_dash_kpi), ENT_QUOTES, 'UTF-8'); ?></div>
+                        <div class="biq-kpi__foot routes-kpi-foot">
+                            <span class="routes-kpi-delta biq-delta biq-delta--flat"><i class="fas fa-minus" aria-hidden="true"></i> ±0,0%</span>
+                            <span class="routes-kpi-spark-wrap" aria-hidden="true"></span>
                         </div>
+                        <div class="biq-kpi__hint"><?php echo htmlspecialchars($rk['hint'], ENT_QUOTES, 'UTF-8'); ?></div>
                     </div>
-                    
-                    <div class="dashboard-card" data-kpi="concluidas" title="Rotas concluídas no período">
-                        <div class="card-header">
-                            <i class="fas fa-circle-check kpi-card-icon" aria-hidden="true"></i>
-                            <h3>Rotas Concluídas</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="completedRoutes">0</span>
-                                <span class="metric-subtitle">Neste mês</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-card" data-kpi="distancia" title="Distância total no período">
-                        <div class="card-header">
-                            <i class="fas fa-road kpi-card-icon" aria-hidden="true"></i>
-                            <h3>Distância Total</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="totalDistance">0 km</span>
-                                <span class="metric-subtitle">Percorridos</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-card" data-kpi="frete" title="Frete total no período">
-                        <div class="card-header">
-                            <i class="fas fa-sack-dollar kpi-card-icon" aria-hidden="true"></i>
-                            <h3>Frete Total</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="totalFrete">R$ 0,00</span>
-                                <span class="metric-subtitle">Em fretes</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Efficiency Metrics -->
-                <div class="dashboard-grid">
-                    <div class="dashboard-card" data-kpi="no_prazo" title="Filtrar entregas no prazo">
-                        <div class="card-header">
-                            <i class="fas fa-calendar-check kpi-card-icon" aria-hidden="true"></i>
-                            <h3>Rotas no Prazo</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="rotasNoPrazo">0</span>
-                                <span class="metric-subtitle">Entregas no prazo</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-card" data-kpi="atrasadas" title="Filtrar entregas atrasadas">
-                        <div class="card-header">
-                            <i class="fas fa-triangle-exclamation kpi-card-icon" aria-hidden="true"></i>
-                            <h3>Rotas Atrasadas</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="rotasAtrasadas">0</span>
-                                <span class="metric-subtitle">Entregas atrasadas</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-card" data-kpi="eficiencia" title="Eficiência média no período">
-                        <div class="card-header">
-                            <i class="fas fa-chart-line kpi-card-icon" aria-hidden="true"></i>
-                            <h3>Eficiência Média</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="mediaEficiencia">0%</span>
-                                <span class="metric-subtitle">Taxa de eficiência</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="dashboard-card" data-kpi="km_vazio" title="Média de quilometragem vazia">
-                        <div class="card-header">
-                            <i class="fas fa-box-open kpi-card-icon" aria-hidden="true"></i>
-                            <h3>Média KM Vazio</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="metric">
-                                <span class="metric-value" id="percentualVazio">0%</span>
-                                <span class="metric-subtitle">Quilometragem sem carga</span>
-                            </div>
-                        </div>
-                    </div>
+                    <?php endforeach; ?>
                 </div>
                 
                 <!-- Active Routes Section -->
@@ -235,12 +227,13 @@ if (array_key_exists('modern', $_GET)) {
                     </div>
                     <div class="fornc-btn-row">
                             <button id="addRouteBtn" class="fornc-btn fornc-btn--primary"><i class="fas fa-plus"></i> Novo</button>
+                            <button id="importFichaBtn" type="button" class="fornc-btn fornc-btn--accent" title="Importar ficha de frete (foto/PDF) e criar rota com os abastecimentos"><i class="fas fa-file-invoice"></i> Importar ficha</button>
                             <button id="importNfeXmlBtn" type="button" class="fornc-btn fornc-btn--accent" title="Importar XML da NF-e e criar rota"><i class="fas fa-file-import"></i> Importar NF-e</button>
                             <button id="applyRouteFilters" type="button" class="fornc-btn fornc-btn--accent"><i class="fas fa-search"></i> Pesquisar</button>
-                            <button id="filterBtn" type="button" class="fornc-btn fornc-btn--ghost"><i class="fas fa-sliders-h"></i> Opções</button>
+                            <button id="filterBtn" type="button" class="fornc-btn fornc-btn--ghost"><i class="fas fa-calendar-alt"></i> Período</button>
                             <button id="columnsBtn" type="button" class="fornc-btn fornc-btn--ghost" title="Colunas da tabela"><i class="fas fa-columns"></i></button>
-                            <button id="exportBtn" type="button" class="fornc-btn fornc-btn--muted"><i class="fas fa-file-export"></i> Exportar</button>
-                            <button id="simulateRouteBtn" type="button" class="fornc-btn fornc-btn--ghost"><i class="fas fa-route"></i> Simular Rota</button>
+                            <a href="<?php echo htmlspecialchars(sf_app_url('pages/simulador_rota.php')); ?>" class="fornc-btn fornc-btn--ghost"><i class="fas fa-route"></i> Simular Rota</a>
+                            <button id="exportBtn" type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" title="Exportar"><i class="fas fa-file-export"></i></button>
                             <button id="helpBtn" type="button" class="fornc-btn fornc-btn--ghost fornc-btn--icon" title="Ajuda"><i class="fas fa-question-circle"></i></button>
                             <button type="button" class="fornc-btn fornc-btn--ghost" id="clearRouteFilters" title="Limpar filtros"><i class="fas fa-undo"></i></button>
                     </div>
@@ -264,7 +257,7 @@ if (array_key_exists('modern', $_GET)) {
                     <button type="button" class="fornc-btn fornc-btn--muted" id="routesExportSelectedBtn"><i class="fas fa-file-csv"></i> CSV selecionadas</button>
                     <button type="button" class="fornc-btn fornc-btn--ghost" id="routesClearSelectionBtn">Limpar seleção</button>
                 </div>
-                <div class="fornc-empty-state" id="routesEmptyState">
+                <div class="fornc-empty-state<?php echo $routes_empty ? ' visible' : ''; ?>" id="routesEmptyState">
                     <p class="fornc-empty-state-title">Nenhuma rota encontrada</p>
                     <p class="fornc-empty-state-hint">Ajuste os filtros ou cadastre uma nova rota.</p>
                     <button type="button" class="fornc-btn fornc-btn--primary" id="routesEmptyCreateBtn"><i class="fas fa-plus"></i> Criar primeira rota</button>
@@ -274,7 +267,7 @@ if (array_key_exists('modern', $_GET)) {
                         <i class="fas fa-spinner fa-spin"></i>
                         <span>Carregando rotas...</span>
                     </div>
-                    <table class="data-table" id="routesDataTable">
+                    <table class="data-table" id="routesDataTable"<?php echo $routes_empty ? ' style="display:none;"' : ''; ?>>
                         <thead>
                             <tr>
                                 <th class="col-sel" data-col="sel"><input type="checkbox" id="routesSelectAll" title="Selecionar página" aria-label="Selecionar todas desta página"></th>
@@ -300,12 +293,30 @@ if (array_key_exists('modern', $_GET)) {
                                 <th data-col="acoes">Ações</th>
                             </tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody>
+                            <?php foreach ($routes_rows as $route_row): ?>
+                            <?php echo routes_render_table_row($route_row); ?>
+                            <?php endforeach; ?>
+                        </tbody>
                     </table>
                 </div>
                 
                 <!-- Pagination -->
-                <div class="pagination" id="paginationRoutesContainer" data-per-page="<?php echo (int)$per_page; ?>"></div>
+                <div class="pagination" id="paginationRoutesContainer" data-per-page="<?php echo (int)$per_page; ?>">
+                    <a href="#" class="pagination-btn<?php echo $routes_pag_page <= 1 ? ' disabled' : ''; ?>" data-direction="prev" data-page="<?php echo max(1, $routes_pag_page - 1); ?>">
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    <span class="pagination-info"><?php
+                        if ($routes_pag_total_pages > 1) {
+                            echo 'Página ' . $routes_pag_page . ' de ' . $routes_pag_total_pages . ' (' . $routes_pag_total . ' registros)';
+                        } else {
+                            echo $routes_pag_total . ' registros';
+                        }
+                    ?></span>
+                    <a href="#" class="pagination-btn<?php echo $routes_pag_page >= $routes_pag_total_pages ? ' disabled' : ''; ?>" data-direction="next" data-page="<?php echo min($routes_pag_total_pages, $routes_pag_page + 1); ?>">
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                </div>
                 
                 <!-- Analytics Section -->
                 <div class="analytics-section">
@@ -891,167 +902,6 @@ if (array_key_exists('modern', $_GET)) {
         </div>
     </div>
 
-    <!-- Route Simulation Modal -->
-    <div class="modal" id="routeSimulationModal">
-        <div class="modal-content route-sim-modal-content">
-            <div class="modal-header">
-                <h2>🚛 Simulador de Rota</h2>
-                <span class="close-modal" onclick="closeSimulationModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="route-sim-grid-main">
-                    <div class="simulation-form">
-                        <h3 class="route-sim-section-title">📍 Configuração da Rota</h3>
-                        
-                        <div class="form-section">
-                            <h4 class="route-sim-subsection-title">Origem</h4>
-                            <div class="form-grid route-sim-form-grid">
-                                <div class="form-group">
-                                    <label for="sim_estado_origem">Estado</label>
-                                    <select id="sim_estado_origem" class="route-sim-input">
-                                        <option value="">Selecione o estado</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="sim_cidade_origem_id">Cidade</label>
-                                    <select id="sim_cidade_origem_id" class="route-sim-input" disabled>
-                                        <option value="">Selecione primeiro o estado</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-section">
-                            <h4 class="route-sim-subsection-title">Destino</h4>
-                            <div class="form-grid route-sim-form-grid">
-                                <div class="form-group">
-                                    <label for="sim_estado_destino">Estado</label>
-                                    <select id="sim_estado_destino" class="route-sim-input">
-                                        <option value="">Selecione o estado</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="sim_cidade_destino_id">Cidade</label>
-                                    <select id="sim_cidade_destino_id" class="route-sim-input" disabled>
-                                        <option value="">Selecione primeiro o estado</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="simVehicle">Veículo (cadastro)</label>
-                            <select id="simVehicle" class="route-sim-input">
-                                <option value="">Selecione um veículo</option>
-                            </select>
-                            <p id="simVehicleCarretaLine" class="route-sim-vehicle-meta" aria-live="polite"></p>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="simFuelType">Combustível:</label>
-                            <select id="simFuelType" class="route-sim-input">
-                                <option value="DIESEL" selected>Diesel</option>
-                                <option value="GASOLINE">Gasolina</option>
-                                <option value="HYBRID">Híbrido</option>
-                                <option value="ELECTRIC">Elétrico</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="simFuelPrice">Preço do Combustível (R$/L):</label>
-                            <input type="number" id="simFuelPrice" class="route-sim-input" step="0.01" value="5.50">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="simTollPass">TAG / pedágio (Google Routes)</label>
-                            <select id="simTollPass" class="route-sim-input">
-                                <option value="">Não informar (preço padrão da API)</option>
-                                <option value="BR_SEM_PARAR">Sem Parar</option>
-                                <option value="BR_CONECTCAR">ConectCar</option>
-                                <option value="BR_VELOE">Veloe</option>
-                                <option value="BR_MOVE_MAIS">Move Mais</option>
-                                <option value="BR_TAGGY">Taggy</option>
-                                <option value="BR_AUTO_EXPRESO">Auto Expresso</option>
-                                <option value="BR_PASSA_RAPIDO">Passa Rápido</option>
-                            </select>
-                            <p class="route-sim-vehicle-meta" aria-live="polite">Opcional: a Google pode aplicar tarifa de TAG onde o modelo cobrir. Continua sendo estimativa (não comercial / praças BR).</p>
-                        </div>
-                        
-                        <button type="button" id="simulateRouteBtnModal" class="btn-route-sim-calc">
-                            <i class="fas fa-calculator"></i> Simular Rota
-                        </button>
-                        
-                        <div class="route-sim-external-box">
-                            <h4 class="route-sim-external-title">
-                                <i class="fas fa-external-link-alt"></i> Simuladores de Rotas Online
-                            </h4>
-                            <div class="route-sim-external-grid">
-                                <a href="https://rotasbrasil.com.br/" target="_blank" rel="noopener noreferrer" class="route-sim-external-link">
-                                    <i class="fas fa-route"></i>
-                                    <span>Rotas Brasil</span>
-                                    <i class="fas fa-external-link-alt"></i>
-                                </a>
-                                <a href="https://www.webrouter.com.br/way/#/calcularRota" target="_blank" rel="noopener noreferrer" class="route-sim-external-link">
-                                    <i class="fas fa-map-marked-alt"></i>
-                                    <span>WebRouter</span>
-                                    <i class="fas fa-external-link-alt"></i>
-                                </a>
-                                <a href="https://qualp.com.br/#/" target="_blank" rel="noopener noreferrer" class="route-sim-external-link">
-                                    <i class="fas fa-route"></i>
-                                    <span>Qualp</span>
-                                    <i class="fas fa-external-link-alt"></i>
-                                </a>
-                                <a href="https://www.semparar.com.br/trace-sua-rota" target="_blank" rel="noopener noreferrer" class="route-sim-external-link">
-                                    <i class="fas fa-tag"></i>
-                                    <span>Sem Parar</span>
-                                    <i class="fas fa-external-link-alt"></i>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="simulation-map">
-                        <h3 class="route-sim-section-title">🗺️ Mapa da Rota</h3>
-                        <div id="simulationMap" class="route-sim-map-el"></div>
-                        <div id="simulationInfo" class="route-sim-alert--info" role="status"></div>
-                        <div id="simulationError" class="route-sim-alert--err" role="alert"></div>
-                    </div>
-                </div>
-                
-                <div id="simulationResults" class="route-sim-results">
-                    <h3 class="route-sim-results-title">📊 Resultados da Simulação</h3>
-                    
-                    <div class="route-sim-result-cards">
-                        <div class="result-card result-card--dist">
-                            <h4 class="rc-title rc-title--green">📏 Distância</h4>
-                            <p class="rc-val rc-val--green" id="simDistance">-</p>
-                            <p class="rc-sub rc-sub--green" id="simDuration">-</p>
-                        </div>
-                        <div class="result-card result-card--fuel">
-                            <h4 class="rc-title rc-title--orange">⛽ Combustível</h4>
-                            <p class="rc-val rc-val--orange" id="simFuelCost">-</p>
-                            <p class="rc-sub rc-sub--orange" id="simFuelLiters">-</p>
-                        </div>
-                        <div class="result-card result-card--toll">
-                            <h4 class="rc-title rc-title--orange">🛣️ Pedágios</h4>
-                            <p class="rc-val rc-val--orange" id="simTolls">-</p>
-                            <p class="rc-sub rc-sub--orange" id="simTollCount">-</p>
-                        </div>
-                        <div class="result-card result-card--total">
-                            <h4 class="rc-title rc-title--white">💰 Custo Total</h4>
-                            <p class="rc-val rc-val--total" id="simTotalCost">-</p>
-                            <p class="rc-sub rc-sub--total" id="simCostPerKm">-</p>
-                        </div>
-                    </div>
-                    
-                    <div class="route-sim-details-panel">
-                        <h4>🛣️ Detalhes da Rota</h4>
-                        <div id="routeDetails" class="route-sim-details-scroll"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
     <?php $sf_help_key = 'routes'; include __DIR__ . '/../includes/sf_page_help_bundle.php'; ?>
 
 
@@ -1211,7 +1061,8 @@ if (array_key_exists('modern', $_GET)) {
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
     <script src="../js/sf_insights.js?v=1.3"></script>
-    <script src="../js/routes.js?v=1.0.6"></script>
+    <script>window.__ROUTES_INITIAL__=<?php echo json_encode($routes_initial, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;window.__ROUTES_DASHBOARD_KPI__=<?php echo json_encode($routes_dash_kpi, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
+    <script src="../js/routes.js?v=1.0.9"></script>
     <script>
     // Garantir dropdown do perfil no menu superior (igual às outras páginas)
     (function() {
@@ -1254,8 +1105,22 @@ if (array_key_exists('modern', $_GET)) {
 
     <!-- Mapa + simulação: URLs via window.__SF_ROUTES_MAP_IMG__ -->
     <script>window.__SF_ROUTES_MAP_IMG__=<?php echo json_encode(sf_app_url('uploads/mapa/mapa-brasil.png'), JSON_UNESCAPED_SLASHES); ?>;</script>
-    <script src="../js/routes-simulation.js?v=1.0.6"></script>
+    <script src="../js/routes-simulation.js?v=1.0.12"></script>
     <script src="../js/routes-map.js?v=1.0.1"></script>
+
+    <!-- Importar ficha de frete (foto/PDF/CSV) → cria a rota com os abastecimentos vinculados -->
+    <?php $rim_title = 'Importar ficha'; include '../includes/refuel_import_modal.php'; ?>
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/legacy/build/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="../js/refuel-import.js?v=<?php echo htmlspecialchars(sf_asset_v(), ENT_QUOTES, 'UTF-8'); ?>"></script>
+    <script>
+    (function () {
+        var btn = document.getElementById('importFichaBtn');
+        if (btn) btn.addEventListener('click', function () {
+            if (typeof window.openRefuelImportModal === 'function') window.openRefuelImportModal();
+        });
+    })();
+    </script>
 
     <!-- Modal de confirmação (substitui confirm() nativo) -->
     <div class="rt-confirm" id="rtConfirm" role="dialog" aria-modal="true" aria-labelledby="rtConfirmTitle" style="display:none;">

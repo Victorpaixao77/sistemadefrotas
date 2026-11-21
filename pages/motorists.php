@@ -1,3 +1,4 @@
+
 <?php
 // Include configuration and functions first
 require_once '../includes/config.php';
@@ -5,6 +6,7 @@ require_once __DIR__ . '/../includes/sf_page_help.php';
 require_once '../includes/functions.php';
 require_once '../includes/progress_bars.php';
 require_once '../includes/sf_api_base.php';
+require_once __DIR__ . '/../includes/motorists_list.php';
 
 // Configure session before starting it
 configure_session();
@@ -16,6 +18,13 @@ session_start();
 if(!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true){
     header('location: ' . sf_app_url('login.php'));
     exit;
+}
+if (function_exists('csrf_token_get')) {
+    require_once __DIR__ . '/../includes/csrf.php';
+    csrf_token_get();
+}
+if (function_exists('sf_release_session_lock')) {
+    sf_release_session_lock();
 }
 
 // Set page title
@@ -37,27 +46,60 @@ $empresa_id = $_SESSION['empresa_id'];
 // Sincronizar alertas de CNH vencendo para o sino de notificações (máx. 1 por dia)
 require_once __DIR__ . '/../includes/sync_cnh_notificacoes.php';
 
-// KPIs iniciais (lista vem só da API via motorists.js)
-$stmt = $conn->prepare("
-    SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN m.disponibilidade_id = 1 THEN 1 ELSE 0 END) AS disponiveis,
-        SUM(CASE WHEN m.disponibilidade_id != 1 OR m.disponibilidade_id IS NULL THEN 1 ELSE 0 END) AS indisponiveis,
-        AVG(CASE WHEN m.porcentagem_comissao IS NOT NULL THEN m.porcentagem_comissao END) AS media_comissao,
-        SUM(CASE WHEN TRIM(COALESCE(m.cpf, '')) = '' OR REPLACE(REPLACE(REPLACE(m.cpf, '.', ''), '-', ''), ' ', '') = '' THEN 1 ELSE 0 END) AS sem_cpf
-    FROM motoristas m
-    WHERE m.empresa_id = :empresa_id
-");
-$stmt->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
-$stmt->execute();
-$mnt_kpi = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+$mnt_page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : 1;
+$mnt_search = isset($_GET['search']) ? trim((string) $_GET['search']) : '';
+$mnt_status = isset($_GET['status']) && $_GET['status'] !== '' ? (string) $_GET['status'] : null;
+$mnt_categoria_cnh = isset($_GET['categoria_cnh']) && $_GET['categoria_cnh'] !== '' ? (string) $_GET['categoria_cnh'] : null;
+$mnt_tipo_contrato = isset($_GET['tipo_contrato']) && $_GET['tipo_contrato'] !== '' ? (string) $_GET['tipo_contrato'] : null;
+$mnt_sort = isset($_GET['sort']) ? trim((string) $_GET['sort']) : 'nome';
+$mnt_order = (isset($_GET['order']) && strtoupper((string) $_GET['order']) === 'DESC') ? 'DESC' : 'ASC';
+$mnt_only_fav = isset($_GET['only_favoritos']) && (string) $_GET['only_favoritos'] === '1';
+$mnt_uid = $_SESSION['usuario_id'] ?? $_SESSION['id'] ?? $_SESSION['user_id'] ?? null;
 
-$total_motoristas = (int) ($mnt_kpi['total'] ?? 0);
-$motoristas_disponiveis = (int) ($mnt_kpi['disponiveis'] ?? 0);
-$motoristas_indisponiveis = (int) ($mnt_kpi['indisponiveis'] ?? 0);
-$media_comissao = (float) ($mnt_kpi['media_comissao'] ?? 0);
-$motoristas_sem_cpf = (int) ($mnt_kpi['sem_cpf'] ?? 0);
-$motoristas = [];
+$mnt_initial = ['success' => true, 'motorists' => [], 'pagination' => ['page' => 1, 'limit' => $per_page, 'total' => 0, 'total_pages' => 1], 'summary' => []];
+if ($empresa_id) {
+    try {
+        $mnt_initial = motorists_fetch_list($conn, (int) $empresa_id, $mnt_uid ? (int) $mnt_uid : null, [
+            'limit' => $per_page,
+            'page' => $mnt_page,
+            'status' => $mnt_status,
+            'search' => $mnt_search !== '' ? $mnt_search : null,
+            'categoria_cnh' => $mnt_categoria_cnh,
+            'tipo_contrato' => $mnt_tipo_contrato,
+            'sort' => $mnt_sort,
+            'order' => $mnt_order,
+            'only_favoritos' => $mnt_only_fav,
+        ]);
+    } catch (Throwable $e) {
+        error_log('motorists SSR: ' . $e->getMessage());
+    }
+}
+
+$mnt_summary = $mnt_initial['summary'] ?? [];
+$mnt_rows = $mnt_initial['motorists'] ?? [];
+$mnt_pag = $mnt_initial['pagination'] ?? ['page' => 1, 'limit' => $per_page, 'total' => 0, 'total_pages' => 1];
+$mnt_total = (int) ($mnt_pag['total'] ?? 0);
+$mnt_cur_page = (int) ($mnt_pag['page'] ?? 1);
+$mnt_total_pages = max(1, (int) ($mnt_pag['total_pages'] ?? 1));
+
+$total_motoristas = (int) ($mnt_summary['total_motorists'] ?? 0);
+$motoristas_disponiveis = (int) ($mnt_summary['motorists_ativos'] ?? 0);
+$motoristas_indisponiveis = (int) ($mnt_summary['motorists_ferias'] ?? 0)
+    + (int) ($mnt_summary['motorists_licenca'] ?? 0)
+    + (int) ($mnt_summary['motorists_inativos'] ?? 0)
+    + (int) ($mnt_summary['motorists_afastados'] ?? 0);
+$media_comissao = (float) ($mnt_summary['media_comissao_pct'] ?? 0);
+
+// Banner CPF ausente (query leve, independente dos filtros da lista)
+$stmt_sem_cpf = $conn->prepare("
+    SELECT COUNT(*) AS sem_cpf FROM motoristas m
+    WHERE m.empresa_id = :empresa_id
+    AND (TRIM(COALESCE(m.cpf, '')) = '' OR REPLACE(REPLACE(REPLACE(m.cpf, '.', ''), '-', ''), ' ', '') = '')
+");
+$stmt_sem_cpf->bindValue(':empresa_id', $empresa_id, PDO::PARAM_INT);
+$stmt_sem_cpf->execute();
+$motoristas_sem_cpf = (int) ($stmt_sem_cpf->fetchColumn() ?: 0);
+$motoristas = $mnt_rows;
 
 // Helper functions
 if (!function_exists('normalize_status_class')) {
@@ -135,1200 +177,10 @@ if (!function_exists('format_cpf_br')) {
     <link rel="icon" type="image/png" href="../logo.png">
     
     <!-- Chart.js for analytics -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+    <script src="../js/sf-charts-premium.js"></script>
     
-    <style>
-        .main-content {
-            margin-left: var(--sidebar-width);
-            transition: margin-left var(--transition-speed) ease;
-            width: calc(100% - var(--sidebar-width));
-            min-height: 100vh;
-            background: var(--bg-primary);
-        }
-        
-        .sidebar-collapsed .main-content {
-            margin-left: var(--sidebar-collapsed-width);
-            width: calc(100% - var(--sidebar-collapsed-width));
-        }
-        
-        .dashboard-content {
-            padding: 20px;
-            width: 100%;
-            max-width: 100%;
-            overflow-x: hidden;
-        }
-        
-        @media (max-width: 768px) {
-            .main-content {
-                margin-left: 0 !important;
-                width: 100% !important;
-            }
-        }
-        
-        /* Estilos para paginação */
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-top: 20px;
-            gap: 15px;
-        }
-        
-        .pagination-btn {
-            padding: 8px 16px;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            background: var(--bg-secondary);
-            color: var(--text-color);
-            text-decoration: none;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        
-        .pagination-btn:hover:not(.disabled) {
-            background: var(--bg-tertiary);
-        }
-        
-        .pagination-btn.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
-        
-        .pagination-info {
-            font-size: 0.9rem;
-            color: var(--text-color);
-            padding: 0 10px;
-        }
-        
-        .filter-options .filter-label {
-            font-size: 0.9rem;
-            color: var(--text-color);
-            margin-right: 0.25rem;
-        }
-        .filter-options .filter-per-page {
-            padding: 6px 10px;
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            background: var(--bg-secondary);
-            color: var(--text-color);
-            font-size: 0.9rem;
-        }
-        th.sortable { cursor: pointer; user-select: none; }
-        th.sortable:hover { color: var(--accent-primary); }
-        th.sortable .sort-ind { opacity: 0.45; margin-left: 0.2rem; font-size: 0.65rem; }
-        th.sortable.sorted .sort-ind { opacity: 1; color: var(--accent-primary); }
-        
-        /* Estilos para a seção de análise */
-        .analytics-section {
-            margin-top: 20px;
-            padding: 0 20px;
-        }
-        
-        .analytics-section .section-header {
-            margin-bottom: 20px;
-        }
-        
-        .analytics-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .analytics-card {
-            background: var(--bg-secondary);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            height: 100%;
-        }
-        
-        .analytics-card .card-header {
-            padding: 15px;
-            border-bottom: 1px solid var(--border-color);
-        }
-        
-        .analytics-card .card-header h3 {
-            margin: 0;
-            font-size: 1rem;
-        }
-        
-        .analytics-card .card-body {
-            padding: 15px;
-            height: 400px;
-            position: relative;
-        }
-
-        .chart-container {
-            position: relative;
-            height: 100%;
-            width: 100%;
-        }
-
-        /* Garantir que os botões do modal de motoristas tenham o mesmo tamanho dos botões do modal de veículos */
-        #motoristModal .modal-footer .btn-secondary,
-        #motoristModal .modal-footer .btn-primary {
-            min-width: 100px;
-            padding: 8px 16px;
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        /* Modal extra large para gamificação e ranking */
-        .modal-xl {
-            width: 95vw;
-            max-width: 1200px;
-            margin: 20px auto;
-        }
-
-        .modal-xl .modal-content {
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        /* Spinner para loading */
-        .spinner-border {
-            width: 3rem;
-            height: 3rem;
-            border: 0.25em solid currentColor;
-            border-right-color: transparent;
-            border-radius: 50%;
-            animation: spinner-border 0.75s linear infinite;
-        }
-
-        @keyframes spinner-border {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        .visually-hidden {
-            position: absolute !important;
-            width: 1px !important;
-            height: 1px !important;
-            padding: 0 !important;
-            margin: -1px !important;
-            overflow: hidden !important;
-            clip: rect(0, 0, 0, 0) !important;
-            white-space: nowrap !important;
-            border: 0 !important;
-        }
-
-        /* Estilos modernos para Gamificação */
-        .gamification-header, .ranking-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-
-        .gamification-header h3, .ranking-header h3 {
-            color: white;
-            font-weight: 700;
-        }
-
-        .gamification-header p, .ranking-header p {
-            color: rgba(255, 255, 255, 0.9);
-            font-weight: 500;
-        }
-
-        .bg-gradient-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        }
-
-        .bg-gradient-success {
-            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important;
-        }
-
-        .bg-gradient-info {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-        }
-
-        /* Cards de Níveis */
-        .level-card {
-            background: white;
-            border-radius: 8px;
-            padding: 6px;
-            text-align: center;
-            transition: all 0.3s ease;
-            min-height: 70px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            border: 2px solid transparent;
-            height: 100%;
-            flex: 1;
-            margin: 0 2px;
-        }
-
-        .level-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-
-        .level-card.bronze {
-            background: linear-gradient(135deg, #CD7F32, #8B4513);
-            color: white;
-        }
-
-        .level-card.silver {
-            background: linear-gradient(135deg, #C0C0C0, #808080);
-            color: white;
-        }
-
-        .level-card.gold {
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            color: white;
-        }
-
-        .level-card.platinum {
-            background: linear-gradient(135deg, #E5E4E2, #C0C0C0);
-            color: white;
-        }
-
-        .level-card.diamond {
-            background: linear-gradient(135deg, #B9F2FF, #00BFFF);
-            color: white;
-        }
-
-        .level-card.legend {
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            color: white;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-        }
-
-        /* Badge Cards */
-        .badge-card {
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 8px;
-            text-align: center;
-            transition: all 0.3s ease;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            min-height: 70px;
-        }
-
-        .badge-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-
-        .badge-icon {
-            font-size: 1.2rem;
-            margin-bottom: 4px;
-        }
-
-        .badge-name {
-            font-weight: 600;
-            font-size: 0.7rem;
-            margin-bottom: 2px;
-            color: #2c3e50;
-        }
-
-        .badge-desc {
-            font-size: 0.6rem;
-            color: #6c757d;
-            line-height: 1.1;
-        }
-
-        /* Stat Cards Compactos */
-        .stat-card {
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            padding: 12px;
-            text-align: center;
-            transition: all 0.3s ease;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            min-height: 80px;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-
-        .stat-icon {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 8px;
-            font-size: 0.9rem;
-        }
-
-        .stat-content {
-            flex: 1;
-        }
-
-        .stat-number {
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 4px;
-        }
-
-        .stat-label {
-            font-size: 0.7rem;
-            color: #6c757d;
-            font-weight: 500;
-            line-height: 1.2;
-        }
-
-        /* Garantir que os níveis fiquem lado a lado */
-        .levels-container {
-            display: flex !important;
-            flex-wrap: nowrap !important;
-            gap: 4px !important;
-            overflow-x: auto;
-            padding-bottom: 5px;
-        }
-
-        .levels-container .level-card {
-            flex: 1;
-            min-width: 0;
-            white-space: nowrap;
-        }
-
-        /* Garantir que os badges fiquem lado a lado */
-        .badges-container {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 8px !important;
-        }
-
-        .badges-container .badge-card {
-            width: 100% !important;
-            margin: 0 !important;
-        }
-
-        /* Garantir que as estatísticas fiquem lado a lado */
-        .stats-container {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 8px !important;
-        }
-
-        .stats-container .stat-card {
-            width: 100% !important;
-            margin: 0 !important;
-        }
-
-        /* Garantir que os filtros fiquem lado a lado */
-        .filters-container {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 12px !important;
-        }
-
-        .filters-container .filter-item {
-            width: 100% !important;
-            margin: 0 !important;
-        }
-
-        /* Garantir que as métricas fiquem lado a lado */
-        .metrics-container {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 8px !important;
-        }
-
-        .metrics-container .metric-card {
-            width: 100% !important;
-            margin: 0 !important;
-        }
-
-        /* Garantir que a distribuição fique lado a lado */
-        .distribution-grid {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 12px !important;
-        }
-
-        .distribution-grid .distribution-item {
-            width: 100% !important;
-            margin: 0 !important;
-        }
-
-        /* Garantir que os critérios fiquem lado a lado */
-        .criteria-container {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            gap: 8px !important;
-        }
-
-        .criteria-container .criteria-card {
-            width: 100% !important;
-            margin: 0 !important;
-        }
-
-        /* Corrigir contraste das métricas de desempenho */
-        .performance-section .metric-info h4 {
-            color: #2c3e50 !important;
-            font-weight: 600 !important;
-            margin-bottom: 8px !important;
-        }
-
-        .performance-section .metric-info p {
-            color: #495057 !important;
-            font-weight: 500 !important;
-            font-size: 1.1rem !important;
-            margin: 0 !important;
-        }
-
-        .performance-section .metric-icon {
-            color: #6c757d !important;
-            font-size: 1.5rem !important;
-        }
-
-        .performance-section h3 {
-            color: #2c3e50 !important;
-            font-weight: 700 !important;
-            margin-bottom: 20px !important;
-        }
-
-        .level-icon {
-            font-size: 1.2rem;
-            margin-bottom: 4px;
-        }
-
-        .level-name {
-            font-weight: bold;
-            font-size: 0.7rem;
-            margin-bottom: 2px;
-        }
-
-        .level-points {
-            font-size: 0.6rem;
-            line-height: 1.1;
-            opacity: 0.9;
-        }
-
-        /* Cards de Badges */
-        .badge-card {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            text-align: center;
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
-            height: 100%;
-        }
-
-        .badge-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            border-color: #007bff;
-        }
-
-        .badge-icon {
-            font-size: 2rem;
-            margin-bottom: 8px;
-        }
-
-        .badge-name {
-            font-weight: bold;
-            font-size: 0.9rem;
-            margin-bottom: 5px;
-            color: #2c3e50;
-        }
-
-        .badge-desc {
-            font-size: 0.75rem;
-            color: #6c757d;
-            line-height: 1.3;
-        }
-
-        /* Cards de Métricas Avançadas */
-        .metric-card {
-            display: flex;
-            align-items: center;
-            padding: 20px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
-            height: 100%;
-        }
-
-        .metric-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-        }
-
-        .metric-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            color: white;
-            font-size: 1.2rem;
-        }
-
-        .metric-content {
-            flex: 1;
-        }
-
-        .metric-content h6 {
-            color: #2c3e50;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .metric-content p {
-            color: #2c3e50;
-            font-size: 1.1rem;
-            font-weight: bold;
-            margin: 0 0 5px 0;
-        }
-
-        .metric-content small {
-            color: #6c757d;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        /* Leaderboard */
-        .leaderboard-container {
-            max-height: 500px;
-            overflow-y: auto;
-            padding: 0;
-        }
-
-        .leaderboard-item {
-            display: flex;
-            align-items: center;
-            padding: 15px 20px;
-            border-bottom: 1px solid #f0f0f0;
-            transition: all 0.3s ease;
-        }
-
-        .leaderboard-item:hover {
-            background: #f8f9fa;
-        }
-
-        .leaderboard-item.top-three {
-            background: linear-gradient(90deg, rgba(255,215,0,0.1), transparent);
-        }
-
-        .position {
-            margin-right: 15px;
-        }
-
-        .position-badge {
-            display: inline-block;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            text-align: center;
-            line-height: 40px;
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
-
-        .position-badge.gold {
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            color: white;
-        }
-
-        .position-badge.silver {
-            background: linear-gradient(135deg, #C0C0C0, #808080);
-            color: white;
-        }
-
-        .position-badge.bronze {
-            background: linear-gradient(135deg, #CD7F32, #8B4513);
-            color: white;
-        }
-
-        .position-badge:not(.gold):not(.silver):not(.bronze) {
-            background: #f8f9fa;
-            color: #6c757d;
-        }
-
-        .driver-info {
-            flex: 1;
-        }
-
-        .driver-name {
-            font-weight: bold;
-            font-size: 1.1rem;
-            color: #2c3e50;
-        }
-        
-        /* Contraste melhorado - modo claro (padrão) */
-        .driver-name {
-            color: #2c3e50 !important;
-            font-weight: 700 !important;
-        }
-        
-        .leaderboard-item .driver-name {
-            color: #2c3e50 !important;
-            font-weight: 700 !important;
-        }
-        
-        .ranking-item .driver-name {
-            color: #2c3e50 !important;
-            font-weight: 700 !important;
-        }
-        
-        .driver-stats {
-            color: #495057 !important;
-            font-weight: 600 !important;
-        }
-        
-        .leaderboard-item .driver-stats {
-            color: #495057 !important;
-            font-weight: 600 !important;
-        }
-        
-        .driver-id {
-            color: #6c757d !important;
-            font-weight: 500 !important;
-        }
-        
-        .ranking-item .driver-id {
-            color: #6c757d !important;
-            font-weight: 500 !important;
-        }
-        
-        .score-text {
-            color: #2c3e50 !important;
-            font-weight: 700 !important;
-        }
-        
-        .ranking-item .score-text {
-            color: #2c3e50 !important;
-            font-weight: 700 !important;
-        }
-        
-        .level-badge {
-            color: #2c3e50 !important;
-            font-weight: 600 !important;
-        }
-        
-        .leaderboard-item .level-badge {
-            color: #2c3e50 !important;
-            font-weight: 600 !important;
-        }
-        
-        .status-badge {
-            color: #2c3e50 !important;
-            font-weight: 600 !important;
-        }
-        
-        .ranking-item .status-badge {
-            color: #2c3e50 !important;
-            font-weight: 600 !important;
-        }
-        
-        /* Modo escuro - apenas quando detectado */
-        @media (prefers-color-scheme: dark) {
-            .driver-name, .leaderboard-item .driver-name, .ranking-item .driver-name {
-                color: #f8f9fa !important;
-            }
-            
-            .driver-stats, .leaderboard-item .driver-stats {
-                color: #e9ecef !important;
-            }
-            
-            .driver-id, .ranking-item .driver-id {
-                color: #adb5bd !important;
-            }
-            
-            .score-text, .ranking-item .score-text {
-                color: #f8f9fa !important;
-            }
-            
-            .level-badge, .leaderboard-item .level-badge {
-                color: #f8f9fa !important;
-            }
-            
-            .status-badge, .ranking-item .status-badge {
-                color: #f8f9fa !important;
-            }
-            
-            /* Forçar contraste em modo escuro para modais */
-            .modal .driver-name,
-            .modal .leaderboard-item .driver-name,
-            .modal .ranking-item .driver-name {
-                color: #f8f9fa !important;
-            }
-            
-            .modal .driver-stats,
-            .modal .leaderboard-item .driver-stats {
-                color: #e9ecef !important;
-            }
-            
-            .modal .driver-id,
-            .modal .ranking-item .driver-id {
-                color: #adb5bd !important;
-            }
-            
-            .modal .score-text,
-            .modal .ranking-item .score-text {
-                color: #f8f9fa !important;
-            }
-            
-            .modal .level-badge,
-            .modal .leaderboard-item .level-badge {
-                color: #f8f9fa !important;
-            }
-            
-            .modal .status-badge,
-            .modal .ranking-item .status-badge {
-                color: #f8f9fa !important;
-            }
-        }
-
-        .driver-stats {
-            display: flex;
-            gap: 15px;
-            margin-top: 5px;
-        }
-        
-        .driver-stats span {
-            font-size: 0.9rem;
-            color: #495057 !important;
-            font-weight: 600 !important;
-        }
-
-        .level-badge {
-            margin-left: 15px;
-        }
-        
-        /* Contraste para modo claro (padrão) */
-        /* Estilos específicos apenas para os modais de gamificação e ranking */
-        .modal-xl .modal-body .driver-name,
-        .modal-xl .modal-body .leaderboard-item .driver-name,
-        .modal-xl .modal-body .ranking-item .driver-name {
-            color: #2c3e50 !important;
-            font-weight: 700 !important;
-        }
-        
-        .modal-xl .modal-body .driver-stats,
-        .modal-xl .modal-body .leaderboard-item .driver-stats {
-            color: #495057 !important;
-            font-weight: 600 !important;
-        }
-        
-        .modal-xl .modal-body .driver-id,
-        .modal-xl .modal-body .ranking-item .driver-id {
-            color: #6c757d !important;
-            font-weight: 500 !important;
-        }
-        
-        .modal-xl .modal-body .score-text,
-        .modal-xl .modal-body .ranking-item .score-text {
-            color: #2c3e50 !important;
-            font-weight: 700 !important;
-        }
-        
-        .modal-xl .modal-body .level-badge,
-        .modal-xl .modal-body .leaderboard-item .level-badge {
-            color: #2c3e50 !important;
-            font-weight: 600 !important;
-        }
-        
-        .modal-xl .modal-body .status-badge,
-        .modal-xl .modal-body .ranking-item .status-badge {
-            color: #2c3e50 !important;
-            font-weight: 600 !important;
-        }
-        
-        /* Modo escuro - apenas para modais de gamificação e ranking */
-        @media (prefers-color-scheme: dark) {
-            .modal-xl .modal-body .driver-name,
-            .modal-xl .modal-body .leaderboard-item .driver-name,
-            .modal-xl .modal-body .ranking-item .driver-name {
-                color: #ffffff !important;
-            }
-            
-            .modal-xl .modal-body .driver-stats,
-            .modal-xl .modal-body .leaderboard-item .driver-stats {
-                color: #e9ecef !important;
-            }
-            
-            .modal-xl .modal-body .driver-id,
-            .modal-xl .modal-body .ranking-item .driver-id {
-                color: #adb5bd !important;
-            }
-            
-            .modal-xl .modal-body .score-text,
-            .modal-xl .modal-body .ranking-item .score-text {
-                color: #ffffff !important;
-            }
-            
-            .modal-xl .modal-body .level-badge,
-            .modal-xl .modal-body .leaderboard-item .level-badge {
-                color: #ffffff !important;
-            }
-            
-            .modal-xl .modal-body .status-badge,
-            .modal-xl .modal-body .ranking-item .status-badge {
-                color: #ffffff !important;
-            }
-        }
-        
-        /* Detecção manual de modo escuro - apenas para modais de gamificação e ranking */
-        body.dark-mode .modal-xl .modal-body .driver-name,
-        body.dark-mode .modal-xl .modal-body .leaderboard-item .driver-name,
-        body.dark-mode .modal-xl .modal-body .ranking-item .driver-name {
-            color: #ffffff !important;
-        }
-        
-        body.dark-mode .modal-xl .modal-body .driver-stats,
-        body.dark-mode .modal-xl .modal-body .leaderboard-item .driver-stats {
-            color: #e9ecef !important;
-        }
-        
-        body.dark-mode .modal-xl .modal-body .driver-id,
-        body.dark-mode .modal-xl .modal-body .ranking-item .driver-id {
-            color: #adb5bd !important;
-        }
-        
-        body.dark-mode .modal-xl .modal-body .score-text,
-        body.dark-mode .modal-xl .modal-body .ranking-item .score-text {
-            color: #ffffff !important;
-        }
-        
-        body.dark-mode .modal-xl .modal-body .level-badge,
-        body.dark-mode .modal-xl .modal-body .leaderboard-item .level-badge {
-            color: #ffffff !important;
-        }
-        
-        body.dark-mode .modal-xl .modal-body .status-badge,
-        body.dark-mode .modal-xl .modal-body .ranking-item .status-badge {
-            color: #ffffff !important;
-        }
-
-        /* Ranking */
-        .ranking-container {
-            max-height: 500px;
-            overflow-y: auto;
-            padding: 0;
-        }
-
-        .ranking-item {
-            display: flex;
-            align-items: center;
-            padding: 15px 20px;
-            border-bottom: 1px solid #f0f0f0;
-            transition: all 0.3s ease;
-        }
-
-        .driver-id {
-            color: #6c757d;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        .ranking-item:hover {
-            background: #f8f9fa;
-        }
-
-        .ranking-item.top-three {
-            background: linear-gradient(90deg, rgba(255,215,0,0.1), transparent);
-        }
-
-        .score-section {
-            flex: 1;
-            margin: 0 20px;
-        }
-
-        .score-bar {
-            position: relative;
-            background: #e9ecef;
-            height: 25px;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .score-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #28a745, #20c997);
-            border-radius: 12px;
-            transition: width 0.3s ease;
-        }
-
-        .score-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-weight: bold;
-            color: white;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-        }
-
-        .status-section {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        /* Distribuição */
-        .distribution-item {
-            margin-bottom: 20px;
-        }
-
-        .distribution-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-
-        .distribution-header span:first-child {
-            color: #2c3e50;
-            font-weight: 600;
-        }
-
-        .distribution-header .badge {
-            font-weight: 600;
-        }
-
-        .distribution-bar {
-            height: 8px;
-            background: #e9ecef;
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 5px;
-        }
-
-        .bar-fill {
-            height: 100%;
-            border-radius: 4px;
-            transition: width 0.3s ease;
-        }
-
-        .distribution-item small {
-            color: #6c757d;
-            font-weight: 500;
-        }
-
-        .total-summary {
-            text-align: center;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 10px;
-        }
-
-        .total-number {
-            font-size: 2.5rem;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-
-        .total-label {
-            color: #495057;
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
-
-        /* Estatísticas */
-        .stat-card {
-            display: flex;
-            align-items: center;
-            padding: 20px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-        }
-
-        .stat-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            color: white;
-            font-size: 1.5rem;
-        }
-
-        .stat-content {
-            flex: 1;
-        }
-
-        .stat-number {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #2c3e50;
-            margin-bottom: 5px;
-        }
-
-        .stat-label {
-            color: #495057;
-            font-size: 0.9rem;
-            font-weight: 600;
-        }
-
-        /* Critérios */
-        .criteria-card {
-            display: flex;
-            align-items: center;
-            padding: 20px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
-            height: 100%;
-        }
-
-        .criteria-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-        }
-
-        .criteria-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 15px;
-            color: white;
-            font-size: 1.2rem;
-        }
-
-        .criteria-content {
-            flex: 1;
-        }
-
-        .criteria-content h6 {
-            color: #2c3e50;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .criteria-content p {
-            color: #6c757d;
-            font-size: 0.85rem;
-            margin: 0;
-        }
-
-        .criteria-percentage {
-            font-size: 1.5rem;
-            font-weight: bold;
-            color: #2c3e50;
-            margin: 5px 0;
-        }
-
-        /* No Data */
-        .no-data {
-            text-align: center;
-            padding: 60px 20px;
-            color: #495057;
-        }
-
-        .no-data h5 {
-            color: #2c3e50;
-            font-weight: 600;
-        }
-
-        .no-data p {
-            color: #6c757d;
-            font-weight: 500;
-        }
-
-        .no-data i {
-            color: #adb5bd;
-            margin-bottom: 20px;
-        }
-
-        /* Scrollbar personalizada */
-        .leaderboard-container::-webkit-scrollbar,
-        .ranking-container::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .leaderboard-container::-webkit-scrollbar-track,
-        .ranking-container::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 3px;
-        }
-
-        .leaderboard-container::-webkit-scrollbar-thumb,
-        .ranking-container::-webkit-scrollbar-thumb {
-            background: #c1c1c1;
-            border-radius: 3px;
-        }
-
-        .leaderboard-container::-webkit-scrollbar-thumb:hover,
-        .ranking-container::-webkit-scrollbar-thumb:hover {
-            background: #a8a8a8;
-        }
-
-        /* Modo moderno: toolbar e botões em fornc-modern-page.css */
-        body.motorists-modern .dashboard-content.motoristas-modern-page.fornc-page {
-            padding-top: 8px;
-        }
-        body.motorists-modern .dashboard-header {
-            display: none;
-        }
-        body.motorists-modern .fornc-filters-inline .fg--check label {
-            text-transform: none;
-            font-size: 0.78rem;
-            flex-direction: row;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
-        }
-        body.motorists-modern .view-mode-btn.fornc-btn--ghost.active {
-            outline: 2px solid var(--accent-primary);
-            outline-offset: 1px;
-        }
-        body.motorists-modern #motoristsTableContainer.motorists-table-wrap {
-            max-height: min(70vh, 560px);
-        }
-        body.motorists-modern .motorists-table-wrap .fornc-table thead th {
-            position: sticky;
-            top: 0;
-            z-index: 2;
-            background: var(--forn-table-head);
-            box-shadow: 0 1px 0 var(--border-color);
-        }
-        body.motorists-modern .motorists-table-wrap #motoristsTable {
-            min-width: 960px;
-            table-layout: auto;
-        }
-        @media (max-width: 767px) {
-            body.motorists-modern .motorists-table-wrap .fornc-table th:not(:first-child):not(:last-child),
-            body.motorists-modern .motorists-table-wrap .fornc-table td:not(:first-child):not(:last-child) {
-                display: table-cell !important;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="../css/motorists-page.css">
     <?php sf_page_help_css('..'); ?>
 </head>
 <body class="<?php echo $is_modern ? 'motorists-modern' : ''; ?>">
@@ -1585,9 +437,9 @@ if (!function_exists('format_cpf_br')) {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr class="mnt-loading-row">
-                                <td colspan="10" class="text-center text-muted">Carregando motoristas…</td>
-                            </tr>
+                            <?php if (empty($motoristas)): ?>
+                            <tr><td colspan="10" class="text-center text-muted">Nenhum motorista encontrado.</td></tr>
+                            <?php else: foreach ($motoristas as $m): echo motorists_render_table_row($m); endforeach; endif; ?>
                         </tbody>
                     </table>
                     <div id="motoristsCardsContainer" class="motorists-cards-grid" style="display:none;"></div>
@@ -1596,13 +448,13 @@ if (!function_exists('format_cpf_br')) {
                 <!-- Pagination -->
                 <?php if ($is_modern): ?><div class="fornc-pagination-bar"><?php endif; ?>
                 <div class="pagination" id="motoristsPagination" data-per-page="<?php echo (int)$per_page; ?>">
-                    <a href="?page=1&per_page=<?php echo (int)$per_page; ?>" class="pagination-btn disabled" id="prevPageBtn">
+                    <a href="?page=<?php echo max(1, $mnt_cur_page - 1); ?>&per_page=<?php echo (int)$per_page; ?>" class="pagination-btn<?php echo ($mnt_cur_page <= 1) ? ' disabled' : ''; ?>" id="prevPageBtn">
                         <i class="fas fa-chevron-left"></i>
                     </a>
                     <span class="pagination-info" id="paginationMotoristsInfo">
-                        Página <span id="currentPage">1</span> de <span id="totalPages">1</span> (0 registros)
+                        Página <span id="currentPage"><?php echo (int) $mnt_cur_page; ?></span> de <span id="totalPages"><?php echo (int) $mnt_total_pages; ?></span> (<?php echo (int) $mnt_total; ?> registros)
                     </span>
-                    <a href="?page=1&per_page=<?php echo (int)$per_page; ?>" class="pagination-btn" id="nextPageBtn">
+                    <a href="?page=<?php echo min($mnt_total_pages, $mnt_cur_page + 1); ?>&per_page=<?php echo (int)$per_page; ?>" class="pagination-btn<?php echo ($mnt_cur_page >= $mnt_total_pages) ? ' disabled' : ''; ?>" id="nextPageBtn">
                         <i class="fas fa-chevron-right"></i>
                     </a>
                 </div>
@@ -2024,19 +876,6 @@ if (!function_exists('format_cpf_br')) {
             </div>
         </div>
     </div>
-    <style>
-        #motoristLogModal .log-details { font-size: 0.85rem; max-width: 280px; word-break: break-word; }
-        .btn-icon.favorite-btn.is-favorite { color: #f59e0b; }
-        .btn-icon.favorite-btn.is-favorite i { font-weight: 900; }
-        .motorists-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
-        .motorist-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; display: flex; align-items: flex-start; gap: 0.75rem; }
-        .motorist-card .card-foto { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
-        .motorist-card .card-body { flex: 1; min-width: 0; }
-        .motorist-card .card-name { font-weight: 600; margin-bottom: 0.25rem; }
-        .motorist-card .card-meta { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; }
-        .motorist-card .card-actions { display: flex; gap: 4px; flex-wrap: wrap; }
-        .view-mode-btn.active { background: var(--accent-primary); color: #fff; }
-    </style>
     
     <!-- Delete Confirmation Modal -->
     <div class="modal<?php echo $is_modern ? ' fornc-modal' : ''; ?>" id="deleteMotoristModal">
@@ -2106,7 +945,8 @@ if (!function_exists('format_cpf_br')) {
     <?php sf_render_api_scripts(); ?>
     <script src="../js/theme.js"></script>
     <script src="../js/sidebar.js"></script>
-    <script src="../js/motorists.js?v=1.2"></script>
+    <script>window.__MOTORISTS_INITIAL__=<?php echo json_encode($mnt_initial, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;</script>
+    <script src="../js/motorists.js?v=1.3"></script>
     <script src="../js/sf_insights.js?v=1.3"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -3523,75 +2363,6 @@ if (!function_exists('format_cpf_br')) {
     }
     </script>
     
-    <style>
-    /* Barras de Progresso para Níveis */
-    .level-progress-container {
-        margin: 8px 0;
-    }
-    
-    
-    .progress-text {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        color: white;
-        font-weight: bold;
-        font-size: 11px;
-        text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
-        z-index: 10;
-        white-space: nowrap;
-        pointer-events: none;
-    }
-    
-    /* Garantir que a barra de progresso tenha altura suficiente */
-    .level-progress-bar {
-        height: 20px !important;
-        background-color: #e9ecef;
-        border-radius: 10px;
-        overflow: visible;
-        position: relative;
-    }
-    
-    .level-progress-bar .progress-bar {
-        border-radius: 10px;
-        transition: width 0.6s ease;
-        position: relative;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .level-progress-footer {
-        margin-top: 4px;
-        text-align: center;
-    }
-    
-    .level-progress-bar .progress-bar.bg-warning {
-        background: linear-gradient(45deg, #ffc107, #ff8f00);
-    }
-    
-    .level-progress-bar .progress-bar.bg-secondary {
-        background: linear-gradient(45deg, #6c757d, #495057);
-    }
-    
-    .level-progress-bar .progress-bar.bg-info {
-        background: linear-gradient(45deg, #17a2b8, #138496);
-    }
-    
-    .level-progress-bar .progress-bar.bg-primary {
-        background: linear-gradient(45deg, #007bff, #0056b3);
-    }
-    
-    .level-progress-bar .progress-bar.bg-danger {
-        background: linear-gradient(45deg, #dc3545, #c82333);
-    }
-    
-    .driver-progress {
-        margin-top: 8px;
-    }
-    </style>
 
     <?php include '../includes/scroll_to_top.php'; ?>
     <?php sf_page_help_js('..'); ?>

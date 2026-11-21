@@ -1,12 +1,7 @@
 <?php
-require_once '../includes/conexao.php';
-session_start();
+require_once __DIR__ . '/includes/adm_auth.php';
 
-// Verificar se o usuário está logado
-if (!isset($_SESSION['admin_id'])) {
-    header('Location: login.php');
-    exit;
-}
+$page_title = 'Log de acessos';
 
 // Parâmetros de filtro e paginação
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
@@ -101,7 +96,8 @@ try {
     $empresas = $empresas_stmt->fetchAll();
 
 } catch (PDOException $e) {
-    $mensagem = "Erro ao carregar logs: " . $e->getMessage();
+    error_log('log_acessos load: ' . $e->getMessage());
+    $mensagem = "Erro ao carregar logs.";
     $tipo_mensagem = "error";
     $logs = [];
     $total = 0;
@@ -117,250 +113,30 @@ try {
     ];
     $empresas = [];
 }
+
+$adm_iframe_mode = !empty($is_iframe);
+$adm_extra_head = <<<'HTML'
+<style>
+.adm-log .table-container { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; overflow-x: auto; }
+.adm-log table { width: 100%; border-collapse: collapse; min-width: 1000px; }
+.adm-log th, .adm-log td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color); color: var(--text-color); }
+.adm-log th { background: var(--bg-tertiary); font-weight: 600; position: sticky; top: 0; }
+.adm-log .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600; display: inline-block; color: #fff; }
+.adm-log .badge-success { background: #28a745; } .adm-log .badge-danger { background: #dc3545; }
+.adm-log .badge-info { background: #17a2b8; } .adm-log .badge-warning { background: #ffc107; color: #212529; }
+.adm-log .pagination { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 1rem; padding: 1rem; flex-wrap: wrap; }
+.adm-log .pagination a, .adm-log .pagination span { padding: 8px 12px; border-radius: 8px; text-decoration: none; color: var(--text-color); background: var(--bg-secondary); border: 1px solid var(--border-color); }
+.adm-log .pagination .current { background: var(--accent-primary,#3b82f6); color: #fff; border-color: transparent; }
+.adm-log .text-small { font-size: 0.85rem; color: var(--text-secondary); }
+</style>
+HTML;
+
+require_once __DIR__ . '/includes/layout_start.php';
 ?>
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Log de Acessos - Sistema de Frotas</title>
-    <link rel="stylesheet" href="../css/styles.css">
-    <link rel="stylesheet" href="../css/theme.css">
-    <link rel="stylesheet" href="../css/responsive.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <style>
-        .main-content {
-            margin-left: 250px;
-            padding: 20px;
-            background: #f8f9fa;
-            min-height: 100vh;
-        }
-        .main-content.iframe-mode {
-            margin-left: 0 !important;
-            padding: 15px;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-        .header h1 {
-            color: #333;
-            margin: 0;
-        }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        .stat-card {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .stat-card h3 {
-            color: #666;
-            font-size: 0.9rem;
-            margin: 0 0 10px 0;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .stat-card .value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #007bff;
-            margin: 0;
-        }
-        .stat-card.success .value {
-            color: #28a745;
-        }
-        .stat-card.danger .value {
-            color: #dc3545;
-        }
-        .stat-card.warning .value {
-            color: #ffc107;
-        }
-        .filters-container {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .filters-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 15px;
-        }
-        .filters-row:last-child {
-            margin-bottom: 0;
-        }
-        .form-group {
-            margin-bottom: 0;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: #333;
-            font-weight: 500;
-            font-size: 0.9rem;
-        }
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            color: #333;
-            font-size: 0.9rem;
-        }
-        .btn {
-            padding: 8px 16px;
-            border-radius: 4px;
-            text-decoration: none;
-            color: white;
-            background: #007bff;
-            border: none;
-            cursor: pointer;
-            transition: background 0.3s;
-            font-size: 0.9rem;
-            display: inline-block;
-        }
-        .btn:hover {
-            background: #0056b3;
-        }
-        .btn-secondary {
-            background: #6c757d;
-        }
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-        .table-container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            overflow-x: auto;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 1000px;
-        }
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-            color: #333;
-        }
-        th {
-            background: #f8f9fa;
-            font-weight: 600;
-            color: #333;
-            position: sticky;
-            top: 0;
-        }
-        tr:hover {
-            background: #f8f9fa;
-        }
-        .badge {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.85rem;
-            font-weight: 600;
-            display: inline-block;
-        }
-        .badge-success {
-            background: #28a745;
-            color: white;
-        }
-        .badge-danger {
-            background: #dc3545;
-            color: white;
-        }
-        .badge-info {
-            background: #17a2b8;
-            color: white;
-        }
-        .badge-warning {
-            background: #ffc107;
-            color: #212529;
-        }
-        .pagination {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin-top: 20px;
-            padding: 20px;
-        }
-        .pagination a,
-        .pagination span {
-            padding: 8px 12px;
-            border-radius: 4px;
-            text-decoration: none;
-            color: #333;
-            background: white;
-            border: 1px solid #ddd;
-        }
-        .pagination a:hover {
-            background: #007bff;
-            color: white;
-            border-color: #007bff;
-        }
-        .pagination .current {
-            background: #007bff;
-            color: white;
-            border-color: #007bff;
-        }
-        .pagination .disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .alert {
-            padding: 12px 20px;
-            border-radius: 4px;
-            margin-bottom: 20px;
-        }
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .text-small {
-            font-size: 0.85rem;
-            color: #666;
-        }
-        @media (max-width: 768px) {
-            .main-content:not(.iframe-mode) {
-                margin-left: 0;
-            }
-            .filters-row {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
-</head>
-<body>
-    <?php if (!$is_iframe): ?>
-        <?php include 'includes/sidebar.php'; ?>
-    <?php endif; ?>
-    
-    <div class="main-content <?php echo $is_iframe ? 'iframe-mode' : ''; ?>">
-        <div class="header">
-            <h1><i class="fas fa-history"></i> Log de Acessos</h1>
-            <?php if ($is_iframe && $filtro_empresa): ?>
-                <p class="text-muted mb-0">Filtrado para empresa específica</p>
-            <?php endif; ?>
-        </div>
+<div class="adm-log adm-cc-page-stack">
+        <?php if ($is_iframe && $filtro_empresa): ?>
+        <p class="text-small">Filtrado para empresa específica</p>
+        <?php endif; ?>
 
         <?php if (isset($mensagem)): ?>
             <div class="alert alert-<?php echo $tipo_mensagem; ?>">
@@ -368,93 +144,53 @@ try {
             </div>
         <?php endif; ?>
 
-        <!-- Estatísticas -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <h3>Total de Acessos</h3>
-                <p class="value"><?php echo number_format($estatisticas['total_acessos']); ?></p>
+        <section class="adm-cc-kpi-band">
+            <h2 class="adm-cc-section__title">Resumo</h2>
+            <div class="adm-cc-kpi-grid">
+                <div class="adm-cc-kpi"><div class="adm-cc-kpi__label">Total de acessos</div><div class="adm-cc-kpi__value"><?php echo number_format($estatisticas['total_acessos']); ?></div></div>
+                <div class="adm-cc-kpi"><div class="adm-cc-kpi__label">Logins com sucesso</div><div class="adm-cc-kpi__value"><?php echo number_format($estatisticas['logins_sucesso']); ?></div></div>
+                <div class="adm-cc-kpi"><div class="adm-cc-kpi__label">Tentativas falhas</div><div class="adm-cc-kpi__value"><?php echo number_format($estatisticas['tentativas_falha']); ?></div></div>
+                <div class="adm-cc-kpi"><div class="adm-cc-kpi__label">Acessos hoje</div><div class="adm-cc-kpi__value"><?php echo number_format($estatisticas['acessos_hoje']); ?></div></div>
+                <div class="adm-cc-kpi"><div class="adm-cc-kpi__label">Total de usuários</div><div class="adm-cc-kpi__value"><?php echo number_format($estatisticas['total_usuarios']); ?></div></div>
+                <div class="adm-cc-kpi"><div class="adm-cc-kpi__label">Total de empresas</div><div class="adm-cc-kpi__value"><?php echo number_format($estatisticas['total_empresas']); ?></div></div>
             </div>
-            <div class="stat-card success">
-                <h3>Logins com Sucesso</h3>
-                <p class="value"><?php echo number_format($estatisticas['logins_sucesso']); ?></p>
-            </div>
-            <div class="stat-card danger">
-                <h3>Tentativas Falhas</h3>
-                <p class="value"><?php echo number_format($estatisticas['tentativas_falha']); ?></p>
-            </div>
-            <div class="stat-card warning">
-                <h3>Acessos Hoje</h3>
-                <p class="value"><?php echo number_format($estatisticas['acessos_hoje']); ?></p>
-            </div>
-            <div class="stat-card">
-                <h3>Total de Usuários</h3>
-                <p class="value"><?php echo number_format($estatisticas['total_usuarios']); ?></p>
-            </div>
-            <div class="stat-card">
-                <h3>Total de Empresas</h3>
-                <p class="value"><?php echo number_format($estatisticas['total_empresas']); ?></p>
-            </div>
-        </div>
+        </section>
 
-        <!-- Filtros -->
-        <div class="filters-container" <?php echo $is_iframe ? 'style="display: none;"' : ''; ?>>
-            <h3 style="margin-top: 0; margin-bottom: 15px; color: #333;"><i class="fas fa-filter"></i> Filtros</h3>
-            <form method="GET" action="">
-                <?php if ($is_iframe): ?>
-                    <input type="hidden" name="empresa_id" value="<?php echo $filtro_empresa; ?>">
-                <?php endif; ?>
-                <div class="filters-row">
-                    <div class="form-group">
-                        <label>Empresa</label>
-                        <select name="empresa_id" <?php echo $is_iframe ? 'disabled' : ''; ?>>
-                            <option value="">Todas as empresas</option>
-                            <?php foreach ($empresas as $empresa): ?>
-                                <option value="<?php echo $empresa['id']; ?>" <?php echo ($filtro_empresa == $empresa['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($empresa['razao_social']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Tipo de Acesso</label>
-                        <select name="tipo">
-                            <option value="">Todos</option>
-                            <option value="login" <?php echo ($filtro_tipo == 'login') ? 'selected' : ''; ?>>Login</option>
-                            <option value="logout" <?php echo ($filtro_tipo == 'logout') ? 'selected' : ''; ?>>Logout</option>
-                            <option value="tentativa_login_falha" <?php echo ($filtro_tipo == 'tentativa_login_falha') ? 'selected' : ''; ?>>Tentativa Falha</option>
-                            <option value="sessao_expirada" <?php echo ($filtro_tipo == 'sessao_expirada') ? 'selected' : ''; ?>>Sessão Expirada</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Status</label>
-                        <select name="status">
-                            <option value="">Todos</option>
-                            <option value="sucesso" <?php echo ($filtro_status == 'sucesso') ? 'selected' : ''; ?>>Sucesso</option>
-                            <option value="falha" <?php echo ($filtro_status == 'falha') ? 'selected' : ''; ?>>Falha</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Data Início</label>
-                        <input type="date" name="data_inicio" value="<?php echo htmlspecialchars($data_inicio); ?>">
-                    </div>
-                    <div class="form-group">
-                        <label>Data Fim</label>
-                        <input type="date" name="data_fim" value="<?php echo htmlspecialchars($data_fim); ?>">
-                    </div>
-                </div>
-                <div style="margin-top: 15px;">
-                    <button type="submit" class="btn">
-                        <i class="fas fa-search"></i> Filtrar
-                    </button>
-                    <a href="log_acessos.php" class="btn btn-secondary" style="margin-left: 10px;">
-                        <i class="fas fa-times"></i> Limpar
-                    </a>
-                </div>
-            </form>
-        </div>
+        <?php if (!$is_iframe): ?>
+        <form method="GET" action="" class="adm-cc-filters" id="adm-log-filters-form">
+            <select name="empresa_id" aria-label="Empresa">
+                <option value="">Todas empresas</option>
+                <?php foreach ($empresas as $empresa): ?>
+                <option value="<?php echo (int) $empresa['id']; ?>" <?php echo ($filtro_empresa == $empresa['id']) ? 'selected' : ''; ?>>
+                    <?php echo htmlspecialchars($empresa['razao_social'], ENT_QUOTES, 'UTF-8'); ?>
+                </option>
+                <?php endforeach; ?>
+            </select>
+            <select name="tipo" aria-label="Tipo de acesso">
+                <option value="">Todos tipos</option>
+                <option value="login" <?php echo ($filtro_tipo === 'login') ? 'selected' : ''; ?>>Login</option>
+                <option value="logout" <?php echo ($filtro_tipo === 'logout') ? 'selected' : ''; ?>>Logout</option>
+                <option value="tentativa_login_falha" <?php echo ($filtro_tipo === 'tentativa_login_falha') ? 'selected' : ''; ?>>Tentativa falha</option>
+                <option value="sessao_expirada" <?php echo ($filtro_tipo === 'sessao_expirada') ? 'selected' : ''; ?>>Sessão expirada</option>
+            </select>
+            <select name="status" aria-label="Status">
+                <option value="">Todos status</option>
+                <option value="sucesso" <?php echo ($filtro_status === 'sucesso') ? 'selected' : ''; ?>>Sucesso</option>
+                <option value="falha" <?php echo ($filtro_status === 'falha') ? 'selected' : ''; ?>>Falha</option>
+            </select>
+            <input type="date" name="data_inicio" value="<?php echo htmlspecialchars((string) $data_inicio, ENT_QUOTES, 'UTF-8'); ?>" aria-label="Data início" title="Data início">
+            <input type="date" name="data_fim" value="<?php echo htmlspecialchars((string) $data_fim, ENT_QUOTES, 'UTF-8'); ?>" aria-label="Data fim" title="Data fim">
+            <?php if ($filtro_empresa || $filtro_tipo || $filtro_status || $data_inicio || $data_fim): ?>
+            <a href="log_acessos.php" class="adm-cc-filters__clear" title="Limpar filtros"><i class="fas fa-xmark" aria-hidden="true"></i> Limpar</a>
+            <?php endif; ?>
+            <span class="adm-cc-filters__meta"><?php echo number_format($total); ?> registro(s)</span>
+        </form>
+        <?php endif; ?>
 
         <!-- Tabela de Logs -->
-        <div class="table-container">
+        <div class="adm-panel">
+            <div class="adm-panel__head"><h2>Registros</h2></div>
+            <div class="adm-panel__body table-container">
             <table>
                 <thead>
                     <tr>
@@ -514,6 +250,7 @@ try {
                     <?php endif; ?>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <!-- Paginação -->
@@ -538,6 +275,18 @@ try {
                 <?php endif; ?>
             </div>
         <?php endif; ?>
-    </div>
-</body>
-</html>
+</div>
+<?php
+$adm_extra_scripts = <<<'JS'
+<script>
+(function () {
+    var form = document.getElementById('adm-log-filters-form');
+    if (!form) return;
+    form.querySelectorAll('select, input[type="date"]').forEach(function (el) {
+        el.addEventListener('change', function () { form.submit(); });
+    });
+})();
+</script>
+JS;
+require_once __DIR__ . '/includes/layout_end.php';
+

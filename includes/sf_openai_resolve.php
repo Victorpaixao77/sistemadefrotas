@@ -198,6 +198,14 @@ function sf_openai_log_usage(PDO $conn, int $empresa_id, string $model, int $pro
         ':cost' => round($cost, 8),
         ':m' => $model !== '' ? $model : null,
     ]);
+
+    try {
+        $brl = round($cost * 5.5, 4);
+        $adm = $conn->prepare('INSERT INTO adm_ia_usage (empresa_cliente_id, modelo, tokens_in, tokens_out, custo_estimado, sucesso) VALUES (?, ?, ?, ?, ?, 1)');
+        $adm->execute([$empresa_id, $model !== '' ? $model : 'openai', max(0, $promptTok), max(0, $completionTok), $brl]);
+    } catch (Throwable $e) {
+        // adm_ia_usage pode não existir em instalações antigas
+    }
 }
 
 /**
@@ -273,4 +281,88 @@ function sf_openai_settings_payload(PDO $conn, int $empresa_id): array
         'month_estimated_usd' => round($usd, 4),
         'pct_used' => $pct,
     ];
+}
+
+/**
+ * Chat completion simples (texto) para assistentes do sistema.
+ * Retorna null se não houver chave ou falhar a chamada.
+ */
+function sf_openai_chat_completion(
+    string $userMessage,
+    int $maxTokens = 200,
+    ?int $empresa_id = null,
+    ?string $systemMessage = null,
+    string $model = 'gpt-4o-mini'
+): ?string {
+    if (!function_exists('curl_init') || trim($userMessage) === '') {
+        return null;
+    }
+
+    $key = '';
+    if ($empresa_id !== null && $empresa_id > 0) {
+        try {
+            $conn = getConnection();
+            $key = sf_openai_key_resolved($conn, $empresa_id);
+        } catch (Throwable $e) {
+            $key = sf_openai_api_key();
+        }
+    } else {
+        $key = sf_openai_api_key();
+    }
+    if ($key === '') {
+        return null;
+    }
+
+    $messages = [];
+    if ($systemMessage !== null && trim($systemMessage) !== '') {
+        $messages[] = ['role' => 'system', 'content' => $systemMessage];
+    }
+    $messages[] = ['role' => 'user', 'content' => $userMessage];
+
+    $payload = json_encode([
+        'model' => $model,
+        'messages' => $messages,
+        'max_tokens' => max(32, min(800, $maxTokens)),
+        'temperature' => 0.4,
+    ], JSON_UNESCAPED_UNICODE);
+    if ($payload === false) {
+        return null;
+    }
+
+    $ch = curl_init('https://api.openai.com/v1/chat/completions');
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $key,
+        ],
+        CURLOPT_POSTFIELDS => $payload,
+        CURLOPT_TIMEOUT => 25,
+    ]);
+    $raw = curl_exec($ch);
+    $http = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if (!$raw || $http < 200 || $http >= 300) {
+        return null;
+    }
+
+    $j = json_decode($raw, true);
+    $content = trim((string) ($j['choices'][0]['message']['content'] ?? ''));
+    if ($content === '') {
+        return null;
+    }
+
+    if ($empresa_id !== null && $empresa_id > 0 && isset($j['usage'])) {
+        try {
+            $conn = getConnection();
+            $pt = (int) ($j['usage']['prompt_tokens'] ?? 0);
+            $ct = (int) ($j['usage']['completion_tokens'] ?? 0);
+            sf_openai_log_usage($conn, $empresa_id, $model, $pt, $ct);
+        } catch (Throwable $e) {
+            error_log('sf_openai_chat_completion usage: ' . $e->getMessage());
+        }
+    }
+
+    return $content;
 }

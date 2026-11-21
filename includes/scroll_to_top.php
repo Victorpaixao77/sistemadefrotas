@@ -1,4 +1,20 @@
 <!-- Botão flutuante: voltar ao topo -->
+<?php
+$sfOnAdmPanel = strpos($_SERVER['SCRIPT_NAME'] ?? '', 'pages_adm') !== false;
+if (
+    session_status() === PHP_SESSION_ACTIVE
+    && !empty($_SESSION['loggedin'])
+    && !empty($_SESSION['usuario_id'])
+    && !$sfOnAdmPanel
+) {
+    if (!function_exists('sf_app_url')) {
+        require_once __DIR__ . '/sf_paths.php';
+    }
+    $sf_tv = function_exists('sf_asset_v') ? sf_asset_v() : '1';
+    echo '<script>window.__SF_APP_BASE__=' . json_encode(sf_app_web_base(), JSON_UNESCAPED_UNICODE) . ';</script>';
+    echo '<script src="' . htmlspecialchars(sf_app_url('js/adm-telemetry.js?v=' . $sf_tv)) . '"></script>';
+}
+?>
 <button type="button" class="scroll-to-top" id="scrollToTopBtn" aria-label="Voltar ao topo" title="Voltar ao topo">
     <i class="fas fa-arrow-up" aria-hidden="true"></i>
 </button>

@@ -13,6 +13,7 @@ session_start();
 
 // Require authentication
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Create database connection
 $conn = getConnection();
@@ -149,7 +150,7 @@ try {
 } catch (Exception $e) {
     error_log("Error in veiculos.php: " . $e->getMessage());
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Erro interno.']);
 }
 
 // Função para salvar veículo

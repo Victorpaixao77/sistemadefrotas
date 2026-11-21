@@ -35,3 +35,7 @@ if ($mes < 1 || $mes > 12) {
 if ($ano < 2000 || $ano > 2100) {
     $ano = (int) date('Y');
 }
+
+if (function_exists('session_write_close')) {
+    session_write_close();
+}

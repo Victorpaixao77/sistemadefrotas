@@ -1,5 +1,6 @@
 package com.sistemafrotas.motorista.ui.screens
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,9 +34,9 @@ fun VelocidadeScreen(
     val vm: VelocidadeViewModel = viewModel(
         factory = AuthViewModelFactory(authRepository) { VelocidadeViewModel(it) }
     )
-    val data by vm.data.collectAsState()
-    val refreshing by vm.refreshing.collectAsState()
-    val error by vm.error.collectAsState()
+    val data by vm.data.collectAsStateWithLifecycle()
+    val refreshing by vm.refreshing.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { vm.carregarSeNecessario() }
 

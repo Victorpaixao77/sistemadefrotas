@@ -42,7 +42,11 @@ define('FISCAL_CERTIFICADO_EMISSOR', 'SERASA EXPERIAN');
 // =====================================================
 // 🌐 CONFIGURAÇÕES SEFAZ
 // =====================================================
-define('FISCAL_AMBIENTE_SEFAZ', 'homologacao'); // producao ou homologacao
+// ⚠️ FALLBACK/LEGADO — NÃO é a fonte da verdade do ambiente SEFAZ.
+// O ambiente REAL é definido POR EMPRESA em `fiscal_config_empresa.ambiente_sefaz`
+// e é o que CTeService/NFeService usam de fato na emissão. Use fiscalAmbienteSefaz($empresaId)
+// para obter o valor real. Esta constante só vale se não houver registro/conexão.
+define('FISCAL_AMBIENTE_SEFAZ', 'homologacao'); // fallback — fonte da verdade: fiscal_config_empresa.ambiente_sefaz
 define('FISCAL_URL_SEFAZ_SP', 'https://nfe.fazenda.sp.gov.br/ws/');
 define('FISCAL_URL_SEFAZ_NACIONAL', 'https://nfe.fazenda.sp.gov.br/ws/');
 define('FISCAL_TIMEOUT_SEFAZ', 30);
@@ -125,9 +129,30 @@ function getFiscalConfig($key, $default = null) {
     return defined($constant_name) ? constant($constant_name) : $default;
 }
 
-// Função para verificar se o ambiente é de produção
-function isFiscalProduction() {
-    return FISCAL_AMBIENTE_SEFAZ === 'producao';
+/**
+ * Ambiente SEFAZ REAL da empresa. Fonte da verdade: fiscal_config_empresa.ambiente_sefaz.
+ * Só cai no fallback da constante se não houver empresa_id, conexão ou registro.
+ */
+function fiscalAmbienteSefaz(?int $empresaId = null): string {
+    if ($empresaId && function_exists('getConnection')) {
+        try {
+            $st = getConnection()->prepare('SELECT ambiente_sefaz FROM fiscal_config_empresa WHERE empresa_id = ? LIMIT 1');
+            $st->execute([$empresaId]);
+            $amb = $st->fetchColumn();
+            if (is_string($amb) && $amb !== '') {
+                return $amb;
+            }
+        } catch (Throwable $e) {
+            // silencioso — usa o fallback abaixo
+        }
+    }
+    return defined('FISCAL_AMBIENTE_SEFAZ') ? FISCAL_AMBIENTE_SEFAZ : 'homologacao';
+}
+
+// Verifica se o ambiente é de produção. Passe o empresa_id para obter o valor REAL (banco);
+// sem ele, usa apenas o fallback da constante (que pode não refletir a realidade).
+function isFiscalProduction(?int $empresaId = null) {
+    return fiscalAmbienteSefaz($empresaId) === 'producao';
 }
 
 // Função para obter URL da SEFAZ baseada no estado

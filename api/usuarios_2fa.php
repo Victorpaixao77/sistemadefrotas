@@ -22,6 +22,7 @@ session_start();
 
 header('Content-Type: application/json');
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 api_require_csrf_json();
 
 $empresa_id = (int) $_SESSION['empresa_id'];

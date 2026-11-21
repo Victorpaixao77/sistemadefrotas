@@ -11,6 +11,7 @@ session_start();
 
 // Require authentication
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 // Create database connection
 $conn = getConnection();
@@ -20,7 +21,7 @@ header('Content-Type: application/json');
 
 // Enable error reporting for debugging
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 ini_set('error_log', __DIR__ . '/../logs/php_error.log');
 
@@ -57,5 +58,5 @@ try {
 } catch (Exception $e) {
     error_log('Error in payment_methods.php: ' . $e->getMessage());
     http_response_code(400);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode(['error' => 'Erro interno.']);
 } 

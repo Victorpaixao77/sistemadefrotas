@@ -10,6 +10,10 @@
     display: flex;
 }
 
+body.adm-app .modal#helpModal.active {
+    display: flex !important;
+}
+
 .modal-content.sf-help-modal-content {
     max-width: 820px;
     width: 100%;

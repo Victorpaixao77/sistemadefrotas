@@ -13,6 +13,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_authentication();
+if (function_exists('session_write_close')) { session_write_close(); }
 
 $empresa_id = isset($_SESSION['empresa_id']) ? $_SESSION['empresa_id'] : null;
 if (!$empresa_id) {
